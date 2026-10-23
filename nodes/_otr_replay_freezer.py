@@ -42,14 +42,14 @@ try:
         load_replay_manifest,
     )
     from ._otr_producer_direction import (CARDS_NAME, MANIFEST_PRODUCER_KEY,
-                                          META_IMAGE_ENGINES, build_cards)
+                                          META_IMAGE_ENGINES, META_IMAGE_SEED, build_cards)
 except ImportError:  # pragma: no cover -- flat (sys.path) load
     from production_ledger import (  # type: ignore
         REPLAY_MANIFEST_NAME, REPLAY_MANIFEST_SCHEMA, ReplayBundleError,
         load_replay_manifest,
     )
     from _otr_producer_direction import (  # type: ignore
-        CARDS_NAME, MANIFEST_PRODUCER_KEY, META_IMAGE_ENGINES, build_cards)
+        CARDS_NAME, MANIFEST_PRODUCER_KEY, META_IMAGE_ENGINES, META_IMAGE_SEED, build_cards)
 
 log = logging.getLogger("OTR.replay_freezer")
 
@@ -277,11 +277,13 @@ def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
     if producer is not None:
         meta = ledger.get("meta") if isinstance(ledger.get("meta"), dict) else {}
         engines = meta.get(META_IMAGE_ENGINES)
-        if not isinstance(engines, dict) or not engines:
+        seed = meta.get(META_IMAGE_SEED)
+        if not isinstance(engines, dict) or not engines or not isinstance(seed, dict):
             raise ReplayBundleError(
-                "a producer freeze needs the image engines its stills were painted "
-                "with, and ledger %s records none (meta %s)" % (ledger_path.name,
-                                                                META_IMAGE_ENGINES))
+                "a producer freeze needs the image engines and seed its stills were "
+                "painted with, and ledger %s records %s (meta %s, %s)" % (
+                    ledger_path.name, "no seed" if isinstance(engines, dict) and engines
+                    else "no engines", META_IMAGE_ENGINES, META_IMAGE_SEED))
         # WHAT A REPLAY OF THIS BUNDLE MUST HAVE READY (chunk 3b): the image
         # engines its stills were actually painted with, per the dispatcher's
         # own per-role histogram -- not every slot, since a slot whose role
@@ -293,7 +295,7 @@ def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
                        if isinstance(counts, dict) for engine in counts if engine})
         lanes = sorted({str(shot.get("engine_id")) for shot in (video.get("shots") or [])
                         if isinstance(shot, dict) and shot.get("engine_id")})
-        producer_section = dict(producer, image_engines=dict(engines),
+        producer_section = dict(producer, image_engines=dict(engines), image_seed=dict(seed),
                                 image_engines_used=used, video_engines=lanes)
 
     if dest is not None:

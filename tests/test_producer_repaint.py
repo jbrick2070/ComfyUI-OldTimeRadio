@@ -78,10 +78,10 @@ def studio(tmp_path):
         painted.append(str(request.get("object_id")))
         return np.full((8, 8, 3), len(painted) % 250, dtype=np.uint8)
 
-    def run(ledger, payload):
+    def run(ledger, payload, policy=None):
         painted.clear()
         led, _done, _report, _warn = D.dispatch_images(
-            ledger, POLICY, payload, gen_fn=paint, output_dir=str(tmp_path),
+            ledger, policy or POLICY, payload, gen_fn=paint, output_dir=str(tmp_path),
             lockdir=tmp_path / "lease.lockdir")
         return led, sorted(painted)
 
@@ -232,6 +232,43 @@ def test_a_kept_still_keeps_the_digest_of_the_paint_it_is(studio):
     assert PD.unpainted_shots(cards, _video(scenes=note, kept={"stills": ["shot_b002"]})) == []
     # Un-kept, the still is what it was before the note, and that shows.
     assert PD.unpainted_shots(cards, _video(scenes=note)) == ["shot_b002"]
+
+
+def test_an_edit_that_paints_the_same_prompt_is_not_unpainted(studio):
+    # Codex QA, 2026-10-22: the painter sees only the composed prompt, so
+    # whitespace, or a text moved between a card and its scene's note, paints
+    # the same pixels and must not hold a Video run back.
+    cards = _cards(_first_run(studio))
+    assert PD.unpainted_shots(cards, _video(
+        cards={"shot_b001": {"picture_text": "  a lamp-lit radio desk "}})) == []
+    moved = _video(cards={"shot_b001": {"picture_text": "a lamp-lit radio desk, at dusk"},
+                          "shot_b002": {"picture_text": "a rain-streaked window, at dusk"}})
+    noted = _video(scenes={"s01": {"note": "at dusk"}})
+    assert PD.unpainted_shots(cards, moved) == PD.unpainted_shots(cards, noted)
+
+
+def test_a_stills_replay_refuses_a_policy_its_project_was_not_painted_with(studio):
+    led = _first_run(studio)
+    direction = PD.parse_direction(json.dumps(dict(FIRST, attempt_id="0f8e1c2d-run2",
+                                                   out="02-stills", source="a" * 64)))
+    wire = copy.deepcopy(led)
+    wire[PD.RUNTIME_KEY] = direction
+    payload, _changed = MB.rebuild_producer_payload(wire, direction)
+    rewired = dict(POLICY, image_models={"character_image_model": {"engine_id": "cloud_flux_pro"}})
+    with pytest.raises(D.ImageRenderError, match="character_image_model 'cloud_flux_pro'"):
+        studio(wire, payload, policy=rewired)
+    reseeded = dict(POLICY, seed={"request_seed": 99})
+    with pytest.raises(D.ImageRenderError, match="seed"):
+        studio(wire, payload, policy=reseeded)
+
+
+def test_kept_stills_stay_in_the_engine_histogram(studio):
+    # Codex QA, 2026-10-22: a replay's readiness plans image_engines_used from
+    # this histogram, so a kept still's engine must stay named in it.
+    led2, painted, _changed = _again(studio, _first_run(studio),
+                                     kept={"stills": ["shot_b001", "shot_b002", "shot_b003"]})
+    assert painted == []
+    assert led2["meta"]["image_engines"]["by_role"]["character_video"]["flux_gen1"] == 4
 
 
 def test_only_a_beats_own_scene_still_answers_to_its_card():

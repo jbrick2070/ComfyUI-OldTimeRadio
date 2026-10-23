@@ -194,21 +194,29 @@ ENGINES = {"announcer_image_model": "z_image_turbo", "music_image_model": "z_ima
            "character_image_model": "z_image_turbo"}
 
 
+#: ...and the image seed configuration they are stamped with.
+SEED = {"mode": "request_hash", "request_seed": 0}
+
+
 def _prompt(direction, replay_from="", picks=None):
     director = dict(picks if picks is not None else ENGINES, custom_models_json="{}")
     return {"63": {"class_type": "OTR_WorkflowValidator", "inputs": {}},
             "1": {"class_type": "OTR_LedgerScriptWriter",
                   "inputs": {"source_bank": "my_story", "replay_from": replay_from}},
             "87": {"class_type": "OTR_VideoDirector", "inputs": director},
+            "88": {"class_type": "OTR_ImageDirector",
+                   "inputs": {"seed_mode": SEED["mode"], "request_seed": SEED["request_seed"]}},
             "90": {"class_type": "OTR_ShotLock",
                    "inputs": {"script_json": ["62", 1], "direction_json": direction}}}
 
 
 def _stamp_engines(ep, engines=None):
-    """Give a fixture episode's ledger the stamp a producer stills run writes."""
+    """Give a fixture episode's ledger the stamps a producer stills run writes:
+    its image engines and its image seed configuration."""
     led_path = next((pathlib.Path(ep) / "audio").glob("*_ledger.json"))
     led = json.loads(led_path.read_text(encoding="utf-8"))
     led.setdefault("meta", {})[PD.META_IMAGE_ENGINES] = dict(engines or ENGINES)
+    led["meta"][PD.META_IMAGE_SEED] = dict(SEED)
     led_path.write_text(json.dumps(led), encoding="utf-8")
 
 
@@ -632,7 +640,7 @@ def test_a_producer_freeze_records_its_identity_and_the_stills_engines(tmp_path,
     producer = PL.load_replay_manifest(str(bundle))[PD.MANIFEST_PRODUCER_KEY]
     assert producer == {"version": 1, "project_id": PID, "attempt_id": FIRST["attempt_id"],
                         "stage": "stills", "out": "01-stills", "source": None,
-                        "image_engines": ENGINES,
+                        "image_engines": ENGINES, "image_seed": SEED,
                         # chunk 3b: what a replay of it renders with (the
                         # fixture's histogram is empty; its one shot's lane)
                         "image_engines_used": [],
@@ -646,7 +654,7 @@ def test_an_ordinary_freeze_writes_no_producer_section_and_an_unstamped_one_is_r
     plain = _frozen_bundle(tmp_path, monkeypatch, tmp_path / "plain" / "ep", producer=False)
     assert PD.MANIFEST_PRODUCER_KEY not in PL.load_replay_manifest(str(plain))
     ep = pathlib.Path(PL.load_replay_manifest(str(plain))["source_episode_root"])
-    with pytest.raises(PL.ReplayBundleError, match="records none"):
+    with pytest.raises(PL.ReplayBundleError, match="records no engines"):
         _producer_freeze(ep, tmp_path / "unstamped" / "01-stills", stamp=False)
     assert not (tmp_path / "unstamped").exists()
 
@@ -667,6 +675,34 @@ def test_a_later_run_must_paint_with_the_bundles_engines(producer_root, tmp_path
     del headless["87"]
     with pytest.raises(PD.DirectionError, match="exactly one OTR_VideoDirector"):
         PD.admit_prompt_direction(headless)
+
+
+def test_a_later_run_must_keep_the_projects_image_seed(producer_root, tmp_path, monkeypatch):
+    # Codex QA, 2026-10-22: every still's seed and cache key derive from it, so
+    # a changed widget would repaint every still with no edit at all.
+    bundle = _frozen_bundle(tmp_path, monkeypatch, PD.bundle_path(PID, "01-stills"))
+    assert PL.load_replay_manifest(str(bundle))[PD.MANIFEST_PRODUCER_KEY]["image_seed"] == SEED
+    reseeded = _continue(bundle, "02-stills")
+    reseeded["88"]["inputs"]["request_seed"] = 7
+    with pytest.raises(PD.DirectionError, match="image director's seed .* differs"):
+        PD.admit_prompt_direction(reseeded)
+    wired = _continue(bundle, "02-stills")
+    wired["88"]["inputs"]["seed_mode"] = ["400", 0]
+    with pytest.raises(PD.DirectionError, match="takes seed_mode from another node"):
+        PD.admit_prompt_direction(wired)
+
+
+def test_the_run_time_check_reads_the_policy_actually_wired():
+    meta = {PD.META_IMAGE_ENGINES: dict(ENGINES), PD.META_IMAGE_SEED: dict(SEED)}
+    policy = {"image_models": {slot: {"engine_id": engine} for slot, engine in ENGINES.items()},
+              "seed": {"mode": "request_hash", "request_seed": 0}}
+    assert PD.check_policy_matches_stamp(policy, meta) is None
+    swapped = dict(policy, image_models=dict(policy["image_models"],
+                                             music_image_model={"engine_id": "flux_gen1"}))
+    assert "music_image_model 'flux_gen1'" in PD.check_policy_matches_stamp(swapped, meta)
+    reseeded = dict(policy, seed={"mode": "fixed", "request_seed": 0})
+    assert "seed" in PD.check_policy_matches_stamp(reseeded, meta)
+    assert "no image-engine and seed stamp" in PD.check_policy_matches_stamp(policy, {})
 
 
 def test_a_bundle_without_the_stamp_cannot_be_continued(producer_root, tmp_path, monkeypatch):

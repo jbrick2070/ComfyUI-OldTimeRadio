@@ -78,6 +78,10 @@ IMAGE_SLOTS = ("announcer_image_model", "music_image_model", "character_image_mo
 DEFAULT_IMAGE_ENGINE = "flux_gen1"
 #: The durable-ledger meta key a producer stills run writes its engines to.
 META_IMAGE_ENGINES = "producer_image_engines"
+#: ...and the image seed configuration, locked for the project like the
+#: engines: every still's seed (and so its cache key) derives from it.
+META_IMAGE_SEED = "producer_image_seed"
+IMAGE_DIRECTOR_CLASS = "OTR_ImageDirector"
 #: The bundle manifest's producer section, and its version.
 MANIFEST_PRODUCER_KEY = "producer"
 MANIFEST_PRODUCER_VERSION = 1
@@ -136,6 +140,7 @@ __all__ = [
     "merged_raw_texts", "compose_picture", "painted_takes", "SUPERSEDED_KEY",
     "producer_replay_needs", "CARDS_NAME", "ROW_INPUT_HASH", "payload_object_hash",
     "still_input_digest", "card_still_digest", "build_cards", "unpainted_shots",
+    "META_IMAGE_SEED", "policy_image_seed", "prompt_image_seed", "check_policy_matches_stamp",
 ]
 
 
@@ -499,6 +504,43 @@ def prompt_image_engines(prompt: dict) -> Dict[str, str]:
             for slot in IMAGE_SLOTS}
 
 
+def _seed_config(mode: Any, request_seed: Any) -> Dict[str, Any]:
+    """A seed configuration as the dispatcher reads one
+    (``resolve_seed_and_mode``): the mode, ``request_hash`` when empty, and
+    the request seed as an integer, 0 when empty."""
+    try:
+        seed = int(request_seed or 0)
+    except (TypeError, ValueError):
+        seed = 0
+    return {"mode": str(mode or "request_hash"), "request_seed": seed}
+
+
+def policy_image_seed(image_policy: Any) -> Dict[str, Any]:
+    """The seed configuration an image policy paints with (its ``seed``
+    section, which the image director writes): what a producer stills run
+    stamps beside its engines."""
+    seed = (image_policy or {}).get("seed") if isinstance(image_policy, dict) else None
+    seed = seed if isinstance(seed, dict) else {}
+    return _seed_config(seed.get("mode"), seed.get("request_seed"))
+
+
+def prompt_image_seed(prompt: dict) -> Dict[str, Any]:
+    """The seed configuration a queued prompt will paint with: the image
+    director's ``seed_mode`` and ``request_seed`` widgets, typed, as it writes
+    them into the policy."""
+    directors = _nodes_of(prompt, IMAGE_DIRECTOR_CLASS)
+    if len(directors) != 1:
+        raise DirectionError("a Scene Producer run needs exactly one %s in the graph, "
+                             "found %d" % (IMAGE_DIRECTOR_CLASS, len(directors)))
+    node_id, node = directors[0]
+    inputs = node.get("inputs") or {}
+    for name in ("seed_mode", "request_seed"):
+        if isinstance(inputs.get(name), list):
+            raise DirectionError("%s node %s takes %s from another node; a producer run "
+                                 "must type it" % (IMAGE_DIRECTOR_CLASS, node_id, name))
+    return _seed_config(inputs.get("seed_mode"), inputs.get("request_seed"))
+
+
 def manifest_producer_fields(direction: Dict[str, Any]) -> Dict[str, Any]:
     """The direction's identity as a producer freeze records it in the bundle
     manifest. The freezer adds the image-engine stamp from the ledger."""
@@ -527,7 +569,9 @@ def _read_cards(bundle: Path) -> Dict[str, Any]:
 
 def _check_image_engines(prompt: dict, manifest: dict, bundle_name: str) -> None:
     """A later run paints, or replays stills painted, with the bundle's own
-    engines -- refused otherwise, before any model loads."""
+    engines and seed configuration -- refused otherwise, before any model
+    loads. (The dispatcher repeats the check against the policy it actually
+    receives: :func:`check_policy_matches_stamp`.)"""
     producer = manifest.get(MANIFEST_PRODUCER_KEY)
     stamped = producer.get("image_engines") if isinstance(producer, dict) else None
     if (not isinstance(stamped, dict) or set(stamped) != set(IMAGE_SLOTS)
@@ -543,6 +587,41 @@ def _check_image_engines(prompt: dict, manifest: dict, bundle_name: str) -> None
             "the video director's image engines differ from bundle %s's: %s; a producer "
             "run keeps the engines its stills were painted with" % (bundle_name,
                                                                    "; ".join(differ)))
+    # THE SEED CONFIGURATION IS LOCKED THE SAME WAY (Codex QA, 2026-10-22):
+    # every still's seed, and so its cache key, derives from it, so a changed
+    # widget would repaint every still with no edit at all.
+    stamped_seed = producer.get("image_seed")
+    if not isinstance(stamped_seed, dict):
+        raise DirectionError(
+            "bundle %s carries no image-seed stamp, so a producer run cannot continue it; "
+            "it was not frozen by a producer stills run" % bundle_name)
+    queued_seed = prompt_image_seed(prompt)
+    if queued_seed != _seed_config(stamped_seed.get("mode"), stamped_seed.get("request_seed")):
+        raise DirectionError(
+            "the image director's seed (%s) differs from the one bundle %s was painted "
+            "with (%s); a producer run keeps its stills' seed" % (
+                _shown(queued_seed), bundle_name, _shown(stamped_seed)))
+
+
+def check_policy_matches_stamp(image_policy: Any, meta: Any) -> Optional[str]:
+    """THE RUN-TIME HALF OF THE CHECK (Codex QA, 2026-10-22): the policy a
+    producer stills REPLAY actually paints with, against the engines and seed
+    its ledger was stamped with. Node 63 reads the video and image directors'
+    widgets at queue time, before anything loads; this catches a graph whose
+    dispatcher is wired to any other policy. Returns the difference in plain
+    words, or None."""
+    meta = meta if isinstance(meta, dict) else {}
+    engines = meta.get(META_IMAGE_ENGINES)
+    seed = meta.get(META_IMAGE_SEED)
+    if not isinstance(engines, dict) or not isinstance(seed, dict):
+        return "the replayed ledger carries no image-engine and seed stamp"
+    painting = policy_image_engines(image_policy)
+    differ = ["%s %s (stamped %s)" % (slot, _shown(painting[slot]), _shown(engines.get(slot)))
+              for slot in IMAGE_SLOTS if painting[slot] != engines.get(slot)]
+    seed_now = policy_image_seed(image_policy)
+    if seed_now != _seed_config(seed.get("mode"), seed.get("request_seed")):
+        differ.append("seed %s (stamped %s)" % (_shown(seed_now), _shown(seed)))
+    return "; ".join(differ) or None
 
 
 # --------------------------------------------------------------------------- #
@@ -648,12 +727,19 @@ def payload_object_hash(obj: Any) -> str:
 def still_input_digest(payload_hash: str, picture_text: str, note: str, char_id: str,
                        identity_take: int, still_take: int, engine_id: str) -> str:
     """Everything that decides a card still's pixels, as one digest: the payload
-    object, the raw picture text, the scene's note, the character and its take,
-    the still's take and the image engine. A Stills run records it per card;
-    node 63 recomputes it for a Video or Publish run. An ACTION never enters it,
-    so a motion edit never asks for a repaint."""
-    return _hash_json({"v": 1, "payload": str(payload_hash or ""),
-                       "picture": str(picture_text or ""), "note": str(note or ""),
+    object, the PROMPT its picture text and scene note compose to, the character
+    and its take, the still's take and the image engine. A Stills run records it
+    per card; node 63 recomputes it for a Video or Publish run. An ACTION never
+    enters it, so a motion edit never asks for a repaint.
+
+    THE COMPOSED PROMPT, NOT THE RAW PARTS (Codex QA, 2026-10-22): the painter
+    sees only ``compose_picture(picture, note)``, so a whitespace-only edit, or
+    one text moved between the picture and the note, paints the same pixels and
+    must not be refused as unpainted. The seed configuration is not here: it is
+    locked for the whole project (:func:`_check_image_engines`), like the
+    engines, so it cannot differ between a paint and a check."""
+    return _hash_json({"v": 2, "payload": str(payload_hash or ""),
+                       "prompt": compose_picture(picture_text, note),
                        "char": str(char_id or ""), "identity_take": int(identity_take or 0),
                        "still_take": int(still_take or 0), "engine": str(engine_id or "")})
 

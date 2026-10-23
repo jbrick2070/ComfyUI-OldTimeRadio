@@ -1681,6 +1681,15 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         _arrived = ledger.get("images") if isinstance(ledger.get("images"), dict) else {}
         _saved = _arrived.get(_PD.PAYLOAD_KEY)
         if isinstance(_saved, dict):                  # a stills REPLAY
+            # The policy this node actually receives must be the one the
+            # project's stills were painted with: node 63 checked the
+            # directors' widgets, this checks whatever is wired here.
+            _drift = _PD.check_policy_matches_stamp(image_policy, ledger.get("meta"))
+            if _drift:
+                raise ImageRenderError(
+                    "Scene Producer stills replay refused: the image policy wired to this "
+                    "node differs from the one the project's stills were painted with: %s"
+                    % _drift)
             _producer_payload = copy.deepcopy(_saved)
             _raw_texts = _PD.merged_raw_texts(_arrived.get(_PD.RAW_TEXTS_KEY), _producer)
         else:                                         # the project's first stills run
@@ -1909,6 +1918,15 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             images.append(_kept)
             ep_rows.append(_kept)
             reused += 1
+            # A kept still was painted by its engine: the histogram (credits,
+            # and a replay's readiness, image_engines_used) must still name it,
+            # or un-keeping it later would call an engine nothing planned.
+            _kept_engine = str(_kept.get("engine_id") or "")
+            if _kept_engine:
+                _kept_role = str(_kept.get("role") or role or "?")
+                img_hist.setdefault(_kept_role, {})
+                img_hist[_kept_role][_kept_engine] = (
+                    img_hist[_kept_role].get(_kept_engine, 0) + 1)
             report.append(f"{oid}: kept -> {os.path.basename(str(_kept.get('path') or ''))}")
             continue
         # Composition provenance -- the banana quote-shield discriminator below.
@@ -2713,6 +2731,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         # later run must match (``_otr_producer_direction``).
         _ie_meta[_PD.META_IMAGE_ENGINES] = _PD.policy_image_engines(image_policy)
         _meta_updates[_PD.META_IMAGE_ENGINES] = _ie_meta[_PD.META_IMAGE_ENGINES]
+        _ie_meta[_PD.META_IMAGE_SEED] = _PD.policy_image_seed(image_policy)
+        _meta_updates[_PD.META_IMAGE_SEED] = _ie_meta[_PD.META_IMAGE_SEED]
     # S2 durable persistence (credits enrichment 2026-07-03): ``ledger`` here
     # is the LOCAL wire-parsed dict -- the stamp above was wire-only, so the
     # image-engine receipts died with the wire. Copy the images section + the
