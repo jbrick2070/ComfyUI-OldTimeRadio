@@ -566,7 +566,7 @@ class ProducerClips:
             target = folder / item["name"]
             if not (target.is_file() and target.stat().st_size == item["bytes"]
                     and file_sha256(target) == item["sha256"]):
-                partial = folder / (".%s.%s.part" % (item["name"], uuid.uuid4().hex[:8]))
+                partial = folder / (".%s.%s.part" % (item["name"], uuid.uuid4().hex))
                 try:
                     shutil.copyfile(str(self.store / key / _STORE_NAMES[role]), str(partial))
                     _replace_held(partial, target)

@@ -273,13 +273,19 @@ class Runs:
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "RadioPlayStudio/0.1"
-    #: Seconds a socket may sit with nothing sent before the connection is
-    #: closed (socketserver applies it to each connection). Without it, a
-    #: client that declares a body and sends only part of it holds a handler
-    #: thread for good (Codex QA, 2026-10-23). It bounds a silence, not a
-    #: request: an upload that keeps moving, or an event stream that writes
-    #: a keep-alive every HEARTBEAT_S, never meets it.
+    #: Seconds one socket read or write may block before the connection is
+    #: closed (socketserver sets it on each connection). Without it, a client
+    #: that declares a body and sends only part of it holds a handler thread
+    #: for good (Codex QA, 2026-10-23). It is a deadline per call, not per
+    #: request: a body that keeps arriving, an event stream that writes a
+    #: keep-alive every HEARTBEAT_S, and a download read at any steady pace
+    #: never meet it, since a file goes out in SEND_CHUNK pieces. A reader
+    #: that stops for longer -- a paused download -- is cut, and comes back
+    #: with a Range request for the rest (Sonnet QA, 2026-10-23).
     timeout = 60
+    #: A file is sent in pieces this size, so the deadline above is a floor
+    #: on a reader's pace (about 1 KB/s), never a cap on a file's size.
+    SEND_CHUNK = 64 * 1024
 
     # -- plumbing -----------------------------------------------------------
     @property
@@ -318,7 +324,9 @@ class Handler(BaseHTTPRequestHandler):
     def _serve(self, route) -> None:
         """Run a route so that no failure inside it ends as an empty reply: a
         person gets a JSON error, the console gets the traceback, and a browser
-        that closed the tab mid-reply is not an error at all."""
+        that closed the tab mid-reply is not an error at all. The one reply
+        that is empty on purpose: a client that went quiet past ``timeout``
+        has its connection closed, with nothing to say to."""
         if not self._guard():
             return
         try:
@@ -625,7 +633,7 @@ class Handler(BaseHTTPRequestHandler):
             with target.open("rb") as handle:
                 handle.seek(start)
                 while remaining > 0:
-                    chunk = handle.read(min(1 << 20, remaining))
+                    chunk = handle.read(min(self.SEND_CHUNK, remaining))
                     if not chunk:
                         break
                     self.wfile.write(chunk)

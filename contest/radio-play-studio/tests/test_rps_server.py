@@ -241,6 +241,11 @@ def test_a_client_that_stops_mid_body_does_not_hold_a_handler(app, monkeypatch):
     # the app answers the next request.
     import socket
     import time
+    # The shipped value, pinned: a patched one would pass with the line gone
+    # (Sonnet QA, 2026-10-23). The drive below runs on a short one.
+    shipped = Handler.__dict__.get("timeout")
+    assert isinstance(shipped, (int, float)) and shipped > 0, "Handler sets no timeout"
+    assert Handler.SEND_CHUNK <= 64 * 1024, "a download must go out in small pieces"
     monkeypatch.setattr(Handler, "timeout", 1)
     port, _ = app
     stalled = socket.create_connection(("127.0.0.1", port), timeout=10)
