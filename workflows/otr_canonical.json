@@ -2411,6 +2411,16 @@
           "shape": 7,
           "type": "STRING",
           "link": 284
+        },
+        {
+          "localized_name": "direction_json",
+          "name": "direction_json",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "direction_json"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -2461,7 +2471,9 @@
         "cnr_id": "comfyui-old-time-radio",
         "ver": "2.3.37"
       },
-      "widgets_values": [],
+      "widgets_values": [
+        ""
+      ],
       "color": "#432",
       "bgcolor": "#653"
     },

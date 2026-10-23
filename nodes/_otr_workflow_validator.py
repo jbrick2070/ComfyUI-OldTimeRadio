@@ -711,6 +711,41 @@ class WorkflowValidator:
         return msg
 
     @staticmethod
+    def _admit_producer_direction(prompt) -> None:
+        """Judge a queued Scene Producer direction before anything is fetched.
+
+        WHY HERE AND NOT IN SHOT LOCK'S ``VALIDATE_INPUTS``: core treats a
+        failed ``VALIDATE_INPUTS`` as a reason to drop only the outputs that
+        depend on that node, and still runs the rest -- the writer, the voices,
+        the music. A raise here stops the whole prompt, because this node runs
+        first and gates the writer.
+
+        A blank or absent direction -- every shipped graph -- returns at once
+        and refuses nothing. A filled one is checked in full
+        (``_otr_producer_direction.admit_prompt_direction``: shape, names, the
+        stage rules against the writer's ``replay_from``, the exact bundle it
+        continues, a bundle name that already exists). Chunk 1 then refuses it
+        anyway, plainly: the stages themselves arrive in chunk 2, and a
+        direction must never run silently as an ordinary full episode.
+        """
+        try:
+            from ._otr_producer_direction import DirectionError, admit_prompt_direction
+        except ImportError:  # flat test imports
+            from _otr_producer_direction import (  # type: ignore
+                DirectionError, admit_prompt_direction)
+        try:
+            admitted = admit_prompt_direction(prompt)
+        except DirectionError as exc:
+            raise ValueError("OTR_WorkflowValidator: Scene Producer direction "
+                             "refused -- %s" % exc) from None
+        if admitted is None:
+            return
+        raise ValueError(
+            "OTR_WorkflowValidator: this %s direction is well formed, but this build "
+            "cannot run Scene Producer stages yet. Clear Shot Lock's direction_json "
+            "to make an ordinary episode." % admitted["direction"]["stage"])
+
+    @staticmethod
     def _admit_story_input(prompt, unique_id) -> None:
         """Judge queued creator input, and save it, before any asset download.
 
@@ -827,6 +862,10 @@ class WorkflowValidator:
             raise ValueError(
                 "OTR_WorkflowValidator: this graph ends at "
                 "OTR_MasterAudioMux and could not finish -- %s" % _mux_gap)
+        # THE SCENE PRODUCER'S DIRECTION (2026-10-22), in BOTH branches and
+        # before either readiness gate below rolls a lane, prices a cloud call
+        # or fetches a weight. A blank direction returns at once.
+        self._admit_producer_direction(prompt)
         if not validate_anyway:
             msg = ("OTR_WorkflowValidator: validate_anyway=False -- contract "
                    "check skipped." + (f" {stamp_msg}" if stamp_msg else ""))

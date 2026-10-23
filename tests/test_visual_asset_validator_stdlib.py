@@ -128,6 +128,9 @@ class VisualAssetValidatorTests(unittest.TestCase):
         # This isolated seam tests asset ordering. Real story admission is
         # covered in test_my_story_validator; do not omit its new dependency.
         self.node._admit_story_input = lambda *args: None
+        # The Scene Producer admission (2026-10-22) is a sibling helper method
+        # this seam does not exec; it is covered in test_producer_direction.py.
+        self.node._admit_producer_direction = lambda *args: None
 
     def validate(self, enabled=True, **kwargs):
         return self.node.validate("canonical.json", enabled, True,

@@ -3478,6 +3478,23 @@ class OTRShotLock:
                     "forceInput": True,
                     "tooltip": "Optional ordering signal (opaque STRING).",
                 }),
+                # THE SCENE PRODUCER'S DIRECTION (2026-10-22,
+                # planning/scene-producer/PLAN.md). Radio Play Studio's shot
+                # editor writes it; blank -- the shipped value -- is an ordinary
+                # run and changes nothing. `advanced` hides it behind the node's
+                # advanced toggle; that is visibility only, the value still
+                # saves, so widgets_values never shifts. NOT `socketless`: every
+                # widget value needs an input descriptor
+                # (tests/test_canonical_widget_input_parity.py), and the
+                # Workflow Validator refuses a wired value instead. Appended
+                # LAST, so link 284 into gate_in keeps its slot.
+                "direction_json": ("STRING", {
+                    "default": "",
+                    "multiline": True,
+                    "advanced": True,
+                    "tooltip": ("Written by Radio Play Studio's shot editor. "
+                                "Leave empty."),
+                }),
             },
             # ShotLock re-binds the writer's technical model to derive its
             # creative directives, so on a comfy:slot-* ledger it spends
@@ -3504,7 +3521,17 @@ class OTRShotLock:
 
     # ------------------------------------------------------------------ #
     def lock(self, script_json, audio_done="", video_policy_json="{}",
-             gate_in=""):
+             gate_in="", direction_json=""):
+        # A FILLED DIRECTION IS REFUSED UNTIL ITS STAGES EXIST (Scene Producer
+        # chunk 1). The Workflow Validator refuses one at queue time; this is
+        # the backstop for a graph without that node, so a direction is never
+        # silently run as an ordinary full episode. Chunk 2 replaces it with
+        # the stage itself. Blank -- every shipped graph -- passes untouched.
+        if str(direction_json or "").strip():
+            raise ValueError(
+                "OTR_ShotLock: direction_json is filled, but this build cannot run "
+                "Scene Producer stages yet. Clear direction_json to make an ordinary "
+                "episode.")
         from . import _otr_ledger_consumers as _OTRLC
         try:
             from .production_ledger import stamp_durable as _stamp_durable
