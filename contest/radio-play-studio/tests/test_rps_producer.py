@@ -966,6 +966,59 @@ def test_a_publish_the_bridge_forgot_is_fetched_from_where_comfyui_saved_it(stud
     assert len(studio.client.directions) == 3
 
 
+def _expiring(studio):
+    """Every job ends "expired", as comfy-api-proxy reports one that finished
+    between its history read and its queue read."""
+    original = studio.client.submit
+
+    def submit(graph):
+        job = original(graph)
+        job.status = "expired"
+        job._fail = JobFailed("job %s ended expired" % job.id)
+        return job
+
+    studio.client.submit = submit
+
+
+def test_a_stills_run_the_bridge_calls_expired_is_settled_by_comfyuis_history(studio):
+    pid = _project(studio)["project_id"]
+    _expiring(studio)
+    studio.comfy["/history"] = {"job-1": {"status": {"status_str": "success",
+                                                     "completed": True}}}
+    events = _run(studio, pid, "stills")
+    assert events[-1]["type"] == "done" and _load(studio, pid)["bundles"][0]["out"] == "01-stills"
+
+
+def test_a_publish_the_bridge_calls_expired_keeps_its_video(studio):
+    # Measured live 2026-10-23 on a Stills run; on Publish it would have
+    # thrown away a finished episode as failed.
+    pid = _project(studio)["project_id"]
+    _run(studio, pid, "stills")
+    _run(studio, pid, "video")
+    _expiring(studio)
+    studio.output[("otr/obs", "radio_play.mp4")] = b"episode-from-history"
+    studio.comfy["/history"] = {"job-3": {
+        "status": {"status_str": "success", "completed": True},
+        "outputs": {"9": {"gifs": [{"filename": "radio_play.mp4", "subfolder": "otr/obs",
+                                    "type": "output"}]}}}}
+    done = _run(studio, pid, "publish")[-1]
+    assert done["type"] == "done", done
+    assert (studio.settings.out_dir / done["run"] / done["file"]).read_bytes() == \
+        b"episode-from-history"
+    assert _load(studio, pid)["published"] is not None
+    assert len(studio.client.directions) == 3, "made once"
+
+
+def test_an_expired_job_comfyui_reports_failed_still_fails(studio):
+    pid = _project(studio)["project_id"]
+    studio.client.freezes = False
+    _expiring(studio)
+    studio.comfy["/history"] = {"job-1": {"status": {"status_str": "error",
+                                                     "completed": False}}}
+    events = _run(studio, pid, "stills")
+    assert events[-1]["type"] == "error" and _load(studio, pid)["pending"] is None
+
+
 def test_a_project_comfyui_may_still_be_working_for_keeps_every_run_waiting(studio):
     from radio_play_studio.server import Busy, Runs
     pid = _project(studio)["project_id"]

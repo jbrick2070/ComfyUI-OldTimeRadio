@@ -35,6 +35,8 @@ POLL_WINDOW_S = 60.0
 #: A submit whose answer was lost is looked for in ComfyUI's own queue and
 #: history this many times, this far apart, before an empty answer is
 #: believed: one empty look never lets the project send the run again.
+#: The bridge's status for a job it took and can no longer find upstream.
+EXPIRED = "expired"
 LOST_SUBMIT_LOOKS = 3
 LOST_SUBMIT_GAP_S = 20.0
 #: How much of ComfyUI's history a lost submit is looked for in: it was sent
@@ -413,6 +415,16 @@ class Studio:
                 yield error(f"lost touch with the run ({describe_failure(exc)}); it may "
                             "still be going, so Studio sends this project nothing more "
                             "until it has looked again.")
+                return
+            if str(getattr(job, "status", "")) == EXPIRED:
+                # "Expired" is the bridge's word for a job it took that is in
+                # neither ComfyUI's history nor its queue when it looks -- and
+                # comfy-api-proxy reads the history first and the queue second,
+                # so a job that finishes between the two reads is in neither
+                # (measured live 2026-10-23: a Stills run that succeeded came
+                # back expired). ComfyUI's own history says how it ended; a
+                # Publish run's video is then saved from where ComfyUI put it.
+                yield self._settle_forgotten(plan, str(job.id), error)
                 return
             failure = exc
         if stage == "publish":
