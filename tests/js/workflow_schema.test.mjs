@@ -217,6 +217,23 @@ test("a node with values, no names, and a MATCHING count passes through", () => 
     assert.deepEqual(graph, before);
 });
 
+test("a node saved with NO values passes, whatever this build now declares", () => {
+    // A node saved before it had any widget carries [] -- every graph saved
+    // before Shot Lock gained direction_json. Nothing can be misplaced, and each
+    // widget takes its own default; refusing it locked all those graphs out.
+    declare("W", ["direction_json"]);
+    const graph = {
+        nodes: [{ id: 1, type: "W", inputs: [{ name: "script_json", link: 7 }],
+                  widgets_values: [] }],
+        links: [[7, 2, 0, 1, 0, "STRING"]],
+    };
+    const before = structuredClone(graph);
+    const out = reconcile(graph);
+    assert.equal(out.ok, true, "no values cannot be misplaced");
+    assert.equal(out.changed, false);
+    assert.deepEqual(graph, before);
+});
+
 test("widgets_values_named loses the dropped key, so the two agree", () => {
     // The frontend writes this map on every save and PREFERS it when
     // LiteGraph.namedValuesRestore is on. Leaving a stale entry would make the

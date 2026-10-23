@@ -653,8 +653,15 @@ def load_replay_manifest(bundle_dir: str) -> Dict[str, Any]:
     mpath = os.path.join(bundle, REPLAY_MANIFEST_NAME)
     if not os.path.isfile(mpath):
         raise ReplayBundleError("no %s under %s" % (REPLAY_MANIFEST_NAME, bundle))
-    with open(mpath, "r", encoding="utf-8") as fh:
-        manifest = json.load(fh)
+    # A CORRUPT MANIFEST IS A REFUSAL LIKE ANY OTHER (Sonnet QA, 2026-10-22).
+    # Truncated, empty, not UTF-8 or carrying a BOM, json.load raised its own
+    # error straight past every caller's `except ReplayBundleError`.
+    try:
+        with open(mpath, "r", encoding="utf-8") as fh:
+            manifest = json.load(fh)
+    except (OSError, ValueError, RecursionError) as exc:
+        raise ReplayBundleError("%s under %s is not readable JSON: %s"
+                                % (REPLAY_MANIFEST_NAME, bundle, exc)) from None
     if not isinstance(manifest, dict) or manifest.get("schema_version") != REPLAY_MANIFEST_SCHEMA:
         raise ReplayBundleError("manifest schema is not %s" % REPLAY_MANIFEST_SCHEMA)
     files = manifest.get("files")
@@ -662,6 +669,8 @@ def load_replay_manifest(bundle_dir: str) -> Dict[str, Any]:
         raise ReplayBundleError("manifest lists no files")
     seen = set()
     for row in files:
+        if not isinstance(row, dict):
+            raise ReplayBundleError("manifest file entry is not an object: %.80r" % (row,))
         rel = _safe_relative(row.get("path"))
         key = rel.lower()
         if key in seen:
@@ -676,8 +685,12 @@ def load_replay_manifest(bundle_dir: str) -> Dict[str, Any]:
         if not os.path.isfile(full):
             raise ReplayBundleError("manifest entry missing on disk: %r" % (rel,))
         size = os.path.getsize(full)
-        if int(row.get("bytes") or -1) != size or size <= 0:
-            raise ReplayBundleError("manifest size mismatch for %r: %s vs %s"
+        try:
+            recorded = int(row.get("bytes") or -1)
+        except (TypeError, ValueError, OverflowError):
+            recorded = -1                         # not a number: a mismatch, refused below
+        if recorded != size or size <= 0:
+            raise ReplayBundleError("manifest size mismatch for %r: %.80s vs %s"
                                     % (rel, row.get("bytes"), size))
         if str(row.get("sha256") or "") != _sha256_file(full):
             raise ReplayBundleError("manifest digest mismatch for %r" % (rel,))

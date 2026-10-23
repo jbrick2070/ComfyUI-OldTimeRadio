@@ -26,6 +26,8 @@ UTF-8, no BOM. Standard library only.
 """
 from __future__ import annotations
 
+import contextlib
+import functools
 import hashlib
 import json
 import logging
@@ -151,6 +153,81 @@ def _require_bundle_target(final: pathlib.Path, out_root: Optional[PathLike]) ->
             raise ReplayBundleError("bundle %s would land outside %s" % (final, root))
 
 
+def _missing_ancestors(folder: PathLike) -> list:
+    """The folders on the way to ``folder``, itself included, that are not on
+    disk yet, outermost first: what ``mkdir(parents=True)`` is about to create.
+    Judged by ``lexists``, so a link -- even a dangling one -- counts as present
+    and is never listed for removal."""
+    missing = []
+    probe = pathlib.Path(os.path.abspath(folder))
+    while not os.path.lexists(probe):
+        missing.append(probe)
+        if probe.parent == probe:
+            break
+        probe = probe.parent
+    missing.reverse()
+    return missing
+
+
+def _remove_if_empty(folders: list) -> None:
+    """Remove ``folders`` innermost first while each is empty, and stop at the
+    first that is not: something else has written into it meanwhile."""
+    for folder in reversed(folders):
+        try:
+            os.rmdir(folder)
+        except OSError:
+            return
+
+
+@contextlib.contextmanager
+def _building(final: pathlib.Path):
+    """Build a bundle in a temporary sibling of ``final``, then rename it into
+    place once the block has written it and the import's own validator has
+    passed it.
+
+    A refusal anywhere -- the block, the validator, the rename -- removes the
+    sibling AND every folder this call created on the way to it, so a retry
+    finds the disk exactly as it was (Sonnet QA, 2026-10-22). A refused first
+    freeze used to leave the empty project folder it had created, and the Scene
+    Producer read that folder as a project already started, refusing the very
+    retry its plan promises. The rename is inside the same guard: a failed
+    rename used to leave a complete ``.building`` folder behind.
+    """
+    tmp = _building_dir(final)
+    created = _missing_ancestors(tmp.parent)
+    try:
+        if os.path.lexists(tmp):
+            shutil.rmtree(tmp)                    # a stale sibling from a crashed freeze
+        tmp.mkdir(parents=True)
+        yield tmp
+        load_replay_manifest(str(tmp))            # the same validator the import runs
+        os.replace(tmp, final)
+    except BaseException:
+        shutil.rmtree(tmp, ignore_errors=True)
+        _remove_if_empty(created)
+        raise
+
+
+def _refusals_as_bundle_errors(func):
+    """Every way a freeze can fail surfaces as ``ReplayBundleError``.
+
+    The module promises that exception, and its callers catch only it: the
+    command line turns it into a clean exit, the Scene Producer into a refusal.
+    An unreadable ledger (``ValueError``), a target outside the folders a
+    replay may be read from (``OtrPathContractError``, also a ``ValueError``)
+    or a failed copy or rename (``OSError``) used to escape raw (Sonnet QA,
+    2026-10-22). The original stays chained for the traceback.
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except (OSError, ValueError) as exc:
+            raise ReplayBundleError("%s refused: %s" % (func.__name__, exc)) from exc
+    return wrapper
+
+
+@_refusals_as_bundle_errors
 def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
            allow_no_plan: bool = False,
            dest: Optional[PathLike] = None,
@@ -160,11 +237,16 @@ def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
 
     The bundle lands at ``out_root/<episode_id>`` unless ``dest`` names the
     bundle directory itself; either way it must not exist yet, because a
-    bundle is never edited. ``source_commit`` is recorded as given (an empty
-    string when unknown) -- this function never asks git. Clips and foley
-    stems are frozen only with ``include_render_outputs=True``.
+    bundle is never edited. Given both, ``dest`` must sit directly inside
+    ``out_root``. ``source_commit`` is recorded as given (an empty string when
+    unknown) -- this function never asks git. Clips and foley stems are frozen
+    only with ``include_render_outputs=True``.
+
+    The episode path is made absolute first: the manifest records it as
+    ``source_episode_root``, and a replay rebases its image paths from it, which
+    a relative root cannot do.
     """
-    ep_dir = pathlib.Path(ep_dir)
+    ep_dir = pathlib.Path(os.path.abspath(ep_dir))
     ledger_path = find_ledger(ep_dir)
     ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
     if not isinstance(ledger, dict) or not ledger.get("lines"):
@@ -183,7 +265,7 @@ def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
 
     if dest is not None:
         final = pathlib.Path(dest)
-        _require_bundle_target(final, None)
+        _require_bundle_target(final, out_root)
     elif out_root is not None:
         final = pathlib.Path(out_root) / _single_folder_name(episode_id,
                                                              "the ledger's episode_id")
@@ -193,10 +275,6 @@ def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
     if final.exists():
         raise ReplayBundleError("bundle already exists: %s (a bundle is immutable; pick --out)"
                                 % final)
-    tmp = _building_dir(final)
-    if tmp.exists():
-        shutil.rmtree(tmp)
-    tmp.mkdir(parents=True)
 
     files = []
 
@@ -208,7 +286,7 @@ def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
         shutil.copyfile(src, dst)
         files.append({"path": rel, "bytes": dst.stat().st_size, "sha256": sha256_file(dst)})
 
-    try:
+    with _building(final) as tmp:
         ledger_rel = "audio/" + ledger_path.name
         master_rel = "audio/" + master.name
         _add(ledger_path, ledger_rel)
@@ -251,16 +329,10 @@ def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
         }
         (tmp / REPLAY_MANIFEST_NAME).write_text(
             json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        load_replay_manifest(str(tmp))            # the same validator the import runs
-    except BaseException:
-        # A refused freeze leaves nothing behind: no half-built sibling for the
-        # next attempt to trip over, and never a partial bundle under `final`.
-        shutil.rmtree(tmp, ignore_errors=True)
-        raise
-    os.replace(tmp, final)
     return final
 
 
+@_refusals_as_bundle_errors
 def derive_engine_bundle(bundle_dir: PathLike, engine_id: str,
                          out_root: Optional[PathLike] = None) -> pathlib.Path:
     """A BUNDLE-TO-BUNDLE derivation: the same frozen files, a new manifest that
@@ -291,11 +363,7 @@ def derive_engine_bundle(bundle_dir: PathLike, engine_id: str,
     _require_bundle_target(final, out_root)
     if final.exists():
         raise ReplayBundleError("derived bundle already exists: %s (a bundle is immutable)" % final)
-    tmp = _building_dir(final)
-    if tmp.exists():
-        shutil.rmtree(tmp)
-    tmp.mkdir(parents=True)
-    try:
+    with _building(final) as tmp:
         for row in manifest["files"]:
             rel = str(row["path"])
             src = bundle_dir / pathlib.Path(rel)
@@ -310,9 +378,4 @@ def derive_engine_bundle(bundle_dir: PathLike, engine_id: str,
         derived["derived_from"] = str(bundle_dir)
         (tmp / REPLAY_MANIFEST_NAME).write_text(
             json.dumps(derived, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        load_replay_manifest(str(tmp))            # the same validator the import runs
-    except BaseException:
-        shutil.rmtree(tmp, ignore_errors=True)
-        raise
-    os.replace(tmp, final)
     return final

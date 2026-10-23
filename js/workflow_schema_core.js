@@ -180,7 +180,14 @@ function reconcileNode(node, lookup) {
     // declares, positional restore is guaranteed to put values in the wrong
     // widgets, so refuse. If it agrees, positional restore is correct and the
     // node passes through untouched.
+    //
+    // NO VALUES AT ALL IS THE ONE COUNT THAT CANNOT MISPLACE ANYTHING. A node
+    // saved before it had any widget carries `[]`, and every widget this build
+    // declares simply takes its own default. Refusing that shape refused every
+    // graph saved before Shot Lock gained its first widget, the Scene
+    // Producer's blank `direction_json` (Sonnet QA, 2026-10-22).
     if (saved.length === 0) {
+        if (values.length === 0) return { ok: true, changed: false };
         if (values.length !== live.length) {
             return refuse(
                 "a node carries values but no widget names, and the count no " +

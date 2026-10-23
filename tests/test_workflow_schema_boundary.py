@@ -185,5 +185,58 @@ if (!first.ok) {
 """
 
 
+def _migrate_in_node(graph: dict, tmp_path: pathlib.Path) -> dict:
+    """Reconcile ONE saved graph with the real shipped core against the real
+    live schema, through ``_MIGRATE_MJS``. Returns ``{"ok": False, "why": ...}``
+    or the migrated graph with ``changed``, ``notes`` and ``changedAgain``."""
+    node = _node_exe()
+    if node is None:
+        pytest.skip("node is not installed; the JS core cannot run here")
+    from nodes._otr_workflow_apply import build_offline_schemas
+    registry = {t: {"nodeData": {"input": s.get("input", {})}}
+                for t, s in build_offline_schemas().items()}
+    reg_path = tmp_path / "registry.json"
+    reg_path.write_text(json.dumps(registry), encoding="utf-8")
+    script = tmp_path / "migrate.mjs"
+    script.write_text(_MIGRATE_MJS, encoding="utf-8")
+    old_path = tmp_path / "older_graph.json"
+    old_path.write_text(json.dumps(graph), encoding="utf-8")
+    proc = subprocess.run(
+        [node, str(script), str(_JS / "workflow_schema_core.js"), str(reg_path),
+         str(old_path)],
+        capture_output=True, text=True, timeout=120)
+    assert proc.returncode == 0, proc.stderr[-2000:]
+    return json.loads(proc.stdout.strip().splitlines()[-1])
+
+
+def test_a_graph_saved_before_shot_lock_had_a_widget_still_loads(tmp_path):
+    """EVERY GRAPH SAVED BEFORE THE SCENE PRODUCER STILL OPENS (Sonnet QA,
+    2026-10-22). Shot Lock had no widget at all until ``direction_json``, so an
+    older save carries ``widgets_values: []`` and no widget descriptor. The
+    boundary refused that shape -- "0 value(s) saved, 1 widget(s) declared" --
+    which locked every older graph out of the GUI. With no values nothing can be
+    misplaced, so it must load untouched and the widget take its blank default.
+
+    Each older graph is built from a shipped one by removing exactly what the
+    widget added: its descriptor and its one saved value.
+    """
+    from tests._support.shipped_graphs import shipped_graphs
+    checked = 0
+    for path in shipped_graphs():
+        graph = json.loads(path.read_text(encoding="utf-8"))
+        locks = [n for n in graph.get("nodes", []) if n.get("type") == "OTR_ShotLock"]
+        if not locks:
+            continue
+        for lock in locks:
+            lock["inputs"] = [slot for slot in lock.get("inputs") or []
+                              if (slot.get("widget") or {}).get("name") != "direction_json"]
+            lock["widgets_values"] = []
+        got = _migrate_in_node(graph, tmp_path)
+        assert got["ok"], "%s refused: %s" % (path.name, got.get("why"))
+        assert not got["changed"] and not got["changedAgain"], (path.name, got["notes"])
+        checked += 1
+    assert checked >= 20, "expected the canonical and its variants to carry Shot Lock"
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))

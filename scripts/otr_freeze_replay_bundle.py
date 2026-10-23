@@ -83,7 +83,8 @@ def freeze(ep_dir: pathlib.Path, out_root: pathlib.Path, *, allow_no_plan: bool 
            **options) -> pathlib.Path:
     """The library freeze, with this checkout's git commit as the source commit
     unless the caller names one. Refusals raise ``ReplayBundleError``."""
-    options.setdefault("source_commit", _git_commit())
+    if "source_commit" not in options:            # git only when the caller names none
+        options["source_commit"] = _git_commit()
     return _freezer.freeze(ep_dir, out_root, allow_no_plan=allow_no_plan, **options)
 
 

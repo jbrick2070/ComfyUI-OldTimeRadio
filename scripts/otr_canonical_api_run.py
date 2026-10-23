@@ -216,7 +216,15 @@ def _apply_direction(workflow: dict, schemas: dict, path: str) -> list[str]:
     source = pathlib.Path(path)
     if not source.is_file():
         raise SystemExit(f"--direction-json missing: {source}")
-    text = source.read_text(encoding="utf-8")
+    # BYTES, DECODED ONCE (Sonnet QA, 2026-10-22). read_text turned CRLF into
+    # LF, so the widget did not get the file's text verbatim; a BOM was refused
+    # as bad JSON; and a UTF-16 file -- what Windows PowerShell's `>` writes --
+    # died with a raw UnicodeDecodeError instead of a reason.
+    try:
+        text = source.read_bytes().decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise SystemExit(f"--direction-json {source} is not UTF-8 text; save it as "
+                         f"UTF-8 (Windows PowerShell's > writes UTF-16)")
     try:
         direction = parse_direction(text)
     except DirectionError as exc:
@@ -313,7 +321,9 @@ def build_api_prompt(args) -> tuple[dict, list[str]]:
     if getattr(args, "video_lane", None):
         applied.extend(_apply_video_lane(workflow, schemas, args.video_lane))
     applied.extend(_apply_writer_shortcuts(workflow, schemas, args))
-    if getattr(args, "direction_json", None):
+    # `is not None`: `--direction-json ""` names no file and must be refused as
+    # one, not read as "option off" and run as an ordinary episode.
+    if getattr(args, "direction_json", None) is not None:
         applied.extend(_apply_direction(workflow, schemas, args.direction_json))
     for patch in args.set:
         applied.append(_apply_set(workflow, schemas, patch))

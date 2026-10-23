@@ -14,7 +14,8 @@ Filled, it asks for one Scene Producer stage:
      "project_id": "a1b2c3d4e5f6",          # lowercase letters, digits, hyphens
      "attempt_id": "0f8e...-uuid",           # unique per submitted run
      "stage": "stills" | "video" | "publish",
-     "out": "03-video",                      # the bundle this run writes; none for publish
+     "out": "03-video",                      # the bundle this run writes, numbered one
+                                             # past the latest; none for publish
      "source": "<sha256 of the previous bundle's manifest.json>",  # none on the first run
      "scenes": {"<scene_id>": {"note": "..."}},
      "cards":  {"<shot_id>": {"picture_text": "...", "motion_text": "..."}},
@@ -73,8 +74,19 @@ OUT_RE = re.compile(r"^([0-9]{2})-(stills|video)$")
 FIRST_OUT = "01-stills"
 ATTEMPT_ID_RE = re.compile(r"^[A-Za-z0-9-]{8,64}$")
 SOURCE_RE = re.compile(r"^[0-9a-f]{64}$")
-#: Shot, scene and character ids as the ledger writes them.
-ITEM_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
+#: Shot, scene and character ids as the ledger mints them: ``shot_shot_001_b2``,
+#: ``shot_b000_music_open``, ``s01``, ``c03``. A letter or digit first, then
+#: letters, digits, ``_`` or ``-`` -- no dot, colon or leading underscore, so
+#: ``.``, ``..``, ``a:b`` and ``__proto__`` are refused before later build steps
+#: put ids into file names (Sonnet QA, 2026-10-22).
+ITEM_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+#: Names Windows reserves for devices, refused as ids for the same reason. The
+#: pattern above allows no extension, so a bare name is the whole case.
+_DEVICE_NAMES = frozenset(["con", "prn", "aux", "nul"]
+                          + ["com%d" % n for n in range(10)]
+                          + ["lpt%d" % n for n in range(10)])
+#: How much of a refused value a refusal quotes back.
+_ECHO_CHARS = 80
 
 MAX_DIRECTION_CHARS = 1_000_000
 MAX_NOTE_CHARS = 2_000
@@ -110,6 +122,14 @@ def is_blank(raw: Any) -> bool:
     return raw is None or (isinstance(raw, str) and not raw.strip())
 
 
+def _shown(value: Any) -> str:
+    """``repr(value)``, cut short: a refusal names the bad value without echoing
+    a megabyte of it back (Sonnet QA, 2026-10-22: a 900,000-character project
+    id produced a 900,068-character refusal)."""
+    text = repr(value)
+    return text if len(text) <= _ECHO_CHARS else text[:_ECHO_CHARS - 3] + "..."
+
+
 def _require_dict(value: Any, where: str) -> dict:
     if not isinstance(value, dict):
         raise DirectionError("%s must be an object" % where)
@@ -119,13 +139,28 @@ def _require_dict(value: Any, where: str) -> dict:
 def _refuse_unknown(value: dict, allowed: frozenset, where: str) -> None:
     unknown = sorted(str(k) for k in value if k not in allowed)
     if unknown:
-        raise DirectionError("%s has unknown field(s): %s" % (where, ", ".join(unknown)))
+        shown = ", ".join(_shown(k) for k in unknown[:5])
+        more = " and %d more" % (len(unknown) - 5) if len(unknown) > 5 else ""
+        raise DirectionError("%s has unknown field(s): %s%s" % (where, shown, more))
 
 
 def _item_id(value: Any, where: str) -> str:
-    if not isinstance(value, str) or not ITEM_ID_RE.fullmatch(value):
-        raise DirectionError("%s is not a valid id: %r" % (where, value))
+    if (not isinstance(value, str) or not ITEM_ID_RE.fullmatch(value)
+            or value.lower() in _DEVICE_NAMES):
+        raise DirectionError("%s is not a valid id: %s" % (where, _shown(value)))
     return value
+
+
+def _no_duplicate_keys(pairs: list) -> dict:
+    """``object_pairs_hook`` for the direction: a key named twice is refused.
+    Plain ``json.loads`` keeps the last one silently, so a direction naming
+    ``project_id`` twice ran on whichever came second (Sonnet QA, 2026-10-22)."""
+    seen: Dict[str, Any] = {}
+    for key, value in pairs:
+        if key in seen:
+            raise DirectionError("direction_json names %s twice" % _shown(key))
+        seen[key] = value
+    return seen
 
 
 def _text(value: Any, limit: int, where: str) -> str:
@@ -163,7 +198,15 @@ def parse_direction(raw: Any) -> Optional[Dict[str, Any]]:
         raise DirectionError("direction_json is larger than %d characters"
                              % MAX_DIRECTION_CHARS)
     try:
-        data = json.loads(raw)
+        data = json.loads(raw, object_pairs_hook=_no_duplicate_keys)
+    except DirectionError:
+        raise
+    except RecursionError:
+        # Arrays nested a few thousand deep fit inside the size limit and
+        # exhaust the decoder's stack; refused as a direction, not raised as a
+        # crash past the Workflow Validator (Sonnet QA, 2026-10-22).
+        raise DirectionError("direction_json is nested too deeply to be a direction") \
+            from None
     except ValueError as exc:
         raise DirectionError("direction_json is not valid JSON: %s" % exc) from None
     data = _require_dict(data, "direction_json")
@@ -171,19 +214,20 @@ def parse_direction(raw: Any) -> Optional[Dict[str, Any]]:
 
     version = data.get("version")
     if type(version) is not int or version != DIRECTION_VERSION:
-        raise DirectionError("direction_json version must be %d, got %r"
-                             % (DIRECTION_VERSION, version))
+        raise DirectionError("direction_json version must be %d, got %s"
+                             % (DIRECTION_VERSION, _shown(version)))
     project_id = data.get("project_id")
     if not isinstance(project_id, str) or not PROJECT_ID_RE.fullmatch(project_id):
         raise DirectionError("project_id must be 4-32 lowercase letters, digits or "
-                             "hyphens, got %r" % (project_id,))
+                             "hyphens, got %s" % _shown(project_id))
     attempt_id = data.get("attempt_id")
     if not isinstance(attempt_id, str) or not ATTEMPT_ID_RE.fullmatch(attempt_id):
         raise DirectionError("attempt_id must be 8-64 letters, digits or hyphens, "
-                             "got %r" % (attempt_id,))
+                             "got %s" % _shown(attempt_id))
     stage = data.get("stage")
-    if stage not in STAGES:
-        raise DirectionError("stage must be one of %s, got %r" % (", ".join(STAGES), stage))
+    if not isinstance(stage, str) or stage not in STAGES:
+        raise DirectionError("stage must be one of %s, got %s"
+                             % (", ".join(STAGES), _shown(stage)))
 
     out = data.get("out")
     if stage == "publish":
@@ -192,13 +236,13 @@ def parse_direction(raw: Any) -> Optional[Dict[str, Any]]:
     else:
         match = OUT_RE.fullmatch(out) if isinstance(out, str) else None
         if not match:
-            raise DirectionError("out must look like 03-%s, got %r" % (stage, out))
+            raise DirectionError("out must look like 03-%s, got %s" % (stage, _shown(out)))
         if match.group(2) != stage:
             raise DirectionError("out %r does not match stage %r" % (out, stage))
 
     source = data.get("source")
     if source is not None and (not isinstance(source, str) or not SOURCE_RE.fullmatch(source)):
-        raise DirectionError("source must be a lowercase sha256, got %r" % (source,))
+        raise DirectionError("source must be a lowercase sha256, got %s" % _shown(source))
     if source is None and stage != "stills":
         raise DirectionError("a %s run replays an earlier bundle, so it needs a source"
                              % stage)
@@ -268,7 +312,7 @@ def check_stage_rules(direction: Dict[str, Any], replay_from: str) -> None:
         if replay_from:
             raise DirectionError(
                 "the first stills run writes and voices a new episode, so the writer's "
-                "replay_from must be empty (it is %r)" % replay_from)
+                "replay_from must be empty (it is %s)" % _shown(replay_from))
     elif not replay_from:
         raise DirectionError(
             "this %s run continues an earlier bundle, so the writer's replay_from must "
@@ -313,18 +357,51 @@ def project_bundle(project_id: str, replay_from: str) -> Path:
     """
     try:
         resolved = Path(confine_to_read_roots(replay_from, "replay_from"))
-        pdir = project_dir(project_id)
+        project_dir(project_id)                   # the id, and its folder's confinement
     except OtrPathContractError as exc:
         raise DirectionError("replay_from is outside the permitted folders: %s" % exc) \
             from None
-    same_parent = (os.path.normcase(str(resolved.parent)) == os.path.normcase(str(pdir))
-                   and os.path.normcase(os.path.realpath(str(resolved.parent)))
-                   == os.path.normcase(os.path.realpath(str(pdir))))
-    if not same_parent or not OUT_RE.fullmatch(resolved.name):
+    # REAL PATHS ONLY (Sonnet QA, 2026-10-22). Comparing the typed spelling
+    # refused the real-path spelling of the very same folder when the output
+    # root sits behind a junction (the Comfy Desktop layout); checking only the
+    # parent's real path admitted a leaf junction (``A/02-video`` leading to
+    # ``B/01-stills``) and a project folder aliased to another project. So the
+    # bundle's real parent must be the project's folder under the REAL bundle
+    # root -- never wherever the project folder itself might lead -- and the
+    # leaf must be that folder's own child under its own name.
+    real = os.path.realpath(str(resolved))
+    expected_parent = os.path.join(os.path.realpath(str(bundle_root())), project_id)
+    if (os.path.normcase(os.path.dirname(real)) != os.path.normcase(expected_parent)
+            or os.path.basename(real) != resolved.name
+            or not OUT_RE.fullmatch(resolved.name)):
         raise DirectionError(
-            "replay_from %r is not one of project %s's bundles; a producer run continues "
-            "its own project's latest bundle" % (replay_from, project_id))
+            "replay_from %s is not one of project %s's bundles; a producer run continues "
+            "its own project's latest bundle" % (_shown(replay_from), project_id))
     return resolved
+
+
+def _latest_bundle(pdir: Path, project_id: str) -> Optional[str]:
+    """The name of the project's highest-numbered bundle, or ``None`` while it
+    has none: no folder yet, or only a folder a refused or crashed freeze left
+    behind (its ``.NN-stage.building`` sibling is not a bundle). Two bundles
+    sharing the top number are refused, because which is latest would be a
+    guess."""
+    if not os.path.lexists(str(pdir)):
+        return None
+    try:
+        names = sorted(entry.name for entry in os.scandir(str(pdir))
+                       if OUT_RE.fullmatch(entry.name))
+    except OSError as exc:
+        raise DirectionError("project %s's folder cannot be read: %s"
+                             % (project_id, exc)) from None
+    if not names:
+        return None
+    top = max(int(name[:2]) for name in names)
+    tops = [name for name in names if int(name[:2]) == top]
+    if len(tops) > 1:
+        raise DirectionError("project %s has two bundles numbered %02d (%s), so which one "
+                             "is latest cannot be told" % (project_id, top, ", ".join(tops)))
+    return tops[0]
 
 
 def manifest_digest(bundle_dir: str) -> str:
@@ -358,10 +435,12 @@ def admit_prompt_direction(prompt: Any) -> Optional[Dict[str, Any]]:
     ``{"direction": ..., "replay_from": ..., "manifest": ... or None}`` or raises
     :class:`DirectionError` naming the problem: more than one Shot Lock or
     writer, a direction or ``replay_from`` wired from another node instead of
-    typed, a malformed direction, a replay whose bundle fails verification or
-    is not the one ``source`` names, or an ``out`` that already exists (the
-    same run submitted twice; execution is sequential, so the second copy
-    reaches this check only after the first has frozen its bundle).
+    typed, a malformed direction, an ``out`` that already exists (the same run
+    submitted twice; execution is sequential, so the second copy reaches this
+    check only after the first has frozen its bundle), a first run for a
+    project that already has a bundle, or a later run that does not continue
+    the project's LATEST bundle -- verified file by file and matching
+    ``source`` -- into the next bundle number.
     """
     if not isinstance(prompt, dict):
         return None
@@ -392,19 +471,40 @@ def admit_prompt_direction(prompt: Any) -> Optional[Dict[str, Any]]:
     check_stage_rules(direction, replay_from)
 
     manifest = None
+    project_id = direction["project_id"]
+    try:
+        pdir = project_dir(project_id)
+        target = (bundle_path(project_id, direction["out"])
+                  if direction["out"] is not None else None)
+    except OtrPathContractError as exc:
+        raise DirectionError("the project folder is outside the producer folder: %s"
+                             % exc) from None
+    if target is not None and os.path.lexists(str(target)):
+        raise DirectionError(
+            "bundle %s of project %s already exists: this run was already submitted, "
+            "or the direction reuses a bundle name" % (direction["out"], project_id))
+    latest = _latest_bundle(pdir, project_id)
     if direction["source"] is None:
-        # The first run starts the project, so the project must not exist yet.
-        try:
-            pdir = project_dir(direction["project_id"])
-        except OtrPathContractError as exc:
-            raise DirectionError("the project folder is outside the producer folder: %s"
-                                 % exc) from None
-        if pdir.exists():
+        # A PROJECT STARTS WITH ITS FIRST BUNDLE, NOT WITH ITS FOLDER (Sonnet
+        # QA, 2026-10-22). A refused first freeze, or a crash in the middle of
+        # one, can leave the folder behind with no bundle in it, and the plan
+        # promises that run a retry.
+        if latest is not None:
             raise DirectionError(
-                "project %s already exists: continue it with source and replay_from, "
-                "or start a new project" % direction["project_id"])
+                "project %s already has bundle %s: continue it with source and "
+                "replay_from, or start a new project" % (project_id, latest))
     else:
-        bundle = project_bundle(direction["project_id"], replay_from)
+        bundle = project_bundle(project_id, replay_from)
+        if latest is None:
+            raise DirectionError("project %s has no bundle yet, so there is nothing to "
+                                 "continue; its first run carries no source" % project_id)
+        if bundle.name != latest:
+            # The plan's stage table: every later run replays the LATEST bundle.
+            # A stale submit that continued an older one would fork the
+            # project's history, and "latest" would stop meaning anything.
+            raise DirectionError(
+                "replay_from names bundle %s, but project %s's latest bundle is %s; a "
+                "producer run continues the latest one" % (bundle.name, project_id, latest))
         try:
             from .production_ledger import ReplayBundleError, load_replay_manifest
         except ImportError:  # pragma: no cover -- flat (sys.path) load
@@ -418,21 +518,21 @@ def admit_prompt_direction(prompt: Any) -> Optional[Dict[str, Any]]:
                 from None
         if digest != direction["source"]:
             raise DirectionError(
-                "replay_from %r is not the bundle this direction continues (its manifest "
-                "is %s, the direction names %s)" % (replay_from, digest[:12],
+                "replay_from %s is not the bundle this direction continues (its manifest "
+                "is %s, the direction names %s)" % (_shown(replay_from), digest[:12],
                                                     direction["source"][:12]))
-
-    if direction["out"] is not None:
-        try:
-            target = bundle_path(direction["project_id"], direction["out"])
-        except OtrPathContractError as exc:
-            raise DirectionError("the bundle path is outside the producer folder: %s"
-                                 % exc) from None
-        if target.exists():
-            raise DirectionError(
-                "bundle %s of project %s already exists: this run was already submitted, "
-                "or the direction reuses a bundle name" % (direction["out"],
-                                                          direction["project_id"]))
+        if direction["out"] is not None:
+            # Bundles are numbered in the order they were made, one apart, so
+            # "latest" is always the highest number and no number is skipped.
+            following = int(latest[:2]) + 1
+            if following > 99:
+                raise DirectionError("project %s has used every bundle number up to 99; "
+                                     "start a new project" % project_id)
+            if int(direction["out"][:2]) != following:
+                raise DirectionError(
+                    "out %s does not follow project %s's latest bundle %s; this run "
+                    "writes %02d-%s" % (direction["out"], project_id, latest, following,
+                                        direction["stage"]))
     return {"direction": direction, "replay_from": replay_from, "manifest": manifest}
 
 

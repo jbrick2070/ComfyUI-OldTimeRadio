@@ -18,7 +18,9 @@ Offline: the episode on disk is the replay suite's own fixture.
 from __future__ import annotations
 
 import importlib.util
+import inspect
 import json
+import os
 import pathlib
 import sys
 
@@ -104,8 +106,10 @@ def test_the_helper_never_spawns_a_process_or_exits():
     source = pathlib.Path(RF.__file__).read_text(encoding="utf-8")
     assert "import subprocess" not in source
     assert "raise SystemExit" not in source
-    assert RF.freeze.__kwdefaults__["source_commit"] == ""
-    assert RF.freeze.__kwdefaults__["include_render_outputs"] is False
+    # The public signature, through the refusal wrapper to the function itself.
+    params = inspect.signature(RF.freeze).parameters
+    assert params["source_commit"].default == ""
+    assert params["include_render_outputs"].default is False
 
 
 def test_the_script_is_a_thin_front_end_that_supplies_the_commit(episode, tmp_path, monkeypatch):
@@ -148,3 +152,94 @@ def test_a_corrupted_episode_id_cannot_lead_the_freeze_outside_its_root(episode,
 def test_a_dest_that_names_no_folder_is_refused(episode, tmp_path):
     with pytest.raises(PL.ReplayBundleError, match="not a usable bundle directory"):
         RF.freeze(episode, None, dest=pathlib.Path(tmp_path.anchor))
+
+
+# --------------------------------------------------------------------------- #
+# Sonnet QA on chunk 1 (2026-10-22): each finding pinned
+# --------------------------------------------------------------------------- #
+
+def _name_a_missing_still(ep: pathlib.Path) -> None:
+    led_path = next((ep / "audio").glob("*_ledger.json"))
+    led = json.loads(led_path.read_text(encoding="utf-8"))
+    led["images"]["images"].append({"image_id": "gone", "path": str(ep / "stills" / "nope.png")})
+    led_path.write_text(json.dumps(led), encoding="utf-8")
+
+
+def test_a_refused_freeze_removes_only_the_folders_it_created(episode, tmp_path):
+    # The Scene Producer read an empty project folder left by a refused first
+    # freeze as a project already started, and refused the retry.
+    _name_a_missing_still(episode)
+    keep = tmp_path / "already_here"
+    keep.mkdir()
+    with pytest.raises(PL.ReplayBundleError, match="image rows not found"):
+        RF.freeze(episode, None, dest=keep / "p" / "proj" / "01-stills")
+    assert keep.is_dir(), "a folder that was there before stays"
+    assert not (keep / "p").exists(), "every folder the freeze created is gone"
+
+
+def test_a_relative_episode_path_is_recorded_absolute(episode, tmp_path, monkeypatch):
+    # A relative source_episode_root cannot be rebased, so a replay's image rows
+    # would keep pointing at the source workspace.
+    monkeypatch.chdir(episode.parent)
+    bundle = RF.freeze(pathlib.Path(episode.name), None, dest=tmp_path / "relative")
+    root = PL.load_replay_manifest(str(bundle))["source_episode_root"]
+    assert os.path.isabs(root) and pathlib.Path(root) == episode
+
+
+def test_a_failed_rename_is_a_refusal_that_leaves_nothing(episode, tmp_path, monkeypatch):
+    def refuse_rename(src, dst):
+        raise PermissionError(5, "Access is denied")
+
+    monkeypatch.setattr(RF.os, "replace", refuse_rename)
+    with pytest.raises(PL.ReplayBundleError, match="freeze refused: .*denied"):
+        RF.freeze(episode, None, dest=tmp_path / "bundles" / "01-stills")
+    assert not (tmp_path / "bundles").exists(), "no complete .building folder left behind"
+
+
+def test_an_unreadable_ledger_and_a_stray_dest_are_bundle_errors(episode, tmp_path):
+    with pytest.raises(PL.ReplayBundleError, match="would land outside"):
+        RF.freeze(episode, tmp_path / "root", dest=tmp_path / "elsewhere" / "b")
+    led_path = next((episode / "audio").glob("*_ledger.json"))
+    led_path.write_text("{ not json", encoding="utf-8")
+    with pytest.raises(PL.ReplayBundleError, match="freeze refused"):
+        RF.freeze(episode, None, dest=tmp_path / "b")
+
+
+def test_derive_refusals_are_bundle_errors_and_leave_nothing(episode, tmp_path, monkeypatch):
+    bundle = RF.freeze(episode, None, dest=tmp_path / "src" / "ep")
+
+    def refuse_rename(src, dst):
+        raise PermissionError(5, "Access is denied")
+
+    monkeypatch.setattr(RF.os, "replace", refuse_rename)
+    with pytest.raises(PL.ReplayBundleError, match="derive_engine_bundle refused"):
+        RF.derive_engine_bundle(bundle, "some_engine", tmp_path / "derived")
+    assert not (tmp_path / "derived").exists()
+
+
+def test_the_script_asks_git_only_when_no_commit_is_named(episode, tmp_path, monkeypatch):
+    import scripts.otr_freeze_replay_bundle as fz
+
+    def no_git():
+        raise AssertionError("git was asked although the caller named the commit")
+
+    monkeypatch.setattr(fz, "_git_commit", no_git)
+    bundle = fz.freeze(episode, tmp_path / "b", source_commit="build-8")
+    assert PL.load_replay_manifest(str(bundle))["source_commit"] == "build-8"
+
+
+@pytest.mark.parametrize("fault", ["truncated", "not_an_object_row", "bytes_not_a_number"])
+def test_a_corrupt_manifest_raises_the_bundle_error(episode, tmp_path, fault):
+    bundle = RF.freeze(episode, None, dest=tmp_path / "ok")
+    path = bundle / PL.REPLAY_MANIFEST_NAME
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if fault == "truncated":
+        path.write_bytes(path.read_bytes()[:40])
+    elif fault == "not_an_object_row":
+        data["files"].append(1)
+        path.write_text(json.dumps(data), encoding="utf-8")
+    else:
+        data["files"][0]["bytes"] = "many"
+        path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(PL.ReplayBundleError):
+        PL.load_replay_manifest(str(bundle))

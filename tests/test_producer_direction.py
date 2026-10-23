@@ -13,6 +13,7 @@ Workflow Validator runs. These tests pin, in order of how much they matter:
 """
 from __future__ import annotations
 
+import codecs
 import copy
 import hashlib
 import importlib.util
@@ -32,6 +33,7 @@ from nodes import production_ledger as PL  # noqa: E402
 FIRST = {"version": 1, "project_id": "a1b2c3d4e5f6",
          "attempt_id": "0f8e1c2d-3b4a-4c5d-9e8f-7a6b5c4d3e2f",
          "stage": "stills", "out": "01-stills"}
+PID = FIRST["project_id"]
 
 
 def _raw(**changes) -> str:
@@ -228,9 +230,24 @@ def test_a_filled_direction_refuses_ambiguous_or_wired_graphs(producer_root):
         PD.admit_prompt_direction(linked_replay)
 
 
-def test_a_first_run_into_an_existing_project_is_refused(producer_root):
-    (producer_root / "a1b2c3d4e5f6").mkdir(parents=True)
-    with pytest.raises(PD.DirectionError, match="project a1b2c3d4e5f6 already exists"):
+def test_a_project_starts_with_its_first_bundle_not_its_folder(producer_root, tmp_path,
+                                                              monkeypatch):
+    # Sonnet QA, 2026-10-22: an empty folder, or one holding only a crashed
+    # freeze's building sibling, is not a started project, and refusing it
+    # refused the retry the plan promises a failed first run.
+    (producer_root / PID / ".01-stills.building").mkdir(parents=True)
+    assert PD.admit_prompt_direction(_prompt(_raw()))
+    # Its first bundle is: the same first run again is the same run submitted
+    # twice. (The freeze clears the stale building sibling on its way.)
+    _frozen_bundle(tmp_path, monkeypatch, PD.bundle_path(PID, "01-stills"))
+    assert not (producer_root / PID / ".01-stills.building").exists()
+    with pytest.raises(PD.DirectionError, match="already exists: this run was already submitted"):
+        PD.admit_prompt_direction(_prompt(_raw()))
+
+
+def test_a_first_run_into_a_project_with_any_bundle_is_refused(producer_root):
+    (producer_root / PID / "02-video").mkdir(parents=True)
+    with pytest.raises(PD.DirectionError, match="already has bundle 02-video"):
         PD.admit_prompt_direction(_prompt(_raw()))
 
 
@@ -403,3 +420,170 @@ def test_set_cannot_write_the_direction():
     workflow = canonical.load_workflow(str(_REPO / "workflows" / "otr_canonical.json"))
     with pytest.raises(SystemExit, match="use --direction-json"):
         canonical._apply_set(workflow, schemas, "OTR_ShotLock.direction_json=")
+
+
+# --------------------------------------------------------------------------- #
+# Sonnet QA on chunk 1 (2026-10-22): each finding pinned
+# --------------------------------------------------------------------------- #
+
+def _continue(bundle, out, *, project_id=PID):
+    """A later-run prompt that continues ``bundle`` into ``out``."""
+    raw = _raw(project_id=project_id, stage=out.split("-", 1)[1], out=out,
+               source=PD.manifest_digest(str(bundle)))
+    return _prompt(raw, replay_from=str(bundle))
+
+
+def test_a_refused_first_freeze_does_not_burn_the_project(producer_root, tmp_path, monkeypatch):
+    good = _frozen_bundle(tmp_path, monkeypatch, tmp_path / "scratch" / "01-stills")
+    ep = pathlib.Path(PL.load_replay_manifest(str(good))["source_episode_root"])
+    led_path = next((ep / "audio").glob("*_ledger.json"))
+    led = json.loads(led_path.read_text(encoding="utf-8"))
+    led["images"]["images"].append({"image_id": "gone", "path": str(ep / "stills" / "gone.png")})
+    led_path.write_text(json.dumps(led), encoding="utf-8")
+    assert PD.admit_prompt_direction(_prompt(_raw()))
+    with pytest.raises(PL.ReplayBundleError, match="image rows not found"):
+        RF.freeze(ep, None, dest=PD.bundle_path(PID, "01-stills"))
+    assert not producer_root.exists(), "the refused freeze removed every folder it created"
+    assert PD.admit_prompt_direction(_prompt(_raw())), "so the retry is admitted"
+
+
+def test_a_later_run_continues_the_latest_bundle_into_the_next_number(producer_root, tmp_path,
+                                                                     monkeypatch):
+    first = _frozen_bundle(tmp_path, monkeypatch, PD.bundle_path(PID, "01-stills"))
+    ep = pathlib.Path(PL.load_replay_manifest(str(first))["source_episode_root"])
+    second = RF.freeze(ep, None, dest=PD.bundle_path(PID, "02-stills"))
+    with pytest.raises(PD.DirectionError, match="latest bundle is 02-stills"):
+        PD.admit_prompt_direction(_continue(first, "03-video"))
+    with pytest.raises(PD.DirectionError, match="does not follow .* this run writes 03-video"):
+        PD.admit_prompt_direction(_continue(second, "04-video"))
+    assert PD.admit_prompt_direction(_continue(second, "03-video"))["replay_from"] == str(second)
+
+
+def test_nothing_to_continue_and_a_shared_number_are_refused(producer_root, tmp_path, monkeypatch):
+    nowhere = PD.bundle_path(PID, "01-stills")
+    with pytest.raises(PD.DirectionError, match="has no bundle yet"):
+        PD.admit_prompt_direction(_prompt(_raw(out="02-stills", source="a" * 64),
+                                          replay_from=str(nowhere)))
+    first = _frozen_bundle(tmp_path, monkeypatch, nowhere)
+    (producer_root / PID / "01-video").mkdir()
+    with pytest.raises(PD.DirectionError, match="two bundles numbered 01"):
+        PD.admit_prompt_direction(_continue(first, "02-stills"))
+
+
+def test_a_key_named_twice_is_refused():
+    with pytest.raises(PD.DirectionError, match="names 'project_id' twice"):
+        PD.parse_direction(_raw()[:-1] + ', "project_id": "bbbbcccc1111"}')
+    later = _raw(out="02-stills", source="a" * 64)[:-1]
+    with pytest.raises(PD.DirectionError, match="names 'shot_001' twice"):
+        PD.parse_direction(later + ', "cards": {"shot_001": {"motion_text": "a"}, '
+                                   '"shot_001": {"motion_text": "b"}}}')
+
+
+def test_a_deeply_nested_direction_is_refused_not_raised():
+    with pytest.raises(PD.DirectionError, match="nested too deeply"):
+        PD.parse_direction(_raw()[:-1] + ', "cards": ' + "[" * 100_000 + "]" * 100_000 + "}")
+
+
+def test_a_refusal_quotes_a_bad_value_briefly():
+    with pytest.raises(PD.DirectionError) as info:
+        PD.parse_direction(_raw(project_id="x" * 900_000))
+    assert len(str(info.value)) < 300
+
+
+@pytest.mark.parametrize("bad", [".", "..", "a:b", "a.b", "__proto__", "-x", "", "con",
+                                 "COM1", "lpt9", "nul"])
+def test_ids_that_could_misname_a_file_are_refused(bad):
+    with pytest.raises(PD.DirectionError, match="not a valid id"):
+        PD.parse_direction(_raw(out="02-stills", source="a" * 64,
+                                cards={bad: {"motion_text": "x"}}))
+
+
+def test_every_id_shape_the_ledger_mints_is_accepted():
+    ids = ["shot_shot_001_b2", "shot_b000_music_open", "shot_music_opening_001", "s01", "c03"]
+    got = PD.parse_direction(_raw(out="02-stills", source="a" * 64,
+                                  cards={i: {"motion_text": "x"} for i in ids}))
+    assert sorted(got["cards"]) == sorted(ids)
+
+
+@pytest.mark.parametrize("fault", ["truncated", "bom", "not_an_object_row"])
+def test_a_corrupt_manifest_is_refused_as_untrusted(producer_root, tmp_path, monkeypatch, fault):
+    bundle = _frozen_bundle(tmp_path, monkeypatch, PD.bundle_path(PID, "01-stills"))
+    path = bundle / PD.MANIFEST_NAME
+    if fault == "truncated":
+        payload = path.read_bytes()[:40]
+    elif fault == "bom":
+        payload = codecs.BOM_UTF8 + path.read_bytes()
+    else:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["files"].append(1)
+        payload = json.dumps(data).encode("utf-8")
+    path.write_bytes(payload)
+    prompt = _prompt(_raw(out="02-stills", source=hashlib.sha256(payload).hexdigest()),
+                     replay_from=str(bundle))
+    with pytest.raises(PD.DirectionError, match="cannot be trusted"):
+        PD.admit_prompt_direction(prompt)
+
+
+_junctions = pytest.mark.skipif(sys.platform != "win32", reason="junctions are a Windows feature")
+
+
+def _junction(link: pathlib.Path, target: pathlib.Path) -> None:
+    import _winapi
+    _winapi.CreateJunction(str(target), str(link))
+
+
+@_junctions
+def test_a_linked_bundle_or_project_cannot_borrow_another_projects_bundle(producer_root, tmp_path,
+                                                                         monkeypatch):
+    other = _frozen_bundle(tmp_path, monkeypatch, PD.bundle_path("bbbbcccc1111", "01-stills"))
+    # A bundle-named link inside this project, leading to the other project's bundle.
+    (producer_root / PID).mkdir()
+    _junction(producer_root / PID / "01-stills", other)
+    with pytest.raises(PD.DirectionError, match="is not one of project a1b2c3d4e5f6's bundles"):
+        PD.admit_prompt_direction(_continue(producer_root / PID / "01-stills", "02-stills"))
+    # A whole project folder that is a link to the other project.
+    _junction(producer_root / "dddd0000aaaa", producer_root / "bbbbcccc1111")
+    with pytest.raises(PD.DirectionError, match="is not one of project dddd0000aaaa's bundles"):
+        PD.admit_prompt_direction(_continue(producer_root / "dddd0000aaaa" / "01-stills",
+                                            "02-stills", project_id="dddd0000aaaa"))
+
+
+@_junctions
+def test_the_real_spelling_of_a_linked_output_root_names_the_same_bundle(tmp_path, monkeypatch):
+    # The Comfy Desktop layout reaches the output folder through a junction; the
+    # pack's own spelling and the real one are the same bundle.
+    real = tmp_path / "real_output"
+    (real / "episodes").mkdir(parents=True)
+    _junction(tmp_path / "linked_output", real)
+    monkeypatch.setattr(PD, "otr_episodes_root", lambda: tmp_path / "linked_output" / "episodes")
+    bundle = _frozen_bundle(tmp_path, monkeypatch, PD.bundle_path(PID, "01-stills"))
+    spelled_real = real / "episodes" / "_replay" / "p" / PID / "01-stills"
+    assert spelled_real.is_dir()
+    for spelling in (bundle, spelled_real):
+        assert PD.admit_prompt_direction(_continue(spelling, "02-stills"))["manifest"]
+
+
+def test_the_harness_sends_the_file_text_verbatim_and_explains_utf16(tmp_path):
+    sys.path.insert(0, str(_REPO / "scripts"))
+    import otr_canonical_api_run as canonical
+    schemas = canonical._schemas(True)
+    workflow = canonical.load_workflow(str(_REPO / "workflows" / "otr_canonical.json"))
+    text = _raw().replace(", ", "," + chr(13) + chr(10))
+    with_bom = tmp_path / "bom.json"
+    with_bom.write_bytes(codecs.BOM_UTF8 + text.encode("utf-8"))
+    canonical._apply_direction(workflow, schemas, str(with_bom))
+    prompt = canonical.workflow_to_api_prompt(workflow, schemas)
+    lock = [n for n in prompt.values() if n["class_type"] == "OTR_ShotLock"][0]
+    assert lock["inputs"]["direction_json"] == text, "CRLF kept, the BOM dropped"
+    utf16 = tmp_path / "utf16.json"
+    utf16.write_bytes(_raw().encode("utf-16"))
+    with pytest.raises(SystemExit, match="not UTF-8 text"):
+        canonical._apply_direction(workflow, schemas, str(utf16))
+
+
+def test_an_empty_direction_option_is_refused_not_ignored(tmp_path):
+    sys.path.insert(0, str(_REPO / "scripts"))
+    import otr_canonical_api_run as canonical
+    with pytest.raises(SystemExit, match="direction-json missing"):
+        canonical.main(["--offline-schemas", "--dry-run", "--direction-json", "",
+                        "--dump-prompt", str(tmp_path / "prompt.json")])
