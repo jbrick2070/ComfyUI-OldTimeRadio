@@ -370,8 +370,10 @@ class Handler(BaseHTTPRequestHandler):
                                path)
         if path not in ("/api/episodes", "/api/presence", "/api/photos",
                         "/api/projects") and not project:
+            self._discard_body()
             return self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
         if (self.headers.get("Content-Type") or "").split(";")[0].strip().lower() != "application/json":
+            self._discard_body()
             return self._send_json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "send application/json"})
         if path == "/api/presence":
             return self._presence()
@@ -401,6 +403,23 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, GraphError) as exc:
             return self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         self._send_json(HTTPStatus.ACCEPTED, {"id": run.id})
+
+    def _discard_body(self) -> None:
+        """Read the body of a request refused before it is read, so the client
+        gets the refusal: answered with its body unread, a connection is reset
+        under load, and the client sees that instead of the status. One past
+        the size limit, or with no readable length, is not read: the
+        connection closes after the answer."""
+        try:
+            length = _body_length(self.headers)
+        except ValueError:
+            self.close_connection = True
+            return
+        while length > 0:
+            chunk = self.rfile.read(min(length, 1 << 16))
+            if not chunk:
+                break
+            length -= len(chunk)
 
     def _body(self) -> dict:
         """The posted JSON object; ValueError for anything else."""

@@ -806,6 +806,7 @@ form.addEventListener("submit", async (e) => {
 let project = null, draft = null;
 let stageBusy = false;          // a stage is running, whichever project it belongs to
 let stagePid = null;            // the project that stage belongs to
+let looking = false;            // a Look again request is on its way
 let saveTimer = null, saveChain = Promise.resolve(true);
 let edits = 0, savedEdits = 0;  // edits made, and how many of them the app holds
 const SAVE_DELAY_MS = 600;
@@ -946,8 +947,11 @@ function assess(card, scene) {
   const stillTake = (draft.takes.stills[sid] || 0) !== (card.still_take || 0);
   const charTake = !!card.still_char_id &&
     (draft.takes.characters[card.still_char_id] || 0) !== (card.still_char_take || 0);
-  // A kept still is used as it is: node 63 never asks it to be painted.
-  const stillDirty = !!card.picture_editable && !keptStill && (promptEdit || stillTake || charTake);
+  // A kept still is used as it is: node 63 never asks it to be painted. One
+  // that does not show its own card (still_dirty: kept through an edit, then
+  // un-kept) is, as node 63 reads its digest.
+  const stillDirty = !!card.picture_editable && !keptStill
+    && (promptEdit || stillTake || charTake || !!card.still_dirty);
   // A still the image model refused: filming skips its shot as a gap, so it is
   // painted again, or the card keeps the clip it has -- a kept still does not
   // stand in for it, as node 63 reads it too.
@@ -1004,6 +1008,7 @@ function drawBoard() {
   // The last run ended without a result: say why, as the app recorded it.
   const failed = !project.pending && project.last_error;
   if (failed && failed.message) { plain($("perror"), failed.message); $("perror").hidden = false; }
+  else $("perror").hidden = true;      // never another project's, or a settled one
   const pub = project.published;
   if (pub) showVideo($("published"), pub.run, pub.file); else $("published").hidden = true;
   refreshBoard();
@@ -1333,7 +1338,7 @@ function refreshBoard() {
   else if (project.published && ready) say(hint, "hint.published");
   else say(hint, "hint.ready");
   $("b_look").hidden = $("b_forget").hidden = !held;
-  $("b_look").disabled = $("b_forget").disabled = busy;
+  $("b_look").disabled = $("b_forget").disabled = busy || looking;
   showStage("stills", paint === 0 && c.cards > 0, "stage.stills_state", {painted: c.painted, changed: c.changed});
   showStage("video", c.toFilm === 0 && c.cards > 0, "stage.video_state", {filmed: c.filmed, total: c.cards});
   const pubKey = project.published && ready ? "stage.publish_done" : ready ? "stage.publish_ready" : "stage.publish_wait";
@@ -1443,9 +1448,9 @@ $("change_story").addEventListener("click", closeProject);
 // A pending run Studio cannot settle by itself -- it lost touch, or ComfyUI
 // could not say -- is looked at again on a press, and is never sent twice.
 $("b_look").addEventListener("click", async () => {
-  if (!project || stageBusy || $("b_look").disabled) return;
+  if (!project || stageBusy || looking) return;
   const pid = project.project_id;
-  $("b_look").disabled = true;           // one look per press
+  looking = true; refreshBoard();        // one look per press, through any redraw
   $("perror").hidden = true;
   try {
     const res = await fetch("/api/projects/" + pid + "/reconcile", {
@@ -1453,8 +1458,12 @@ $("b_look").addEventListener("click", async () => {
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || res.statusText);
+    looking = false;
     watchStage(body.id, body.stage, pid);
-  } catch (err) { plain($("perror"), err.message); $("perror").hidden = false; refreshBoard(); }
+  } catch (err) {
+    looking = false;
+    plain($("perror"), err.message); $("perror").hidden = false; refreshBoard();
+  }
 });
 // Or it is given up, after the person says so: the project may run the stage again.
 $("b_forget").addEventListener("click", async () => {

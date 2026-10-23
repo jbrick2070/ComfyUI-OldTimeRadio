@@ -32,11 +32,11 @@ VIDEO_SUFFIXES = (".mp4", ".webm", ".mov", ".mkv")
 #: polls in a row are forgiven (a restart of the bridge, a dropped connection),
 #: and the longest pause between them. About ten minutes of outage in all.
 POLL_WINDOW_S = 60.0
+#: The bridge's status for a job it took and can no longer find upstream.
+EXPIRED = "expired"
 #: A submit whose answer was lost is looked for in ComfyUI's own queue and
 #: history this many times, this far apart, before an empty answer is
 #: believed: one empty look never lets the project send the run again.
-#: The bridge's status for a job it took and can no longer find upstream.
-EXPIRED = "expired"
 LOST_SUBMIT_LOOKS = 3
 LOST_SUBMIT_GAP_S = 20.0
 #: How much of ComfyUI's history a lost submit is looked for in: it was sent
@@ -417,13 +417,19 @@ class Studio:
                             "until it has looked again.")
                 return
             if str(getattr(job, "status", "")) == EXPIRED:
-                # "Expired" is the bridge's word for a job it took that is in
-                # neither ComfyUI's history nor its queue when it looks -- and
-                # comfy-api-proxy reads the history first and the queue second,
-                # so a job that finishes between the two reads is in neither
-                # (measured live 2026-10-23: a Stills run that succeeded came
-                # back expired). ComfyUI's own history says how it ended; a
-                # Publish run's video is then saved from where ComfyUI put it.
+                # "Expired" is the bridge's word for a job it took that ComfyUI
+                # no longer has -- a ComfyUI restarted under a run, say. It is
+                # settled the way a job the bridge has forgotten is: ComfyUI's
+                # own queue and history say how it ended, a complete bundle is
+                # still adopted, and a project ComfyUI cannot be asked about
+                # stays pending instead of being freed to make it again.
+                #
+                # NOT the "expired" seen live on 2026-10-23 (Sonnet QA): that
+                # one was only the bridge's event STREAM, whose closing status
+                # comes from one snapshot taken the moment ComfyUI reports the
+                # run done, and can find it in neither its history nor its
+                # queue. settle()'s own poll came back succeeded, and the
+                # SDK's result() polls again before it ever raises.
                 yield self._settle_forgotten(plan, str(job.id), error)
                 return
             failure = exc

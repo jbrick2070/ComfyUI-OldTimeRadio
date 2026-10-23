@@ -54,9 +54,11 @@ from typing import Any, Dict, Iterable, Optional
 
 try:
     from . import _otr_producer_direction as _PD
+    from ._otr_paths import OUTPUT_DIR_ENV
     from ._otr_shared import env as otr_env
 except ImportError:  # pragma: no cover -- flat (sys.path) load
     import _otr_producer_direction as _PD  # type: ignore
+    from _otr_paths import OUTPUT_DIR_ENV  # type: ignore
     from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR.producer_clips")
@@ -90,7 +92,8 @@ _NOT_CAUSAL = frozenset({"request_id", "observability", "plate_path"})
 #: differ between two runs of one project; the last two say where credentials
 #: are kept, and rotating a key must not film a project again.
 _ENV_NOT_CAUSAL = frozenset({
-    "OTR_ACTIVE_PROFILE", "OTR_SNAPSHOT_HASH", "OTR_OUTPUT_DIR", "OTR_ENABLE_STYLE_GRAMMAR",
+    # The output root's name is _otr_paths' to spell (its single-owner guard).
+    "OTR_ACTIVE_PROFILE", "OTR_SNAPSHOT_HASH", OUTPUT_DIR_ENV, "OTR_ENABLE_STYLE_GRAMMAR",
     "OTR_ALLOW_KEY_FILES", "OTR_API_KEY_PACK_ROOT"})
 #: The shapes of ``OTR_`` settings that never change a clip's bytes: where
 #: credentials are kept and which endpoint is called; how long to wait and how

@@ -326,9 +326,11 @@ def unpainted(project: dict) -> list:
             char_changed = bool(char) and (draft["takes"]["characters"].get(char, 0)
                                            != card.get("still_char_take", 0))
             asked = composed(body.get("picture_text", card.get("picture_text")), asked_note)
+            # still_dirty: the still does not show its own card -- one kept
+            # through an edit and un-kept since -- as node 63 reads its digest.
             if (asked != composed(card.get("picture_text"), shown_note)
                     or draft["takes"]["stills"].get(sid, 0) != card.get("still_take", 0)
-                    or char_changed):
+                    or char_changed or card.get("still_dirty")):
                 waiting.append(sid)
     return waiting
 

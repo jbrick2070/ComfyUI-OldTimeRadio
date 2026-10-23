@@ -60,6 +60,13 @@ try:
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
 
+#: The environment variable that names the output root. It is read and pinned
+#: here alone (tests/test_output_root_single_owner.py); a module that must only
+#: NAME it -- the clip reuse key leaves it out, because the pack writes it while
+#: a prompt runs -- imports this rather than spelling it.
+OUTPUT_DIR_ENV = "OTR_OUTPUT_DIR"
+
+
 class OtrPathContractError(ValueError):
     """An OTR output-path request violates the output-tree contract
     (empty/invalid episode_id, traversal, or a result outside
@@ -131,7 +138,7 @@ def pin_output_dir_from_comfy() -> Optional[str]:
     Returns the pinned path, or ``None`` when the operator already set
     the knob, folder_paths is missing, or the API returned empty.
     """
-    if (otr_env.get("OTR_OUTPUT_DIR") or "").strip():
+    if (otr_env.get(OUTPUT_DIR_ENV) or "").strip():
         return None
     try:
         import folder_paths  # type: ignore
@@ -143,7 +150,7 @@ def pin_output_dir_from_comfy() -> Optional[str]:
     if not text:
         return None
     pinned = os.path.abspath(os.path.expanduser(text))
-    otr_env.pin("OTR_OUTPUT_DIR", pinned)
+    otr_env.pin(OUTPUT_DIR_ENV, pinned)
     return pinned
 
 

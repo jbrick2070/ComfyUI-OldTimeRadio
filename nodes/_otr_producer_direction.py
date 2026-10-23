@@ -956,6 +956,15 @@ def build_cards(ledger: dict, producer: Dict[str, Any], files: list) -> Dict[str
             # 2026-10-22).
             "note_editable": bool(scene_id),
             "note": (raw.get("scenes") or {}).get(scene_id, ""), "shots": []})
+        # A STILL THAT DOES NOT SHOW ITS OWN CARD (Codex QA, 2026-10-23): one
+        # kept through a scene note, a portrait or a take, then un-kept, keeps
+        # the digest of the paint it is, while the card records the new inputs.
+        # Node 63 refuses to film it (unpainted_shots); this says so on the
+        # card, so Studio and the page can too, before anything is sent.
+        painted = card["still_input_hash"]
+        card["still_dirty"] = bool(painted) and painted != _card_digest(
+            card, card["picture_text"], group["note"], card["still_char_take"],
+            card["still_take"])
         group["shots"].append(card)
     cast = []
     for member in ledger.get("cast") or []:

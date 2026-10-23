@@ -246,6 +246,15 @@ def test_a_kept_still_keeps_the_digest_of_the_paint_it_is(studio):
     assert PD.unpainted_shots(cards, _video(scenes=note, kept={"stills": ["shot_b002"]})) == []
     # Un-kept, the still is what it was before the note, and that shows.
     assert PD.unpainted_shots(cards, _video(scenes=note)) == ["shot_b002"]
+    # On the card too, so Studio sees it without node 63's digest (Codex QA,
+    # 2026-10-23); a still painted as its card stands is not dirty.
+    dirty = {c["shot_id"]: c["still_dirty"] for g in cards["scenes"] for c in g["shots"]}
+    assert dirty["shot_b002"] is True and dirty["shot_b001"] is False
+
+
+def test_no_still_is_dirty_straight_after_the_paint_that_made_it(studio):
+    cards = _cards(_first_run(studio))
+    assert not [c["shot_id"] for g in cards["scenes"] for c in g["shots"] if c["still_dirty"]]
 
 
 def test_an_edit_that_paints_the_same_prompt_is_not_unpainted(studio):

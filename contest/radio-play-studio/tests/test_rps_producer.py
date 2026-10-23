@@ -356,6 +356,11 @@ def test_a_still_changes_when_its_prompt_does_as_node_63_composes_it():
     assert producer.unpainted(project) == []
     project["draft"]["takes"]["stills"] = {"shot_b002": 1}
     assert producer.unpainted(project) == [], "a kept still is not painted again"
+    # Un-kept, a still that does not show its own card waits for a paint
+    # (Codex QA, 2026-10-23: kept through a note, then un-kept).
+    project["draft"] = producer.empty_draft()
+    project["view"]["scenes"][0]["shots"][2]["still_dirty"] = True
+    assert producer.unpainted(project) == ["shot_b003"]
 
 
 def test_a_new_portrait_waits_for_a_stills_run_whether_or_not_a_still_names_it():

@@ -31,6 +31,7 @@ import re
 import shutil
 import tempfile
 import time
+import uuid
 
 from .._otr_shared import still_receipt as _receipt
 from .._otr_shared.ffmpeg import resolve_ffmpeg as _resolve_ffmpeg
@@ -4567,8 +4568,9 @@ def _bring_clip_into(clip, dest, name):
     try:
         replace_held(src, target)
     except OSError:
-        handle, part = tempfile.mkstemp(prefix="." + name + ".", suffix=".part", dir=dest)
-        os.close(handle)
+        # Beside the target, under a name of its own: the episode folder, not
+        # the system temp folder test_engine_tmp_in_tree guards against.
+        part = os.path.join(dest, ".%s.%s.part" % (name, uuid.uuid4().hex[:8]))
         try:
             shutil.copyfile(src, part)
             replace_held(part, target)

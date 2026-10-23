@@ -286,6 +286,9 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
             # hash and to its seed by value. None when no receipt was built.
             "prompt_sha8": clip.get("prompt_sha8"),
             "request_seed": clip.get("request_seed"),
+            # Every segment's seed, on a beat filmed in more than one (2026-10-23);
+            # present only where the manifest row carries it.
+            **({"segment_seeds": clip["segment_seeds"]} if "segment_seeds" in clip else {}),
             "actual_request_sha": clip.get("actual_request_sha"),
             # family = the engine's render family (audio_driven_face / text_to_video /
             # image_to_video ...) -- the human-readable suffix the credits MODELS.VIDEO
