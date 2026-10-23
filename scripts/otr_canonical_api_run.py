@@ -86,6 +86,12 @@ def _apply_set(workflow: dict, schemas: dict, patch: str) -> str:
     if "." not in left:
         raise SystemExit(f"--set must name NODE.widget, got {patch!r}")
     node_ref, widget = left.rsplit(".", 1)
+    if widget.strip() == "direction_json":
+        # Only --direction-json may set it: that path validates the direction
+        # first, and a later --set could otherwise blank or replace a direction
+        # the run already reported as applied (Codex QA, 2026-10-22).
+        raise SystemExit("--set cannot write direction_json; use --direction-json FILE, "
+                         "which validates the direction before the prompt is sent")
     nid = _node_id_for(workflow, node_ref)
     value = _parse_value(raw_value)
     patch_creative(workflow, nid, widget, value, schemas)

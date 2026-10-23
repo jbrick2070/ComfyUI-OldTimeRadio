@@ -126,3 +126,25 @@ def test_the_command_line_turns_a_refusal_into_a_clean_exit(episode, tmp_path):
     assert fz.main([str(episode), "--out", str(out)]) == 0
     with pytest.raises(SystemExit, match="refused: bundle already exists"):
         fz.main([str(episode), "--out", str(out)])
+
+
+def test_a_corrupted_episode_id_cannot_lead_the_freeze_outside_its_root(episode, tmp_path):
+    # Codex QA, 2026-10-22: the ledger's episode_id becomes part of a path the
+    # helper deletes and renames, so it must be one folder name.
+    led_path = next((episode / "audio").glob("*_ledger.json"))
+    led = json.loads(led_path.read_text(encoding="utf-8"))
+    victim = tmp_path / "victim"
+    victim.mkdir()
+    (victim / "keep.txt").write_text("must survive", encoding="utf-8")
+    for bad in ("../victim", "..", "a/b", "C:x", " padded "):
+        led["episode_id"] = bad
+        led_path.write_text(json.dumps(led), encoding="utf-8")
+        with pytest.raises(PL.ReplayBundleError, match="single safe folder name"):
+            RF.freeze(episode, tmp_path / "bundles")
+    assert (victim / "keep.txt").read_text(encoding="utf-8") == "must survive"
+    assert not (tmp_path / ".victim.building").exists()
+
+
+def test_a_dest_that_names_no_folder_is_refused(episode, tmp_path):
+    with pytest.raises(PL.ReplayBundleError, match="not a usable bundle directory"):
+        RF.freeze(episode, None, dest=pathlib.Path(tmp_path.anchor))

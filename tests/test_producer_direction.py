@@ -228,10 +228,19 @@ def test_a_filled_direction_refuses_ambiguous_or_wired_graphs(producer_root):
         PD.admit_prompt_direction(linked_replay)
 
 
-def test_an_existing_bundle_name_refuses_the_run(producer_root):
-    (producer_root / "a1b2c3d4e5f6" / "01-stills").mkdir(parents=True)
-    with pytest.raises(PD.DirectionError, match="already exists"):
+def test_a_first_run_into_an_existing_project_is_refused(producer_root):
+    (producer_root / "a1b2c3d4e5f6").mkdir(parents=True)
+    with pytest.raises(PD.DirectionError, match="project a1b2c3d4e5f6 already exists"):
         PD.admit_prompt_direction(_prompt(_raw()))
+
+
+def test_a_later_run_whose_bundle_name_is_taken_is_refused(producer_root, tmp_path, monkeypatch):
+    bundle = _frozen_bundle(tmp_path, monkeypatch, PD.bundle_path("a1b2c3d4e5f6", "01-stills"))
+    digest = PD.manifest_digest(str(bundle))
+    (bundle.parent / "02-stills").mkdir()
+    with pytest.raises(PD.DirectionError, match="bundle 02-stills of project a1b2c3d4e5f6 already exists"):
+        PD.admit_prompt_direction(_prompt(_raw(out="02-stills", source=digest),
+                                          replay_from=str(bundle)))
 
 
 def test_a_replay_must_name_the_exact_bundle_it_continues(producer_root, tmp_path, monkeypatch):
@@ -333,3 +342,54 @@ def test_the_harness_sends_a_validated_direction_as_text(tmp_path):
     bad.write_text(_raw(stage="video", out="02-video"), encoding="utf-8")
     with pytest.raises(SystemExit, match="needs a source"):
         canonical._apply_direction(workflow, schemas, str(bad))
+
+
+# --------------------------------------------------------------------------- #
+# Codex QA on chunk 1 (2026-10-22): each finding pinned
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.parametrize("changes, words", [
+    ({"project_id": "abcd\n"}, "project_id"),
+    ({"out": "01-stills\n"}, "out must look like"),
+    ({"attempt_id": "0f8e1c2d-3b4a\n"}, "attempt_id"),
+    ({"out": "02-stills", "source": "a" * 64 + "\n"}, "lowercase sha256"),
+    ({"out": chr(0x0660) + chr(0x0661) + "-stills"}, "out must look like"),  # Arabic-Indic digits
+    ({"version": 1.0}, "version must be 1"),
+    ({"out": "99-stills"}, "first run writes 01-stills"),
+])
+def test_names_are_matched_whole_and_the_version_is_an_integer(changes, words):
+    with pytest.raises(PD.DirectionError, match=words):
+        PD.parse_direction(_raw(**changes))
+
+
+def test_a_replay_must_stay_inside_its_own_project(producer_root, tmp_path, monkeypatch):
+    other = _frozen_bundle(tmp_path, monkeypatch, PD.bundle_path("bbbbcccc1111", "01-stills"))
+    digest = PD.manifest_digest(str(other))
+    with pytest.raises(PD.DirectionError, match="is not one of project a1b2c3d4e5f6's bundles"):
+        PD.admit_prompt_direction(_prompt(_raw(out="02-stills", source=digest),
+                                          replay_from=str(other)))
+
+
+def test_an_ordinary_bundle_outside_the_producer_folder_is_refused(producer_root, tmp_path, monkeypatch):
+    loose = _frozen_bundle(tmp_path, monkeypatch, tmp_path / "elsewhere" / "01-stills")
+    digest = PD.manifest_digest(str(loose))
+    with pytest.raises(PD.DirectionError, match="is not one of project"):
+        PD.admit_prompt_direction(_prompt(_raw(out="02-stills", source=digest),
+                                          replay_from=str(loose)))
+
+
+@pytest.mark.parametrize("falsy", [0, False, [], {}])
+def test_shot_lock_and_the_validator_agree_on_what_blank_means(falsy):
+    from nodes.otr_shot_lock import OTRShotLock
+    assert not PD.is_blank(falsy)
+    with pytest.raises(ValueError, match="cannot run Scene Producer stages yet"):
+        OTRShotLock().lock("{}", direction_json=falsy)
+
+
+def test_set_cannot_write_the_direction():
+    sys.path.insert(0, str(_REPO / "scripts"))
+    import otr_canonical_api_run as canonical
+    schemas = canonical._schemas(True)
+    workflow = canonical.load_workflow(str(_REPO / "workflows" / "otr_canonical.json"))
+    with pytest.raises(SystemExit, match="use --direction-json"):
+        canonical._apply_set(workflow, schemas, "OTR_ShotLock.direction_json=")

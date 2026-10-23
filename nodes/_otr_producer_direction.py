@@ -58,12 +58,19 @@ SHOT_LOCK_CLASS = "OTR_ShotLock"
 WRITER_CLASS = "OTR_LedgerScriptWriter"
 MANIFEST_NAME = "manifest.json"
 
+#: EVERY NAME IS CHECKED WITH ``fullmatch`` (Codex QA, 2026-10-22): ``$`` under
+#: ``re.match`` also accepts a trailing newline, so ``"01-stills\n"`` would have
+#: become a directory name. Digits are spelled ``[0-9]``, never ``\d``, which
+#: also accepts non-ASCII digits.
+#:
 #: A project id names a folder: short, so bundle paths stay under Windows'
 #: 260-character limit on a long install root.
 PROJECT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{3,31}$")
 #: ``NN-stills`` or ``NN-video``. Nothing else, which also keeps a bundle name
 #: from ever colliding with the project's clip store.
-OUT_RE = re.compile(r"^(\d{2})-(stills|video)$")
+OUT_RE = re.compile(r"^([0-9]{2})-(stills|video)$")
+#: The one bundle name a project's first run may write.
+FIRST_OUT = "01-stills"
 ATTEMPT_ID_RE = re.compile(r"^[A-Za-z0-9-]{8,64}$")
 SOURCE_RE = re.compile(r"^[0-9a-f]{64}$")
 #: Shot, scene and character ids as the ledger writes them.
@@ -83,7 +90,8 @@ _KEPT_GROUPS = ("stills", "clips")
 
 __all__ = [
     "DIRECTION_VERSION", "STAGES", "WIDGET_NAME", "DirectionError", "is_blank",
-    "parse_direction", "check_stage_rules", "bundle_root", "project_dir",
+    "parse_direction", "check_stage_rules", "bundle_root", "project_dir", "FIRST_OUT",
+    "project_bundle",
     "bundle_path", "manifest_digest", "admit_prompt_direction",
 ]
 
@@ -114,7 +122,7 @@ def _refuse_unknown(value: dict, allowed: frozenset, where: str) -> None:
 
 
 def _item_id(value: Any, where: str) -> str:
-    if not isinstance(value, str) or not ITEM_ID_RE.match(value):
+    if not isinstance(value, str) or not ITEM_ID_RE.fullmatch(value):
         raise DirectionError("%s is not a valid id: %r" % (where, value))
     return value
 
@@ -161,15 +169,15 @@ def parse_direction(raw: Any) -> Optional[Dict[str, Any]]:
     _refuse_unknown(data, _TOP_KEYS, "direction_json")
 
     version = data.get("version")
-    if isinstance(version, bool) or version != DIRECTION_VERSION:
+    if type(version) is not int or version != DIRECTION_VERSION:
         raise DirectionError("direction_json version must be %d, got %r"
                              % (DIRECTION_VERSION, version))
     project_id = data.get("project_id")
-    if not isinstance(project_id, str) or not PROJECT_ID_RE.match(project_id):
+    if not isinstance(project_id, str) or not PROJECT_ID_RE.fullmatch(project_id):
         raise DirectionError("project_id must be 4-32 lowercase letters, digits or "
                              "hyphens, got %r" % (project_id,))
     attempt_id = data.get("attempt_id")
-    if not isinstance(attempt_id, str) or not ATTEMPT_ID_RE.match(attempt_id):
+    if not isinstance(attempt_id, str) or not ATTEMPT_ID_RE.fullmatch(attempt_id):
         raise DirectionError("attempt_id must be 8-64 letters, digits or hyphens, "
                              "got %r" % (attempt_id,))
     stage = data.get("stage")
@@ -181,18 +189,23 @@ def parse_direction(raw: Any) -> Optional[Dict[str, Any]]:
         if out is not None:
             raise DirectionError("a publish run writes no bundle, so it takes no out")
     else:
-        match = OUT_RE.match(out) if isinstance(out, str) else None
+        match = OUT_RE.fullmatch(out) if isinstance(out, str) else None
         if not match:
             raise DirectionError("out must look like 03-%s, got %r" % (stage, out))
         if match.group(2) != stage:
             raise DirectionError("out %r does not match stage %r" % (out, stage))
 
     source = data.get("source")
-    if source is not None and (not isinstance(source, str) or not SOURCE_RE.match(source)):
+    if source is not None and (not isinstance(source, str) or not SOURCE_RE.fullmatch(source)):
         raise DirectionError("source must be a lowercase sha256, got %r" % (source,))
     if source is None and stage != "stills":
         raise DirectionError("a %s run replays an earlier bundle, so it needs a source"
                              % stage)
+    if source is None and out != FIRST_OUT:
+        # A run with no source starts a project. Only one bundle name can do
+        # that, so a source-less direction cannot start a second, disconnected
+        # episode inside a project that already has one (Codex QA, 2026-10-22).
+        raise DirectionError("a project's first run writes %s, got %r" % (FIRST_OUT, out))
 
     scenes: Dict[str, Dict[str, str]] = {}
     for sid, body in _require_dict(data.get("scenes", {}), "scenes").items():
@@ -266,7 +279,7 @@ def bundle_root() -> Path:
 
 def project_dir(project_id: str) -> Path:
     """One project's folder, confined to :func:`bundle_root`."""
-    if not isinstance(project_id, str) or not PROJECT_ID_RE.match(project_id):
+    if not isinstance(project_id, str) or not PROJECT_ID_RE.fullmatch(project_id):
         raise DirectionError("not a valid project id: %r" % (project_id,))
     root = bundle_root()
     return Path(confine_to_output_tree(str(root / project_id), "producer project",
@@ -275,11 +288,36 @@ def project_dir(project_id: str) -> Path:
 
 def bundle_path(project_id: str, out: str) -> Path:
     """Where the bundle named ``out`` of ``project_id`` lives (or will)."""
-    if not isinstance(out, str) or not OUT_RE.match(out):
+    if not isinstance(out, str) or not OUT_RE.fullmatch(out):
         raise DirectionError("not a valid bundle name: %r" % (out,))
     root = bundle_root()
     return Path(confine_to_output_tree(str(project_dir(project_id) / out), "producer bundle",
                                        roots=[str(root)]))
+
+
+def project_bundle(project_id: str, replay_from: str) -> Path:
+    """``replay_from`` resolved as the writer resolves it, and proven to be one of
+    THIS project's bundles: a direct child of :func:`project_dir` whose name is
+    a bundle name, by its typed path and by its real one.
+
+    Without this a direction for one project could continue another project's
+    bundle, or any ordinary replay bundle under the read roots (Codex QA,
+    2026-10-22).
+    """
+    try:
+        resolved = Path(confine_to_read_roots(replay_from, "replay_from"))
+        pdir = project_dir(project_id)
+    except OtrPathContractError as exc:
+        raise DirectionError("replay_from is outside the permitted folders: %s" % exc) \
+            from None
+    same_parent = (os.path.normcase(str(resolved.parent)) == os.path.normcase(str(pdir))
+                   and os.path.normcase(os.path.realpath(str(resolved.parent)))
+                   == os.path.normcase(os.path.realpath(str(pdir))))
+    if not same_parent or not OUT_RE.fullmatch(resolved.name):
+        raise DirectionError(
+            "replay_from %r is not one of project %s's bundles; a producer run continues "
+            "its own project's latest bundle" % (replay_from, project_id))
+    return resolved
 
 
 def manifest_digest(bundle_dir: str) -> str:
@@ -347,15 +385,27 @@ def admit_prompt_direction(prompt: Any) -> Optional[Dict[str, Any]]:
     check_stage_rules(direction, replay_from)
 
     manifest = None
-    if direction["source"] is not None:
+    if direction["source"] is None:
+        # The first run starts the project, so the project must not exist yet.
+        try:
+            pdir = project_dir(direction["project_id"])
+        except OtrPathContractError as exc:
+            raise DirectionError("the project folder is outside the producer folder: %s"
+                                 % exc) from None
+        if pdir.exists():
+            raise DirectionError(
+                "project %s already exists: continue it with source and replay_from, "
+                "or start a new project" % direction["project_id"])
+    else:
+        bundle = project_bundle(direction["project_id"], replay_from)
         try:
             from .production_ledger import ReplayBundleError, load_replay_manifest
         except ImportError:  # pragma: no cover -- flat (sys.path) load
             from production_ledger import (ReplayBundleError,  # type: ignore
                                            load_replay_manifest)
         try:
-            manifest = load_replay_manifest(replay_from)
-            digest = manifest_digest(replay_from)
+            manifest = load_replay_manifest(str(bundle))
+            digest = manifest_digest(str(bundle))
         except (ReplayBundleError, OtrPathContractError) as exc:
             raise DirectionError("the bundle in replay_from cannot be trusted: %s" % exc) \
                 from None

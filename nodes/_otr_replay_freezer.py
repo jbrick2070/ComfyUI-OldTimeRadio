@@ -128,6 +128,29 @@ def _building_dir(final: pathlib.Path) -> pathlib.Path:
     return final.parent / ("." + final.name + ".building")
 
 
+def _single_folder_name(name: object, what: str) -> str:
+    """``name`` as ONE folder name, or a refusal. The ledger's episode id becomes
+    part of a path this module deletes and renames, so a corrupted ledger must
+    not be able to point it anywhere else (Codex QA, 2026-10-22)."""
+    text = str(name or "")
+    if (not text or text in (".", "..") or text != text.strip()
+            or any(ch in text for ch in "/\\:\x00")):
+        raise ReplayBundleError("%s is not a single safe folder name: %r" % (what, text))
+    return text
+
+
+def _require_bundle_target(final: pathlib.Path, out_root: Optional[PathLike]) -> None:
+    """Refuse a bundle directory that is no directory name at all, or that would
+    land anywhere but directly inside ``out_root`` -- checked BEFORE the building
+    directory is removed or the bundle renamed into place."""
+    if not final.name or final.name in (".", ".."):
+        raise ReplayBundleError("not a usable bundle directory: %s" % final)
+    if out_root is not None:
+        root = pathlib.Path(out_root).resolve()
+        if final.resolve().parent != root:
+            raise ReplayBundleError("bundle %s would land outside %s" % (final, root))
+
+
 def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
            allow_no_plan: bool = False,
            dest: Optional[PathLike] = None,
@@ -160,8 +183,11 @@ def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
 
     if dest is not None:
         final = pathlib.Path(dest)
+        _require_bundle_target(final, None)
     elif out_root is not None:
-        final = pathlib.Path(out_root) / episode_id
+        final = pathlib.Path(out_root) / _single_folder_name(episode_id,
+                                                             "the ledger's episode_id")
+        _require_bundle_target(final, out_root)
     else:
         raise ReplayBundleError("freeze needs out_root or dest")
     if final.exists():
@@ -262,6 +288,7 @@ def derive_engine_bundle(bundle_dir: PathLike, engine_id: str,
     safe = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in engine_id)
     out_root = pathlib.Path(out_root) if out_root else bundle_dir.parent
     final = out_root / ("%s__engine_%s" % (bundle_dir.name, safe))
+    _require_bundle_target(final, out_root)
     if final.exists():
         raise ReplayBundleError("derived bundle already exists: %s (a bundle is immutable)" % final)
     tmp = _building_dir(final)

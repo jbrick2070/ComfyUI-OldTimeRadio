@@ -3527,7 +3527,14 @@ class OTRShotLock:
         # the backstop for a graph without that node, so a direction is never
         # silently run as an ordinary full episode. Chunk 2 replaces it with
         # the stage itself. Blank -- every shipped graph -- passes untouched.
-        if str(direction_json or "").strip():
+        # "Blank" is the shared module's rule, so this backstop and the
+        # validator can never disagree (a falsy non-text value such as 0 or {}
+        # is a malformed direction, not a blank one).
+        try:
+            from ._otr_producer_direction import is_blank as _direction_is_blank
+        except ImportError:  # pragma: no cover -- flat imports
+            from _otr_producer_direction import is_blank as _direction_is_blank  # type: ignore
+        if not _direction_is_blank(direction_json):
             raise ValueError(
                 "OTR_ShotLock: direction_json is filled, but this build cannot run "
                 "Scene Producer stages yet. Clear direction_json to make an ordinary "
