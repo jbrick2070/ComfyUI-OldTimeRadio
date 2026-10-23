@@ -24,9 +24,20 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 GITHUB_BLOB = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/"
+GITHUB_BLOB_ANY = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
 _REF = re.compile(r"(?<![/\w])apple/((?:[A-Za-z0-9_.\-]+/)*[A-Za-z0-9_.\-]+\.(?:md|yaml|json|txt))")
 _BARE = re.compile(r"(?<![/\w])([A-Za-z0-9_\-]+(?:--[A-Za-z0-9_.\-]+)?\.(?:md|yaml|json|txt))\b")
-_BLOB = re.compile(re.escape(GITHUB_BLOB) + r"([^\s)\]<>\"'#?]+)")
+#: A file link on GitHub: on main, or a permalink to a commit.
+_BLOB = re.compile(re.escape(GITHUB_BLOB_ANY) + r"(main|[0-9a-f]{7,40})/([^\s)\]<>\"'#?]+)")
+
+
+def _held_in_git(ref: str, path: str, tracked_all: set) -> bool:
+    """main's tracked files for a main link; the commit's tree for a permalink."""
+    if ref == "main":
+        return path in tracked_all
+    import subprocess
+    return subprocess.run(["git", "-C", str(REPO), "cat-file", "-e", f"{ref}:{path}"],
+                          capture_output=True).returncode == 0
 
 
 def _tracked(prefix: str) -> set:
@@ -68,13 +79,14 @@ def _apple_names() -> set:
 
 def _problems(text: str, patterns: list, names: set, tracked_all: set) -> list:
     problems = []
-    for line in text.splitlines():
+    # A Windows spelling of a path names the same file (Codex QA, 2026-10-23).
+    for line in text.replace("\\", "/").splitlines():
         # Every file this line links on GitHub, bare URL or markdown link alike.
         linked = set()
-        for target in _BLOB.findall(line):
+        for ref, target in _BLOB.findall(line):
             target = target.rstrip(".,;:")       # a bare URL at the end of a sentence
-            if target not in tracked_all:
-                problems.append(f"GitHub link to {target}, which git does not hold")
+            if not _held_in_git(ref, target, tracked_all):
+                problems.append(f"GitHub link to {target} at {ref}, which git does not hold")
             linked.add(target)
         # A reference is exempt only when THIS line links that same file.
         for rel in {f"apple/{m}" for m in _REF.findall(line)}:
@@ -116,16 +128,30 @@ def test_the_rule_catches_what_it_must_and_nothing_else():
         "[ok](" + GITHUB_BLOB + "apple/INSTALL.md) beside apple/IDEOGRAM4_LICENSE_ATTESTATION.md\n",
         patterns, names, tracked)
     assert held == [
-        "GitHub link to apple/NOPE.md, which git does not hold",
+        "GitHub link to apple/NOPE.md at main, which git does not hold",
         "IDEOGRAM4_LICENSE_ATTESTATION.md (apple/IDEOGRAM4_LICENSE_ATTESTATION.md) is excluded by .comfyignore",
         "apple/IDEOGRAM4_LICENSE_ATTESTATION.md is excluded by .comfyignore",
         "apple/evidence/manifest.json is excluded by .comfyignore"]
+    # A Windows spelling names the same excluded file (Codex QA, 2026-10-23).
+    assert _problems("See apple\\evidence\\manifest.json", patterns, names, tracked) == [
+        "apple/evidence/manifest.json is excluded by .comfyignore"]
+    # A permalink to a commit is held against that commit's tree: this file at
+    # the repository's first commit on main does not exist there.
+    import subprocess
+    root = subprocess.run(["git", "-C", str(REPO), "rev-list", "--max-parents=0", "HEAD"],
+                          capture_output=True, text=True).stdout.split()[0]
+    head = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"],
+                          capture_output=True, text=True).stdout.strip()
+    assert _problems(f"[then]({GITHUB_BLOB_ANY}{root}/tests/test_shipped_docs_point_at_shipped_files.py)",
+                     patterns, names, tracked) == [
+        f"GitHub link to tests/test_shipped_docs_point_at_shipped_files.py at {root}, which git does not hold"]
     fine = _problems(
         # A bare URL counts as a link; a query string or fragment is not part of the path.
         "it is at " + GITHUB_BLOB + "apple/IDEOGRAM4_LICENSE_ATTESTATION.md?plain=1#top, "
         "the IDEOGRAM4_LICENSE_ATTESTATION.md note\n"
         "see `anime.json`, which ships from config/\n"
-        "and https://github.com/jbrick2070/ComfyUI-OldTimeRadio/issues\n",
+        "and https://github.com/jbrick2070/ComfyUI-OldTimeRadio/issues\n"
+        f"and a permalink [now]({GITHUB_BLOB_ANY}{head}/tests/test_shipped_docs_point_at_shipped_files.py)\n",
         patterns, names, tracked)
     assert fine == []
 

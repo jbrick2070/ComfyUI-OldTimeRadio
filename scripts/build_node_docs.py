@@ -40,7 +40,9 @@ _KINDS = {"INT": "a whole number", "FLOAT": "a number", "BOOLEAN": "on or off",
 
 def _prepare_runtime() -> None:
     """Import the pack the way its test suite does: no GPU, test mode, and a
-    stand-in for ComfyUI's ``folder_paths`` whose file lists are empty."""
+    stand-in for ComfyUI's ``folder_paths`` whose file lists are empty. The
+    two variables are set for the rest of the process, as the suite's
+    conftest sets them; the command line is the generator's own process."""
     os.environ.setdefault("OTR_TEST_MODE", "1")
     os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
     if "folder_paths" not in sys.modules:
@@ -184,27 +186,17 @@ def render(key: str, entry: dict, display_name: str, cls, labels: dict) -> str:
     return "\n".join(lines)
 
 
-#: Settings that change what a node offers or starts on: cloud keys and the
-#: switches that turn a cloud lane on. The pages are rendered without them,
-#: so a page reads the same on a machine that has a key and one that does not.
-_MACHINE_ENV_PREFIXES = ("OPENROUTER_", "OTR_OPENROUTER", "OTR_ENABLE_", "GOOGLE_API",
-                         "OTR_GOOGLE", "COMFY_API", "OTR_COMFY", "GEMINI_API")
-
-
 def render_all() -> dict:
-    """``{key: page}`` for every registered node, rendered as a machine with
-    no cloud key would render them."""
+    """``{key: page}`` for every registered node.
+
+    A page must read the same on every machine. What a node OFFERS or STARTS
+    ON can depend on the machine -- cloud keys turn rows on, the host picks a
+    writer -- so the pages print no dropdown choice and no dropdown default
+    (``_default``), and the environment is left exactly as found: an earlier
+    version scrubbed the cloud variables around the render, and a module that
+    caches a variable at import kept the scrubbed value for the rest of the
+    process (Codex QA, 2026-10-23)."""
     _prepare_runtime()
-    scrubbed = {k: v for k, v in os.environ.items() if k.startswith(_MACHINE_ENV_PREFIXES)}
-    for key in scrubbed:
-        del os.environ[key]
-    try:
-        return _render_all()
-    finally:
-        os.environ.update(scrubbed)
-
-
-def _render_all() -> dict:
     config = json.loads(CONFIG.read_text(encoding="utf-8"))
     config.pop("_comment", None)
     table = node_table()
