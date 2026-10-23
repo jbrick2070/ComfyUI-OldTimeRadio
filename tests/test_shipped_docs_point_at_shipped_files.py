@@ -79,8 +79,12 @@ def _apple_names() -> set:
 
 def _problems(text: str, patterns: list, names: set, tracked_all: set) -> list:
     problems = []
-    # A Windows spelling of a path names the same file (Codex QA, 2026-10-23).
-    for line in text.replace("\\", "/").splitlines():
+    # A Windows spelling of a path names the same file (Codex QA, 2026-10-23);
+    # so do `./apple/X.md`, `.\apple\X.md` and a markdown-escaped underscore
+    # (Sonnet QA, same day).
+    text = text.replace("\\_", "_").replace("\\", "/")
+    text = re.sub(r"(?<![\w/])\./", "", text)
+    for line in text.splitlines():
         # Every file this line links on GitHub, bare URL or markdown link alike.
         linked = set()
         for ref, target in _BLOB.findall(line):
@@ -135,16 +139,27 @@ def test_the_rule_catches_what_it_must_and_nothing_else():
     # A Windows spelling names the same excluded file (Codex QA, 2026-10-23).
     assert _problems("See apple\\evidence\\manifest.json", patterns, names, tracked) == [
         "apple/evidence/manifest.json is excluded by .comfyignore"]
+    for spelling in (".\\apple\\evidence\\manifest.json", "./apple/evidence/manifest.json",
+                     "apple/evidence/manifest.json", "apple/IDEOGRAM4\\_LICENSE\\_ATTESTATION.md"):
+        assert _problems(f"See {spelling}", patterns, names, tracked) != [], spelling
+    # ...and the escaped spelling names the real file, not `apple/X/_Y.md`.
+    assert _problems("see apple/IDEOGRAM4\\_LICENSE\\_ATTESTATION.md", patterns, names, tracked) == [
+        "apple/IDEOGRAM4_LICENSE_ATTESTATION.md is excluded by .comfyignore"]
     # A permalink to a commit is held against that commit's tree: this file at
-    # the repository's first commit on main does not exist there.
+    # the repository's first commit on main does not exist there. A shallow
+    # clone's oldest commit is its cut, which may hold this file, so the
+    # negative case runs only on a full clone (Sonnet QA, 2026-10-23).
     import subprocess
-    root = subprocess.run(["git", "-C", str(REPO), "rev-list", "--max-parents=0", "HEAD"],
-                          capture_output=True, text=True).stdout.split()[0]
+    shallow = subprocess.run(["git", "-C", str(REPO), "rev-parse", "--is-shallow-repository"],
+                             capture_output=True, text=True).stdout.strip() == "true"
     head = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"],
                           capture_output=True, text=True).stdout.strip()
-    assert _problems(f"[then]({GITHUB_BLOB_ANY}{root}/tests/test_shipped_docs_point_at_shipped_files.py)",
-                     patterns, names, tracked) == [
-        f"GitHub link to tests/test_shipped_docs_point_at_shipped_files.py at {root}, which git does not hold"]
+    if not shallow:
+        root = subprocess.run(["git", "-C", str(REPO), "rev-list", "--max-parents=0", "HEAD"],
+                              capture_output=True, text=True).stdout.split()[0]
+        assert _problems(f"[then]({GITHUB_BLOB_ANY}{root}/tests/test_shipped_docs_point_at_shipped_files.py)",
+                         patterns, names, tracked) == [
+            f"GitHub link to tests/test_shipped_docs_point_at_shipped_files.py at {root}, which git does not hold"]
     fine = _problems(
         # A bare URL counts as a link; a query string or fragment is not part of the path.
         "it is at " + GITHUB_BLOB + "apple/IDEOGRAM4_LICENSE_ATTESTATION.md?plain=1#top, "

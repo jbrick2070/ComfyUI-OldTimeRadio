@@ -348,15 +348,19 @@ def test_every_roll_checklist_sits_together_at_the_foot_of_the_app_form():
     """Operator, 2026-09-27: the rolls must look alike in the app view.
     Operator, 2026-09-28: "all the clickbox sections are at the bottom after
     space saver" -- so every pool now closes the form, right after Space saver,
-    in the order of what it narrows, each with the same note."""
-    form = json.loads((REPO / "config" / "app_mode.json").read_text(
-        encoding="utf-8"))["form"]
+    in the order of what it narrows. Since the 2026-10-23 form round each
+    checklist's note names the roll that reads it (a reader could not tell
+    which switch a checklist belonged to), in one shape, and every note keeps
+    the rule the shared note carried: an empty checklist is the whole list."""
+    cfg = json.loads((REPO / "config" / "app_mode.json").read_text(encoding="utf-8"))
+    form = cfg["form"]
     names = [row[1] for row in form]
     pools = ["language_roll_pool", "bank_roll_pool", "style_roll_pool",
              "video_roll_pool", "still_roll_pool"]
     assert names[names.index("asset_cleanup") + 1:] == pools
-    notes = {row[1]: (row[2] if len(row) > 2 else None) for row in form}
-    assert {notes[p] for p in pools} == {"roll_pool_note"}
+    notes = {row[1]: cfg[row[2]] for row in form if row[1] in pools}
+    rolls = ["Language", "Bank", "Style", "Video", "Still"]
+    assert [notes[p] for p in pools] == [f"{roll} roll only; none = all" for roll in rolls]
 
 
 def test_the_writer_wires_both_pools_and_the_language_roll_at_their_real_sites():

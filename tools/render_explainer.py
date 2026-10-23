@@ -15,7 +15,6 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import os
 import re
 import subprocess
 import sys
@@ -25,6 +24,11 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 REPO = Path(__file__).resolve().parents[1]
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+from nodes._otr_shared import env as otr_env  # noqa: E402 -- the environment's one owner
+from nodes._otr_shared import proc as otr_proc  # noqa: E402 -- the one spawner
+
 SCRIPT = REPO / "planning" / "app-view-explainer" / "APP_VIEW_EXPLAINER.md"
 CONFIG = REPO / "config" / "app_mode.json"
 VOICES = Path(r"C:\ComfyUI-Models\TTS\KokoroTTS\voices")
@@ -457,8 +461,8 @@ def narrate(scenes: list, cache: Path, voice_id: str) -> list:
     import hashlib
     import soundfile as sf
     import torch
-    os.environ.setdefault("HF_HOME", r"C:\ComfyUI-Models\huggingface")
-    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    otr_env.setdefault("HF_HOME", r"C:\ComfyUI-Models\huggingface")
+    otr_env.setdefault("HF_HUB_OFFLINE", "1")
     from kokoro import KPipeline
     pipe = None
     voice = torch.load(str(VOICES / f"{voice_id}.pt"), weights_only=True)
@@ -551,7 +555,7 @@ def main(argv=None) -> int:
     cmd = ["ffmpeg", "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}",
            "-r", str(FPS), "-i", "-", "-i", str(wav), "-c:v", "libx264", "-preset", "medium", "-crf", "20",
            "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-shortest", "-movflags", "+faststart", str(out)]
-    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+    proc = otr_proc.popen(cmd, stdin=subprocess.PIPE)
     i = 0
     for p in plan:
         n = int(p["dur"] * FPS)

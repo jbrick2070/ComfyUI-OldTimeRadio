@@ -739,7 +739,7 @@ def test_with_the_audio_roll_on_the_advice_is_to_turn_it_off(monkeypatch):
         (), {"kokoro": "cannot speak %s here: measured" % language.label}))
     with pytest.raises(_langs().EpisodeLanguageError) as exc:
         L.settle_prompt_language(_language_prompt("Japanese", audio=True), "63")
-    assert "turn 'Randomize audio (non-cloud)' off" in str(exc.value)
+    assert "turn 'Randomize audio (16 GB+)' off" in str(exc.value)
 
 
 def test_one_language_left_is_logged_as_the_episodes_language(monkeypatch, caplog):

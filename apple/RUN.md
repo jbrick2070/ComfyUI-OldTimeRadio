@@ -168,8 +168,8 @@ download is, and whether it needs another node pack.
 
 Or let the pack draw them. Three Yes/No switches, all shipped off and meant for
 cards with 16 GB or more, sit above the pickers they replace in the app view:
-**Randomize video (non-cloud)** and **Randomize stills (non-cloud)** on
-OTR_VideoDirector, and **Randomize audio (non-cloud)** on OTR_CastLock. Each
+**Randomize video (16 GB+)** and **Randomize stills (16 GB+)** on
+OTR_VideoDirector, and **Randomize audio (16 GB+)** on OTR_CastLock. Each
 draws one local model for the whole episode from the ones this machine can run,
 downloading it the first time as if you had picked it. To narrow the video or
 still draw, tick models in **Video lanes to roll** or **Still models to roll**

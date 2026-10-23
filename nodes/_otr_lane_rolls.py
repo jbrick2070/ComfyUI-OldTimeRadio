@@ -1,7 +1,7 @@
 """nodes/_otr_lane_rolls.py -- the three model randomizers (operator, 2026-09-28).
 
 Three Yes/No switches, off in every shipped workflow, local engines only, each
-marked "Suggested for 16 GB+" in the app form:
+labelled "(16 GB+)" on the app form:
 
 * ``roll_video_lanes`` (OTR_VideoDirector): one local video lane for the whole
   episode, written into all three video roles.
@@ -884,7 +884,7 @@ def _run_voice_gap(row, voices, host):
 _LANGUAGE_ROW = "Language"
 _POOL_ROW = "Languages to roll"
 _VOICE_ROWS = "'Characters - voices' and 'Announcer - voice'"
-_AUDIO_ROLL_ROW = "Randomize audio (non-cloud)"
+_AUDIO_ROLL_ROW = "Randomize audio (16 GB+)"
 
 #: The note a refusal hangs on each cloud voice it suggests: what it costs.
 #: An engine not listed here is local and needs no note.
