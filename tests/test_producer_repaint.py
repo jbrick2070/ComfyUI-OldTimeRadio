@@ -155,7 +155,12 @@ def test_a_kept_card_keeps_its_still_through_a_scene_note(studio):
                                      kept={"stills": ["shot_b002"]})
     assert painted == ["still_b001"]
     kept = _rows(led2)["still_b002"]
-    assert kept["path"] == before["path"] and kept["provenance"] == {"source": "kept"}
+    assert kept["path"] == before["path"]
+    assert kept["provenance"] == {"source": "kept", "painted": before["provenance"]}
+    led3, painted, _changed = _again(studio, led2, scenes={"s01": {"note": "at dusk"}},
+                                     kept={"stills": ["shot_b002"]})
+    assert painted == [] and _rows(led3)["still_b002"]["provenance"] == kept["provenance"], \
+        "kept twice, it still names the paint, not the first keep"
 
 
 def test_takes_redraw_a_still_or_a_whole_character(studio):
@@ -180,7 +185,7 @@ SHOTS = {"video": {"shots": [
 def _cards(led, direction=None):
     """The cards a producer freeze of ``led`` would write."""
     ledger = dict(copy.deepcopy(led), **copy.deepcopy(SHOTS))
-    files = [{"path": "%s/%s" % ("portraits" if row.get("kind") == "portrait" else "stills",
+    files = [{"path": "%s/%s" % (pathlib.Path(row["path"]).parent.name,
                                   pathlib.Path(row["path"]).name)}
              for row in ledger["images"]["images"]]
     fields = PD.manifest_producer_fields(direction or PD.parse_direction(json.dumps(FIRST)))
@@ -205,7 +210,7 @@ def test_cards_record_what_each_still_was_painted_from(studio):
     assert cards["scenes"][1]["shots"][0]["motion_editable"] is False
     assert cards["cast"] == [{"char_id": "c1", "name": "MARA", "take": 0,
                               "picture": cards["cast"][0]["picture"]}]
-    assert cards["cast"][0]["picture"].startswith("portraits/")
+    assert cards["cast"][0]["picture"].startswith("stills/c1_"), "portraits paint into stills/"
 
 
 def test_a_video_run_refuses_edits_its_stills_do_not_show(studio):
@@ -335,3 +340,116 @@ def test_the_dispatcher_paints_on_a_stills_replay_and_verifies_on_any_other(monk
             wire[PD.RUNTIME_KEY] = direction
         D.OTRImageGenDispatcher().dispatch(json.dumps(wire), episode_id="e")
     assert calls == ["paint", "verify", "verify"]
+
+
+# --------------------------------------------------------------------------- #
+# Sonnet QA on chunk 3 (2026-10-22): each finding pinned
+# --------------------------------------------------------------------------- #
+
+def test_a_replay_with_the_shared_pool_cleared_paints_only_the_edit(studio):
+    # A replay in a new workspace, or after the pool was cleared, still has
+    # every row's episode copy; only the pool copies are gone.
+    led = _first_run(studio)
+    for row in led["images"]["images"]:
+        if row["pool_path"] != row["path"]:
+            pathlib.Path(row["pool_path"]).unlink()
+    _led2, painted, _changed = _again(
+        studio, led, cards={"shot_b002": {"picture_text": "a window lashed by a storm"}})
+    assert painted == ["still_b002"]
+
+
+def test_a_portrait_reference_falls_back_to_the_rows_episode_copy(tmp_path, monkeypatch):
+    monkeypatch.setenv("OTR_EXTRA_OUTPUT_ROOTS", str(tmp_path))
+    episode_copy = tmp_path / "stills" / "c1_abc.png"
+    episode_copy.parent.mkdir()
+    episode_copy.write_bytes(b"\x89PNG\r\n\x1a\nportrait")
+    monkeypatch.setattr(D._pl, "portrait_path_for_hash",
+                        lambda _h, _o: str(tmp_path / "pool" / "abc.png"))
+    row = {"pool_path": str(tmp_path / "pool" / "abc.png"), "path": str(episode_copy)}
+    assert D._portrait_png(row, "abc", str(tmp_path)) == str(episode_copy)
+    assert D._portrait_png({"pool_path": row["pool_path"]}, "abc", str(tmp_path)) == ""
+
+
+def test_superseded_rows_are_the_stills_no_longer_shown(studio):
+    led = _first_run(studio)
+    original = _rows(led)["still_b002"]["image_id"]
+    led2, _painted, _changed = _again(
+        studio, led, cards={"shot_b002": {"picture_text": "a window lashed by a storm"}})
+    edited = _rows(led2)["still_b002"]["image_id"]
+
+    def filed(ledger):
+        return [row["image_id"] for row in ledger["images"][PD.SUPERSEDED_KEY]]
+
+    led3, painted, _changed = _again(studio, led2)
+    assert painted == [] and filed(led3) == [original], \
+        "a cache hit keeps its id, so no copy of a live still is filed"
+    led4, painted, _changed = _again(
+        studio, led3, cards={"shot_b002": {"picture_text": "a rain-streaked window"}})
+    assert painted == [] and _rows(led4)["still_b002"]["image_id"] == original
+    assert filed(led4) == [edited], "the undone still is shown again and leaves the list"
+
+
+def test_a_saved_prompt_that_differs_only_by_whitespace_is_unchanged():
+    payload = copy.deepcopy(PAYLOAD)
+    payload["objects"][1].update(prompt="a lamp-lit radio desk  ",
+                                 prompt_hash=MB._content_hash("a lamp-lit radio desk  "))
+    direction = PD.parse_direction(json.dumps(dict(FIRST, out="02-stills", source="a" * 64)))
+    wire = {"beats": BEATS, "images": {PD.PAYLOAD_KEY: payload,
+                                       PD.RAW_TEXTS_KEY: PD.initial_raw_texts(payload)}}
+    rebuilt, changed = MB.rebuild_producer_payload(wire, direction)
+    assert changed == [] and rebuilt == payload
+
+
+def test_an_edit_to_a_failed_still_waits_for_a_stills_run(studio):
+    led = _first_run(studio)
+    led["images"]["images"] = [r for r in led["images"]["images"]
+                               if r["object_id"] != "still_b003"]
+    cards = _cards(led)
+    failed = cards["scenes"][1]["shots"][0]
+    assert (failed["state"], failed["still"], failed["still_input_hash"]) == ("failed", "", "")
+    assert PD.unpainted_shots(cards, _video()) == [], "untouched, the video stage floors it"
+    assert PD.unpainted_shots(cards, _video(
+        cards={"shot_b003": {"picture_text": "a hall of valves"}})) == ["shot_b003"]
+    assert PD.unpainted_shots(cards, _video(takes={"stills": {"shot_b003": 1}})) == ["shot_b003"]
+
+
+def test_a_character_take_waits_for_a_stills_run_without_a_still_of_its_own(studio):
+    # PAYLOAD's scene stills carry no character, so no card digest names c1:
+    # only the portrait shows the take.
+    led = _first_run(studio)
+    retake = _video(takes={"characters": {"c1": 1}})
+    assert PD.unpainted_shots(_cards(led), retake) == []
+    assert PD.unpainted_characters(_cards(led), retake) == ["c1"]
+    led2, painted, _changed = _again(studio, led, takes={"characters": {"c1": 1}})
+    assert painted == ["c1"]
+    assert PD.unpainted_characters(_cards(led2), retake) == []
+    assert PD.unpainted_characters(_cards(led2), _video()) == ["c1"], "takes are sent in full"
+
+
+def test_a_direction_names_only_what_its_bundles_cards_show(studio):
+    led = _first_run(studio)
+    cards = _cards(led)
+    PD.check_direction_ids(cards, _video(
+        cards={"shot_b001": {"picture_text": "a desk", "motion_text": "stands"}},
+        scenes={"s02": {"note": "in fog"}}, takes={"characters": {"c1": 2}},
+        kept={"stills": ["shot_b002"]}))
+    for changes, words in (
+            ({"cards": {"shot_b009": {"picture_text": "x"}}}, "no card shot_b009"),
+            ({"kept": {"stills": ["shot_b009"]}}, "no card shot_b009"),
+            ({"scenes": {"s09": {"note": "x"}}}, "no scene s09"),
+            ({"takes": {"characters": {"c9": 1}}}, "no character c9"),
+            ({"cards": {"shot_b003": {"motion_text": "walks"}}},
+             "card shot_b003 has no action to edit")):
+        with pytest.raises(PD.DirectionError, match=words):
+            PD.check_direction_ids(cards, _video(**changes))
+    # A shot whose lane paints no still: nothing to describe, redraw or keep.
+    led["images"][PD.PAYLOAD_KEY]["objects"] = PAYLOAD["objects"][:3]
+    led["images"]["images"] = [r for r in led["images"]["images"]
+                               if r["object_id"] != "still_b003"]
+    stillless = _cards(led)
+    for changes, words in (
+            ({"cards": {"shot_b003": {"picture_text": "x"}}}, "has no still to describe"),
+            ({"takes": {"stills": {"shot_b003": 1}}}, "has no still to take again"),
+            ({"kept": {"stills": ["shot_b003"]}}, "has no still to keep")):
+        with pytest.raises(PD.DirectionError, match="shot_b003 " + words):
+            PD.check_direction_ids(stillless, _video(**changes))

@@ -38,9 +38,13 @@ engine would mix two looks in one episode.
 
 CARDS.JSON AND UNPAINTED EDITS (chunk 3). Every producer freeze writes
 ``cards.json``, the page's view of its bundle, and each card still records the
-digest of what it was painted from. A Video or Publish run whose direction asks
-for a still its card does not show -- an edited picture or note, a raised take
--- is refused (:func:`unpainted_shots`) unless the card is kept.
+digest of what it was painted from. A replay's direction may name only the
+cards, scenes and cast that file shows, and only the edits each card can take
+(:func:`check_direction_ids`). A Video or Publish run whose direction asks for
+a still its card does not show -- an edited picture or note, a raised take --
+is refused (:func:`unpainted_shots`) unless the card is kept, and so is one
+that changes a character's take before it is painted
+(:func:`unpainted_characters`).
 
 WHAT IS NOT HERE YET, and which build step adds it beside its caller (a check
 with nothing to compare against is the defect the repo's own rules forbid): the
@@ -73,9 +77,6 @@ WRITER_CLASS = "OTR_LedgerScriptWriter"
 DIRECTOR_CLASS = "OTR_VideoDirector"
 #: The three image slots the video director resolves, in its policy's order.
 IMAGE_SLOTS = ("announcer_image_model", "music_image_model", "character_image_model")
-#: What the image director puts in a slot the video director left empty
-#: (``otr_image_director.direct``).
-DEFAULT_IMAGE_ENGINE = "flux_gen1"
 #: The durable-ledger meta key a producer stills run writes its engines to.
 META_IMAGE_ENGINES = "producer_image_engines"
 #: ...and the image seed configuration, locked for the project like the
@@ -141,6 +142,7 @@ __all__ = [
     "producer_replay_needs", "CARDS_NAME", "ROW_INPUT_HASH", "payload_object_hash",
     "still_input_digest", "card_still_digest", "build_cards", "unpainted_shots",
     "META_IMAGE_SEED", "policy_image_seed", "prompt_image_seed", "check_policy_matches_stamp",
+    "action_is_editable", "check_direction_ids", "unpainted_characters",
 ]
 
 
@@ -475,32 +477,56 @@ def policy_image_engines(image_policy: Any) -> Dict[str, str]:
     return out
 
 
-def prompt_image_engines(prompt: dict) -> Dict[str, str]:
-    """The per-slot image engines a queued prompt will paint with: the video
-    director's three picks, resolved exactly as it resolves them
-    (``OTRVideoDirector._image_picks``: a "+ Add Custom" pick takes its
-    ``custom_models_json`` entry), then given the image director's default for
-    an empty slot. A producer run types these, like its direction; a pick
-    wired from another node cannot be checked, so it is refused."""
-    directors = _nodes_of(prompt, DIRECTOR_CLASS)
-    if len(directors) != 1:
+def _typed_inputs(prompt: dict, class_type: str, names: tuple) -> Dict[str, Any]:
+    """The one ``class_type`` node's inputs, refused when the graph has none or
+    several, or when one of ``names`` is wired from another node: a producer
+    run types every value its checks read."""
+    nodes = _nodes_of(prompt, class_type)
+    if len(nodes) != 1:
         raise DirectionError("a Scene Producer run needs exactly one %s in the graph, "
-                             "found %d" % (DIRECTOR_CLASS, len(directors)))
-    node_id, node = directors[0]
+                             "found %d" % (class_type, len(nodes)))
+    node_id, node = nodes[0]
     inputs = node.get("inputs") or {}
-    for name in IMAGE_SLOTS + ("custom_models_json",):
+    for name in names:
         if isinstance(inputs.get(name), list):
             raise DirectionError("%s node %s takes %s from another node; a producer run "
-                                 "must type it" % (DIRECTOR_CLASS, node_id, name))
+                                 "must type it" % (class_type, node_id, name))
+    return inputs
+
+
+def prompt_image_engines(prompt: dict) -> Dict[str, str]:
+    """The per-slot image engines a queued prompt will paint with, resolved by
+    the two directors' own code in the order they run: the video director's
+    three picks (``OTRVideoDirector._image_picks``: a "+ Add Custom" pick takes
+    its ``custom_models_json`` entry), then the image director's
+    (``OTRImageDirector.resolve_image_models``: the gen-1 engine for an empty
+    slot, a sentinel still unresolved from its own ``custom_models_json``, and
+    the role check).
+
+    BOTH DIRECTORS, NOT ONE (Sonnet QA, 2026-10-22): resolved by the video
+    director alone, a custom pick declared only on the image director came out
+    here as the sentinel itself while the stills were painted with the declared
+    engine, so the project's own stamp refused every later run."""
+    inputs = _typed_inputs(prompt, DIRECTOR_CLASS, IMAGE_SLOTS + ("custom_models_json",))
+    image_inputs = _typed_inputs(prompt, IMAGE_DIRECTOR_CLASS, ("custom_models_json",))
     try:
+        from .otr_image_director import OTRImageDirector, _registry_descriptors
         from .otr_video_director import OTRVideoDirector
     except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from otr_image_director import (OTRImageDirector,  # type: ignore
+                                        _registry_descriptors)
         from otr_video_director import OTRVideoDirector  # type: ignore
     picked = OTRVideoDirector._image_picks(
         inputs.get("custom_models_json", ""),
         {slot: inputs.get(slot, "") for slot in IMAGE_SLOTS})
-    return {slot: (picked[slot].strip() if isinstance(picked.get(slot), str)
-                   and picked[slot].strip() else DEFAULT_IMAGE_ENGINE)
+    custom = OTRImageDirector._parse_json_obj(
+        image_inputs.get("custom_models_json", "{}"), "custom_models_json", [])
+    try:
+        resolved = OTRImageDirector.resolve_image_models(
+            picked, custom, _registry_descriptors(), [])
+    except ValueError as exc:
+        raise DirectionError(str(exc)) from None
+    return {slot: str((resolved.get(slot) or {}).get("engine_id") or "")
             for slot in IMAGE_SLOTS}
 
 
@@ -528,16 +554,7 @@ def prompt_image_seed(prompt: dict) -> Dict[str, Any]:
     """The seed configuration a queued prompt will paint with: the image
     director's ``seed_mode`` and ``request_seed`` widgets, typed, as it writes
     them into the policy."""
-    directors = _nodes_of(prompt, IMAGE_DIRECTOR_CLASS)
-    if len(directors) != 1:
-        raise DirectionError("a Scene Producer run needs exactly one %s in the graph, "
-                             "found %d" % (IMAGE_DIRECTOR_CLASS, len(directors)))
-    node_id, node = directors[0]
-    inputs = node.get("inputs") or {}
-    for name in ("seed_mode", "request_seed"):
-        if isinstance(inputs.get(name), list):
-            raise DirectionError("%s node %s takes %s from another node; a producer run "
-                                 "must type it" % (IMAGE_DIRECTOR_CLASS, node_id, name))
+    inputs = _typed_inputs(prompt, IMAGE_DIRECTOR_CLASS, ("seed_mode", "request_seed"))
     return _seed_config(inputs.get("seed_mode"), inputs.get("request_seed"))
 
 
@@ -767,6 +784,17 @@ def _scene_of_beat(ledger: dict) -> Dict[str, str]:
             for b in (ledger.get("beats") or []) if isinstance(b, dict)}
 
 
+def action_is_editable(shot: Any) -> bool:
+    """Whether a planned shot has an action a person can edit: a character
+    beat whose ``creative`` carries a ``motion`` leaf. Bookends and music have
+    no ``creative``; a Ghost shot composes from its own finalized prompt
+    (``ghost_prompt``), so editing ``motion`` there would change nothing. One
+    rule for a card's Motion box, node 63's refusal and Shot Lock's."""
+    creative = shot.get("creative") if isinstance(shot, dict) else None
+    return (isinstance(creative, dict) and "motion" in creative
+            and not shot.get("ghost_prompt"))
+
+
 def build_cards(ledger: dict, producer: Dict[str, Any], files: list) -> Dict[str, Any]:
     """The small versioned view a producer freeze writes beside the manifest:
     the one contract between the nodes and Radio Play Studio's page. Media
@@ -781,15 +809,18 @@ def build_cards(ledger: dict, producer: Dict[str, Any], files: list) -> Dict[str
                if isinstance(o, dict)}
     rows = {str(r.get("object_id")): r for r in images.get("images") or []
             if isinstance(r, dict) and r.get("object_id")}
-    by_name = {}
-    for entry in files:
-        rel = str(entry.get("path") or "")
-        if rel.startswith(("stills/", "portraits/")):
-            by_name.setdefault(rel.rsplit("/", 1)[-1], rel)
+    # A row's member is its own folder and name: the dispatcher paints every
+    # row into the episode's stills folder, and an older episode kept its
+    # portraits in a portraits folder, so a name the two folders share can
+    # never point a card at the other's file (Sonnet QA, 2026-10-22).
+    listed = {str(entry.get("path") or "") for entry in files}
 
     def media(row):
-        name = os.path.basename(str((row or {}).get("path") or ""))
-        return by_name.get(name, "") if name else ""
+        path = str((row or {}).get("path") or "")
+        if not path:
+            return ""
+        rel = "%s/%s" % (os.path.basename(os.path.dirname(path)), os.path.basename(path))
+        return rel if rel in listed else ""
 
     lines = {str(ln.get("line_id")): ln for ln in ledger.get("lines") or []
              if isinstance(ln, dict)}
@@ -807,7 +838,7 @@ def build_cards(ledger: dict, producer: Dict[str, Any], files: list) -> Dict[str
         row = rows.get("still_%s" % beat)
         line = lines.get(beat) or {}
         creative = shot.get("creative") if isinstance(shot.get("creative"), dict) else {}
-        editable = "motion" in creative and not shot.get("ghost_prompt")
+        editable = action_is_editable(shot)
         scene_id = scene_of.get(beat, "")
         still = media(row)
         state = ("kept" if shot_id in kept else
@@ -850,32 +881,104 @@ def build_cards(ledger: dict, producer: Dict[str, Any], files: list) -> Dict[str
             "cast": cast, "scenes": list(scenes.values())}
 
 
+def _card_digest(card: Dict[str, Any], picture: Any, note: Any, char_take: Any,
+                 still_take: Any) -> str:
+    """:func:`still_input_digest` for a card's still with these texts and takes."""
+    char_id = str(card.get("still_char_id") or "")
+    return still_input_digest(str(card.get("payload_hash") or ""), picture, note, char_id,
+                              int(char_take or 0) if char_id else 0, int(still_take or 0),
+                              str(card.get("engine_id") or ""))
+
+
 def unpainted_shots(cards: Dict[str, Any], direction: Dict[str, Any]) -> list:
     """The cards whose stills do not show what the direction asks for: an
     edited picture or note, a raised take -- any change to a still's inputs
     since it was painted -- unless the card is kept. A Video or Publish run
-    with any is refused: it would film the old stills under the new edits."""
+    with any is refused: it would film the old stills under the new edits.
+
+    A card whose still FAILED has no painted digest. Its baseline is the texts
+    and takes it was last asked to paint (Sonnet QA, 2026-10-22), so an edit
+    made to retry it is caught like any other, and an untouched failed card is
+    left to the video stage, which floors it."""
     kept = set(direction["kept"]["stills"])
     characters = direction["takes"]["characters"]
     stills = direction["takes"]["stills"]
+    painted_take = {str(m.get("char_id")): m.get("take") or 0
+                    for m in cards.get("cast") or [] if isinstance(m, dict)}
     pending = []
     for group in cards.get("scenes") or []:
+        recorded_note = group.get("note", "")
         scene_note = direction["scenes"].get(group.get("scene_id"), {}).get(
-            "note", group.get("note", ""))
+            "note", recorded_note)
         for card in group.get("shots") or []:
             shot_id = card.get("shot_id")
-            if not card.get("still_input_hash") or shot_id in kept:
+            if not card.get("picture_editable") or shot_id in kept:
                 continue
-            picture = direction["cards"].get(shot_id, {}).get("picture_text",
-                                                               card.get("picture_text", ""))
-            char_id = card.get("still_char_id") or ""
-            digest = still_input_digest(
-                card.get("payload_hash", ""), picture, scene_note, char_id,
-                characters.get(char_id, 0) if char_id else 0, stills.get(shot_id, 0),
-                card.get("engine_id", ""))
-            if digest != card["still_input_hash"]:
+            char_id = str(card.get("still_char_id") or "")
+            asked = _card_digest(
+                card, direction["cards"].get(shot_id, {}).get(
+                    "picture_text", card.get("picture_text", "")),
+                scene_note, characters.get(char_id, 0), stills.get(shot_id, 0))
+            shown = card.get("still_input_hash") or _card_digest(
+                card, card.get("picture_text", ""), recorded_note,
+                painted_take.get(char_id, 0), card.get("still_take", 0))
+            if asked != shown:
                 pending.append(shot_id)
     return pending
+
+
+def unpainted_characters(cards: Dict[str, Any], direction: Dict[str, Any]) -> list:
+    """The cast whose take the direction changes from the one their pictures
+    were painted with. A character's take repaints the portrait and every still
+    painted from it, so a Video or Publish run that changes one is refused until
+    a Stills run has painted it -- whether or not any card's own digest names the
+    character (Sonnet QA, 2026-10-22: a cast member with no still of their own
+    would have been filmed with the old face)."""
+    asked = direction["takes"]["characters"]
+    return [str(m.get("char_id")) for m in cards.get("cast") or []
+            if isinstance(m, dict)
+            and int(asked.get(str(m.get("char_id")), 0)) != int(m.get("take") or 0)]
+
+
+def check_direction_ids(cards: Dict[str, Any], direction: Dict[str, Any]) -> None:
+    """Refuse a replay's direction that names what its bundle's ``cards.json``
+    does not show, or asks a card for what it cannot take: a card, scene or
+    character that is not there, a picture text or still take on a card with
+    no still, an action on a card with none to edit, a kept still on a card
+    with no still to keep.
+
+    Each would otherwise do nothing at all, and an edit that does nothing looks
+    like a broken edit (plan, "Direction JSON": unknown ids and motion edits on
+    cards without an editable action are refused). Shot Lock refuses an unknown
+    or uneditable action again at run time, as a backstop."""
+    shots = {str(card.get("shot_id")): card for group in cards.get("scenes") or []
+             for card in group.get("shots") or [] if isinstance(card, dict)}
+    scenes = {str(group.get("scene_id")) for group in cards.get("scenes") or []}
+    cast = {str(m.get("char_id")) for m in cards.get("cast") or [] if isinstance(m, dict)}
+    problems = []
+    for label, ids, known in (
+            ("card", list(direction["cards"]) + list(direction["takes"]["stills"])
+             + list(direction["takes"]["clips"]) + list(direction["kept"]["stills"])
+             + list(direction["kept"]["clips"]), shots),
+            ("scene", list(direction["scenes"]), scenes),
+            ("character", list(direction["takes"]["characters"]), cast)):
+        problems.extend("no %s %s" % (label, i) for i in sorted(set(ids) - set(known)))
+
+    def refuse(ids, holds, words):
+        problems.extend("card %s %s" % (i, words) for i in sorted(ids)
+                        if i in shots and not holds(shots[i]))
+
+    refuse([s for s, body in direction["cards"].items() if "picture_text" in body],
+           lambda card: card.get("picture_editable"), "has no still to describe")
+    refuse(direction["takes"]["stills"], lambda card: card.get("picture_editable"),
+           "has no still to take again")
+    refuse([s for s, body in direction["cards"].items() if "motion_text" in body],
+           lambda card: card.get("motion_editable"), "has no action to edit")
+    refuse(direction["kept"]["stills"], lambda card: card.get("still"),
+           "has no still to keep")
+    if problems:
+        raise DirectionError("the direction does not fit bundle %s: %s"
+                             % (cards.get("bundle"), "; ".join(problems[:8])))
 
 
 # --------------------------------------------------------------------------- #
@@ -982,16 +1085,23 @@ def admit_prompt_direction(prompt: Any) -> Optional[Dict[str, Any]]:
                 "is %s, the direction names %s)" % (_shown(replay_from), digest[:12],
                                                     direction["source"][:12]))
         _check_image_engines(prompt, manifest, bundle.name)
+        cards = _read_cards(bundle)
+        check_direction_ids(cards, direction)
         if direction["stage"] in ("video", "publish"):
             # UNPAINTED EDITS (plan, "Validation"): a Video or Publish run films
             # the stills it has, so an edit the stills do not show yet -- a
             # picture, a note, a take -- must be painted first, or the card kept.
-            pending = unpainted_shots(_read_cards(bundle), direction)
+            pending = unpainted_shots(cards, direction)
             if pending:
                 raise DirectionError(
                     "%d card(s) carry edits their stills do not show yet: %s; paint the "
                     "stills first, or keep those cards as they are"
                     % (len(pending), ", ".join(pending[:8])))
+            recast = unpainted_characters(cards, direction)
+            if recast:
+                raise DirectionError(
+                    "the take of %s differs from the one their pictures were painted "
+                    "with; paint the stills first" % ", ".join(recast[:8]))
         if direction["out"] is not None:
             # Bundles are numbered in the order they were made, one apart, so
             # "latest" is always the highest number and no number is skipped.

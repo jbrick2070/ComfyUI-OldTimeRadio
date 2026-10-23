@@ -723,6 +723,19 @@ def test_the_check_resolves_picks_as_the_two_directors_do():
     assert PD.prompt_image_engines(prompt) == {
         "announcer_image_model": "flux_gen1", "music_image_model": "z_image_turbo",
         "character_image_model": "my_house_engine"}
+    # Sonnet QA, 2026-10-22: a sentinel the video director leaves unresolved
+    # is resolved by the image director from its own map, as it paints it.
+    prompt["87"]["inputs"]["custom_models_json"] = "{}"
+    prompt["88"]["inputs"]["custom_models_json"] = json.dumps(
+        {"character_image_model": "my_house_engine"})
+    assert PD.prompt_image_engines(prompt)["character_image_model"] == "my_house_engine"
+    prompt["88"]["inputs"]["custom_models_json"] = "{}"
+    assert PD.prompt_image_engines(prompt)["character_image_model"] == "", \
+        "declared nowhere, it paints with nothing, and the stamp records that"
+    prompt["88"]["inputs"]["custom_models_json"] = ["500", 0]
+    with pytest.raises(PD.DirectionError, match="OTR_ImageDirector node 88 takes "
+                                                "custom_models_json from another node"):
+        PD.prompt_image_engines(prompt)
 
 
 def test_the_stamp_reads_the_policy_the_dispatcher_paints_with():
@@ -884,3 +897,32 @@ def test_node_63_refuses_a_video_run_over_edits_the_stills_do_not_show(producer_
     assert PD.admit_prompt_direction(_prompt(
         _raw(stage="stills", out="02-stills", source=digest, cards=edit),
         replay_from=str(bundle)))
+
+
+def test_node_63_refuses_what_the_bundle_does_not_show(producer_root, tmp_path, monkeypatch):
+    # Sonnet QA, 2026-10-22: each of these used to be admitted and then do
+    # nothing at all.
+    bundle = _bundle_with_a_painted_card(tmp_path, monkeypatch)
+    digest = PD.manifest_digest(str(bundle))
+
+    def run(stage, **changes):
+        return _prompt(_raw(stage=stage, out="02-%s" % stage, source=digest, **changes),
+                       replay_from=str(bundle))
+
+    for changes, words in (
+            ({"cards": {"shot_nope": {"picture_text": "x"}}}, "no card shot_nope"),
+            ({"scenes": {"s99": {"note": "x"}}}, "no scene s99"),
+            ({"takes": {"characters": {"c99": 1}}}, "no character c99"),
+            # Ghost composes from its own prompt: the fixture's one shot has no
+            # action to edit, which Shot Lock alone used to catch, at run time.
+            ({"cards": {"shot_b001": {"motion_text": "turns"}}},
+             "card shot_b001 has no action to edit")):
+        for stage in ("stills", "video"):
+            with pytest.raises(PD.DirectionError,
+                               match="does not fit bundle 01-stills: .*" + words):
+                PD.admit_prompt_direction(run(stage, **changes))
+    # The fixture's still carries no character, so only the cast's take shows
+    # c02's: a Video run waits for the Stills run that paints it.
+    with pytest.raises(PD.DirectionError, match="the take of c02 differs"):
+        PD.admit_prompt_direction(run("video", takes={"characters": {"c02": 1}}))
+    assert PD.admit_prompt_direction(run("stills", takes={"characters": {"c02": 1}}))

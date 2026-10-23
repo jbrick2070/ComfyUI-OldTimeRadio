@@ -43,6 +43,9 @@ from ._otr_shared import character_photos as _photos
 #: video director). The custom engine id is read from ``custom_models_json``.
 ADD_CUSTOM = "+ Add Custom Model"
 
+#: The gen-1 engine an image slot paints with when the video policy names none.
+FALLBACK_IMAGE_ENGINE = "flux_gen1"
+
 #: Which role(s) each image slot must be compatible with (fail-closed filter) --
 #: identical mapping to the video director's slots so the shared filter agrees.
 IMAGE_SLOT_ROLES = {
@@ -278,31 +281,8 @@ class OTRImageDirector:
         video_policy = self._parse_video_policy_required(video_policy_json)
         descriptors = _registry_descriptors()
 
-        # SINGLE SOURCE OF TRUTH (operator 2026-06-18: "only in one place not two").
-        # Image-MODEL picks live ONLY in OTR_VideoDirector, carried per-role in
-        # video_policy["image_models"]. This node has no image-model widgets; it
-        # reads those picks verbatim. A slot absent from the policy defaults to the
-        # gen-1 engine (flux_gen1, always usable) with a LOUD warning -- never a
-        # silent crash on a box-fresh / partially-wired policy. No other swap: the
-        # dispatcher hard-fails if the picked engine cannot run.
         vp_images = video_policy.get("image_models")
-        vp_images = vp_images if isinstance(vp_images, dict) else {}
-        picks = {}
-        for slot in ("announcer_image_model", "music_image_model",
-                     "character_image_model"):
-            vp_pick = vp_images.get(slot)
-            if isinstance(vp_pick, str) and vp_pick.strip():
-                picks[slot] = vp_pick
-            else:
-                warnings.append(
-                    f"{slot}: no pick in video_policy['image_models']; "
-                    f"defaulting to flux_gen1 (gen-1). Set it in OTR_VideoDirector.")
-                picks[slot] = "flux_gen1"
-        resolved = {}
-        for slot, picked in picks.items():
-            resolved[slot] = self._resolve_and_validate(
-                slot, picked, custom, descriptors, warnings
-            )
+        resolved = self.resolve_image_models(vp_images, custom, descriptors, warnings)
 
         # Legacy receipt values only -- see _RECEIPT_GRANULARITY.
         granularity = {
@@ -376,6 +356,41 @@ class OTRImageDirector:
         return (json.dumps(policy, ensure_ascii=True, separators=(",", ":")),)
 
     # ------------------------------------------------------------------ #
+    @staticmethod
+    def resolve_image_models(vp_images, custom, descriptors, warnings) -> dict:
+        """Each image slot's engine, exactly as this node paints it: the
+        ``image_models`` it emits.
+
+        SINGLE SOURCE OF TRUTH (operator 2026-06-18: "only in one place not
+        two"). Image-MODEL picks live ONLY in OTR_VideoDirector, carried per
+        role in ``video_policy["image_models"]``. This node has no image-model
+        widgets; it reads those picks verbatim. A slot absent from the policy
+        defaults to the gen-1 engine (:data:`FALLBACK_IMAGE_ENGINE`, always
+        usable) with a LOUD warning -- never a silent crash on a box-fresh or
+        partially wired policy. A '+ Add Custom Model' pick still unresolved
+        takes this node's own ``custom``, and every engine passes the role
+        check. No other swap: the dispatcher hard-fails if the picked engine
+        cannot run.
+
+        The Scene Producer's queue-time engine check calls this too
+        (``_otr_producer_direction.prompt_image_engines``), so the engines it
+        compares with a bundle are the engines this node will paint with."""
+        vp_images = vp_images if isinstance(vp_images, dict) else {}
+        picks = {}
+        for slot in IMAGE_SLOT_ROLES:
+            vp_pick = vp_images.get(slot)
+            if isinstance(vp_pick, str) and vp_pick.strip():
+                picks[slot] = vp_pick
+            else:
+                warnings.append(
+                    f"{slot}: no pick in video_policy['image_models']; "
+                    f"defaulting to {FALLBACK_IMAGE_ENGINE} (gen-1). Set it in "
+                    f"OTR_VideoDirector.")
+                picks[slot] = FALLBACK_IMAGE_ENGINE
+        return {slot: OTRImageDirector._resolve_and_validate(
+                    slot, picked, custom, descriptors, warnings)
+                for slot, picked in picks.items()}
+
     @staticmethod
     def _parse_json_obj(raw, label, warnings) -> dict:
         try:

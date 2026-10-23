@@ -669,9 +669,15 @@ _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 def _portrait_png(portrait_row, portrait_hash, output_dir) -> str:
     """The portrait row's PNG on disk, or "". Confined before the stat (Sonnet
     QA, 2026-10-18): the row is ledger data, so outside the approved folders it
-    reads as absent; the content-addressed pool path is the fallback."""
-    cand = _confined_or_empty(str((portrait_row or {}).get("pool_path")
-                                  or (portrait_row or {}).get("path") or ""))
+    reads as absent; the content-addressed pool path is the fallback.
+
+    THE EPISODE COPY IS THE LAST RESORT (Sonnet QA, 2026-10-22): a replay
+    imported into a new workspace, or run after the shared pool was cleared,
+    finds neither pool copy, while the row's own episode copy -- rebased onto
+    this workspace by the import -- is right here. Tried last, so every case
+    the pool answers reads exactly the file it read before."""
+    row = portrait_row or {}
+    cand = _confined_or_empty(str(row.get("pool_path") or row.get("path") or ""))
     if not cand or not os.path.isfile(cand):
         try:
             # The pool fallback is confined too: the hash is ledger data, and a
@@ -682,6 +688,8 @@ def _portrait_png(portrait_row, portrait_hash, output_dir) -> str:
                 str(_pl.portrait_path_for_hash(portrait_hash, output_dir) or ""))
         except Exception:  # noqa: BLE001 -- resolver is best-effort
             cand = ""
+    if not cand or not os.path.isfile(cand):
+        cand = _confined_or_empty(str(row.get("path") or ""))
     return cand if cand and os.path.isfile(cand) else ""
 
 
@@ -1914,7 +1922,13 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 raise ImageRenderError(
                     "Scene Producer keeps the still of card shot_%s, but %s has no "
                     "verified still on disk to keep" % (beat_id, oid))
-            _kept = dict(_kept, provenance={"source": "kept"})
+            # Marked kept, so its old digest is not stamped over below, and
+            # still saying where its pixels came from (Sonnet QA, 2026-10-22):
+            # the provenance of the paint it keeps, through any earlier keep.
+            _was = _kept.get("provenance") if isinstance(_kept.get("provenance"), dict) else {}
+            _kept = dict(_kept, provenance={
+                "source": "kept",
+                "painted": _was.get("painted", {}) if _was.get("source") == "kept" else _was})
             images.append(_kept)
             ep_rows.append(_kept)
             reused += 1
@@ -2292,6 +2306,16 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             # An untrusted cache source is simply NOT A HIT: fall through to
             # the LOUD regenerate below rather than copying it (2026-09-05).
             trusted = _trusted_pool_source(src, output_dir) if src else ""
+            if not trusted and ref_row is not None:
+                # THE EPISODE COPY WHEN THE POOL COPY IS GONE (Sonnet QA,
+                # 2026-10-22). A replay imported into a new workspace, or run
+                # after the shared pool was cleared, finds the row's pool copy
+                # missing while its episode copy -- rebased onto this
+                # workspace by the import -- is right here. Without it every
+                # unchanged still was painted again: the same pixels, and on
+                # a cloud engine the same spend, once more per replay.
+                src = str(ref_row.get("path") or "")
+                trusted = _trusted_pool_source(src, output_dir) if src else ""
             if trusted:
                 src = trusted   # the checked spelling is the one copied
                 try:
@@ -2698,9 +2722,17 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     _obj, str(_row.get("engine_id") or ""), _raw_texts, _painted,
                     _scene_of_beat)
         images, _newly_superseded = _one_row_per_object(images)
-        _known = {str(r.get("image_id")) for r in _superseded if isinstance(r, dict)}
-        _superseded.extend(r for r in _newly_superseded
-                           if str(r.get("image_id")) not in _known)
+        # ONLY STILLS NO LONGER SHOWN, each once (Sonnet QA, 2026-10-22). A
+        # cache hit or a kept still is a new row under its old image_id, and
+        # every run used to file a copy of it here beside the live row: a
+        # ledger, and every bundle frozen from it, a row longer per still per
+        # run. A still shown again leaves the list.
+        _filed, _seen = [], {str(r.get("image_id")) for r in images if isinstance(r, dict)}
+        for _row in _superseded + _newly_superseded:
+            if isinstance(_row, dict) and str(_row.get("image_id")) not in _seen:
+                _seen.add(str(_row.get("image_id")))
+                _filed.append(_row)
+        _superseded = _filed
     ledger["images"] = {
         "image_revision": rev,
         "episode_id": ep,

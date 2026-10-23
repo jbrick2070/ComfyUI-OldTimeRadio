@@ -2411,16 +2411,6 @@ def _apply_replay_engine_override(planned: dict, override: str, policy: dict) ->
                          "source engine: %r" % leftover[:5])
 
 
-def action_is_editable(shot: dict) -> bool:
-    """Whether a planned shot has an action a person can edit: a character
-    beat whose ``creative`` carries a ``motion`` leaf. Bookends and music have
-    no ``creative``; a Ghost shot composes from its own finalized prompt
-    (``ghost_prompt``), so editing ``motion`` there would change nothing."""
-    creative = shot.get("creative") if isinstance(shot, dict) else None
-    return (isinstance(creative, dict) and "motion" in creative
-            and not shot.get("ghost_prompt"))
-
-
 def apply_action_edits(planned: dict, ledger: dict, meta: dict, cards: dict) -> list:
     """THE SCENE PRODUCER'S ACTION OVERLAY: apply each card's edited action
     (``motion_text``) to the frozen plan, in place, and return the shot ids it
@@ -2446,8 +2436,13 @@ def apply_action_edits(planned: dict, ledger: dict, meta: dict, cards: dict) -> 
 
     Refused, before anything changes: a card for a shot the plan does not
     have, and an action on a shot with nothing to edit
-    (:func:`action_is_editable`).
+    (``_otr_producer_direction.action_is_editable``, the rule a card's Motion
+    box and node 63 read too).
     """
+    try:
+        from ._otr_producer_direction import action_is_editable
+    except ImportError:  # pragma: no cover -- flat imports
+        from _otr_producer_direction import action_is_editable  # type: ignore
     shots = {s.get("shot_id"): s for s in (planned.get("shots") or [])
              if isinstance(s, dict)}
     wanted = {sid: body["motion_text"] for sid, body in (cards or {}).items()

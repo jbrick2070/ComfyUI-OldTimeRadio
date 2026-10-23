@@ -2794,7 +2794,10 @@ def rebuild_producer_payload(ledger: dict, direction: dict) -> tuple:
         picture = raw["cards"].get(shot, obj.get("prompt"))
         note = raw["scenes"].get(scene_of_beat.get(str(obj.get("beat_id") or ""), ""), "")
         prompt = _PD.compose_picture(picture, note)
-        if prompt != str(obj.get("prompt") or ""):
+        # Compared as composed: a saved prompt that differs only by its outer
+        # whitespace paints the same picture, so it keeps its prompt and hash
+        # and is not reported as changed (Sonnet QA, 2026-10-22).
+        if prompt != _PD.compose_picture(obj.get("prompt"), ""):
             obj["prompt"] = prompt
             obj["prompt_hash"] = _content_hash(prompt)
             changed.append(shot)
