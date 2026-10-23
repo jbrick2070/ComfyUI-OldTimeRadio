@@ -41,7 +41,8 @@ def producer_root(tmp_path, monkeypatch):
 class _Camera:
     """A stand-in video engine. ``broken`` names shots it fails on, and
     ``timeouts`` shots whose provider times out -- a cloud floor on a cloud
-    lane. ``peak_mb``, when set, is the VRAM peak each render reports."""
+    lane. ``peak_mb``, when set, is the VRAM peak each render reports, and
+    ``broke`` names shots the provider refuses for an empty wallet."""
     family = "abstract"
     roles = ("retired_role_b",)
     default_roles = ()
@@ -56,6 +57,7 @@ class _Camera:
         self.filmed = []
         self.broken = set()
         self.timeouts = set()
+        self.broke = set()
         self.peak_mb = None
 
     def load(self):
@@ -78,6 +80,10 @@ class _Camera:
             from nodes._otr_shared import cloud_media_backend as cmb
             raise cmb.CloudMediaError(cmb.CloudErrorCode.TIMEOUT,
                                       "the provider timed out on %s" % sid)
+        if sid in self.broke:
+            from nodes._otr_shared import cloud_media_backend as cmb
+            raise cmb.CloudMediaError(cmb.CloudErrorCode.BUDGET,
+                                      "cloud media: budget exhausted on %s" % sid)
         self.filmed.append(sid)
         path = self.scratch / ("otr_engine_tmp_%s_%d.mp4" % (sid, len(self.filmed)))
         path.write_bytes(("%s|%s" % (sid, request.get("text_prompt"))).encode())
@@ -453,6 +459,24 @@ def test_a_record_keeps_files_never_paths(tmp_path):
             PC.lookup(store, key)
 
 
+def test_a_commit_waits_out_a_folder_held_for_a_moment(tmp_path, monkeypatch):
+    store, key = tmp_path / "store", "ce" * 32
+    real_replace = os.replace
+    refused = []
+
+    def held_once(src, dst):
+        if ".staging-" in str(src) and not refused:
+            refused.append(src)
+            raise PermissionError(13, "the folder is held", str(src))
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(PC.os, "replace", held_once)
+    monkeypatch.setattr(PC.time, "sleep", lambda seconds: None)
+    record = PC.commit(store, key, BODY, {"clip": str(_clip_file(tmp_path))})
+    assert refused and PC.lookup(store, key) == record
+    assert [p.name for p in store.iterdir()] == [key], "no staging folder is left behind"
+
+
 def test_a_tampered_entry_is_refused(tmp_path):
     store, key = tmp_path / "store", "cd" * 32
     PC.commit(store, key, BODY, {"clip": str(_clip_file(tmp_path))})
@@ -565,6 +589,77 @@ def test_a_floored_shot_is_a_failed_card_and_its_retry_comes_back_filmed(
     assert filmed == ["shot_b002"]
     assert not set(rd._FLOOR_MARKS) & set(again["ledger"]["video"]["shots"][1])
     assert again["ledger"]["video"][PC.FLOOR_KEY] == {} and "shot_b002" in _map(again)
+
+
+@pytest.mark.parametrize("fanout", ["1", "2"])
+def test_a_spend_cap_halt_still_delivers_the_shots_filmed_before(
+        producer_root, cameras, floors, tmp_path, monkeypatch, fanout):
+    # Reusing a clip costs nothing, so an empty wallet floors only the shots
+    # that would have to be filmed.
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", fanout)
+    camera = cameras("cloud_stub_camera")
+    first, _filmed, _producer = _film(camera, _cloud_workspace(tmp_path, "ep_a"))
+    camera.broke = {"shot_b001", "shot_b002"}
+    again, filmed, producer = _film(camera, _cloud_workspace(
+        tmp_path, "ep_b", prompts={"shot_b001": "an edited desk",
+                                   "shot_b002": "an edited window"}))
+    assert filmed == [] and producer.reused == {"shot_b003": "store"}
+    shots = {s["shot_id"]: s for s in again["ledger"]["video"]["shots"]}
+    assert shots["shot_b001"].get("budget_floor") and shots["shot_b002"].get("budget_floor")
+    assert not shots["shot_b003"].get("budget_floor")
+    assert list(_map(again)) == ["shot_b003"]
+    assert _map(again)["shot_b003"] == _map(first)["shot_b003"]
+
+
+@pytest.mark.parametrize("fanout", ["1", "2"])
+def test_a_spend_cap_halt_still_delivers_a_kept_clip(producer_root, cameras, floors,
+                                                    tmp_path, monkeypatch, fanout):
+    # The kept shot comes third, past both fan-out workers, so the halt
+    # reaches it before any worker does.
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", fanout)
+    camera = cameras("cloud_stub_camera")
+    ep_a, ledger_a, build_a = _cloud_workspace(tmp_path, "ep_a")
+    first, _filmed, _producer = _film(camera, (ep_a, ledger_a, build_a))
+    camera.broke = {"shot_b001", "shot_b002"}
+    edited = {"shot_b001": "an edited desk", "shot_b002": "an edited window",
+              "shot_b003": "an edited corridor"}
+    workspace = _replayed(tmp_path, ep_a, "ep_b", engine_id="cloud_stub_camera",
+                          prompts=edited)
+    again, filmed, producer = _film(camera, workspace, bundle_map=_map(first),
+                                    kept=["shot_b003"])
+    assert filmed == [] and producer.reused == {"shot_b003": "kept"}
+    assert list(_map(again)) == ["shot_b003"]
+    assert set(again["ledger"]["video"][PC.FLOOR_KEY]) == {"shot_b001", "shot_b002"}
+
+
+def test_a_clip_or_floor_the_episode_cannot_take_by_a_move_is_copied_in_under_its_name(
+        producer_root, cameras, floors, tmp_path, monkeypatch):
+    # A scanner holding a file it has just seen appear refuses the move. The
+    # map and the floor payload must still name files the episode holds, and
+    # the store keep the filmed clip.
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", "1")
+    camera = cameras("cloud_stub_camera")
+    camera.timeouts = {"shot_b002"}
+    real_move = shutil.move
+
+    def held(src, dst, *args, **kwargs):
+        if "shot_b002" in str(src) or "shot_b003" in str(src):
+            raise PermissionError(13, "the file is held", str(src))
+        return real_move(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr(shutil, "move", held)
+    ep, ledger, build = workspace = _cloud_workspace(tmp_path, "ep_a")
+    result, filmed, _producer = _film(camera, workspace)
+    record = _map(result)["shot_b003"]
+    floor = result["ledger"]["video"][PC.FLOOR_KEY]["shot_b002"]
+    assert record["files"]["clip"]["path"] == \
+        "clips/shot_b003_retired_role_b_cloud_stub_camera.mp4"
+    assert floor["files"]["clip"]["path"] == "clips/shot_b002_retired_role_b_still_pan.mp4"
+    for sid, item in (("shot_b003", record["files"]["clip"]),
+                      ("shot_b002", floor["files"]["clip"])):
+        assert PC.file_sha256(ep / item["path"]) == item["sha256"]
+        assert result["clips"][sid]["path"] == str(ep / item["path"])
+    assert PC.lookup(PC.store_dir(PID), record["key"]) is not None
 
 
 def test_a_kept_floor_is_used_as_it_is_and_stays_a_floor(producer_root, cameras, floors,

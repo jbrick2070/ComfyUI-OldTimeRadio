@@ -44,6 +44,7 @@ import os
 import re
 import shutil
 import threading
+import time
 import uuid
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Iterable, Optional
@@ -95,6 +96,10 @@ _ENV_NOT_CAUSAL_ENDINGS = ("_API_KEY", "_KEY_FILE", "_DIR", "_ROOT", "_ROOTS", "
                            "_TMP", "_CACHE", "_TIMEOUT", "_TIMEOUT_S", "_FANOUT",
                            "_EST_USD", "_EST_USD_PER_S", "_PORT")
 _KEY_RE = re.compile(r"^[0-9a-f]{64}$")
+#: How long a commit waits, in turn, before it renames a held staging folder
+#: into place again: on Windows a scanner opening a file it has just seen
+#: appear holds the folder for a moment.
+_RENAME_WAITS_S = (0.05, 0.1, 0.2, 0.4, 0.8)
 _NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$")
 
 __all__ = ["CLIP_KEY_VERSION", "FLOOR_KEY", "MAP_KEY", "ClipStoreError", "ProducerClips",
@@ -296,6 +301,20 @@ def lookup(store: Path, key: str) -> Optional[Dict[str, Any]]:
     return record
 
 
+def _rename_into_place(staging: Path, entry: Path) -> None:
+    """Rename a staged entry onto its key, again while the folder is held. A
+    refusal with the entry already there is another writer's commit, which
+    the caller settles; that one is not waited out."""
+    for wait in _RENAME_WAITS_S + (None,):
+        try:
+            os.replace(str(staging), str(entry))
+            return
+        except PermissionError:
+            if wait is None or entry.exists():
+                raise
+            time.sleep(wait)
+
+
 def commit(store: Path, key: str, body: Dict[str, Any],
            files: Dict[str, str]) -> Dict[str, Any]:
     """Commit one filmed shot to the store and return its record.
@@ -335,7 +354,7 @@ def commit(store: Path, key: str, body: Dict[str, Any],
         (staging / RECORD_NAME).write_text(
             json.dumps(record, ensure_ascii=True, sort_keys=True, indent=1), encoding="utf-8")
         try:
-            os.replace(str(staging), str(entry))
+            _rename_into_place(staging, entry)
         except OSError:
             # Another writer committed the same key first: the same clip.
             settled = lookup(store, key)
