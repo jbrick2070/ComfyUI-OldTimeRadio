@@ -422,6 +422,24 @@ def test_an_edit_to_a_failed_still_waits_for_a_stills_run(studio):
     assert PD.unpainted_shots(cards, _video(takes={"stills": {"shot_b003": 1}})) == ["shot_b003"]
 
 
+def test_a_refused_repaint_shows_failed_and_waits_for_a_new_paint_or_a_kept_clip(studio):
+    # The repaint was refused: the old row is still filed, and the receipt
+    # names the beat a gap, which the render skips. The card must say so.
+    led = _first_run(studio)
+    led["images"]["required_scene_targets"] = [
+        {"object_id": "still_b002", "status": "sanctioned_gap", "beat_id": "b002"}]
+    cards = _cards(led)
+    card = {c["shot_id"]: c for g in cards["scenes"] for c in g["shots"]}["shot_b002"]
+    assert card["still"], "the old still is still shown"
+    assert (card["still_state"], card["state"], card["still_input_hash"]) == \
+        ("failed", "failed", "")
+    assert PD.unpainted_shots(cards, _video()) == [], "untouched, the video stage floors it"
+    publish = _video(stage="publish", out=None)
+    assert "shot_b002 (its still was refused)" in PD.unfilmed_shots(cards, publish)
+    assert "shot_b002 (its still was refused)" not in PD.unfilmed_shots(
+        cards, _video(stage="publish", out=None, kept={"stills": [], "clips": ["shot_b002"]}))
+
+
 def test_a_character_take_waits_for_a_stills_run_without_a_still_of_its_own(studio):
     # PAYLOAD's scene stills carry no character, so no card digest names c1:
     # only the portrait shows the take.

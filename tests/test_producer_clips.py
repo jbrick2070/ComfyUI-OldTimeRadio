@@ -8,10 +8,10 @@ same still and audio bytes at its own paths, as a replay workspace does.
 """
 from __future__ import annotations
 
+import ast
 import json
 import os
 import pathlib
-import re
 import shutil
 import sys
 
@@ -385,9 +385,22 @@ def test_the_key_sees_every_engine_setting_in_the_environment(monkeypatch):
                         ("OTR_GOOGLE_API_KEY", "a rotated key"),
                         ("OTR_CLOUD_VIDEO_TIMEOUT_S", "900"), ("OTR_CLOUD_FANOUT", "4"),
                         ("OTR_CLOUD_VIDEO_EST_USD", "0.5"), ("OTR_LTX25_ENCODER_CACHE", "0"),
+                        # A spend cap raised after a halt must film nothing again.
+                        ("OTR_CLOUD_MEDIA_BUDGET_USD", "90"),
+                        ("OTR_CLOUD_MAX_CONCURRENCY_LTX25", "3"),
+                        ("OTR_COMFY_MAX_RETRIES", "5"), ("OTR_TMP_SWEEP_MAX_AGE_S", "60"),
+                        ("OTR_COMFY_API_BASE", "https://example.invalid"),
+                        ("OTR_HF_TOKEN_FILE", "D:/token"), ("OTR_RUNTIME_SECRETS_FILE", "D:/s"),
+                        ("OTR_VIDEO_BUDGET_MARGIN", "0.2"), ("OTR_VIDEO_COST_PER_FRAME_MB", "9"),
+                        ("OTR_UNIFIED_MEMORY_HEADROOM_MB", "512"), ("OTR_TMP", "D:/tmp"),
                         ("HF_HOME", "D:/hf")):
         monkeypatch.setenv(name, value)
         assert key() == same, name
+    # A folder or root that chooses model files is a cause.
+    for name in ("OTR_LTX_8GB_CKPT_DIR", "OTR_COMFYUI_MODELS_ROOT"):
+        monkeypatch.setenv(name, "D:/other_weights")
+        assert key() != same, name
+        monkeypatch.delenv(name)
 
 
 def test_every_setting_the_pack_writes_while_a_prompt_runs_stays_out_of_the_key():
@@ -398,8 +411,22 @@ def test_every_setting_the_pack_writes_while_a_prompt_runs_stays_out_of_the_key(
     # named in this test as the exception it is.
     pinned = set()
     for source in (_REPO / "nodes").rglob("*.py"):
-        pinned.update(re.findall(r"otr_env\.(?:pin|setdefault)\(\s*[\"'](OTR_[A-Z0-9_]+)",
-                                 source.read_text(encoding="utf-8")))
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            # env.pin / env.setdefault / env.unpin("OTR_..."), whatever the alias,
+            # and environ["OTR_..."] = / .pop("OTR_...") wherever it is spelled.
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                    and node.func.attr in ("pin", "setdefault", "unpin", "pop")
+                    and node.args and isinstance(node.args[0], ast.Constant)
+                    and str(node.args[0].value).startswith("OTR_")):
+                if node.func.attr != "pop" or "environ" in ast.unparse(node.func.value):
+                    pinned.add(node.args[0].value)
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if (isinstance(target, ast.Subscript) and "environ" in ast.unparse(target.value)
+                            and isinstance(target.slice, ast.Constant)
+                            and str(target.slice.value).startswith("OTR_")):
+                        pinned.add(target.slice.value)
     assert pinned, "the scan found the pins"
     assert pinned <= PC._ENV_NOT_CAUSAL, sorted(pinned - PC._ENV_NOT_CAUSAL)
 
@@ -440,6 +467,66 @@ def test_a_file_replaced_in_place_never_passes_as_the_one_it_replaced(tmp_path):
     os.utime(str(stored), ns=(before.st_atime_ns, before.st_mtime_ns))
     with pytest.raises(PC.ClipStoreError, match="not the file its record names"):
         PC.lookup(store, key)
+
+
+def test_a_record_of_the_wrong_shape_is_passed_over_never_a_crash(producer_root, cameras,
+                                                                  tmp_path):
+    camera = cameras()
+    ep_a, ledger, build = _workspace(tmp_path, "ep_a")
+    first, _filmed, _producer = _film(camera, (ep_a, ledger, build))
+    forged = json.loads(json.dumps(_map(first)))
+    forged["shot_b001"]["clip"]["receipts"] = 5                # not a list
+    forged["shot_b002"]["clip"]["vram_peak_mb"] = 10 ** 400     # no float holds it
+    again, filmed, producer = _film(camera, _replayed(tmp_path, ep_a, "ep_c"),
+                                    bundle_map=forged)
+    assert filmed == []
+    assert producer.reused["shot_b001"] == "store", "the bad record is passed over"
+    assert producer.reused["shot_b002"] == "bundle" and again["vram_peak_mb"] is None
+
+
+def test_a_stored_clip_copied_in_waits_out_a_held_file(producer_root, cameras, tmp_path,
+                                                       monkeypatch):
+    camera = cameras()
+    _film(camera, _workspace(tmp_path, "ep_a"))
+    real_replace = os.replace
+    refused = []
+
+    def held_once(src, dst):
+        if str(src).endswith(".part") and not refused:
+            refused.append(src)
+            raise PermissionError(13, "the file is held", str(src))
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(PC.os, "replace", held_once)
+    monkeypatch.setattr(PC.time, "sleep", lambda seconds: None)
+    ep_b, ledger, build = workspace = _workspace(tmp_path, "ep_b")
+    _again, filmed, producer = _film(camera, workspace)
+    assert refused and filmed == [] and set(producer.reused.values()) == {"store"}
+    assert not [p.name for p in (ep_b / "clips").iterdir() if p.name.endswith(".part")]
+
+
+def test_a_copy_in_that_fails_half_way_leaves_nothing_under_the_clips_name(
+        producer_root, cameras, tmp_path, monkeypatch):
+    camera = cameras()
+    real_move, real_copy = shutil.move, shutil.copyfile
+
+    def held(src, dst, *args, **kwargs):
+        if "shot_b002" in str(src):
+            raise PermissionError(13, "the file is held", str(src))
+        return real_move(src, dst, *args, **kwargs)
+
+    def breaks(src, dst, *args, **kwargs):
+        if "shot_b002" in str(src) and str(dst).endswith(".part"):
+            pathlib.Path(dst).write_bytes(b"half")
+            raise OSError("the disk filled up")
+        return real_copy(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr(shutil, "move", held)
+    monkeypatch.setattr(shutil, "copyfile", breaks)
+    ep, ledger, build = workspace = _workspace(tmp_path, "ep_a")
+    result, filmed, _producer = _film(camera, workspace)
+    assert filmed == sorted(PROMPTS) and "shot_b002" not in _map(result), "not committed"
+    assert not [p.name for p in (ep / "clips").iterdir() if "shot_b002" in p.name]
 
 
 def test_a_record_keeps_files_never_paths(tmp_path):
@@ -734,6 +821,51 @@ def test_a_spend_cap_halt_still_delivers_a_kept_clip(producer_root, cameras, flo
     assert filmed == [] and producer.reused == {"shot_b003": "kept"}
     assert list(_map(again)) == ["shot_b003"]
     assert set(again["ledger"]["video"][PC.FLOOR_KEY]) == {"shot_b001", "shot_b002"}
+
+
+@pytest.mark.parametrize("fanout", ["1", "2"])
+def test_a_shot_that_cannot_be_looked_up_after_a_halt_floors(
+        producer_root, cameras, floors, tmp_path, monkeypatch, fanout):
+    # A request builder that fails for a shot met after the halt floors it,
+    # as the halt would; it never stops the episode.
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", fanout)
+    camera = cameras("cloud_stub_camera")
+    _film(camera, _cloud_workspace(tmp_path, "ep_a"))
+    camera.broke = {"shot_b001", "shot_b002"}
+    ep, ledger, build = _cloud_workspace(tmp_path, "ep_b", prompts={
+        "shot_b001": "an edited desk", "shot_b002": "an edited window"})
+
+    def builder(shot, ledger, canvas=None, segment_index=0):
+        if shot["shot_id"] == "shot_b003" and len(camera.asked_after_halt) > 0:
+            raise RuntimeError("the builder could not make a request for this shot")
+        return build(shot, ledger, canvas=canvas, segment_index=segment_index)
+
+    camera.asked_after_halt = []
+    real_render = camera.render_clip
+
+    def render(request, prepared):
+        camera.asked_after_halt.append(request["shot_id"])
+        return real_render(request, prepared)
+
+    camera.render_clip = render
+    again, filmed, producer = _film(camera, (ep, ledger, builder))
+    shots = {s["shot_id"]: s for s in again["ledger"]["video"]["shots"]}
+    assert shots["shot_b003"].get("budget_floor"), "floored as the halt would"
+    assert producer.reused == {}
+
+
+def test_a_kept_clip_on_a_refused_still_is_a_delivered_beat(producer_root, cameras, tmp_path,
+                                                           monkeypatch):
+    camera = cameras()
+    ep_a, ledger, build = _workspace(tmp_path, "ep_a")
+    first, _filmed, _producer = _film(camera, (ep_a, ledger, build))
+    monkeypatch.setattr(rd, "sanctioned_gap_beat_ids", lambda ledger: {"b002"})
+    ep, ledger_b, build_b = _replayed(tmp_path, ep_a, "ep_b")
+    again, filmed, producer = _film(camera, (ep, ledger_b, build_b), bundle_map=_map(first),
+                                    kept=["shot_b002"])
+    assert producer.reused["shot_b002"] == "kept"
+    rows = {r["shot_id"]: r for r in rd.build_clip_manifest(again, episode_id="ep_b")["clips"]}
+    assert (rows["shot_b002"]["status"], rows["shot_b002"]["exists"]) == ("ok", True)
 
 
 def test_a_clip_or_floor_the_episode_cannot_take_by_a_move_is_copied_in_under_its_name(

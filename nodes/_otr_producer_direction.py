@@ -70,9 +70,11 @@ from typing import Any, Dict, Optional
 try:
     from ._otr_paths import (OtrPathContractError, confine_to_output_tree,
                              confine_to_read_roots, otr_episodes_root)
+    from ._otr_shared import still_receipt as _still_receipt
 except ImportError:  # pragma: no cover -- flat (sys.path) load
     from _otr_paths import (OtrPathContractError, confine_to_output_tree,  # type: ignore
                             confine_to_read_roots, otr_episodes_root)
+    from _otr_shared import still_receipt as _still_receipt  # type: ignore
 
 DIRECTION_VERSION = 1
 STAGES = ("stills", "video", "publish")
@@ -876,6 +878,12 @@ def build_cards(ledger: dict, producer: Dict[str, Any], files: list) -> Dict[str
     floored = video.get(FLOOR_MAP_KEY) if isinstance(video.get(FLOOR_MAP_KEY), dict) else {}
     characters = takes.get("characters") or {}
     stills = takes.get("stills") or {}
+    # Beats whose still the image model REFUSED, read from the receipt as the
+    # render reads it (render_driver.sanctioned_gap_beat_ids). A repaint that
+    # was refused leaves the old row in place, so the row alone would show a
+    # painted still the render will skip as a gap.
+    refused_beats = {str(row.get("beat_id")) for row in images.get("required_scene_targets") or []
+                     if _still_receipt.is_sanctioned_gap(row) and row.get("beat_id")}
     scenes: Dict[str, Dict[str, Any]] = {}
     for shot in video.get("shots") or []:
         if not isinstance(shot, dict) or not str(shot.get("shot_id") or "").startswith("shot_"):
@@ -890,7 +898,9 @@ def build_cards(ledger: dict, producer: Dict[str, Any], files: list) -> Dict[str
         scene_id = scene_of.get(beat, "")
         still_char = str((obj or {}).get("char_id") or "")
         still = media(row)
-        still_state = ("kept" if shot_id in kept else
+        refused = beat in refused_beats
+        still_state = ("failed" if refused else
+                       "kept" if shot_id in kept else
                        "painted" if still else
                        "failed" if obj is not None else "")
         # THE CLIP (chunk 4b): the record of the clip the last Video run
@@ -928,7 +938,9 @@ def build_cards(ledger: dict, producer: Dict[str, Any], files: list) -> Dict[str
                               or ("budget" if marks.get("budget_floor") else "")
                               or marks.get("status") or ""),
             "clip_input_hash": str((record or {}).get("key") or ""),
-            "still_input_hash": str((row or {}).get(ROW_INPUT_HASH) or ""),
+            # A refused still has no painted digest: its baseline is the texts
+            # and takes it was last asked to paint (unpainted_shots).
+            "still_input_hash": "" if refused else str((row or {}).get(ROW_INPUT_HASH) or ""),
             "payload_hash": payload_object_hash(obj) if obj else "",
             "still_char_id": still_char,
             # The character take this card was last asked to paint with: with
@@ -1049,7 +1061,7 @@ def unfilmed_shots(cards: Dict[str, Any], direction: Dict[str, Any]) -> list:
             if sid in kept:
                 continue
             body = direction["cards"].get(sid, {})
-            if card.get("picture_editable") and not card.get("still"):
+            if card.get("still_state") == "failed":
                 # The render skips a shot whose still was refused, as a gap,
                 # and refuses that gap in a Publish its card does not keep.
                 pending.append("%s (its still was refused)" % sid)

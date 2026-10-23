@@ -4496,8 +4496,11 @@ def _as_rendered(producer, shot, found):
     clip = found["clip"]
     _mark_reused_receipts(clip, producer.reused.get(sid, "?"))
     peak = clip.get("vram_peak_mb")
-    used = (int(peak) if isinstance(peak, (int, float)) and not isinstance(peak, bool)
-            and math.isfinite(peak) else None)
+    try:
+        used = (int(peak) if isinstance(peak, (int, float)) and not isinstance(peak, bool)
+                and math.isfinite(float(peak)) else None)
+    except OverflowError:       # a number no float holds is no peak
+        used = None
     marks = {k: v for k, v in (found.get("marks") or {}).items() if k in _FLOOR_MARKS}
     out_shot = dict(_rendered_shot(shot), **marks)
     return clip, out_shot, list(found["attempts"]), used
@@ -4508,8 +4511,9 @@ def _mark_reused_receipts(clip, source):
     -- with where it came from: the run's render trace lists them, and must
     never claim a render this run did not do. Outside the causal fields, so
     every receipt still recomputes its ``actual_request_sha``."""
-    rows = [clip.get("receipt")] + list(clip.get("receipts") or ())
-    rows += [seg.get("receipt") for seg in clip.get("segments") or ()
+    receipts, segments = clip.get("receipts"), clip.get("segments")
+    rows = [clip.get("receipt")] + (receipts if isinstance(receipts, list) else [])
+    rows += [seg.get("receipt") for seg in (segments if isinstance(segments, list) else [])
              if isinstance(seg, dict)]
     for row in rows:
         if isinstance(row, dict):
@@ -4528,8 +4532,20 @@ def _bring_clip_into(clip, dest, name):
     src = str(clip.get("path") or "")
     if (src and os.path.isfile(src)
             and os.path.dirname(os.path.abspath(src)) != os.path.abspath(dest)):
+        # Copied beside the target and renamed into place, so a copy that
+        # fails half-way leaves nothing under the clip's name.
         target = os.path.join(dest, name)
-        shutil.copyfile(src, target)
+        handle, part = tempfile.mkstemp(prefix="." + name + ".", suffix=".part", dir=dest)
+        os.close(handle)
+        try:
+            shutil.copyfile(src, part)
+            os.replace(part, target)
+        except BaseException:
+            try:
+                os.remove(part)
+            except OSError:
+                pass
+            raise
         clip["path"] = target
 
 
@@ -5649,6 +5665,33 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                          "release that would evict other owners too",
                          engine_id, _exc)
 
+    def _look_up_after_halt(shot):
+        """A producer run's shot met after a spend-cap halt: ``(request,
+        render tuple)`` for the clip it filmed before (``film=False``), or
+        None, and the caller floors it as the halt would. A refusal of the
+        clip store still raises; nothing else does, so neither a shot never
+        filmed nor one that cannot be looked up -- a request builder that
+        fails, an engine since retired -- stops the episode."""
+        sid = str(shot.get("shot_id") or "")
+        try:
+            request = (request_builder(shot, ledger, canvas=canvas)
+                       if request_builder is not None
+                       else build_request(shot, assets, frame_count, canvas))
+            return request, render_beat_coverage(
+                shot, ledger, request=request, request_builder=request_builder,
+                canvas=canvas, host_caps=_episode_host_caps, profile=_episode_profile,
+                on_segment_done=_video_progress.part, reuse=producer, film=False)
+        except _producer_clips_module().ClipStoreError:
+            raise
+        except NotFilmed:
+            _LOG.error("[OTR video] BUDGET floor shot %s -- not submitted after "
+                       "spend-cap halt, and never filmed before", sid)
+        except Exception as exc:  # noqa: BLE001 -- a halt never stops the episode
+            _LOG.error("[OTR video] BUDGET floor shot %s -- not submitted after "
+                       "spend-cap halt, and it could not be looked up (%s: %s)",
+                       sid, type(exc).__name__, exc)
+        return None
+
     def _book_kept(shot):
         """Book a KEPT card's clip, or the floor it fell to (``kept``, taken
         before any shot was filmed): a clip as a reused clip is booked, a
@@ -5773,10 +5816,16 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                         continue
                     try:
                         rendered[sid] = _exec_shot(shot, film=False)
+                    except _producer_clips_module().ClipStoreError as exc:
+                        errors[sid] = exc        # raised in ledger order below
                     except NotFilmed:
                         continue
-                    except Exception as exc:  # noqa: BLE001 -- raised in ledger order below
-                        errors[sid] = exc
+                    except Exception as exc:  # noqa: BLE001 -- a halt never stops the episode
+                        _LOG.error(
+                            "[OTR video] shot %s could not be looked up after the "
+                            "spend-cap halt (%s: %s); it floors as the halt would",
+                            sid, type(exc).__name__, exc)
+                        continue
                     halted.discard(sid)
             for shot in section["shots"]:
                 bid = _beat_id_for_shot(shot)
@@ -5950,60 +5999,64 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                 # scope is never opened into memory that is about to be drained,
                 # and idempotent, so the 2nd..Nth beat on the same engine is free.
                 _begin_engine_scope(_this_engine)
-                if request_builder is not None:
-                    request = request_builder(shot, ledger, canvas=canvas)
-                else:
-                    request = build_request(shot, assets, frame_count, canvas)
-                # ONE BEAT, however many renders it takes (2026-07-26, chunks 6c/6d).
-                # A shot with no coverage plan or a single-clip one goes straight to
-                # render_shot with the request already built above -- unchanged. A
-                # multi-segment plan opens ONE beat session, renders each segment from
-                # its own request, chains terminal frames inside the loop, and assembles
-                # the result before it comes back.
-                try:
-                    clip, out_shot, attempts, used = render_beat_coverage(
-                        shot, ledger, request=request,
-                        request_builder=request_builder,
-                        canvas=canvas,
-                        host_caps=_episode_host_caps,
-                        profile=_episode_profile,
-                        on_segment_done=_video_progress.part,
-                        reuse=producer, film=not halted)
-                except NotFilmed:
-                    _LOG.error(
-                        "[OTR video] BUDGET floor shot %s -- not submitted "
-                        "after spend-cap halt, and never filmed before",
-                        shot.get("shot_id"))
-                    _commit_still_floor(shot, _stamp_budget_floor_shot(shot))
-                    continue
-                except Exception as exc:
-                    if producer is not None and isinstance(
-                            exc, _producer_clips_module().ClipStoreError):
-                        # A refusal of the clip store is never a floor,
-                        # whatever words its message happens to hold.
-                        raise
-                    sid = str(shot.get("shot_id") or "")
-                    if _cloud_budget_floor_sid(sid, {sid: exc}, ()):
-                        _LOG.error(
-                            "[OTR video] BUDGET floor shot %s -- "
-                            "empty wallet or an explicit spend-off cap "
-                            "refused a further reserve; the beat is shown "
-                            "as its scene still. %s",
-                            sid, exc)
+                if halted:
+                    # A SPEND-CAP HALT NEVER STOPS THE EPISODE. A producer run's
+                    # shot met after one is delivered when it was filmed before,
+                    # and floors as the halt would otherwise -- including when
+                    # it cannot be looked up at all (_look_up_after_halt).
+                    looked_up = _look_up_after_halt(shot)
+                    if looked_up is None:
                         _commit_still_floor(shot, _stamp_budget_floor_shot(shot))
-                        cloud_spend_halt = True
                         continue
-                    _floor_why = _cloud_floor_reason(sid, {sid: exc}, shot)
-                    if _floor_why:
-                        _LOG.error(
-                            "[OTR video] CLOUD floor shot %s [%s] -- %s The "
-                            "beat keeps its place and is shown as its scene "
-                            "still. %s", sid, _floor_why,
-                            _cloud_floor_sentence(_floor_why), exc)
-                        _commit_still_floor(
-                            shot, _stamp_cloud_floor_shot(shot, _floor_why))
-                        continue
-                    raise
+                    request, (clip, out_shot, attempts, used) = looked_up
+                else:
+                    if request_builder is not None:
+                        request = request_builder(shot, ledger, canvas=canvas)
+                    else:
+                        request = build_request(shot, assets, frame_count, canvas)
+                    # ONE BEAT, however many renders it takes (2026-07-26, chunks 6c/6d).
+                    # A shot with no coverage plan or a single-clip one goes straight to
+                    # render_shot with the request already built above -- unchanged. A
+                    # multi-segment plan opens ONE beat session, renders each segment from
+                    # its own request, chains terminal frames inside the loop, and assembles
+                    # the result before it comes back.
+                    try:
+                        clip, out_shot, attempts, used = render_beat_coverage(
+                            shot, ledger, request=request,
+                            request_builder=request_builder,
+                            canvas=canvas,
+                            host_caps=_episode_host_caps,
+                            profile=_episode_profile,
+                            on_segment_done=_video_progress.part,
+                            reuse=producer)
+                    except Exception as exc:
+                        if producer is not None and isinstance(
+                                exc, _producer_clips_module().ClipStoreError):
+                            # A refusal of the clip store is never a floor,
+                            # whatever words its message happens to hold.
+                            raise
+                        sid = str(shot.get("shot_id") or "")
+                        if _cloud_budget_floor_sid(sid, {sid: exc}, ()):
+                            _LOG.error(
+                                "[OTR video] BUDGET floor shot %s -- "
+                                "empty wallet or an explicit spend-off cap "
+                                "refused a further reserve; the beat is shown "
+                                "as its scene still. %s",
+                                sid, exc)
+                            _commit_still_floor(shot, _stamp_budget_floor_shot(shot))
+                            cloud_spend_halt = True
+                            continue
+                        _floor_why = _cloud_floor_reason(sid, {sid: exc}, shot)
+                        if _floor_why:
+                            _LOG.error(
+                                "[OTR video] CLOUD floor shot %s [%s] -- %s The "
+                                "beat keeps its place and is shown as its scene "
+                                "still. %s", sid, _floor_why,
+                                _cloud_floor_sentence(_floor_why), exc)
+                            _commit_still_floor(
+                                shot, _stamp_cloud_floor_shot(shot, _floor_why))
+                            continue
+                        raise
                 # NO FALLBACKS (2026-07-02): render_shot either returns a clip or
                 # raises RenderError; there are no runtime fallback decisions and no
                 # AS-2 family-change group prune (the family can never change here).
@@ -7235,8 +7288,13 @@ def build_clip_manifest(result, *, episode_id=""):
             # alike is what would let a broken render publish as "degraded".
             # Stamped ONLY when the receipt says so; never inferred from the
             # missing file.
+            # A refused still sanctions its beat only while nothing stands
+            # in for it: a Scene Producer card that KEPT its clip delivers
+            # one, and is counted as delivered. An ordinary run never films
+            # a refused beat, so its rows are as they were.
             "status": (_receipt.STATUS_SANCTIONED_GAP
-                       if (shot_is_sanctioned_gap(shot, _gap_beats_for_manifest)
+                       if ((shot_is_sanctioned_gap(shot, _gap_beats_for_manifest)
+                            and not exists)
                            or _shot_is_budget_floor(shot)
                            or _shot_is_cloud_floor(shot))
                        else _receipt.STATUS_OK),

@@ -21,11 +21,13 @@ A committed entry is never changed; one that fails verification is moved
 aside, not overwritten.
 
 THE ENVIRONMENT IS IN THE KEY. Engines read their sampler settings -- steps,
-guidance, a negative prompt -- from ``OTR_`` settings at render time, outside
-the request, so every one of them enters the key (:func:`causal_env`) except
-those that cannot change a clip: the ones the pack itself writes while a
-prompt runs, credentials, and settings that only say where files live, how
-long to wait, how many calls run at once or what a call is expected to cost.
+guidance, a negative prompt, the folder a checkpoint is in -- from ``OTR_``
+settings at render time, outside the request, so every one of them enters the
+key (:func:`causal_env`) except those that cannot change a clip: the ones the
+pack itself writes while a prompt runs, and those that decide whether, when,
+how often or how fast a render runs, what it may spend, where its scratch and
+logs go or where credentials are kept. A spend cap raised after a halt films
+nothing again.
 
 WHAT THE KEY DOES NOT SEE, honestly: a setting outside the pack's ``OTR_``
 names, and a model file an engine does not declare (``model_artifacts``).
@@ -89,12 +91,17 @@ _NOT_CAUSAL = frozenset({"request_id", "observability", "plate_path"})
 _ENV_NOT_CAUSAL = frozenset({
     "OTR_ACTIVE_PROFILE", "OTR_SNAPSHOT_HASH", "OTR_OUTPUT_DIR", "OTR_ENABLE_STYLE_GRAMMAR",
     "OTR_ALLOW_KEY_FILES", "OTR_API_KEY_PACK_ROOT"})
-#: Endings of ``OTR_`` settings that never change a clip's bytes: a credential,
-#: a place files live, how long to wait, how many calls run at once, and what a
-#: call is expected to cost.
-_ENV_NOT_CAUSAL_ENDINGS = ("_API_KEY", "_KEY_FILE", "_DIR", "_ROOT", "_ROOTS", "_PATH",
-                           "_TMP", "_CACHE", "_TIMEOUT", "_TIMEOUT_S", "_FANOUT",
-                           "_EST_USD", "_EST_USD_PER_S", "_PORT")
+#: The shapes of ``OTR_`` settings that never change a clip's bytes: where
+#: credentials are kept and which endpoint is called; how long to wait and how
+#: often to retry; how many calls run at once; what a run may spend, in money
+#: or memory; and where scratch, caches and logs go. Folders and roots that
+#: choose model files are not among them: they stay in the key.
+_ENV_NOT_CAUSAL_RE = re.compile(
+    r"(_API_KEY|_KEY_FILES?|_TOKEN_FILE|_SECRETS_FILE|_API_BASE|_URL|_HOST|_PORT"
+    r"|_TIMEOUT|_TIMEOUT_S|_RETRIES|_FANOUT|_WORKERS"
+    r"|_BUDGET_USD|_BUDGET_MARGIN|_EST_USD|_EST_USD_PER_S|_HEADROOM_MB"
+    r"|_CACHE|_CACHE_DIR|_TMP|_LOG_PATH|_STDERR_DIR|_MAX_AGE_S)$"
+    r"|_MAX_CONCURRENCY|_COST_|_SWEEP_")
 _KEY_RE = re.compile(r"^[0-9a-f]{64}$")
 #: How long a commit waits, in turn, before it renames a held staging folder
 #: into place again: on Windows a scanner opening a file it has just seen
@@ -136,12 +143,12 @@ def causal_env() -> Dict[str, str]:
     Engines read their own at render time, outside the request -- HuMo its
     steps, guidance and negative prompt, LTX its sampler and schedule -- so all
     of them enter the key, and a setting added tomorrow is in it the day it
-    lands. Left out: the names in :data:`_ENV_NOT_CAUSAL` and those ending as
-    :data:`_ENV_NOT_CAUSAL_ENDINGS` lists, none of which changes what a clip
+    lands. Left out: the names in :data:`_ENV_NOT_CAUSAL` and those of a shape
+    :data:`_ENV_NOT_CAUSAL_RE` matches, none of which changes what a clip
     shows."""
     return {name: value for name, value in sorted(otr_env.snapshot().items())
             if name.startswith("OTR_") and name not in _ENV_NOT_CAUSAL
-            and not name.endswith(_ENV_NOT_CAUSAL_ENDINGS)}
+            and not _ENV_NOT_CAUSAL_RE.search(name)}
 
 
 def _as_file(value: Any) -> Any:
@@ -235,6 +242,7 @@ def _check_record(record: Any, where: str) -> Dict[str, Any]:
     if set(record["clip"]) & set(_PATH_FIELDS.values()):
         raise ClipStoreError("%s names a path in its clip: a record keeps files, not paths"
                              % where)
+    _check_clip_shape(record["clip"], where)
     # The mux finds a beat's foley bed by its stem: a receipt for a stem the
     # record does not list would drop the bed without a word.
     foley_sha = record["clip"].get("foley_sha256")
@@ -256,8 +264,22 @@ def _check_floor(record: Any, where: str) -> Dict[str, Any]:
     if isinstance(clip, dict) and set(clip) & set(_PATH_FIELDS.values()):
         raise ClipStoreError("%s names a path in its clip: a floor keeps files, not paths"
                              % where)
+    if isinstance(clip, dict):
+        _check_clip_shape(clip, where)
     _check_files(record["files"], where)
     return record
+
+
+def _check_clip_shape(clip: Dict[str, Any], where: str) -> None:
+    """A clip body's receipts and segments, of the shapes a render gives
+    them, or a refusal -- so a corrupt record is passed over for the store,
+    never a crash of the run that reads it."""
+    if ((clip.get("receipt") is not None and not isinstance(clip.get("receipt"), dict))
+            or (clip.get("receipts") is not None and not isinstance(clip.get("receipts"), list))
+            or (clip.get("segments") is not None
+                and not isinstance(clip.get("segments"), list))):
+        raise ClipStoreError("%s carries a clip whose receipts or segments are not "
+                             "receipts or segments" % where)
 
 
 def _check_files(files: Dict[str, Any], where: str) -> None:
@@ -301,18 +323,25 @@ def lookup(store: Path, key: str) -> Optional[Dict[str, Any]]:
     return record
 
 
+def _replace_held(src: Path, dst: Path, settled: Any = None) -> None:
+    """``os.replace``, again while a scanner holds the file or folder for a
+    moment. ``settled()``, when given, says a refusal needs no wait: another
+    writer has put the same thing there."""
+    for wait in _RENAME_WAITS_S + (None,):
+        try:
+            os.replace(str(src), str(dst))
+            return
+        except PermissionError:
+            if wait is None or (settled is not None and settled()):
+                raise
+            time.sleep(wait)
+
+
 def _rename_into_place(staging: Path, entry: Path) -> None:
     """Rename a staged entry onto its key, again while the folder is held. A
     refusal with the entry already there is another writer's commit, which
     the caller settles; that one is not waited out."""
-    for wait in _RENAME_WAITS_S + (None,):
-        try:
-            os.replace(str(staging), str(entry))
-            return
-        except PermissionError:
-            if wait is None or entry.exists():
-                raise
-            time.sleep(wait)
+    _replace_held(staging, entry, settled=entry.exists)
 
 
 def commit(store: Path, key: str, body: Dict[str, Any],
@@ -424,9 +453,9 @@ class ProducerClips:
         return found
 
     def check_gap(self, shot_id: str) -> None:
-        """A shot skipped as a refused-still gap. A Publish run publishes one
-        only when its card is kept: otherwise the gap refuses the run."""
-        if self.stage == "publish" and str(shot_id) not in self.kept:
+        """A shot skipped as a refused-still gap refuses a Publish run. A kept
+        card never gets here: the render takes every keep before any gap."""
+        if self.stage == "publish":
             raise ClipStoreError(
                 "Publish refuses shot %s: its still was refused, so it has no clip; "
                 "paint it again, or keep the card to publish the gap" % shot_id)
@@ -519,8 +548,12 @@ class ProducerClips:
             if not (target.is_file() and target.stat().st_size == item["bytes"]
                     and file_sha256(target) == item["sha256"]):
                 partial = folder / (".%s.%s.part" % (item["name"], uuid.uuid4().hex[:8]))
-                shutil.copyfile(str(self.store / key / _STORE_NAMES[role]), str(partial))
-                os.replace(str(partial), str(target))
+                try:
+                    shutil.copyfile(str(self.store / key / _STORE_NAMES[role]), str(partial))
+                    _replace_held(partial, target)
+                finally:
+                    if partial.exists():
+                        partial.unlink()
                 _verify(target, item)
             paths[role] = target
         return paths

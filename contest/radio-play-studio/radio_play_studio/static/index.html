@@ -908,8 +908,9 @@ function assess(card, scene) {
   // A kept still keeps its picture through a scene note or a new portrait.
   const stillDirty = !!card.picture_editable && (pictureEdit || stillTake || (!keptStill && (noteEdit || charTake)));
   // A still the image model refused: filming skips its shot as a gap, so it is
-  // painted again, or the card is kept as it is (a kept clip publishes).
-  const stillFailed = card.still_state === "failed" && !keptStill && !keptClip && !stillDirty;
+  // painted again, or the card keeps the clip it has -- a kept still does not
+  // stand in for it, as node 63 reads it too.
+  const stillFailed = card.still_state === "failed" && !keptClip && !stillDirty;
   const motionEdit = card.motion_editable && d.motion_text != null && d.motion_text !== card.motion_text;
   const clipTake = (draft.takes.clips[sid] || 0) !== (card.clip_take || 0);
   const filmed = !!card.clip && card.clip_state !== "failed";
@@ -1216,9 +1217,9 @@ function refreshBoard() {
     tx(badge, key, text);
     tx(kind, card.clip && !a.stale ? "kind.clip" : "kind.still", card.clip && !a.stale ? "Clip" : "Still");
     if (a.failed && a.stillFailed) {
-      // Keep is offered only for a card with a still or a clip to keep.
-      if (keep.hidden) tx(why, "why.still_paint", "This picture could not be painted.");
-      else tx(why, "why.still", "This picture could not be painted.");
+      // Only a clip kept can publish a refused still as it is.
+      if (["filmed", "failed", "kept"].includes(card.clip_state)) tx(why, "why.still", "This picture could not be painted.");
+      else tx(why, "why.still_paint", "This picture could not be painted.");
       why.hidden = false;
     }
     else if (a.failed) {
