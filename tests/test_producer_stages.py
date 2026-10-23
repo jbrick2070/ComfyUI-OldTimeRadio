@@ -117,9 +117,6 @@ def test_a_first_run_direction_cannot_reach_a_replay(replay_json):
 
 def test_what_this_build_cannot_honour_is_refused_before_any_work():
     from nodes.otr_shot_lock import OTRShotLock
-    clips = _direction(takes={"clips": {"shot_b001": 1}})
-    with pytest.raises(ValueError, match="clip takes are not available in this build yet"):
-        OTRShotLock().lock("{}", direction_json=clips)
     publish = _direction(stage="publish", out=None)
     with pytest.raises(ValueError, match="Publish is not available in this build yet"):
         OTRShotLock().lock("{}", direction_json=publish)

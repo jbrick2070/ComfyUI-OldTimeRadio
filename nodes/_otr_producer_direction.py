@@ -47,12 +47,13 @@ that changes a character's take before it is painted
 (:func:`unpainted_characters`).
 
 CLIP REUSE (chunk 4a) lives beside this module, in ``_otr_producer_clips``: a
-Video run films only the shots whose causal key changed.
+Video run films only the shots whose causal key changed. Since chunk 4b a clip
+take films a shot again, a kept clip -- or the floor a shot fell to -- is used
+as it is, and ``cards.json`` shows each card's clip and its state.
 
 WHAT IS NOT HERE YET, and which build step adds it beside its caller (a check
 with nothing to compare against is the defect the repo's own rules forbid):
-clip takes and kept clips (chunk 4b), and Publish (chunk 4c). Until then
-:func:`not_yet_supported` refuses those.
+Publish (chunk 4c). Until then :func:`not_yet_supported` refuses it.
 
 UTF-8, no BOM. Standard library only.
 """
@@ -731,6 +732,14 @@ def painted_takes(direction: Dict[str, Any]) -> Dict[str, Dict[str, int]]:
             "stills": dict(takes.get("stills") or {})}
 
 
+#: The video section's maps a producer Video run writes beside the shot rows
+#: (``_otr_producer_clips``): the record of every clip it delivered, and the
+#: payload of every shot it floored. Paths in both are relative to the
+#: episode folder.
+CLIP_MAP_KEY = "producer_clip_reuse"
+FLOOR_MAP_KEY = "producer_floor_payloads"
+
+
 # --------------------------------------------------------------------------- #
 # cards.json, and the still-input digest it records per card
 # --------------------------------------------------------------------------- #
@@ -849,14 +858,25 @@ def build_cards(ledger: dict, producer: Dict[str, Any], files: list) -> Dict[str
         rel = "%s/%s" % (os.path.basename(os.path.dirname(path)), os.path.basename(path))
         return rel if rel in listed else ""
 
+    def filed(record):
+        """A video-map record's clip, bundle-relative, when the bundle has it."""
+        item = (((record or {}).get("files") or {}).get("clip")
+                if isinstance(record, dict) else None)
+        rel = str((item or {}).get("path") or "") if isinstance(item, dict) else ""
+        return rel if rel in listed else ""
+
     lines = {str(ln.get("line_id")): ln for ln in ledger.get("lines") or []
              if isinstance(ln, dict)}
     scene_of = _scene_of_beat(ledger)
     kept = set((producer.get("kept") or {}).get("stills") or [])
+    kept_clips = set((producer.get("kept") or {}).get("clips") or [])
+    video = ledger.get("video") if isinstance(ledger.get("video"), dict) else {}
+    filmed = video.get(CLIP_MAP_KEY) if isinstance(video.get(CLIP_MAP_KEY), dict) else {}
+    floored = video.get(FLOOR_MAP_KEY) if isinstance(video.get(FLOOR_MAP_KEY), dict) else {}
     characters = takes.get("characters") or {}
     stills = takes.get("stills") or {}
     scenes: Dict[str, Dict[str, Any]] = {}
-    for shot in (ledger.get("video") or {}).get("shots") or []:
+    for shot in video.get("shots") or []:
         if not isinstance(shot, dict) or not str(shot.get("shot_id") or "").startswith("shot_"):
             continue
         shot_id = str(shot["shot_id"])
@@ -869,9 +889,22 @@ def build_cards(ledger: dict, producer: Dict[str, Any], files: list) -> Dict[str
         scene_id = scene_of.get(beat, "")
         still_char = str((obj or {}).get("char_id") or "")
         still = media(row)
-        state = ("kept" if shot_id in kept else
-                 "painted" if still else
-                 "failed" if obj is not None else "")
+        still_state = ("kept" if shot_id in kept else
+                       "painted" if still else
+                       "failed" if obj is not None else "")
+        # THE CLIP (chunk 4b): the record of the clip the last Video run
+        # delivered, or the payload of the floor it fell to -- a failed card
+        # until it is filmed again or kept as it is.
+        record = filmed.get(shot_id) if isinstance(filmed.get(shot_id), dict) else None
+        floor = floored.get(shot_id) if isinstance(floored.get(shot_id), dict) else None
+        clip = filed(record) or filed(floor)
+        clip_state = ("kept" if shot_id in kept_clips and (record or floor) else
+                      "filmed" if record is not None else
+                      "failed" if floor is not None else "")
+        marks = (floor or {}).get("marks") if isinstance((floor or {}).get("marks"), dict) else {}
+        state = ("failed" if "failed" in (still_state, clip_state) else
+                 "kept" if "kept" in (still_state, clip_state) else
+                 "filmed" if clip_state == "filmed" else still_state)
         card = {
             "shot_id": shot_id, "char_id": str(shot.get("char_id") or ""),
             "line": str(line.get("text") or ""),
@@ -881,8 +914,15 @@ def build_cards(ledger: dict, producer: Dict[str, Any], files: list) -> Dict[str
                              if obj else ""),
             "motion_text": str(creative.get("motion") or "") if editable else "",
             "motion_editable": bool(editable), "picture_editable": obj is not None,
-            "still": still, "clip": None,
-            "still_take": int(stills.get(shot_id, 0) or 0), "clip_take": 0,
+            "still": still, "clip": clip or None,
+            "still_take": int(stills.get(shot_id, 0) or 0),
+            "clip_take": int((record or {}).get("clip_take") or 0),
+            "still_state": still_state, "clip_state": clip_state,
+            # Why the clip is a floor -- the scene still, or black -- when it is.
+            "clip_floor": str(marks.get("cloud_floor")
+                              or ("budget" if marks.get("budget_floor") else "")
+                              or marks.get("status") or ""),
+            "clip_input_hash": str((record or {}).get("key") or ""),
             "still_input_hash": str((row or {}).get(ROW_INPUT_HASH) or ""),
             "payload_hash": payload_object_hash(obj) if obj else "",
             "still_char_id": still_char,
@@ -1024,6 +1064,9 @@ def check_direction_ids(cards: Dict[str, Any], direction: Dict[str, Any]) -> Non
            lambda card: card.get("motion_editable"), "has no action to edit")
     refuse(direction["kept"]["stills"], lambda card: card.get("still"),
            "has no still to keep")
+    # A clip to keep is one a Video run filmed, or the floor it fell to.
+    refuse(direction["kept"]["clips"], lambda card: card.get("clip_state") in
+           ("filmed", "failed", "kept"), "has no clip to keep")
     problems.extend("character %s has no picture to take again" % c
                     for c, take in sorted(direction["takes"]["characters"].items())
                     if take and c in cast and not cast[c].get("has_portrait")
@@ -1238,19 +1281,13 @@ def not_yet_supported(direction: Dict[str, Any]) -> Optional[str]:
     Real now: ACTION edits (Shot Lock recomposes them on replay); since chunk
     3 picture edits, scene notes, character and still takes and kept stills (a
     stills replay repaints them, and node 63 refuses a Video run that would
-    film stills they have not reached); and since chunk 4a clip reuse, so a
-    Video run films only what changed. Still to come: clip takes and kept
-    clips (chunk 4b), and Publish (chunk 4c). Takes are sent in full, so a
-    clip take of 0 -- no take -- asks for nothing and is not refused.
+    film stills they have not reached); since chunk 4a clip reuse, so a Video
+    run films only what changed; and since chunk 4b clip takes (another draw
+    of the shot) and kept clips, floors included. Still to come: Publish
+    (chunk 4c).
     """
     if direction["stage"] == "publish":
         return "Publish is not available in this build yet"
-    asked = [label for label, present in (
-        ("clip takes", any(direction["takes"]["clips"].values())),
-        ("kept clips", bool(direction["kept"]["clips"])),
-    ) if present]
-    if asked:
-        return "%s are not available in this build yet" % ", ".join(asked)
     return None
 
 

@@ -343,7 +343,7 @@ def test_the_validator_admits_a_plain_direction_and_refuses_what_is_not_built(pr
     with pytest.raises(ValueError, match="first run has no cards yet"):
         admit(_prompt(_raw(cards={"shot_b001": {"picture_text": "a desk"}})))
     # Since chunk 3 picture edits, notes, still and character takes and kept
-    # stills are real; clip takes and kept clips wait for clip reuse.
+    # stills are real, and since chunk 4b clip takes and kept clips.
     later = PD.parse_direction(_raw(out="02-stills", source="a" * 64,
                                     cards={"shot_b001": {"picture_text": "a desk"}},
                                     scenes={"s01": {"note": "at dusk"}},
@@ -352,11 +352,7 @@ def test_the_validator_admits_a_plain_direction_and_refuses_what_is_not_built(pr
     assert PD.not_yet_supported(later) is None
     clips = PD.parse_direction(_raw(out="02-stills", source="a" * 64,
                                     takes={"clips": {"shot_b001": 1}}, kept={"clips": ["shot_b002"]}))
-    assert "clip takes, kept clips are not available" in PD.not_yet_supported(clips)
-    # Takes are sent in full: a clip take of 0 is no take (Codex QA, 2026-10-22).
-    in_full = PD.parse_direction(_raw(out="02-stills", source="a" * 64,
-                                      takes={"clips": {"shot_b001": 0, "shot_b002": 0}}))
-    assert PD.not_yet_supported(in_full) is None
+    assert PD.not_yet_supported(clips) is None
     action_only = PD.parse_direction(_raw(out="02-stills", source="a" * 64,
                                           cards={"shot_b001": {"motion_text": "leans in"}}))
     assert PD.not_yet_supported(action_only) is None
@@ -377,9 +373,9 @@ def test_shot_lock_carries_the_widget_as_an_advanced_input():
 
 def test_shot_lock_refuses_what_this_build_cannot_honour_before_any_work():
     from nodes.otr_shot_lock import OTRShotLock
-    with pytest.raises(ValueError, match="takes are not available in this build yet"):
-        OTRShotLock().lock("{}", direction_json=_raw(out="02-stills", source="a" * 64,
-                                                     takes={"clips": {"shot_b001": 1}}))
+    with pytest.raises(ValueError, match="Publish is not available in this build yet"):
+        OTRShotLock().lock("{}", direction_json=_raw(stage="publish", out=_DROP,
+                                                     source="a" * 64))
 
 
 def test_every_shipped_graph_saves_the_widget_blank():

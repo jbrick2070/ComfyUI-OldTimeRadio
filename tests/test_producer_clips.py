@@ -37,7 +37,9 @@ def producer_root(tmp_path, monkeypatch):
 
 
 class _Camera:
-    """A stand-in video engine. ``broken`` names shots it fails on."""
+    """A stand-in video engine. ``broken`` names shots it fails on, and
+    ``timeouts`` shots whose provider times out -- a cloud floor on a cloud
+    lane."""
     family = "abstract"
     roles = ("retired_role_b",)
     default_roles = ()
@@ -51,6 +53,7 @@ class _Camera:
         self.scratch = scratch
         self.filmed = []
         self.broken = set()
+        self.timeouts = set()
 
     def load(self):
         pass
@@ -68,6 +71,10 @@ class _Camera:
         sid = request["shot_id"]
         if sid in self.broken:
             raise RuntimeError("the camera jammed on %s" % sid)
+        if sid in self.timeouts:
+            from nodes._otr_shared import cloud_media_backend as cmb
+            raise cmb.CloudMediaError(cmb.CloudErrorCode.TIMEOUT,
+                                      "the provider timed out on %s" % sid)
         self.filmed.append(sid)
         path = self.scratch / ("otr_engine_tmp_%s_%d.mp4" % (sid, len(self.filmed)))
         path.write_bytes(("%s|%s" % (sid, request.get("text_prompt"))).encode())
@@ -131,9 +138,10 @@ def _workspace(root, name, engine_id="stub_camera", prompts=None):
     return ep, ledger, build
 
 
-def _film(camera, workspace, bundle_map=None):
+def _film(camera, workspace, bundle_map=None, **reuse):
     ep, ledger, build = workspace
-    producer = PC.ProducerClips(project_id=PID, episode_root=ep, bundle_map=bundle_map)
+    producer = PC.ProducerClips(project_id=PID, episode_root=ep, bundle_map=bundle_map,
+                                **reuse)
     camera.filmed.clear()
     result = rd.run_episode(ledger, request_builder=build, producer=producer)
     return result, sorted(camera.filmed), producer
@@ -356,3 +364,182 @@ def test_a_tampered_entry_is_refused(tmp_path):
         PC.lookup(store, key)
     with pytest.raises(PC.ClipStoreError, match="not a clip key"):
         PC.lookup(store, "../escape")
+
+
+# --------------------------------------------------------------------------- #
+# chunk 4b: clip takes, floors and kept clips
+# --------------------------------------------------------------------------- #
+
+def _direction(**changes):
+    data = {"version": 1, "project_id": PID, "attempt_id": "0f8e1c2d-run3",
+            "stage": "video", "out": "03-video", "source": "a" * 64}
+    data.update(changes)
+    return PD.parse_direction(json.dumps(data))
+
+
+def test_a_clip_take_is_another_draw_and_take_0_is_the_seed_itself(monkeypatch):
+    monkeypatch.setattr(rd, "_confined_ledger_path", lambda path, _field: path)
+    ledger = {"audio": {"master_audio_sha256": "frozen", "ledger_frozen": True},
+              "lines": [{"line_id": "b001", "char_id": "c03", "speaker_role": "character",
+                         "start_s": 0.0, "dur_s": 2.0, "bark_wav_path": "X:/a/seg_b001.wav"}],
+              "images": {"images": [{"object_id": "c03", "path": "X:/img/c03.png"}]},
+              "video": {"video_revision": 1, "fps": 25, "shots": [
+                  {"shot_id": "shot_b001", "source_line_ids": ["b001"], "engine_id": "abstract",
+                   "target_frame_count": 50, "render_request_hash": "hash_b001",
+                   "creative": {"text_prompt": "a desk"}}]}}
+    shot = ledger["video"]["shots"][0]
+
+    def seed():
+        return rd.build_request_from_shot(shot, ledger)["seed_bundle"]["request_seed"]
+
+    plain = seed()
+    ledger[PD.RUNTIME_KEY] = _direction(takes={"clips": {"shot_b001": 0}})
+    assert seed() == plain, "take 0 is the seed itself"
+    ledger[PD.RUNTIME_KEY] = _direction(takes={"clips": {"shot_b001": 1}})
+    one = seed()
+    ledger[PD.RUNTIME_KEY] = _direction(takes={"clips": {"shot_b001": 2}})
+    assert len({plain, one, seed()}) == 3
+    ledger[PD.RUNTIME_KEY] = _direction(takes={"clips": {"shot_b009": 5}})
+    assert seed() == plain, "another shot's take leaves this one alone"
+
+
+def test_a_shot_that_renders_sheds_the_floor_marks_its_replay_carried(producer_root, cameras,
+                                                                      tmp_path):
+    # A replay plans from the section its source stamped, floors included:
+    # without this, a retried beat that rendered was reported floored for good.
+    camera = cameras()
+    for producer in (True, False):
+        ep, ledger, build = _workspace(tmp_path, "ep_%s" % producer)
+        ledger["video"]["shots"][1].update(status="sanctioned_gap", cloud_floor="timeout",
+                                           floor_render="still_pan")
+        if producer:
+            result, _filmed, _p = _film(camera, (ep, ledger, build))
+        else:
+            result = rd.run_episode(ledger, request_builder=build)
+        assert not set(rd._FLOOR_MARKS) & set(result["ledger"]["video"]["shots"][1])
+
+
+@pytest.fixture
+def floors(monkeypatch, tmp_path):
+    """The still_pan floor drawn as a stand-in file in scratch: these tests are
+    about what the producer keeps of a floor, not how ffmpeg pans a still."""
+    drawn = []
+    scratch = tmp_path / "floor_scratch"
+    scratch.mkdir()
+
+    def floor(shot, ledger, **_kw):
+        drawn.append(shot["shot_id"])
+        clip = scratch / ("otr_floor_%s_%d.mp4" % (shot["shot_id"], len(drawn)))
+        clip.write_bytes(b"the scene still of " + shot["shot_id"].encode())
+        return {"path": str(clip), "engine_id": "still_pan", "frame_count": 25, "fps": 25}
+
+    monkeypatch.setattr(rd, "_render_still_floor", floor)
+    return drawn
+
+
+def _cloud_workspace(tmp_path, name, **changes):
+    return _workspace(tmp_path, name, engine_id="cloud_stub_camera", **changes)
+
+
+@pytest.mark.parametrize("fanout", ["1", "2"])
+def test_a_floored_shot_is_a_failed_card_and_its_retry_comes_back_filmed(
+        producer_root, cameras, floors, tmp_path, monkeypatch, fanout):
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", fanout)
+    camera = cameras("cloud_stub_camera")
+    camera.timeouts = {"shot_b002"}
+    first, filmed, _producer = _film(camera, _cloud_workspace(tmp_path, "ep_a"))
+    assert filmed == ["shot_b001", "shot_b003"] and floors == ["shot_b002"]
+    floored = first["ledger"]["video"][PC.FLOOR_KEY]
+    assert list(floored) == ["shot_b002"] and "shot_b002" not in _map(first)
+    assert floored["shot_b002"]["marks"]["cloud_floor"] == "timeout"
+    assert floored["shot_b002"]["files"]["clip"]["path"] == \
+        "clips/shot_b002_retired_role_b_still_pan.mp4"
+    # The provider is back: the floored shot is filmed again, and only it.
+    camera.timeouts.clear()
+    ep_b, ledger, build = _cloud_workspace(tmp_path, "ep_b")
+    ledger["video"]["shots"][1].update(first["ledger"]["video"]["shots"][1])
+    again, filmed, _producer = _film(camera, (ep_b, ledger, build),
+                                     bundle_map=_map(first), bundle_floors=floored)
+    assert filmed == ["shot_b002"]
+    assert not set(rd._FLOOR_MARKS) & set(again["ledger"]["video"]["shots"][1])
+    assert again["ledger"]["video"][PC.FLOOR_KEY] == {} and "shot_b002" in _map(again)
+
+
+def test_a_kept_floor_is_used_as_it_is_and_stays_a_floor(producer_root, cameras, floors,
+                                                         tmp_path):
+    camera = cameras("cloud_stub_camera")
+    camera.timeouts = {"shot_b002"}
+    ep_a, ledger_a, build_a = _cloud_workspace(tmp_path, "ep_a")
+    first, _filmed, _producer = _film(camera, (ep_a, ledger_a, build_a))
+    floored = first["ledger"]["video"][PC.FLOOR_KEY]
+    camera.timeouts.clear()
+    ep_b, ledger, build = _cloud_workspace(tmp_path, "ep_b")
+    shutil.copytree(str(ep_a / "clips"), str(ep_b / "clips"))       # as the import does
+    ledger["video"]["shots"][1].update(first["ledger"]["video"]["shots"][1])
+    again, filmed, producer = _film(camera, (ep_b, ledger, build), bundle_map=_map(first),
+                                    bundle_floors=floored, kept=["shot_b002"])
+    assert filmed == [] and producer.reused["shot_b002"] == "kept floor"
+    shot = again["ledger"]["video"]["shots"][1]
+    assert (shot["cloud_floor"], shot["floor_render"]) == ("timeout", "still_pan")
+    assert pathlib.Path(again["clips"]["shot_b002"]["path"]).parent == ep_b / "clips"
+    assert again["ledger"]["video"][PC.FLOOR_KEY] == floored, "the floor rides on"
+
+
+def test_a_kept_clip_is_used_whatever_changed_and_a_missing_one_refuses(
+        producer_root, cameras, tmp_path):
+    camera = cameras()
+    ep_a, ledger_a, build_a = _workspace(tmp_path, "ep_a")
+    first, _filmed, _producer = _film(camera, (ep_a, ledger_a, build_a))
+    workspace = _workspace(tmp_path, "ep_c", prompts={"shot_b002": "an edited window"})
+    shutil.copytree(str(ep_a / "clips"), str(workspace[0] / "clips"))
+    _again, filmed, producer = _film(camera, workspace, bundle_map=_map(first),
+                                     kept=["shot_b002"])
+    assert filmed == [] and producer.reused["shot_b002"] == "kept"
+    with pytest.raises(PC.ClipStoreError, match="card shot_b002 keeps its clip, but"):
+        _film(camera, _workspace(tmp_path, "ep_d"), bundle_map=_map(first),
+              kept=["shot_b002"])
+
+
+def test_a_film_again_records_its_take(producer_root, cameras, tmp_path):
+    camera = cameras()
+    first, _filmed, _producer = _film(camera, _workspace(tmp_path, "ep_a"),
+                                      takes={"shot_b001": 3})
+    assert _map(first)["shot_b001"]["clip_take"] == 3
+    assert _map(first)["shot_b002"]["clip_take"] == 0
+
+
+def test_cards_show_each_clip_and_its_state(producer_root, cameras, floors, tmp_path):
+    camera = cameras("cloud_stub_camera")
+    camera.timeouts = {"shot_b002"}
+    first, _filmed, _producer = _film(camera, _cloud_workspace(tmp_path, "ep_a"),
+                                      takes={"shot_b003": 2})
+    video = first["ledger"]["video"]
+    files = [{"path": r["files"]["clip"]["path"]}
+             for r in list(video[PC.MAP_KEY].values()) + list(video[PC.FLOOR_KEY].values())]
+
+    def cards(**kept):
+        fields = PD.manifest_producer_fields(_direction(kept=kept))
+        return {c["shot_id"]: c for g in PD.build_cards(first["ledger"], fields, files)["scenes"]
+                for c in g["shots"]}
+
+    shown = cards()
+    assert shown["shot_b001"]["clip"] == video[PC.MAP_KEY]["shot_b001"]["files"]["clip"]["path"]
+    assert (shown["shot_b001"]["clip_state"], shown["shot_b001"]["state"]) == ("filmed", "filmed")
+    assert shown["shot_b001"]["clip_input_hash"] == video[PC.MAP_KEY]["shot_b001"]["key"]
+    assert shown["shot_b003"]["clip_take"] == 2
+    floor = shown["shot_b002"]
+    assert (floor["clip_state"], floor["state"], floor["clip_floor"]) == \
+        ("failed", "failed", "timeout")
+    assert floor["clip"] == "clips/shot_b002_retired_role_b_still_pan.mp4"
+    kept = cards(clips=["shot_b002"])["shot_b002"]
+    assert (kept["clip_state"], kept["state"]) == ("kept", "kept")
+    # Node 63 lets a card keep only a clip, or a floor, it has.
+    shown_cards = PD.build_cards(first["ledger"], PD.manifest_producer_fields(_direction()),
+                                 files)
+    PD.check_direction_ids(shown_cards, _direction(kept={"clips": ["shot_b001", "shot_b002"]}))
+    for group in shown_cards["scenes"]:
+        for card in group["shots"]:
+            if card["shot_id"] == "shot_b003":
+                card.update(clip=None, clip_state="")
+    with pytest.raises(PD.DirectionError, match="card shot_b003 has no clip to keep"):
+        PD.check_direction_ids(shown_cards, _direction(kept={"clips": ["shot_b003"]}))

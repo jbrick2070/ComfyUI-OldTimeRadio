@@ -3058,13 +3058,14 @@ class OTRImageGenDispatcher:
         ep = str(led.get("episode_id") or episode_id
                  or (led.get("meta") or {}).get("episode_id") or "")
         # A STILLS BUNDLE AFTER A VIDEO ONE CARRIES ITS CLIPS (plan, "Freezer"):
-        # the video section's reuse map names files in clips/ and audio/foley/,
-        # and the next Video run reuses them from this bundle even when the
-        # project's clip store is gone. Before any video run there is no map,
-        # and a stills bundle carries stills only, as it always has.
+        # the video section's reuse map and floor payloads name files in clips/
+        # and audio/foley/, and the next Video run reuses them -- or a kept
+        # floor -- from this bundle even when the project's clip store is gone.
+        # Before any video run there are none, and a stills bundle carries
+        # stills only, as it always has.
         video = led.get("video") if isinstance(led.get("video"), dict) else {}
-        bundle = _PD.freeze_stage(direction, ep,
-                                  include_render_outputs=bool(video.get(_PC.MAP_KEY)))
+        bundle = _PD.freeze_stage(direction, ep, include_render_outputs=bool(
+            video.get(_PC.MAP_KEY) or video.get(_PC.FLOOR_KEY)))
         log.warning("[OTR_ImageGenDispatcher] Scene Producer stills stage done: froze "
                     "episode %s into %s; the graph stops here (%s)", ep, bundle,
                     str(report or "").splitlines()[0] if report else "no report")

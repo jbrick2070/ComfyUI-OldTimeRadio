@@ -730,6 +730,32 @@ def _seed_from_hash(request_hash, shot_id):
     return int(hashlib.sha256(src.encode("utf-8")).hexdigest()[:8], 16) & 0x7FFFFFFF
 
 
+def _producer_clip_take(ledger, shot):
+    """The Scene Producer clip take this shot is filmed with (the direction
+    Shot Lock put on the wire ledger); 0 on every other run."""
+    try:
+        from .. import _otr_producer_direction as _PD  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        import _otr_producer_direction as _PD  # type: ignore
+    direction = _PD.runtime_direction(ledger)
+    if direction is None:
+        return 0
+    clips = (direction.get("takes") or {}).get("clips") or {}
+    try:
+        return int(clips.get(str((shot or {}).get("shot_id") or ""), 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _clip_take_seed(seed, take):
+    """A clip take above zero is a different, reproducible draw of the same
+    shot; take 0 is the seed itself, byte for byte."""
+    if not take:
+        return seed
+    return int(hashlib.sha256(("%d#take%d" % (int(seed), int(take))).encode("utf-8"))
+               .hexdigest()[:8], 16) & 0x7FFFFFFF
+
+
 def _portrait_index(ledger):
     """``{char_id: portrait_path}`` from ``ledger['images']['images']`` (the
     OTR_ImageGenDispatcher write-back; each entry is keyed by ``object_id``).
@@ -3881,6 +3907,12 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     if _seg_index:
         _video_seed = _seed_from_hash(req_hash, "%s#seg%d"
                                       % (shot.get("shot_id"), _seg_index))
+    # A SCENE PRODUCER CLIP TAKE ("Film again", chunk 4b) is another draw of
+    # the same shot. Mixed into the seed itself: ``_seed_from_hash`` reads the
+    # request hash alone whenever there is one, so a take passed through its
+    # second argument would change nothing. Take 0 -- every ordinary run --
+    # leaves the seed exactly as it was.
+    _video_seed = _clip_take_seed(_video_seed, _producer_clip_take(ledger, shot))
     req["seed_bundle"] = {"request_seed": _video_seed}
     # The request carries no segment index: multi-segment requests are rebuilt
     # per segment, so this original request's index 0 is not the segment a
@@ -4298,6 +4330,19 @@ def build_actual_receipt(engine, shot, request, clip, *, segment=None,
     return receipt
 
 
+#: What marks a shot floored, as the floors stamp it (``_stamp_cloud_floor_shot``,
+#: ``_stamp_budget_floor_shot``, ``_commit_still_floor``).
+_FLOOR_MARKS = ("status", "cloud_floor", "content_floor", "budget_floor", "floor_render")
+
+
+def _rendered_shot(shot):
+    """A shot as it leaves a successful render: without any floor mark. A
+    replay plans from the video section its source stamped, floors included,
+    and old marks on a clip that rendered would report it floored for good
+    (plan, "Floors are failed cards": a successful retry becomes filmed)."""
+    return {k: v for k, v in (shot or {}).items() if k not in _FLOOR_MARKS}
+
+
 def render_shot(shot, request, *, host_caps=None, profile=None, segment=None):
     """Render ONE shot with its selected engine. NO FALLBACKS (operator
     2026-06-16 'this is art, not a space shuttle'; hardened 2026-07-02 NO
@@ -4308,7 +4353,7 @@ def render_shot(shot, request, *, host_caps=None, profile=None, segment=None):
     Returns ``(clip, shot, [engine], observed_peak_mb)``; an unknown peak is None."""
     sid = shot["shot_id"]
     eng = shot["engine_id"]
-    out_shot = dict(shot)
+    out_shot = _rendered_shot(shot)
     _t_render = time.monotonic()
     try:
         clip = _render_one(eng, request, host_caps=host_caps,
@@ -4408,7 +4453,28 @@ def _reuse_filmed_clip(reuse, shot, requests, profile):
         return None
     _LOG.warning("[OTR video] REUSED shot %s: filmed before under key %s, taken from "
                  "the %s, not rendered", sid, key[:12], reuse.reused.get(sid, "?"))
-    return found["clip"], dict(shot), list(found["attempts"]), None
+    # A kept FLOOR stays visibly a floor: it carries back the marks it fell
+    # with, and nothing else a replayed row might have.
+    out_shot = dict(_rendered_shot(shot), **found.get("marks", {}))
+    return found["clip"], out_shot, list(found["attempts"]), None
+
+
+def _producer_floor(producer, row, clip):
+    """A shot this producer run floored, or skipped as a refused-still gap:
+    its floor clip, when one was drawn, goes into the episode folder, and its
+    marks into the run's floor payloads. Never raises: a floor exists so one
+    bad beat cannot abort the episode."""
+    sid = str((row or {}).get("shot_id") or "")
+    try:
+        if isinstance(clip, dict) and clip.get("path"):
+            os.makedirs(str(producer.clips_dir), exist_ok=True)
+            _persist_one_clip(clip, str(producer.clips_dir),
+                              _persisted_clip_name(sid, *_clip_name_parts(row)))
+        marks = {k: row[k] for k in _FLOOR_MARKS if row.get(k) not in (None, "")}
+        producer.floored(sid, marks or {"status": _receipt.STATUS_SANCTIONED_GAP}, clip)
+    except Exception as exc:  # noqa: BLE001 -- the floor itself must stand
+        _LOG.error("[OTR video] shot %s floored, and its floor payload was not kept: "
+                   "%s: %s", sid, type(exc).__name__, exc)
 
 
 def _producer_commit(producer, out_shot, clip, attempts):
@@ -5528,9 +5594,13 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
             clips.pop(sid, None)
             row["floor_render"] = "none"
             new_shots.append(row)
+            if producer is not None:
+                _producer_floor(producer, row, None)
             return
         row["floor_render"] = CLOUD_FLOOR_RENDER_ENGINE
         new_shots.append(row)
+        if producer is not None:
+            _producer_floor(producer, row, clips.get(sid))
 
     # Opened only by the LOCAL walk below; closed in this function's finally.
     _quiet_bars = _QuietInnerBars()
@@ -5592,6 +5662,8 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                         "The beat keeps its place in the timeline and is floored.",
                         sid, bid)
                     new_shots.append(shot)
+                    if producer is not None:
+                        _producer_floor(producer, shot, None)
                     continue
                 if _cloud_budget_floor_sid(sid, errors, halted):
                     _LOG.error(
@@ -5672,6 +5744,8 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
                         "The beat keeps its place in the timeline and is floored.",
                         shot.get("shot_id"), _beat_id_for_shot(shot))
                     new_shots.append(shot)
+                    if producer is not None:
+                        _producer_floor(producer, shot, None)
                     continue
                 # ENGINE-GATED: a spend-cap halt is about money, and a LOCAL
                 # beat costs none -- it renders normally.
@@ -5862,8 +5936,9 @@ def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
             _end_engine_scope(_scoped_id)
     section["shots"] = new_shots
     if producer is not None:
-        section[_producer_clips_module().MAP_KEY] = producer.records_for(
-            s.get("shot_id") for s in new_shots if isinstance(s, dict))
+        _ids = [s.get("shot_id") for s in new_shots if isinstance(s, dict)]
+        section[_producer_clips_module().MAP_KEY] = producer.records_for(_ids)
+        section[_producer_clips_module().FLOOR_KEY] = producer.floors_for(_ids)
     _report_cloud_floors(new_shots)
     ledger["video"] = section
     receipts = []

@@ -54,8 +54,11 @@ CLIP_KEY_VERSION = 1
 RECORD_VERSION = 1
 RECORD_NAME = "record.json"
 #: The video section's map from shot id to the record of the clip this
-#: workspace delivered for it. Its paths are relative to the episode folder.
-MAP_KEY = "producer_clip_reuse"
+#: workspace delivered for it, and the map from shot id to the payload of the
+#: floor a shot fell to. Their paths are relative to the episode folder. The
+#: names belong to the shared direction module, which cards.json reads them by.
+MAP_KEY = _PD.CLIP_MAP_KEY
+FLOOR_KEY = _PD.FLOOR_MAP_KEY
 #: The store's folder inside a project, beside its bundles; no bundle name can
 #: take it (``_otr_producer_direction.OUT_RE``).
 STORE_DIR = "clips"
@@ -71,7 +74,7 @@ _NOT_CAUSAL = frozenset({"request_id", "observability", "plate_path"})
 _KEY_RE = re.compile(r"^[0-9a-f]{64}$")
 _NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$")
 
-__all__ = ["CLIP_KEY_VERSION", "MAP_KEY", "ClipStoreError", "ProducerClips",
+__all__ = ["CLIP_KEY_VERSION", "FLOOR_KEY", "MAP_KEY", "ClipStoreError", "ProducerClips",
            "clip_reuse_key", "commit", "file_sha256", "lookup", "request_projection",
            "store_dir"]
 
@@ -198,15 +201,33 @@ def _check_record(record: Any, where: str) -> Dict[str, Any]:
     if not isinstance(record.get("clip"), dict) or not isinstance(record.get("attempts"), list):
         raise ClipStoreError("%s carries no clip" % where)
     files = record.get("files")
-    if not isinstance(files, dict) or "clip" not in files \
-            or not set(files) <= set(_STORE_NAMES):
+    if not isinstance(files, dict) or "clip" not in files:
         raise ClipStoreError("%s lists no clip file" % where)
+    _check_files(files, where)
+    return record
+
+
+def _check_floor(record: Any, where: str) -> Dict[str, Any]:
+    """A floor payload's shape: its marks, and the floor clip when one was
+    drawn -- a black floor has none."""
+    if not isinstance(record, dict) or record.get("version") != RECORD_VERSION:
+        raise ClipStoreError("%s is not a version-%d floor" % (where, RECORD_VERSION))
+    if not isinstance(record.get("marks"), dict) or not isinstance(record.get("files"), dict):
+        raise ClipStoreError("%s carries no floor marks" % where)
+    if record["files"] and not isinstance(record.get("clip"), dict):
+        raise ClipStoreError("%s lists a file but no clip" % where)
+    _check_files(record["files"], where)
+    return record
+
+
+def _check_files(files: Dict[str, Any], where: str) -> None:
+    if not set(files) <= set(_STORE_NAMES):
+        raise ClipStoreError("%s lists a file it cannot hold" % where)
     for role, item in files.items():
         if (not isinstance(item, dict) or not _NAME_RE.fullmatch(str(item.get("name") or ""))
                 or not isinstance(item.get("bytes"), int) or isinstance(item.get("bytes"), bool)
                 or not _KEY_RE.fullmatch(str(item.get("sha256") or ""))):
             raise ClipStoreError("%s lists its %s file badly" % (where, role))
-    return record
 
 
 def _verify(path: Path, item: Dict[str, Any]) -> None:
@@ -304,17 +325,28 @@ class ProducerClips:
     shot's weights load and :meth:`commit` once the shot is whole. Safe to
     call from the cloud fan-out's worker threads."""
 
-    def __init__(self, *, project_id: str, episode_root: Any, bundle_map: Any) -> None:
+    def __init__(self, *, project_id: str, episode_root: Any, bundle_map: Any,
+                 bundle_floors: Any = None, kept: Iterable[Any] = (),
+                 takes: Any = None) -> None:
         self.store = store_dir(project_id)
         self.episode_root = Path(str(episode_root))
         self.clips_dir = self.episode_root.joinpath(*_EPISODE_DIRS["clip"])
         self.foley_dir = self.episode_root.joinpath(*_EPISODE_DIRS["foley"])
         self._bundle = {str(sid): record for sid, record in dict(bundle_map or {}).items()
                         if isinstance(record, dict)}
+        self._bundle_floors = {str(sid): record
+                               for sid, record in dict(bundle_floors or {}).items()
+                               if isinstance(record, dict)}
+        #: The cards whose clip -- or floor -- is kept as it is (kept.clips).
+        self.kept = frozenset(str(sid) for sid in kept or ())
+        #: The clip take each shot is filmed with (takes.clips); 0 when absent.
+        self.takes = {str(sid): int(take or 0) for sid, take in dict(takes or {}).items()}
         self._lock = threading.Lock()
         self._keys: Dict[str, str] = {}
         self._records: Dict[str, Dict[str, Any]] = {}
-        #: Shot id -> where its clip came from this run: "bundle" or "store".
+        self._floors: Dict[str, Dict[str, Any]] = {}
+        #: Shot id -> where its clip came from this run: "bundle", "store",
+        #: "kept" or "kept floor".
         self.reused: Dict[str, str] = {}
 
     # -- finding ---------------------------------------------------------- #
@@ -322,10 +354,13 @@ class ProducerClips:
         """The clip filmed under ``key`` for this shot, in this workspace, as
         ``{"clip": ..., "attempts": [...]}`` -- or None, and the shot renders.
         The bundle's own record is used in place when it names this key and
-        its files verify; otherwise the store's entry is copied in."""
+        its files verify; otherwise the store's entry is copied in. A kept
+        card's clip is used whatever its key (:meth:`_keep`)."""
         shot_id = str(shot_id)
         with self._lock:
             self._keys[shot_id] = key
+        if shot_id in self.kept:
+            return self._keep(shot_id)
         record = self._bundle.get(shot_id)
         if record is not None and record.get("key") == key:
             try:
@@ -347,11 +382,43 @@ class ProducerClips:
                       "in (%s); filming it again", shot_id, exc)
             return None
 
+    def _keep(self, shot_id: str) -> Dict[str, Any]:
+        """A KEPT card's clip, used as it is whatever has changed since: the
+        clip the bundle's record names -- or the floor the shot fell to, which
+        stays visibly a floor, its marks returned with it. Keep never vouches
+        for a missing or tampered file: either refuses the run."""
+        record = self._bundle.get(shot_id)
+        if record is not None:
+            try:
+                return self._take(shot_id, record, self._in_bundle(record), "kept")
+            except ClipStoreError as exc:
+                raise ClipStoreError("card %s keeps its clip, but %s" % (shot_id, exc)) from None
+        floor = self._bundle_floors.get(shot_id)
+        if floor is None:
+            raise ClipStoreError("card %s keeps a clip it does not have" % shot_id)
+        try:
+            _check_floor(floor, "the bundle's floor for %s" % shot_id)
+            paths = self._bundle_paths(floor["files"])
+        except ClipStoreError as exc:
+            raise ClipStoreError("card %s keeps its floor, but %s" % (shot_id, exc)) from None
+        clip = dict(floor.get("clip") or {})
+        for role, path in paths.items():
+            clip[_PATH_FIELDS[role]] = str(path)
+        with self._lock:
+            self.reused[shot_id] = "kept floor"
+            self._floors[shot_id] = floor
+        return {"clip": clip, "attempts": [], "marks": dict(floor["marks"])}
+
     def _in_bundle(self, record: Dict[str, Any]) -> Dict[str, Path]:
         """A bundle record's files where they sit in this workspace, verified."""
         _check_record(record, "the bundle's record")
+        return self._bundle_paths(record["files"])
+
+    def _bundle_paths(self, files: Dict[str, Any]) -> Dict[str, Path]:
+        """Bundle-map files where they sit in this workspace, verified: each in
+        its own episode folder, under its own name, never anywhere else."""
         paths = {}
-        for role, item in record["files"].items():
+        for role, item in files.items():
             rel = PurePosixPath(str(item.get("path") or ""))
             if (rel.is_absolute() or ".." in rel.parts
                     or tuple(rel.parts[:-1]) != _EPISODE_DIRS[role]
@@ -406,6 +473,7 @@ class ProducerClips:
         # the next run's ledger are the same record.
         body = json.loads(json.dumps(
             {"shot_id": shot_id, "attempts": [str(a) for a in attempts or ()],
+             "clip_take": self.takes.get(shot_id, 0),
              "clip": {k: v for k, v in clip.items() if k not in _PATH_FIELDS.values()}},
             ensure_ascii=True, default=str))
         try:
@@ -436,3 +504,36 @@ class ProducerClips:
         with self._lock:
             return {str(sid): self._records[str(sid)] for sid in shot_ids
                     if str(sid) in self._records}
+
+    # -- floors ----------------------------------------------------------- #
+    def floored(self, shot_id: str, marks: Dict[str, Any], clip: Any) -> None:
+        """Record a shot this run floored (plan, "Floors are failed cards"):
+        its floor marks, and the floor clip when one was drawn -- already in
+        the episode's clips folder. A floor is never a reuse record, so the
+        next Video run films the shot again unless its card is kept."""
+        shot_id = str(shot_id)
+        files: Dict[str, Any] = {}
+        body_clip = None
+        path = str(clip.get("path") or "") if isinstance(clip, dict) else ""
+        if path and os.path.isfile(path):
+            try:
+                entry = _file_entry(Path(path), os.path.basename(path))
+                files = {"clip": dict(entry, path="/".join(
+                    _EPISODE_DIRS["clip"] + (entry["name"],)))}
+                body_clip = {k: v for k, v in clip.items() if k not in _PATH_FIELDS.values()}
+            except ClipStoreError as exc:
+                log.error("[OTR.producer_clips] shot %s floored, and its floor clip cannot "
+                          "be read (%s); it is recorded as a floor with no clip", shot_id, exc)
+        record = json.loads(json.dumps(
+            {"version": RECORD_VERSION, "shot_id": shot_id, "marks": dict(marks or {}),
+             "clip": body_clip, "files": files}, ensure_ascii=True, default=str))
+        with self._lock:
+            self._floors[shot_id] = record
+            self._records.pop(shot_id, None)
+
+    def floors_for(self, shot_ids: Iterable[Any]) -> Dict[str, Dict[str, Any]]:
+        """The floor payloads of the shots this run floored, or kept floored,
+        in plan order."""
+        with self._lock:
+            return {str(sid): self._floors[str(sid)] for sid in shot_ids
+                    if str(sid) in self._floors}

@@ -425,10 +425,11 @@ def _grade_acceptance(ledger, manifest):
 
 def _producer_clips(direction, ledger, episode_id, _rd):
     """A Scene Producer Video run's clip reuse (``_otr_producer_clips``): the
-    project's store, this workspace's episode folder, and the reuse map the
-    bundle it replays carries. The folder is resolved by the rule the clip
-    persist uses after the render, so a shot committed mid-render lands where
-    the persist would have put it."""
+    project's store, this workspace's episode folder, the reuse map and floor
+    payloads the bundle it replays carries, and the direction's kept clips and
+    clip takes. The folder is resolved by the rule the clip persist uses after
+    the render, so a shot committed mid-render lands where the persist would
+    have put it."""
     from pathlib import Path
 
     from . import _otr_producer_clips as _PC
@@ -436,10 +437,12 @@ def _producer_clips(direction, ledger, episode_id, _rd):
     workspace = _rd.resolve_episode_id_for_clip_persistence(
         episode_id,
         freeze_timestamp=str(((ledger.get("meta") or {}).get("freeze_timestamp") or "")))
+    video = ledger.get("video") if isinstance(ledger.get("video"), dict) else {}
     return _PC.ProducerClips(
         project_id=direction["project_id"],
         episode_root=Path(str(otr_clips_dir(str(workspace)))).parent,
-        bundle_map=(ledger.get("video") or {}).get(_PC.MAP_KEY))
+        bundle_map=video.get(_PC.MAP_KEY), bundle_floors=video.get(_PC.FLOOR_KEY),
+        kept=direction["kept"]["clips"], takes=direction["takes"]["clips"])
 
 
 class OTRVideoRenderBatch:
