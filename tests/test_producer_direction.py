@@ -280,10 +280,11 @@ def test_the_validator_passes_blank_and_refuses_every_filled_direction_for_now(p
         admit(_prompt(_raw()))
 
 
-def test_shot_lock_carries_the_widget_as_an_advanced_last_input():
+def test_shot_lock_carries_the_widget_as_an_advanced_input():
+    # By identity, never by position: a later widget may legitimately follow it.
     from nodes.otr_shot_lock import OTRShotLock
     optional = OTRShotLock.INPUT_TYPES()["optional"]
-    assert list(optional)[-1] == "direction_json"
+    assert "direction_json" in optional
     kind, opts = optional["direction_json"]
     assert kind == "STRING" and opts["default"] == ""
     assert opts["advanced"] is True and opts["multiline"] is True
@@ -296,11 +297,39 @@ def test_shot_lock_refuses_a_filled_direction_before_any_work():
         OTRShotLock().lock("{}", direction_json=_raw())
 
 
-def test_every_shipped_graph_saves_the_widget_blank_and_last():
+def test_every_shipped_graph_saves_the_widget_blank():
+    # By identity: find the descriptor by name and its value by its place among
+    # Shot Lock's WIDGET descriptors (its other inputs are sockets).
     for path in sorted((_REPO / "workflows").glob("otr_*.json")):
         graph = json.loads(path.read_text(encoding="utf-8"))
         locks = [n for n in graph.get("nodes", []) if n.get("type") == "OTR_ShotLock"]
         for node in locks:
-            assert node["inputs"][-1]["name"] == "direction_json", path.name
-            assert node["inputs"][-1]["widget"] == {"name": "direction_json"}, path.name
-            assert node["widgets_values"] == [""], path.name
+            by_name = {i["name"]: i for i in node["inputs"]}
+            desc = by_name.get("direction_json")
+            assert desc and desc.get("widget") == {"name": "direction_json"}, path.name
+            assert desc.get("link") is None, path.name
+            widget_names = [i["name"] for i in node["inputs"] if "widget" in i]
+            value = node["widgets_values"][widget_names.index("direction_json")]
+            assert value == "", path.name
+
+
+def test_the_harness_sends_a_validated_direction_as_text(tmp_path):
+    sys.path.insert(0, str(_REPO / "scripts"))
+    import otr_canonical_api_run as canonical
+    import otr_api
+    from nodes._otr_workflow_apply import CREATIVE_WHITELIST
+    assert "direction_json" in CREATIVE_WHITELIST and "direction_json" in otr_api.CREATIVE_WHITELIST
+    # The harness's own loader, offline schemas and converter: what a run does.
+    schemas = canonical._schemas(True)
+    workflow = canonical.load_workflow(str(_REPO / "workflows" / "otr_canonical.json"))
+    good = tmp_path / "direction.json"
+    good.write_text(_raw(), encoding="utf-8")
+    applied = canonical._apply_direction(workflow, schemas, str(good))
+    assert applied == ["OTR_ShotLock.direction_json=<stage stills, project a1b2c3d4e5f6, out 01-stills>"]
+    prompt = canonical.workflow_to_api_prompt(workflow, schemas)
+    lock = [n for n in prompt.values() if n["class_type"] == "OTR_ShotLock"][0]
+    assert lock["inputs"]["direction_json"] == _raw()
+    bad = tmp_path / "bad.json"
+    bad.write_text(_raw(stage="video", out="02-video"), encoding="utf-8")
+    with pytest.raises(SystemExit, match="needs a source"):
+        canonical._apply_direction(workflow, schemas, str(bad))

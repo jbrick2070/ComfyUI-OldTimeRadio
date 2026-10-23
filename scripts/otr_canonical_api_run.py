@@ -196,6 +196,34 @@ def _apply_writer_shortcuts(workflow: dict, schemas: dict, args) -> list[str]:
     return applied
 
 
+def _apply_direction(workflow: dict, schemas: dict, path: str) -> list[str]:
+    """SCENE PRODUCER (2026-10-22): Shot Lock's ``direction_json`` from a file.
+
+    The file is validated with the pack's own schema before anything is sent,
+    so a malformed direction fails here with its reason instead of at node 63.
+    The text is patched verbatim as a string through the creative whitelist --
+    never through the ``--set`` value parser, which would turn JSON into a dict.
+    """
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    from nodes._otr_producer_direction import DirectionError, parse_direction
+    source = pathlib.Path(path)
+    if not source.is_file():
+        raise SystemExit(f"--direction-json missing: {source}")
+    text = source.read_text(encoding="utf-8")
+    try:
+        direction = parse_direction(text)
+    except DirectionError as exc:
+        raise SystemExit(f"--direction-json {source}: {exc}")
+    if direction is None:
+        raise SystemExit(f"--direction-json {source} is empty; leave the option off "
+                         f"for an ordinary run")
+    lock_id = _node_id_for(workflow, "OTR_ShotLock")
+    patch_creative(workflow, lock_id, "direction_json", text, schemas)
+    return ["OTR_ShotLock.direction_json=<stage %s, project %s, out %s>"
+            % (direction["stage"], direction["project_id"], direction["out"] or "none")]
+
+
 def _schemas(offline: bool) -> dict:
     if not offline:
         return fetch_schemas()
@@ -279,6 +307,8 @@ def build_api_prompt(args) -> tuple[dict, list[str]]:
     if getattr(args, "video_lane", None):
         applied.extend(_apply_video_lane(workflow, schemas, args.video_lane))
     applied.extend(_apply_writer_shortcuts(workflow, schemas, args))
+    if getattr(args, "direction_json", None):
+        applied.extend(_apply_direction(workflow, schemas, args.direction_json))
     for patch in args.set:
         applied.append(_apply_set(workflow, schemas, patch))
 
@@ -511,6 +541,11 @@ def main(argv: list[str] | None = None) -> int:
                              "(scripts/otr_freeze_replay_bundle.py). The writer, "
                              "cast, TTS, music and stills pass through frozen; "
                              "only the video phase and the publish tail run.")
+    parser.add_argument("--direction-json", default=None, dest="direction_json",
+                        help="SCENE PRODUCER: a file holding Shot Lock's direction_json "
+                             "(planning/scene-producer/PLAN.md). Validated before the "
+                             "prompt is sent; pair it with --replay-from for every "
+                             "stage after the first.")
     parser.add_argument("--video-lane", default=None, dest="video_lane",
                         help="set the announcer, character and music video "
                              "dropdowns to this video lane (e.g. "

@@ -1069,6 +1069,12 @@ CREATIVE_WHITELIST = frozenset({
     # package whitelist. Decides what stays on disk after publishing, never
     # an engine or route; the mux still refuses any unproven deletion.
     "asset_cleanup",
+    # SCENE PRODUCER (2026-10-22): Shot Lock's direction_json. The direction
+    # Radio Play Studio's shot editor writes -- which stage to run and what the
+    # user changed. It names no engine, route or model, no workflow row manages
+    # it, and the Workflow Validator refuses a malformed one before anything
+    # runs. Whitelisted so a headless proof run can drive a producer stage.
+    "direction_json",
 })
 
 

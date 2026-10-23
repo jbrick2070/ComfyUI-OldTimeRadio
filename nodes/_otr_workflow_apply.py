@@ -959,6 +959,12 @@ CREATIVE_WHITELIST = frozenset({
     # published video (operator, 2026-09-26). The mux still refuses any
     # deletion it cannot prove safe, whoever set the mode.
     "asset_cleanup",
+    # SCENE PRODUCER (2026-10-22): Shot Lock's direction_json. The direction
+    # Radio Play Studio's shot editor writes -- which stage to run and what the
+    # user changed. It names no engine, route or model, no workflow row manages
+    # it, and the Workflow Validator refuses a malformed one before anything
+    # runs. Whitelisted so a headless proof run can drive a producer stage.
+    "direction_json",
 })
 
 
