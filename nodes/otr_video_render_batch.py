@@ -602,7 +602,9 @@ class OTRVideoRenderBatch:
         foley stems included, into the bundle the direction names, then stop
         the graph here. A stage that did not account for every shot is not a
         bundle anyone should continue, so it fails LOUD and freezes nothing;
-        sanctioned floors are accounted for, and they freeze."""
+        sanctioned floors are accounted for, and they freeze. The blocker is
+        built before the freeze, so a core without it leaves no bundle behind
+        for the retry to trip over (Sonnet QA, 2026-10-22)."""
         from . import _otr_producer_direction as _PD
         if not report.get("ok"):
             raise ValueError(
@@ -610,11 +612,11 @@ class OTRVideoRenderBatch:
                 "every shot (%s unaccounted%s); no bundle was frozen" % (
                     report.get("unaccounted_beat_count", "?"),
                     "; " + str(report["error"]) if report.get("error") else ""))
+        blocked = _PD.execution_blocker()
         ep = str(report.get("episode_id") or "")
         bundle = _PD.freeze_stage(direction, ep, include_render_outputs=True)
         log.warning("[OTR_VideoRenderBatch] Scene Producer video stage done: froze "
                     "episode %s into %s; the graph stops here", ep, bundle)
-        blocked = _PD.execution_blocker()
         return {"ui": {"text": [payload[:6000]]}, "result": (blocked, blocked)}
 
     @staticmethod

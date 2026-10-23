@@ -1500,14 +1500,31 @@ def _flush_pending_cloud_stills(pending, ctx):
             packed["laplacian"], ctx)
 
 
+def _draws_partner_heartbeat(engine_id) -> bool:
+    """True when this image engine renders through a Comfy partner node, whose
+    wait loop redraws the executing node's bar with its own heartbeat
+    (``cloud_media_invoke._emit_heartbeat``).
+
+    The id alone does not say so (Codex QA, 2026-10-22): ``ideo`` is a partner
+    engine whose node key is ``cloud_ideogram_v4``. So the registered engine's
+    node key decides too -- the partner half of :func:`_is_cloud_image_engine`.
+    A direct API engine (``native=False`` with no partner node) draws nothing."""
+    eid = str(engine_id or "")
+    if eid.startswith("cloud_"):
+        return True
+    eng = _safe_engine(eid)
+    return eng is not None and str(getattr(eng, "node_key", "") or "").startswith("cloud_")
+
+
 def _stage_bar_items(objects, image_policy) -> int:
     """How many items the Scene Producer's stage bar counts: every object, or
-    none when any of them renders on a partner engine (``cloud_*``). A partner
-    call's wait loop redraws this node's bar with its own heartbeat
-    (``cloud_media_invoke``), from fan-out worker threads the quiet does not
-    reach, and two bars on one node fight -- the same rule the voice loop keeps
-    (``cloud_fanout.adapter_draws_partner_heartbeat``). A role whose slot
-    cannot resolve is left to the loop below, which refuses it in its place."""
+    none when any of them renders on a partner engine
+    (:func:`_draws_partner_heartbeat`). A partner call's wait loop redraws this
+    node's bar with its own heartbeat, from fan-out worker threads the quiet
+    does not reach, and two bars on one node fight -- the same rule the voice
+    loop keeps (``cloud_fanout.adapter_draws_partner_heartbeat``). A role whose
+    slot cannot resolve is left to the loop below, which refuses it in its
+    place."""
     for obj in objects:
         if not isinstance(obj, dict):
             continue
@@ -1516,7 +1533,7 @@ def _stage_bar_items(objects, image_policy) -> int:
                 image_policy, str(obj.get("role") or "character_video"))
         except ValueError:
             continue
-        if str(engine_id or "").startswith("cloud_"):
+        if _draws_partner_heartbeat(engine_id):
             return 0
     return len(objects)
 
@@ -2804,15 +2821,22 @@ class OTRImageGenDispatcher:
         downstream -- the video, composite, captions, credits and mux -- is
         skipped by ComfyUI's silent blocker, and the prompt still ends as a
         success. The stills are already stamped durably, so the freeze reads
-        them from disk."""
+        them from disk.
+
+        THE LEDGER'S ID FIRST (Sonnet QA, 2026-10-22): ``dispatch_images``
+        re-keys a stale ``pending_*`` id to the folder the stills actually went
+        to and stamps it on the ledger as durable identity truth, so that, not
+        the wired id, names the workspace to freeze. And the blocker is built
+        BEFORE the freeze: a core without it must fail with no bundle left
+        behind, or the retry would meet "bundle already exists"."""
         from . import _otr_producer_direction as _PD
-        ep = str(episode_id or led.get("episode_id")
+        blocked = _PD.execution_blocker()
+        ep = str(led.get("episode_id") or episode_id
                  or (led.get("meta") or {}).get("episode_id") or "")
         bundle = _PD.freeze_stage(direction, ep, include_render_outputs=False)
         log.warning("[OTR_ImageGenDispatcher] Scene Producer stills stage done: froze "
                     "episode %s into %s; the graph stops here (%s)", ep, bundle,
                     str(report or "").splitlines()[0] if report else "no report")
-        blocked = _PD.execution_blocker()
         return (blocked, blocked, blocked)
 
     @staticmethod

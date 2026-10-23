@@ -275,6 +275,81 @@ def test_an_edited_action_reaches_the_lane_request(replay_json, engine, keeps_li
     assert PL.peek_ledger().data["video"]["shots"][0]["creative"]["motion"] == ACTION
 
 
+def _request_text(request):
+    return request.get("text_prompt") if isinstance(request, dict) else request.text_prompt
+
+
+def test_an_edited_action_drops_the_old_moments_foley(replay_json):
+    # Codex QA, 2026-10-22: on a lane that decodes its audio from the prompt the
+    # director's sound wins over the lexicon, so an edited action that kept it
+    # would still sound like the moment it replaced.
+    from nodes.otr_shot_lock import OTRShotLock
+    from nodes._otr_video_engines import render_driver as RD
+    old_sound = "paper rustling, a pen scratching"
+    data = _character_shot(replay_json, "ltx25_foley_16gb")
+    data["video"]["shots"][0]["creative"]["sound"] = old_sound
+    runs = {}
+    for name, cards in (("unedited", {}), ("edited", {"shot_b001": {"motion_text": ACTION}})):
+        patched, *_ = OTRShotLock().lock(json.dumps(data), video_policy_json=POLICY,
+                                         direction_json=_direction(cards=cards))
+        ledger = json.loads(patched)
+        shot = ledger["video"]["shots"][0]
+        runs[name] = (shot["creative"].get("sound"),
+                      _request_text(RD.build_request_from_shot(shot, ledger, phase="render")))
+    assert runs["unedited"][0] == old_sound and old_sound in runs["unedited"][1]
+    sound, text = runs["edited"]
+    assert sound == "" and ACTION in text and "paper rustling" not in text
+
+
+def test_an_edit_says_where_its_prompt_came_from_and_reads_the_first_line(replay_json):
+    # Sonnet QA, 2026-10-22: the recomposed text is no longer the writer's, and
+    # a duplicated line id must resolve as the render driver resolves it.
+    from nodes import otr_shot_lock as SL
+    data = _character_shot(replay_json, "humo_1.7B_169")
+    data["video"]["shots"][0]["creative"]["source"] = "llm"
+    data["lines"] = [{"line_id": "b001", "text": "The first reading."},
+                     {"line_id": "b001", "text": "A later duplicate."}] + [
+        ln for ln in data.get("lines") or [] if ln.get("line_id") != "b001"]
+    assert SL.apply_action_edits(data["video"], data, data["meta"],
+                                 {"shot_b001": {"motion_text": ACTION}}) == ["shot_b001"]
+    creative = data["video"]["shots"][0]["creative"]
+    assert creative["source"] == "scene_producer_edit"
+    assert "The first reading." in creative["text_prompt"]
+    assert "A later duplicate." not in creative["text_prompt"]
+
+
+def test_a_stage_builds_its_blocker_before_it_freezes(monkeypatch):
+    # Sonnet QA, 2026-10-22: a core without the blocker must fail with no bundle
+    # left behind, or the retry would meet "bundle already exists".
+    from nodes import otr_image_gen_dispatcher as D
+    from nodes import otr_video_render_batch as B
+    froze = []
+    monkeypatch.setattr(PD, "freeze_stage", lambda *a, **k: froze.append(a) or pathlib.Path("b"))
+
+    def no_blocker():
+        raise ModuleNotFoundError("comfy_execution")
+
+    monkeypatch.setattr(PD, "execution_blocker", no_blocker)
+    direction = PD.parse_direction(_direction(stage="stills", out="01-stills", source=None))
+    with pytest.raises(ModuleNotFoundError):
+        D.OTRImageGenDispatcher._finish_stills_stage({"episode_id": "e"}, direction, "e", "")
+    with pytest.raises(ModuleNotFoundError):
+        B.OTRVideoRenderBatch._finish_video_stage(
+            PD.parse_direction(_direction()), {"ok": True, "episode_id": "e"}, "{}")
+    assert froze == []
+
+
+def test_the_stills_freeze_names_the_workspace_the_ledger_settled_on(monkeypatch, recorded):
+    # Sonnet QA, 2026-10-22: dispatch_images re-keys a stale pending id to the
+    # folder the stills went to and stamps it on the ledger; that is frozen.
+    calls, _sentinel = recorded
+    from nodes import otr_image_gen_dispatcher as D
+    direction = PD.parse_direction(_direction(stage="stills", out="01-stills", source=None))
+    D.OTRImageGenDispatcher._finish_stills_stage(
+        {"episode_id": "signal_lost_final_slug"}, direction, "pending_20261022_010101", "")
+    assert calls == [("01-stills", "signal_lost_final_slug", False)]
+
+
 def test_an_unchanged_action_recomposes_nothing(replay_json):
     from nodes import otr_shot_lock as SL
     data = _character_shot(replay_json, "ltx25_foley_16gb")

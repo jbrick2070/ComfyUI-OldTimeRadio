@@ -2432,8 +2432,17 @@ def apply_action_edits(planned: dict, ledger: dict, meta: dict, cards: dict) -> 
     from the frozen appearance, setting, expression and camera -- and the
     spoken line only on a lane that keeps dialogue. Both matter: the LTX and
     HuMo lane formatters compose again from the structured leaves, so changing
-    ``text_prompt`` alone would not reach the render. No LLM runs and no other
-    leaf is rewritten. An action equal to the frozen one recomposes nothing.
+    ``text_prompt`` alone would not reach the render. No LLM runs. An action
+    equal to the frozen one recomposes nothing.
+
+    THE DIRECTOR'S FOLEY GOES WITH THE OLD ACTION (Codex QA, 2026-10-22). The
+    ``sound`` leaf is the nonverbal director's sounds for the moment it wrote,
+    and on a lane that decodes its audio from the prompt the director's sound
+    wins over the lexicon (``eng_ltx25``). Kept, an edit to "slams the drawer"
+    would still sound like the paper rustling it replaced. So an edited action
+    clears it, and the lane derives its sounds from the new action with the
+    same deterministic lexicon every beat used before the director wrote foley.
+    Every other leaf is kept as frozen.
 
     Refused, before anything changes: a card for a shot the plan does not
     have, and an action on a shot with nothing to edit
@@ -2453,10 +2462,13 @@ def apply_action_edits(planned: dict, ledger: dict, meta: dict, cards: dict) -> 
                          "shot(s) that have none to edit: %s" % ", ".join(not_editable[:5]))
     # A character beat's id IS its line's line_id and its text the line's
     # stripped text (`extract_beats`); read them directly rather than re-run
-    # the planner's role validation over a frozen ledger.
-    lines = {str(ln.get("line_id")): str(ln.get("text") or "").strip()
-             for ln in (ledger.get("lines") or [])
-             if isinstance(ln, dict) and ln.get("line_id")}
+    # the planner's role validation over a frozen ledger. The FIRST line with
+    # an id wins, as in the render driver's own line index (Sonnet QA,
+    # 2026-10-22), so the prompt and the lane request never disagree.
+    lines: dict = {}
+    for ln in (ledger.get("lines") or []):
+        if isinstance(ln, dict) and ln.get("line_id"):
+            lines.setdefault(str(ln.get("line_id")), str(ln.get("text") or "").strip())
     setting = _read_setting(meta)
     changed = []
     for sid in sorted(wanted):
@@ -2476,8 +2488,13 @@ def apply_action_edits(planned: dict, ledger: dict, meta: dict, cards: dict) -> 
             _join_directive_leaves(appearance, setting, line, leaves, nonverbal=nonverbal),
             nonverbal=nonverbal)
         creative["motion"] = action
+        if creative.get(_SOUND_KEY):
+            creative[_SOUND_KEY] = ""         # the old moment's foley; see above
         creative["text_prompt"] = text_prompt
         creative["prompt_hash"] = _content_hash(text_prompt)
+        # Truthful provenance: the text is now the deterministic composition
+        # around the person's action, whatever wrote the frozen one.
+        creative["source"] = "scene_producer_edit"
         creative["edited_by"] = "scene_producer"
         cache_keys = shot.get("cache_keys")
         if isinstance(cache_keys, dict):

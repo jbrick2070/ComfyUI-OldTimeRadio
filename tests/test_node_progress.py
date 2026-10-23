@@ -285,15 +285,19 @@ def test_a_producer_run_shows_its_items_and_hides_its_samplers(fake_comfy_bars, 
     assert utils.PROGRESS_BAR_HOOK is real
 
 
-def test_a_partner_engine_keeps_its_own_heartbeat_bar():
-    # Two bars on one node fight: a cloud_* engine's wait loop redraws this
+@pytest.mark.parametrize("engine, items", [
+    ("flux_gen1", 2),            # local: the stage bar
+    ("google_image", 2),         # a direct API engine draws no heartbeat
+    ("cloud_flux_pro", 0),       # partner, by its id
+    ("ideo", 0),                 # partner by its node key, cloud_ideogram_v4 (Codex QA)
+])
+def test_a_partner_engine_keeps_its_own_heartbeat_bar(engine, items):
+    # Two bars on one node fight: a partner engine's wait loop redraws this
     # node's bar from fan-out threads the quiet does not reach.
     from nodes import otr_image_gen_dispatcher as disp
     objects = [{"role": "character_video"}, {"role": "character_video"}]
-    local = {"image_models": {"character_image_model": {"engine_id": "flux_gen1"}}}
-    partner = {"image_models": {"character_image_model": {"engine_id": "cloud_flux_pro"}}}
-    assert disp._stage_bar_items(objects, local) == 2
-    assert disp._stage_bar_items(objects, partner) == 0
+    policy = {"image_models": {"character_image_model": {"engine_id": engine}}}
+    assert disp._stage_bar_items(objects, policy) == items
 
 
 def test_an_ordinary_run_draws_no_stage_bar_and_quiets_nothing(fake_comfy_bars, tmp_path):
