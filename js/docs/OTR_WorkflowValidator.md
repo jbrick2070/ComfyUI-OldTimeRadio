@@ -11,7 +11,7 @@ Opt-in execution-time workflow contract validator. Place as the first node in a 
 
 The shipped workflows set these; most people never change them.
 
-**`workflow_json_path`** -- text; starts as `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_canonical.json`.
+**`workflow_json_path`** -- text; starts as a path on this machine.
 
 Path of the workflow JSON this validator audits (default: the canonical graph). Template/expert field -- generated variants stamp it; a missing file fails the validation report, not the render.
 
@@ -39,7 +39,7 @@ Generation stamp: semantic hash of this variant as emitted. A mismatch against t
 
 Generation stamp: the tool/version that emitted this variant. Empty on the canonical master; informational in the validation report.
 
-**`credential`** -- text.
+**`credential`** -- a connection from another node (`STRING`).
 
 Wire the '0 - Comfy Credential' node here. It carries no key -- only the order.
 

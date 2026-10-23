@@ -11,25 +11,25 @@ The terminal publication node that muxes frozen master audio onto the silent vid
 
 The shipped workflows set these; most people never change them.
 
-**`silent_video_path`** -- text; starts as empty.
+**`silent_video_path`** -- a connection from another node (`STRING`).
 
 Always-silent composite (OTR_SilentComposite). Audio is added HERE only.
 
-**`master_audio_path`** -- text; starts as empty.
+**`master_audio_path`** -- a connection from another node (`STRING`).
 
 Frozen master mix from OTR_EpisodeAssembler.output_path (the master WAV). Copied with -c:a copy.
 
 ### Optional
 
-**`audio_done`** -- text; starts as empty.
+**`audio_done`** -- a connection from another node (`STRING`).
 
 Audio-done gate (EpisodeAssembler out3). Orders the mux AFTER the audio freezes. Opaque.
 
-**`declared_credits_tail_s`** -- a number; starts as `0.0`.
+**`declared_credits_tail_s`** -- a connection from another node (`FLOAT`).
 
 OTR_CreditsRoll's declared silent-credits tail duration. Makes the tail guard credits-aware (v <= a + declared + tol); 0 -> the OTR_MAX_CREDITS_TAIL_S env ceiling.
 
-**`clip_manifest_json`** -- text; starts as empty.
+**`clip_manifest_json`** -- a connection from another node (`STRING`).
 
 Retired connector kept for topology compatibility (rip-sfx 2026-08-06). The manifest is hashed by IS_CHANGED but has no effect on the output.
 
@@ -41,15 +41,15 @@ Frame rate declared to the mux for timing math. Must match the silent video's re
 
 Final mp4 path. Empty -> <output>/otr/episodes/<stem>_final.mp4.
 
-**`video_policy_json`** -- text; starts as empty.
+**`video_policy_json`** -- a connection from another node (`STRING`).
 
 Video policy JSON from OTR_VideoDirector. Read for ONE question: is any role on the LTX 2.5 foley lane? If so this node mixes the foley bed under the provisional master and performs the single delivery loudness pass.
 
-**`foley_receipts_json`** -- text; starts as empty.
+**`foley_receipts_json`** -- a connection from another node (`STRING`).
 
 Clip manifest carrying the per-beat foley receipts (foley_path / foley_sha256 / start_s). The bed the mix is built from. Ignored unless video_policy_json names a foley route.
 
-**`script_json`** -- text; starts as empty.
+**`script_json`** -- a connection from another node (`STRING`).
 
 Writer ledger JSON (OTR_LedgerScriptWriter script_json). Read for ONE question: must this episode reach otr/obs to count as delivered? A story the listener wrote must, and a miss fails the run; every other bank is published too, whatever its rights receipt says.
 

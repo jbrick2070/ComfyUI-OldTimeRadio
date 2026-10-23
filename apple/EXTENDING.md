@@ -174,7 +174,7 @@ partner stack, a Mac device policy.
 **The source of truth is one file: `config/workflow_matrix.json`.** Each row is
 one workflow. Edit that file. Do not hand-edit any `workflows/otr_*.json`
 other than the canonical -- those JSON files and their launch recipes in
-`apple/LAUNCH_RECIPES.md` are generated, and the next rebuild silently undoes you. A new shipping workflow is a
+[apple/LAUNCH_RECIPES.md](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/LAUNCH_RECIPES.md) are generated, and the next rebuild silently undoes you. A new shipping workflow is a
 matrix row only -- there is no second place a workflow can be defined.
 
 This wants the git clone. `scripts/` is not in a registry install.
@@ -241,8 +241,8 @@ python scripts/build_variants.py --check
 ```
 
 `--all` writes the per-machine workflow JSON, the launch recipes
-(`apple/LAUNCH_RECIPES.md`, one section per workflow), and the generated docs
-(`apple/MACHINES.md`, `apple/DROPDOWN_MATRIX.md`, `apple/MACHINE_MATRIX.md`)
+([apple/LAUNCH_RECIPES.md](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/LAUNCH_RECIPES.md), one section per workflow), and the generated docs
+(`apple/MACHINES.md`, [apple/DROPDOWN_MATRIX.md](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/DROPDOWN_MATRIX.md), [apple/MACHINE_MATRIX.md](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/MACHINE_MATRIX.md))
 from the same matrix. `--check` diffs the committed workflows against a fresh
 regeneration and fails on drift.
 
@@ -264,7 +264,7 @@ the one that would otherwise lie.
 
 Set `"ships"` false (or delete the row), **and delete** the matching
 `workflows/<id>.json` that `--all` emitted, then re-run `--all` so its section
-leaves `apple/LAUNCH_RECIPES.md`. Leaving the files is not enough to fail `--check`: a row that still
+leaves [apple/LAUNCH_RECIPES.md](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/LAUNCH_RECIPES.md). Leaving the files is not enough to fail `--check`: a row that still
 exists -- even with `"ships"` false -- is what `load_workflow_row` reads, so the
 leftover workflow regenerates cleanly.
 

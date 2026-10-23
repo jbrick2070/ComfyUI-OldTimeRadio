@@ -11,7 +11,7 @@ Generates opening and closing musical theme cues tailored to the episode's setti
 
 On the shipped workflows these are the widgets a person changes; the ones on the app form are named as the form names them.
 
-**`script_json`** -- text, as many lines as you like; starts as `{}`.
+**`script_json`** -- a connection from another node (`STRING`).
 
 Frozen v2 ledger JSON from OTR_LedgerFreezeCascade. Passed VERBATIM to the legacy engine on the batch path; read for cue mood on the clip path.
 
@@ -21,11 +21,11 @@ Theme-music engine. `stable_audio_3` is the shipped default and is ungated; `mus
 
 ### Optional
 
-**`ledger_json`** -- text, as many lines as you like; starts as empty.
+**`ledger_json`** -- a connection from another node (`STRING`).
 
 Cast-locked ledger from OTR_CastLock (carries episode_seed). Read on the clip path for the per-cue seed; the batch path delegates the raw script_json.
 
-**`gate_in`** -- text, as many lines as you like; starts as empty.
+**`gate_in`** -- a connection from another node (`STRING`).
 
 Optional ordering signal. Wire an upstream 'done' here to force this node to run after it.
 

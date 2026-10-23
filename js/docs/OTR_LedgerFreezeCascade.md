@@ -11,25 +11,25 @@ Validates ledger structure, runs readiness checks, and freezes the production le
 
 The shipped workflows set these; most people never change them.
 
-**`script_text`** -- text.
+**`script_text`** -- a connection from another node (`STRING`).
 
 Passthrough from OTR_LedgerScriptWriter. The cascade reads the production ledger directly via peek_ledger(); this socket exists so the graph wires the writer and cascade in line.
 
 ### Optional
 
-**`script_json`** -- text.
+**`script_json`** -- a connection from another node (`STRING`).
 
 Forwarded from the writer's script_json slot. The cascade re-serializes this from the post-freeze ledger so downstream consumers see the final state.
 
-**`news_used`** -- text.
+**`news_used`** -- a connection from another node (`STRING`).
 
 Passthrough of the writer's news_used slot. Not touched by the cascade.
 
-**`estimated_minutes`** -- a whole number.
+**`estimated_minutes`** -- a connection from another node (`INT`).
 
 Passthrough of the writer's estimated_minutes INT slot. Not touched by the cascade.
 
-**`technical_model`** -- text.
+**`technical_model`** -- a connection from another node (`STRING`).
 
 Technical model ID from the writer. Required for compatibility on a normal current-ledger run; freeze does not acquire or generate with this model. Validated via _otr_model_inputs.require_model -- an unwired or blank socket raises MissingModelInputError loud.
 

@@ -11,25 +11,25 @@ Coordinates still image generation for character portraits and scene backgrounds
 
 The shipped workflows set these; most people never change them.
 
-**`script_json`** -- text, as many lines as you like; starts as `{}`.
+**`script_json`** -- a connection from another node (`STRING`).
 
 Frozen ledger JSON; the dispatcher stamps ledger['images'] into it.
 
-**`image_policy_json`** -- text, as many lines as you like; starts as `{}`.
+**`image_policy_json`** -- a connection from another node (`STRING`).
 
 OTR_ImageDirector policy (engine per role + fresh cap + seed).
 
-**`image_prompts_json`** -- text, as many lines as you like; starts as `{}`.
+**`image_prompts_json`** -- a connection from another node (`STRING`).
 
 OTR_MetaBriefImagePromptGen output: the versioned {"objects":[...]} payload (portraits + scene stills).
 
 ### Optional
 
-**`gate_in`** -- text, as many lines as you like; starts as empty.
+**`gate_in`** -- a connection from another node (`STRING`).
 
 Optional ordering signal (e.g. audio_done); opaque STRING.
 
-**`episode_id`** -- text; starts as empty.
+**`episode_id`** -- a connection from another node (`STRING`).
 
 Episode id (still-spine ST-3/DS-3; wired in the saved json). Every still materializes into episodes/<episode_id>/stills/ + stills_manifest.json. Falls back to the ledger's episode_id; an unkeyed dispatch is LOUD.
 

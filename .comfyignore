@@ -344,7 +344,10 @@ contest/radio-play-studio/.gitignore
 # the shipped set; none of these is on it, and nothing under nodes/ reads
 # them. Their siblings (the H3 and Ideogram attestations, the other model
 # licence notes) were already excluded. The FLUX3 attestation stays: the
-# README's licence section points readers at it.
+# README's licence section points readers at it, and so does the Gemma licence
+# note: shipped code and apple/LLM_PREFLIGHT.md name it (Codex QA). The contest
+# write-up goes too: it is a submission record that names the drafts, and the
+# app it describes ships with its own README under contest/.
 apple/CONTEST_DEMO_SCRIPT.md
 apple/CONTEST_DEMO_STORYBOARD.md
 apple/CONTEST_EXPLAINER_PROMPT.md
@@ -352,4 +355,4 @@ apple/CONTEST_SUBMISSION_DRAFT.md
 apple/RESEARCH_PROMPT_TTS_KILLER.md
 apple/SPEC_pack_owned_vram_residency.md
 apple/RIGHTS_DECISION_LEMMY_VOICE.md
-apple/model-license-comfy-org--gemma-4.md
+apple/CONTEST_RADIO_PLAY_STUDIO.md

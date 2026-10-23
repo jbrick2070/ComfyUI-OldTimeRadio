@@ -15,9 +15,11 @@ claim below was read from one of those, never remembered.
 3. **The canvas**: node titles ("1 - Story Writer"), the Start here note.
 4. **The App Mode form** (`extra.linearData`): one flat list of rows. Each
    row shows `widget.label || widget.name` and, under it, ONE truncated line
-   of `config.description`. Nothing else: the `tooltip` from INPUT_TYPES is
-   not drawn in App Mode (`AppModeWidgetList.vue`, `WidgetDescription.vue`
-   -- the description prop or an i18n placeholder, `truncate`).
+   of `config.description` (`AppModeWidgetList.vue`, `WidgetDescription.vue`
+   -- the description prop or an i18n placeholder, `truncate`). The
+   INPUT_TYPES `tooltip` is not drawn; it shows on hover, as on the canvas
+   (`v-tooltip` on the widget, Codex QA 2026-10-23), so the description line
+   is the only help a person sees without pointing at the row.
 5. **The node help panel** (the "?" on a node): with no `docs/` folder it
    shows `DESCRIPTION` and the per-input tooltips. With
    `WEB_DIRECTORY/docs/<NodeClass>.md` (and `<NodeClass>/<locale>.md`) it
@@ -46,7 +48,7 @@ is the operator's call, as always.
 
 | Finding | The practice | Fix |
 |---|---|---|
-| 26 of 40 rows have no description, and the tooltip is not drawn in App Mode | The one line under a row is the only help a form user gets. | A note (30 characters or fewer -- the row truncates) on every row. **Done below.** |
+| 26 of 40 rows have no description, and the tooltip only shows on hover | The one line under a row is the only help a form user sees. | A note (30 characters or fewer -- the row truncates) on every row. **Done below.** |
 | Rows carry the operator's order, no sections | The frontend has no grouping; the role prefixes in `labels` ("Announcer - video") already do that job. | Keep. |
 | My Story text rows open at the default height | `InputWidgetConfig.height` persists a textarea height. | Proposed: `height` on the four My Story rows and the photos row, via one more optional column in `form`. Needs build_variants and its tests. |
 
@@ -69,7 +71,7 @@ is the operator's call, as always.
 
 | Finding | The practice | Fix |
 |---|---|---|
-| These ship in the zip and are not user guides: CONTEST_DEMO_SCRIPT, CONTEST_DEMO_STORYBOARD, CONTEST_EXPLAINER_PROMPT, CONTEST_SUBMISSION_DRAFT, RESEARCH_PROMPT_TTS_KILLER, SPEC_pack_owned_vram_residency, RIGHTS_DECISION_LEMMY_VOICE, FLUX3_KLEIN_LICENSE_ATTESTATION and model-license-comfy-org--gemma-4 (their siblings are already excluded) | `.comfyignore` names what is internal; the README's guide table is the shipped set. | Exclude them. **Done below.** CONTEST_RADIO_PLAY_STUDIO.md stays: it describes the app that ships in `contest/`. ARCHITECTURE.md and SHAKESPEARE_CORPUS_SPEC.yaml stay: one is a reader's map, the other a schema. |
+| These ship in the zip and are not user guides: the contest drafts and write-up (CONTEST_DEMO_SCRIPT, CONTEST_DEMO_STORYBOARD, CONTEST_EXPLAINER_PROMPT, CONTEST_SUBMISSION_DRAFT, CONTEST_RADIO_PLAY_STUDIO), RESEARCH_PROMPT_TTS_KILLER, SPEC_pack_owned_vram_residency, RIGHTS_DECISION_LEMMY_VOICE | `.comfyignore` names what is internal; the README's guide table is the shipped set; nothing shipped may point at a file that is not. | Exclude them, and a test that every `apple/` reference in the README, the Studio README and a shipped guide resolves to a shipped file. **Done below.** FLUX3_KLEIN_LICENSE_ATTESTATION and model-license-comfy-org--gemma-4 stay: the README's licence section, LLM_PREFLIGHT.md and the model catalog point at them (Codex QA). ARCHITECTURE.md and SHAKESPEARE_CORPUS_SPEC.yaml stay: one is a reader's map, the other a schema. The Studio app ships its own README under `contest/`. |
 
 ## Build order
 

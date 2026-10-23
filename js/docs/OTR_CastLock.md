@@ -11,7 +11,7 @@ Locks character and announcer voice assignments between the script freeze cascad
 
 On the shipped workflows these are the widgets a person changes; the ones on the app form are named as the form names them.
 
-**`script_json`** -- text, as many lines as you like; starts as `{}`.
+**`script_json`** -- a connection from another node (`STRING`).
 
 Frozen v2 ledger JSON from OTR_LedgerFreezeCascade (node 62 slot 1). CastLock rewrites it into the canonical ledger_json; the legacy raw path keeps reading this untouched string.
 
@@ -33,7 +33,7 @@ Which engine speaks the characters. auto keeps the shipped Kokoro voice. Charact
 
 Which engine reads the announcer. auto keeps the shipped Kokoro voice. Announcer Voice inherits this stamp -- there is no second engine dropdown.
 
-**`gate_in`** -- text, as many lines as you like; starts as empty.
+**`gate_in`** -- a connection from another node (`STRING`).
 
 Optional ordering signal (wire an upstream done).
 

@@ -11,21 +11,21 @@ Locks the video plan and shot budget against the frozen audio timeline, acting a
 
 The shipped workflows set these; most people never change them.
 
-**`script_json`** -- text, as many lines as you like; starts as `{}`.
+**`script_json`** -- a connection from another node (`STRING`).
 
 Frozen ledger JSON (OTR_LedgerFreezeCascade out1 script_json). ShotLock stamps a video section into it.
 
-**`audio_done`** -- text, as many lines as you like; starts as empty.
+**`audio_done`** -- a connection from another node (`STRING`).
 
 Audio-done gate (OTR_EpisodeAssembler out3). Wiring it orders ShotLock AFTER audio timing freezes so the clip budget is bound against the real timeline. Opaque STRING.
 
-**`video_policy_json`** -- text, as many lines as you like; starts as `{}`.
+**`video_policy_json`** -- a connection from another node (`STRING`).
 
 Per-role selection policy from OTR_VideoDirector.
 
 ### Optional
 
-**`gate_in`** -- text, as many lines as you like; starts as empty.
+**`gate_in`** -- a connection from another node (`STRING`).
 
 Optional ordering signal (opaque STRING).
 

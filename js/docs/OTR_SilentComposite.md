@@ -11,7 +11,7 @@ Assembles rendered video clips and the procedural CRT base into one standardized
 
 On the shipped workflows these are the widgets a person changes; the ones on the app form are named as the form names them.
 
-**`base_video_path`** -- text; starts as empty.
+**`base_video_path`** -- a connection from another node (`STRING`).
 
 Base video to normalize (M1: the OTR_SignalLostVideo radio-floor mp4). Any audio is STRIPPED here (V-1).
 
@@ -33,11 +33,11 @@ Fallback frame rate for the silent timeline. When the clip manifest carries its 
 
 Silent composite path. Empty -> <output>/otr/episodes/<stem>_silent.mp4.
 
-**`gate_in`** -- text; starts as empty.
+**`gate_in`** -- a connection from another node (`STRING`).
 
 Optional ordering signal (opaque STRING).
 
-**`clip_manifest_json`** -- text, as many lines as you like; starts as `{}`.
+**`clip_manifest_json`** -- a connection from another node (`STRING`).
 
 OTR_VideoRenderBatch clip manifest. When it carries per-beat clips the composite ASSEMBLES a frame-accurate CFR timeline (each beat conformed to its audio-derived frame count; gaps filled from base_video_path). Empty -> the single-base floor path.
 

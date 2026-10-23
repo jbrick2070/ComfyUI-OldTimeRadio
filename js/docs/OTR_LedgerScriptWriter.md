@@ -118,7 +118,7 @@ Per-line max_new_tokens ceiling on the composer hot-path.
 
 Default 200 preserves current behavior. The Attempt-1 uses this cap directly; attempt-2 retry uses the full cap. It is a per-CALL decode budget, not a length target -- it was scaled from target_words until 2026-08-14, which made it a token ceiling derived from a word request.
 
-**Writer - story** (`creative_writing_model`) -- a choice from the dropdown; starts as `openrouter:slot-a`.
+**Writer - story** (`creative_writing_model`) -- a choice from the dropdown; starts as a path on this machine.
 
 LLM for the creative/narrative passes (outline, cast, dialogue composer, style picker invention). To use a remote OpenRouter model, set OPENROUTER_API_KEY and pick OpenRouter A/B (see https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/openrouter-setup.md).
 
@@ -136,7 +136,7 @@ Writers -- download size and where each fits:
 - comfy_native:gemma4-12b-int8-convrot: about 12.1 GB; run by ComfyUI itself; fit not rated by these tags
 nv8 / nv16 / nv24: fits an NVIDIA card of that many GB at full precision; -nf4: only as a 4-bit load; mac16: a 16 GB Apple Silicon Mac; -tight: fits with nothing to spare. Sizes are the one-time download, not the memory it uses while running.
 
-**Writer - structure** (`technical_model`) -- a choice from the dropdown; starts as `comfy_native:gemma4-e2b-it-int8-convrot`.
+**Writer - structure** (`technical_model`) -- a choice from the dropdown; starts as a path on this machine.
 
 LLM for the technical/structured passes (JSON validators, GBNF grammar output, reviewer verdicts, cast contract checks, format normalization, news interpreter). Profile/platform-owned baseline: your hardware profile pins it, and a direct headless -Set override is sanctioned and wins over the profile when supplied. Pick a smaller model here when you want Slot 1 != Slot 2 routing for VRAM headroom. To use a remote OpenRouter model, set OPENROUTER_API_KEY and pick OpenRouter A/B (see https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/openrouter-setup.md).
 
@@ -236,7 +236,7 @@ All three leave otr/obs alone: the published video there is never touched, and n
 
 A partial or full episode can no longer be frozen into a replay bundle (the freeze needs the master WAV and the stills). Freeze first, or run it off.
 
-**`gate_in`** -- text, as many lines as you like; starts as empty.
+**`gate_in`** -- a connection from another node (`STRING`).
 
 Ordering/validation signal (wire OTR_WorkflowValidator.validation_report).
 

@@ -53,7 +53,7 @@ Video plan canvas height (px). Profile/platform-owned -- see canvas_w.
 
 When a role is set to '+ Add Custom Model', map the role key to a custom engine id here -- video AND image roles, e.g. {"character_video_model": "my_engine", "music_image_model": "my_image_engine"}. This is the one declaration the queue check and the render both read.
 
-**`gate_in`** -- text, as many lines as you like; starts as empty.
+**`gate_in`** -- a connection from another node (`STRING`).
 
 Optional ordering signal (opaque STRING).
 

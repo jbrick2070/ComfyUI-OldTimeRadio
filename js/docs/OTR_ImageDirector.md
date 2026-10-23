@@ -23,7 +23,7 @@ request_hash: seeds derive deterministically from each request (same episode re-
 
 Base seed for the stills. Each shot derives its own seed from this and its request, so the same number reproduces the same pictures.
 
-**`video_policy_json`** -- text.
+**`video_policy_json`** -- a connection from another node (`STRING`).
 
 OTR_VideoDirector policy (REQUIRED; wire the provider before this consumer). Carries the frozen route, device policy and per-role aspects; empty/malformed FAILS CLOSED.
 
@@ -33,7 +33,7 @@ OTR_VideoDirector policy (REQUIRED; wire the provider before this consumer). Car
 
 Declare custom image engines on OTR_VideoDirector's custom_models_json instead -- that one is resolved before this node and is what the queue check reads. This map is used only for a '+ Add Custom Model' pick that arrives here unresolved (a policy built without OTR_VideoDirector), e.g. {"music_image_model":"z_image"}.
 
-**`gate_in`** -- text, as many lines as you like; starts as empty.
+**`gate_in`** -- a connection from another node (`STRING`).
 
 Optional ordering signal (opaque STRING).
 

@@ -41,15 +41,15 @@ Crossfade between theme and content
 
 Padded AUDIO batch of every music cue from OTR_StableAudioTheme.
 
-**`music_cue_manifest_json`** -- text, as many lines as you like; starts as empty.
+**`music_cue_manifest_json`** -- a connection from another node (`STRING`).
 
 Cue manifest JSON from OTR_StableAudioTheme (maps placement -> batch row).
 
-**`video_policy_json`** -- text, as many lines as you like; starts as empty.
+**`video_policy_json`** -- a connection from another node (`STRING`).
 
 Video policy JSON from OTR_VideoDirector. Read for ONE question: is any role on the LTX 2.5 foley lane? If so this node writes an UN-LEVELLED provisional master WAV and OTR_MasterAudioMux does the single delivery loudness pass after mixing the bed in. Empty -> today's behaviour, unchanged.
 
-**`replay_descriptor`** -- text, as many lines as you like; starts as empty.
+**`replay_descriptor`** -- a connection from another node (`STRING`).
 
 v2_ledger_json from OTR_LedgerFreezeCascade. On a canonical replay the frozen master WAV is copied and verified against the bundle's SHA-256; otherwise ignored.
 

@@ -11,11 +11,11 @@ Renders and appends a late retro sci-fi console credits sequence to the tail of 
 
 The shipped workflows set these; most people never change them.
 
-**`video_path`** -- text.
+**`video_path`** -- a connection from another node (`STRING`).
 
 The finished video, with captions already burned in. Comes from Caption Burn.
 
-**`clip_manifest_json`** -- text.
+**`clip_manifest_json`** -- a connection from another node (`STRING`).
 
 Node 92 slot 1 (third fan-out consumer).
 

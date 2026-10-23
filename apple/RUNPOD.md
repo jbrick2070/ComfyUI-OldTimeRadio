@@ -74,7 +74,7 @@ After provisioning, boot ComfyUI on the pod with
 `main.py --listen 0.0.0.0 --port 8188`, then drive one leg with
 `scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188`
 and the workflow you provisioned (`--workflow-id <workflow id>`). The full
-boot-and-qualify recipe is in `apple/RUNPOD_INSTALL.md` section 5. You can
+boot-and-qualify recipe is in [apple/RUNPOD_INSTALL.md](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/RUNPOD_INSTALL.md) section 5. You can
 instead load `workflows/otr_canonical.json` in the UI, set the dropdowns for
 the lane you rented the box for, and queue one episode.
 
@@ -104,7 +104,7 @@ machine.
 
 ---
 
-`apple/RUNPOD_INSTALL.md` in the GitHub tree carries the rest: the failure atlas,
+[apple/RUNPOD_INSTALL.md](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/apple/RUNPOD_INSTALL.md) in the GitHub tree carries the rest: the failure atlas,
 hand-driven multi-leg sweep and soak loops, driving a pod from a second machine,
 ending an overnight campaign safely (RunPod self-stop), and the evidence ledger.
 It does not ship in a Manager install.

@@ -82,6 +82,9 @@ def _kind(spec) -> str:
     opts = spec[1] if isinstance(spec, (list, tuple)) and len(spec) > 1 and isinstance(spec[1], dict) else {}
     if isinstance(kind, (list, tuple)):
         return "a choice from the dropdown"
+    if opts.get("forceInput"):
+        # A widget type kept as a link socket on purpose (Codex QA, 2026-10-23).
+        return f"a connection from another node (`{kind}`)"
     if kind == "STRING" and opts.get("multiline"):
         return "text, as many lines as you like"
     if kind in _KINDS:
@@ -103,10 +106,18 @@ def _default(spec):
     if "default" not in opts:
         return None
     value = opts["default"]
+    if opts.get("forceInput"):
+        return None
     if isinstance(value, bool):
         return "on" if value else "off"
     if isinstance(value, str):
-        return f"`{value}`" if value.strip() else "empty"
+        if not value.strip():
+            return "empty"
+        if "/" in value or "\\" in value or ":" in value:
+            # A path, which a node derives from its own checkout: the page
+            # must read the same on every machine (Codex QA, 2026-10-23).
+            return "a path on this machine"
+        return f"`{value}`"
     return f"`{value}`"
 
 

@@ -11,17 +11,17 @@ Composes descriptive still-image prompts for characters and scenes using the pro
 
 The shipped workflows set these; most people never change them.
 
-**`script_json`** -- text, as many lines as you like; starts as `{}`.
+**`script_json`** -- a connection from another node (`STRING`).
 
 Frozen ledger JSON (cast + meta brief). Image prompts derive from here.
 
 ### Optional
 
-**`image_policy_json`** -- text, as many lines as you like; starts as `{}`.
+**`image_policy_json`** -- a connection from another node (`STRING`).
 
 OTR_ImageDirector policy: seed + per-role still 'aspects' (so character stills match the selected video engine: portrait 832x1216 vs 16:9 832x480).
 
-**`gate_in`** -- text, as many lines as you like; starts as empty.
+**`gate_in`** -- a connection from another node (`STRING`).
 
 Optional ordering signal (opaque STRING).
 

@@ -11,17 +11,17 @@ Synthesizes spoken dialogue for all dramatic characters in the script using voic
 
 The shipped workflows set these; most people never change them.
 
-**`script_json`** -- text, as many lines as you like; starts as `[]`.
+**`script_json`** -- a connection from another node (`STRING`).
 
 Frozen v2 ledger JSON from OTR_LedgerFreezeCascade (node 62 slot 1). Passed VERBATIM to the legacy engine on the byte-identical batch path.
 
 ### Optional
 
-**`ledger_json`** -- text, as many lines as you like; starts as empty.
+**`ledger_json`** -- a connection from another node (`STRING`).
 
 Cast-locked ledger from OTR_CastLock (carries voice_ref_id / episode_seed). Read on the per-line path; the batch path ignores it and delegates the raw script_json. No episode_seed widget (I-4).
 
-**`gate_in`** -- text, as many lines as you like; starts as empty.
+**`gate_in`** -- a connection from another node (`STRING`).
 
 Optional ordering signal. Wire an upstream 'done' here to force this node to run after it. Optional on the first chain node; the audio chain binds it node->node.
 

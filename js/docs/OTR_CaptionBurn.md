@@ -11,7 +11,7 @@ Burns open SDH subtitles and the episode title card directly onto the silent com
 
 On the shipped workflows these are the widgets a person changes; the ones on the app form are named as the form names them.
 
-**`video_path`** -- text; starts as empty.
+**`video_path`** -- a connection from another node (`STRING`).
 
 Silent video from OTR_SilentComposite. Captions burn here; audio is added later by MasterAudioMux.
 
@@ -37,11 +37,11 @@ Optional explicit timed-ledger path. Empty -> resolved from the video stem (otr_
 
 Captioned mp4 path. Empty (the shipped default) -> <stem>_captioned.mp4 beside the input video. With burn OFF and no title plan the input passes through untouched.
 
-**`gate_in`** -- text; starts as empty.
+**`gate_in`** -- a connection from another node (`STRING`).
 
 Optional ordering signal (opaque STRING).
 
-**`title_card_plan_json`** -- text; starts as empty.
+**`title_card_plan_json`** -- a connection from another node (`STRING`).
 
 Hero title-card plan from OTR_SignalLostVideo. When present the title burns REGARDLESS of burn_captions and any failure REFUSES instead of passing through -- the title is the only copy left once the procgen draw is suppressed.
 
