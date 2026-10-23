@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radio Play Studio</title>
+<style>
+  :root {
+    --bg: #f4efe6; --panel: #fffdf8; --ink: #2a2118; --muted: #6f6254;
+    --line: #d9ccb8; --accent: #b4491f; --accent-ink: #fff8f0; --ok: #2f6b3a; --bad: #a3261a;
+    --bar: #e5d9c5; --kept: #8a7d6b; --wash: #efe6d8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17130f; --panel: #211b15; --ink: #f0e6d6; --muted: #a89a86;
+      --line: #3a3026; --accent: #e0703f; --accent-ink: #1a1007; --ok: #7ec28a; --bad: #f08a7e;
+      --bar: #3a3026; --kept: #8f826f; --wash: #2a221b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17130f; --panel: #211b15; --ink: #f0e6d6; --muted: #a89a86;
+    --line: #3a3026; --accent: #e0703f; --accent-ink: #1a1007; --ok: #7ec28a; --bad: #f08a7e;
+    --bar: #3a3026; --kept: #8f826f; --wash: #2a221b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 Georgia, "Times New Roman", serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 120px; }
+  h1 { font-size: 2rem; margin: 0 0 4px; letter-spacing: .02em; }
+  .tag { color: var(--muted); margin: 0 0 24px; }
+  fieldset { border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
+             padding: 16px; margin: 0 0 16px; }
+  legend { padding: 0 8px; font-weight: bold; }
+  label { display: block; margin: 12px 0 4px; font-weight: bold; }
+  .help { color: var(--muted); font-size: .875rem; margin: 2px 0 0; }
+  select, input, textarea { width: 100%; padding: 8px 10px; font: inherit; color: var(--ink);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+  textarea { min-height: 56px; resize: vertical; }
+  button { font: inherit; font-weight: bold; padding: 12px 22px; border: 0; border-radius: 8px;
+           background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .small { padding: 6px 12px; font-size: .875rem; }
+  .quiet { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  .quiet[aria-pressed="true"] { border-color: var(--ok); color: var(--ok); }
+  [hidden] { display: none !important; }
+  .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  #lang { width: auto; max-width: 11rem; padding: 6px 8px; font-size: .875rem; }
+
+  /* The form, folded to one line once a project exists */
+  .summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+             border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
+             padding: 12px 16px; margin: 0 0 16px; }
+  .summary strong { font-size: 1.05rem; }
+  .summary span { color: var(--muted); }
+  .summary .quiet { margin-left: auto; }
+
+  /* Stage line */
+  .stages { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 0 0 8px; }
+  .stage { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--panel); }
+  .stage b { display: block; }
+  .stage span { color: var(--muted); font-size: .875rem; }
+  .stage.on { border-color: var(--accent); }
+  .stage.done b::after { content: " \2713"; color: var(--ok); }
+  #bar { height: 10px; background: var(--bar); border-radius: 5px; overflow: hidden; margin: 12px 0 6px; }
+  #fill { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+  #status { color: var(--muted); min-height: 1.5em; margin: 0 0 16px; }
+
+  /* Cast strip */
+  .castrow { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
+  .person { width: 128px; text-align: center; }
+  .face { width: 128px; height: 128px; border-radius: 8px; border: 1px solid var(--line);
+          display: flex; align-items: flex-end; justify-content: center; overflow: hidden;
+          color: #fff; font-size: 2.4rem; background: var(--panel); position: relative; }
+  .person b { display: block; margin: 6px 0 2px; }
+  .person .quiet { margin-top: 2px; }
+
+  /* Scenes and shots */
+  details.scene { border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
+                  margin: 0 0 12px; }
+  details.scene > summary { list-style: none; cursor: pointer; padding: 12px 16px; display: flex;
+                            align-items: center; gap: 10px; flex-wrap: wrap; }
+  details.scene > summary::-webkit-details-marker { display: none; }
+  details.scene > summary::before { content: "\25B8"; color: var(--muted); }
+  details[open].scene > summary::before { content: "\25BE"; }
+  details.scene > summary b { font-size: 1.05rem; }
+  details.scene > summary .count { color: var(--muted); font-size: .875rem; }
+  details.scene > summary .flag { font-size: .8rem; padding: 1px 8px; border-radius: 10px;
+                                  border: 1px solid var(--line); color: var(--muted); }
+  details.scene > summary .flag.changed { border-color: var(--accent); color: var(--accent); }
+  details.scene > summary .flag.failed { border-color: var(--bad); color: var(--bad); }
+  .scenebody { padding: 0 16px 16px; }
+  .scenenote { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center;
+               margin: 4px 0 12px; }
+  .scenenote label { margin: 0; font-size: .875rem; }
+  .scenenote input { padding: 6px 10px; font-size: .95rem; }
+  .shots { display: grid; gap: 10px; }
+  .shot { border: 1px solid var(--line); border-left-width: 4px; border-radius: 10px; padding: 12px;
+          background: var(--bg); display: grid; grid-template-columns: 176px 1fr; gap: 12px; }
+  .shot.changed { border-left-color: var(--accent); }
+  .shot.failed { border-left-color: var(--bad); border-color: var(--bad); }
+  .shot.accepted { border-left-color: var(--ok); }
+  .shot.rendering { border-left-color: var(--accent); }
+  .shot.kept { border-left-color: var(--kept); }
+  .still { position: relative; width: 176px; height: 99px; border-radius: 6px; overflow: hidden;
+           border: 1px solid var(--line); background: var(--panel); }
+  .still .art { position: absolute; inset: 0; }
+  .still .kind { position: absolute; left: 6px; bottom: 4px; font-size: .7rem; color: #fff;
+                 background: rgba(0,0,0,.45); padding: 0 6px; border-radius: 8px; }
+  .still .play { position: absolute; right: 6px; bottom: 4px; width: 22px; height: 22px; border-radius: 11px;
+                 background: rgba(0,0,0,.5); color: #fff; font-size: .7rem; display: flex;
+                 align-items: center; justify-content: center; }
+  .shot.rendering .still .art { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.18) 0 12px, transparent 12px 24px);
+                                background-size: 48px 48px; animation: slide 1s linear infinite; filter: saturate(.4); }
+  @keyframes slide { to { background-position: 48px 0; } }
+  .shot.failed .still .art { filter: grayscale(1) brightness(.6); }
+  .badge { display: inline-block; font-size: .8rem; padding: 1px 8px; border-radius: 10px;
+           border: 1px solid var(--line); color: var(--muted); margin-left: 6px; vertical-align: middle; }
+  .badge.changed { border-color: var(--accent); color: var(--accent); }
+  .badge.rendering { border-color: var(--accent); color: var(--accent); }
+  .badge.failed { border-color: var(--bad); color: var(--bad); }
+  .badge.accepted { border-color: var(--ok); color: var(--ok); }
+  .badge.kept { border-color: var(--kept); color: var(--kept); }
+  .who { font-weight: bold; }
+  .when { color: var(--muted); font-size: .875rem; }
+  .line { font-style: italic; color: var(--muted); margin: 2px 0 6px; }
+  .shot label { margin: 6px 0 2px; font-size: .875rem; }
+  .shot textarea { min-height: 48px; font-size: .95rem; }
+  .shot.changed textarea.dirty { border-color: var(--accent); }
+  .tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+  .why { color: var(--bad); font-size: .875rem; margin: 4px 0 0; }
+  .note { color: var(--muted); font-size: .875rem; margin: 4px 0 0; }
+
+  /* The three buttons */
+  .actions { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0 8px;
+             border-top: 1px solid var(--line); display: flex; gap: 10px; flex-wrap: wrap;
+             align-items: center; margin-top: 8px; }
+  .actions .hint { color: var(--muted); font-size: .875rem; flex-basis: 100%; }
+
+  /* First visit */
+  .intro { border: 2px solid var(--line); background: var(--panel); border-radius: 10px; padding: 16px; }
+  .intro strong { display: block; font-size: 1.1rem; margin-bottom: 4px; }
+  .intro p { margin: 0 0 12px; color: var(--muted); }
+
+  /* The published episode */
+  .done video, .done .player { width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; background: #000;
+                 margin-top: 12px; display: flex; align-items: center; justify-content: center; color: #ddd; }
+  .done a { color: var(--ok); }
+
+  .devbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
+  @media (max-width: 560px) {
+    .shot { grid-template-columns: 1fr; }
+    .still { width: 100%; height: auto; aspect-ratio: 16 / 9; }
+    .stages { grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+    .stage { padding: 6px 8px; } .stage b { font-size: .95rem; } .stage span { font-size: .78rem; }
+    .summary .quiet { margin-left: 0; }
+    .actions { padding: 8px 0 6px; gap: 6px; }
+    .actions button { padding: 8px 12px; font-size: .9rem; flex: 1 1 auto; }
+    .actions .hint { font-size: .8rem; line-height: 1.3; }
+    main { padding-bottom: 150px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <h1>Radio Play Studio</h1>
+    <select id="lang" aria-label="Language of this page"><option>English</option></select>
+  </header>
+  <p class="tag">Press the button. Your own ComfyUI writes, casts, performs and films a radio play.</p>
+
+  <div class="devbar">
+    <button type="button" class="small quiet" id="toggle_intro">Show the first visit</button>
+    <button type="button" class="small quiet" id="toggle_theme">Light / dark</button>
+    <span class="help">Mockup only: nothing here talks to a server.</span>
+  </div>
+
+  <!-- The form, folded to one line once the shots exist -->
+  <div class="summary" id="summary">
+    <strong>A Midsummer Night's Dream, Act 3 Scene 1</strong>
+    <span>Shakespeare &middot; English &middot; 1 act &middot; 3 voices &middot; watercolour</span>
+    <button type="button" class="small quiet">Change the story</button>
+  </div>
+
+  <!-- First visit: the board before any stills exist -->
+  <section id="intro" class="intro" hidden>
+    <strong>Direct the shots before they are filmed</strong>
+    <p>The play is written, cast and voiced as usual, then it stops after the stills: one picture for
+       every line. Change any picture, try one again, keep the ones you like, then film. Filming is the
+       slow part, so it only films what changed.</p>
+    <button type="button" id="first_go">Write it and paint the stills</button>
+    <p class="help" style="margin-top:8px">About 4 minutes on this machine. The voices and music are
+       final after this step; only the pictures change from here.</p>
+  </section>
+
+  <section id="board" aria-live="polite">
+    <div class="stages">
+      <div class="stage done"><b>Stills</b><span>12 painted, 1 to redo</span></div>
+      <div class="stage on"><b>Video</b><span>7 of 12 filmed</span></div>
+      <div class="stage"><b>Publish</b><span>after every shot is filmed</span></div>
+    </div>
+    <div id="bar"><div id="fill" style="width:58%"></div></div>
+    <p id="status">Filming shot 8 of 12, about 21 min left. You can keep editing; a shot you change now is filmed on the next press.</p>
+
+    <fieldset>
+      <legend>Cast</legend>
+      <div class="castrow">
+        <div class="person">
+          <div class="face" style="background:linear-gradient(160deg,#7b5ea7,#2d1b4e)">T</div>
+          <b>Titania</b>
+          <span class="help">she &middot; 6 shots</span><br>
+          <button type="button" class="small quiet">Paint again</button>
+        </div>
+        <div class="person">
+          <div class="face" style="background:linear-gradient(160deg,#a7743b,#4a2e12)">B</div>
+          <b>Bottom</b>
+          <span class="help">he &middot; 5 shots</span><br>
+          <button type="button" class="small quiet">Paint again</button>
+        </div>
+        <div class="person">
+          <div class="face" style="background:linear-gradient(160deg,#3f6b5e,#13261f)">A</div>
+          <b>Announcer</b>
+          <span class="help">he &middot; 1 shot</span><br>
+          <button type="button" class="small quiet">Paint again</button>
+        </div>
+      </div>
+      <p class="help">A new portrait repaints every shot that character is in, so try the shots first.</p>
+    </fieldset>
+
+    <!-- Scene 1 -->
+    <details class="scene" open>
+      <summary><b>Scene 1 &middot; The wood near Athens, night</b>
+        <span class="count">4 shots &middot; 0:00 to 0:41</span>
+        <span class="flag changed">1 changed</span></summary>
+      <div class="scenebody">
+        <div class="scenenote"><label for="s1">Scene note</label>
+          <input id="s1" value="moonlight through tall trees, mist on the ground" placeholder="A few words every picture in this scene should share"></div>
+        <div class="shots">
+
+          <div class="shot kept" data-state="kept">
+            <div class="still"><div class="art" style="background:linear-gradient(135deg,#2a3f5f,#0d1626)"></div>
+              <span class="kind">Still</span><span class="play" title="Hear the line">&#9654;</span></div>
+            <div>
+              <span class="who">Shot 1 &middot; Announcer</span> <span class="when">6.1 s</span>
+              <span class="badge kept">Kept from last time</span>
+              <p class="line">A wood near Athens. Night. The fairy queen sleeps while the players rehearse.</p>
+              <label>Picture</label>
+              <textarea>Wide shot of a moonlit wood, a clearing with a mossy bank, an old man's silhouette at the edge, watercolour</textarea>
+              <label>Motion</label>
+              <textarea>slow push in, mist drifting</textarea>
+              <div class="tools"><button type="button" class="small quiet">Paint again</button>
+                <button type="button" class="small quiet" aria-pressed="false">Keep</button></div>
+            </div>
+          </div>
+
+          <div class="shot changed" data-state="changed">
+            <div class="still"><div class="art" style="background:linear-gradient(135deg,#5a4a7a,#1b1230)"></div>
+              <span class="kind">Still</span><span class="play" title="Hear the line">&#9654;</span></div>
+            <div>
+              <span class="who">Shot 2 &middot; Bottom to Quince</span> <span class="when">4.8 s</span>
+              <span class="badge changed">Changed, not painted yet</span>
+              <p class="line">There are things in this comedy that will never please.</p>
+              <label>Picture</label>
+              <textarea class="dirty">Bottom, a stout weaver with a donkey's head, strikes a pose on the mossy bank, torchlight, watercolour</textarea>
+              <label>Motion</label>
+              <textarea>he turns to the camera and spreads his arms</textarea>
+              <div class="tools"><button type="button" class="small quiet">Paint again</button>
+                <button type="button" class="small quiet" aria-pressed="false">Keep</button>
+                <span class="note">Painted on the next press.</span></div>
+            </div>
+          </div>
+
+          <div class="shot kept" data-state="kept">
+            <div class="still"><div class="art" style="background:linear-gradient(135deg,#3d5a40,#101f12)"></div>
+              <span class="kind">Clip</span><span class="play" title="Hear the line">&#9654;</span></div>
+            <div>
+              <span class="who">Shot 3 &middot; Quince</span> <span class="when">3.2 s</span>
+              <span class="badge kept">Kept from last time</span>
+              <p class="line">We will have a prologue, and it shall say we will do no harm.</p>
+              <label>Picture</label>
+              <textarea>Quince the carpenter, thin and anxious, holds a scroll up to the torch, the wood dark behind him</textarea>
+              <label>Motion</label>
+              <textarea>he raises the scroll, nods</textarea>
+              <div class="tools"><button type="button" class="small quiet">Paint again</button>
+                <button type="button" class="small quiet">Film again</button>
+                <button type="button" class="small quiet" aria-pressed="false">Keep</button></div>
+            </div>
+          </div>
+
+          <div class="shot accepted" data-state="accepted">
+            <div class="still"><div class="art" style="background:linear-gradient(135deg,#6b4f8a,#2a1b3d)"></div>
+              <span class="kind">Clip</span><span class="play" title="Hear the line">&#9654;</span></div>
+            <div>
+              <span class="who">Shot 4 &middot; Titania, waking</span> <span class="when">5.0 s</span>
+              <span class="badge accepted">Accepted</span>
+              <p class="line">What angel wakes me from my flowery bed?</p>
+              <label>Picture</label>
+              <textarea>Titania wakes on a bank of wild thyme, silver gown, flowers in her hair, moonlight on her face</textarea>
+              <label>Motion</label>
+              <textarea>she sits up slowly, eyes opening</textarea>
+              <div class="tools"><button type="button" class="small quiet">Paint again</button>
+                <button type="button" class="small quiet">Film again</button>
+                <button type="button" class="small quiet" aria-pressed="true">Kept</button>
+                <span class="note">A new portrait will not touch this shot.</span></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </details>
+
+    <!-- Scene 2 -->
+    <details class="scene" open>
+      <summary><b>Scene 2 &middot; Titania's bower</b>
+        <span class="count">5 shots &middot; 0:41 to 1:24</span>
+        <span class="flag failed">1 failed</span>
+        <span class="flag">1 filming</span></summary>
+      <div class="scenebody">
+        <div class="scenenote"><label for="s2">Scene note</label>
+          <input id="s2" value="" placeholder="A few words every picture in this scene should share"></div>
+        <div class="shots">
+
+          <div class="shot" data-state="painted">
+            <div class="still"><div class="art" style="background:linear-gradient(135deg,#7a3e5a,#2b1020)"></div>
+              <span class="kind">Clip</span><span class="play" title="Hear the line">&#9654;</span></div>
+            <div>
+              <span class="who">Shot 5 &middot; Titania to Bottom</span> <span class="when">4.4 s</span>
+              <span class="badge">Filmed</span>
+              <p class="line">I pray thee, gentle mortal, sing again.</p>
+              <label>Picture</label>
+              <textarea>Titania reaches toward Bottom across a bower of roses, lanterns of fireflies, watercolour</textarea>
+              <label>Motion</label>
+              <textarea>she leans in, a hand lifting</textarea>
+              <div class="tools"><button type="button" class="small quiet">Paint again</button>
+                <button type="button" class="small quiet">Film again</button>
+                <button type="button" class="small quiet" aria-pressed="false">Keep</button></div>
+            </div>
+          </div>
+
+          <div class="shot failed" data-state="failed">
+            <div class="still"><div class="art" style="background:linear-gradient(135deg,#8a6a3e,#2d2010)"></div>
+              <span class="kind">Still</span><span class="play" title="Hear the line">&#9654;</span></div>
+            <div>
+              <span class="who">Shot 6 &middot; Bottom</span> <span class="when">3.9 s</span>
+              <span class="badge failed">Failed</span>
+              <p class="line">Methinks, mistress, you should have little reason for that.</p>
+              <label>Picture</label>
+              <textarea>Bottom with the donkey's head scratches behind one long ear, puzzled, roses behind him</textarea>
+              <label>Motion</label>
+              <textarea>he scratches his ear and shrugs</textarea>
+              <p class="why">This picture could not be painted. Try again, or change the words. The episode cannot be published until it is.</p>
+              <div class="tools"><button type="button" class="small">Paint again</button>
+                <button type="button" class="small quiet" aria-pressed="false">Keep</button></div>
+            </div>
+          </div>
+
+          <div class="shot rendering" data-state="rendering">
+            <div class="still"><div class="art" style="background:linear-gradient(135deg,#4a6a8a,#152536)"></div>
+              <span class="kind">Still</span></div>
+            <div>
+              <span class="who">Shot 7 &middot; Titania</span> <span class="when">5.6 s</span>
+              <span class="badge rendering">Filming now</span>
+              <p class="line">Thou art as wise as thou art beautiful.</p>
+              <label>Picture</label>
+              <textarea disabled>Close on Titania, amused and tender, fireflies, a rose petal falling</textarea>
+              <label>Motion</label>
+              <textarea disabled>she smiles, a petal drifts past</textarea>
+              <div class="tools"><button type="button" class="small quiet" disabled>Paint again</button>
+                <button type="button" class="small quiet" disabled>Film again</button></div>
+            </div>
+          </div>
+
+          <div class="shot" data-state="painted">
+            <div class="still"><div class="art" style="background:linear-gradient(135deg,#6a4a3a,#241510)"></div>
+              <span class="kind">Still</span><span class="play" title="Hear the line">&#9654;</span></div>
+            <div>
+              <span class="who">Shot 8 &middot; Bottom</span> <span class="when">4.1 s</span>
+              <span class="badge">Painted, not filmed</span>
+              <p class="line">Not so, neither. But if I had wit enough to get out of this wood, I have enough to serve mine own turn.</p>
+              <label>Picture</label>
+              <textarea>Bottom looks about the bower for a way out, lanterns, roses, comic unease</textarea>
+              <label>Motion</label>
+              <textarea>he looks left, then right</textarea>
+              <div class="tools"><button type="button" class="small quiet">Paint again</button>
+                <button type="button" class="small quiet" aria-pressed="false">Keep</button></div>
+            </div>
+          </div>
+
+          <div class="shot" data-state="painted">
+            <div class="still"><div class="art" style="background:linear-gradient(135deg,#7a5a8a,#2a1a36)"></div>
+              <span class="kind">Still</span><span class="play" title="Hear the line">&#9654;</span></div>
+            <div>
+              <span class="who">Shot 9 &middot; Titania</span> <span class="when">6.3 s</span>
+              <span class="badge">Painted, not filmed</span>
+              <p class="line">Out of this wood do not desire to go; thou shalt remain here whether thou wilt or no.</p>
+              <label>Picture</label>
+              <textarea>Titania rises, commanding, the bower's roses closing like a curtain behind Bottom</textarea>
+              <label>Motion</label>
+              <textarea>she rises, roses close behind</textarea>
+              <div class="tools"><button type="button" class="small quiet">Paint again</button>
+                <button type="button" class="small quiet" aria-pressed="false">Keep</button></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </details>
+
+    <!-- Scene 3, folded -->
+    <details class="scene">
+      <summary><b>Scene 3 &middot; Morning in the wood</b>
+        <span class="count">3 shots &middot; 1:24 to 1:50</span>
+        <span class="flag">all painted</span></summary>
+      <div class="scenebody">
+        <div class="scenenote"><label for="s3">Scene note</label>
+          <input id="s3" value="first light, birdsong, dew" placeholder="A few words every picture in this scene should share"></div>
+        <div class="shots">
+          <div class="shot kept" data-state="kept">
+            <div class="still"><div class="art" style="background:linear-gradient(135deg,#9a8a5a,#3a3010)"></div>
+              <span class="kind">Still</span><span class="play" title="Hear the line">&#9654;</span></div>
+            <div>
+              <span class="who">Shot 10 &middot; Titania</span> <span class="when">4.7 s</span>
+              <span class="badge kept">Kept from last time</span>
+              <p class="line">Come, sit thee down upon this flowery bed, while I thy amiable cheeks do coy.</p>
+              <label>Picture</label><textarea>Titania draws Bottom down onto the bank at first light, dew on every leaf</textarea>
+              <label>Motion</label><textarea>she guides him down, gentle</textarea>
+              <div class="tools"><button type="button" class="small quiet">Paint again</button>
+                <button type="button" class="small quiet" aria-pressed="false">Keep</button></div>
+            </div>
+          </div>
+          <div class="shot kept" data-state="kept">
+            <div class="still"><div class="art" style="background:linear-gradient(135deg,#8a7a4a,#302810)"></div>
+              <span class="kind">Still</span><span class="play" title="Hear the line">&#9654;</span></div>
+            <div>
+              <span class="who">Shot 11 &middot; Bottom</span> <span class="when">3.5 s</span>
+              <span class="badge kept">Kept from last time</span>
+              <p class="line">I have a reasonable good ear in music. Let us have the tongs and the bones.</p>
+              <label>Picture</label><textarea>Bottom, pleased with himself, mimes playing the tongs and bones, birds on the branch above</textarea>
+              <label>Motion</label><textarea>he mimes a tune, bobbing</textarea>
+              <div class="tools"><button type="button" class="small quiet">Paint again</button>
+                <button type="button" class="small quiet" aria-pressed="false">Keep</button></div>
+            </div>
+          </div>
+          <div class="shot" data-state="painted">
+            <div class="still"><div class="art" style="background:linear-gradient(135deg,#b09a6a,#4a3a1a)"></div>
+              <span class="kind">Still</span><span class="play" title="Hear the line">&#9654;</span></div>
+            <div>
+              <span class="who">Shot 12 &middot; Announcer</span> <span class="when">5.2 s</span>
+              <span class="badge">Painted, not filmed</span>
+              <p class="line">And so the queen of fairies slept beside her ass, and the wood kept its secret till morning.</p>
+              <label>Picture</label><textarea>Wide shot, the two asleep on the bank at sunrise, the announcer's silhouette walking away</textarea>
+              <label>Motion</label><textarea>slow pull back as the light rises</textarea>
+              <div class="tools"><button type="button" class="small quiet">Paint again</button>
+                <button type="button" class="small quiet" aria-pressed="false">Keep</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <div class="actions">
+      <button type="button" id="b_stills">Paint the stills</button>
+      <button type="button" id="b_video" class="quiet">Film the shots</button>
+      <button type="button" id="b_publish" class="quiet">Publish the episode</button>
+      <span class="hint" id="hint"></span>
+    </div>
+
+    <div id="published" class="done" hidden>
+      <div class="player">The finished episode plays here</div>
+      <a href="#">Download the episode</a>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const WORDS = {
+  painted: "Painted, not filmed", filmed: "Filmed", changed: "Changed, not painted yet",
+  rendering: "Painting now", kept: "Kept from last time", failed: "Failed", accepted: "Accepted",
+};
+let running = false;
+
+function setState(shot, state, word) {
+  shot.className = "shot " + (state === "painted" || state === "filmed" ? "" : state);
+  shot.dataset.state = state;
+  const badge = shot.querySelector(".badge");
+  badge.className = "badge " + (state === "painted" || state === "filmed" ? "" : state);
+  badge.textContent = word || WORDS[state];
+  shot.querySelectorAll("textarea, .tools button").forEach((el) => { el.disabled = state === "rendering"; });
+  const why = shot.querySelector(".why");
+  if (why && state !== "failed") why.remove();
+}
+
+function count(state) { return document.querySelectorAll('.shot[data-state="' + state + '"]').length; }
+
+function paintButtons() {
+  const dirty = count("changed"), failed = count("failed"), rendering = count("rendering");
+  const unfilmed = [...document.querySelectorAll(".shot")].filter((s) => s.querySelector(".kind").textContent === "Still").length;
+  const stills = $("b_stills"), video = $("b_video"), publish = $("b_publish"), hint = $("hint");
+  stills.textContent = dirty ? "Paint the stills (" + dirty + " changed)" : "Paint the stills";
+  stills.disabled = running || dirty === 0;
+  video.disabled = running || dirty > 0 || failed > 0;
+  video.textContent = unfilmed ? "Film the shots (" + unfilmed + " to film)" : "Film the shots";
+  publish.disabled = running || dirty > 0 || failed > 0 || unfilmed > 0;
+  if (running) hint.textContent = "Working. You can keep editing; a shot you change now is done on the next press.";
+  else if (failed) hint.textContent = failed + " shot failed. Paint it again, or change its words, before filming.";
+  else if (dirty) hint.textContent = "Only the changed shots are painted; everything else is kept.";
+  else if (unfilmed) hint.textContent = "Filming only films shots that are not filmed yet, or that you changed.";
+  else hint.textContent = "Every shot is filmed. Publishing mixes the voices and music under them.";
+}
+
+function markDirty(shot) {
+  if (shot.dataset.state === "rendering") return;
+  setState(shot, "changed");
+  shot.querySelectorAll("textarea").forEach((t) => t.classList.add("dirty"));
+  paintButtons();
+}
+
+document.querySelectorAll(".shot").forEach((shot) => {
+  shot.querySelectorAll("textarea").forEach((t) => t.addEventListener("input", () => markDirty(shot)));
+  shot.querySelectorAll(".tools button").forEach((b) => {
+    const text = b.textContent.trim();
+    if (text === "Paint again" || text === "Film again") b.addEventListener("click", () => markDirty(shot));
+    if (text === "Keep" || text === "Kept") b.addEventListener("click", () => {
+      const on = b.getAttribute("aria-pressed") !== "true";
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      b.textContent = on ? "Kept" : "Keep";
+      if (on) setState(shot, "accepted");
+      else setState(shot, shot.querySelector(".kind").textContent === "Clip" ? "filmed" : "painted");
+      paintButtons();
+    });
+  });
+});
+
+function run(stageWord, pick, after) {
+  running = true;
+  const shots = pick();
+  shots.forEach((s) => setState(s, "rendering", stageWord));
+  $("status").textContent = stageWord + " " + shots.length + " shot" + (shots.length === 1 ? "" : "s") + "...";
+  $("fill").style.width = "10%";
+  paintButtons();
+  let i = 0;
+  const tick = () => {
+    if (i < shots.length) {
+      after(shots[i]); i += 1;
+      $("fill").style.width = Math.round(10 + 90 * i / shots.length) + "%";
+      $("status").textContent = stageWord + " " + i + " of " + shots.length + ", about " + (shots.length - i) * 3 + " min left";
+      setTimeout(tick, 700);
+    } else {
+      running = false; $("status").textContent = "Done. " + shots.length + " shot" + (shots.length === 1 ? "" : "s") + " finished; the rest were kept.";
+      paintButtons();
+    }
+  };
+  setTimeout(tick, 700);
+}
+
+$("b_stills").addEventListener("click", () => run("Painting",
+  () => [...document.querySelectorAll('.shot[data-state="changed"], .shot[data-state="failed"]')],
+  (s) => { s.querySelector(".kind").textContent = "Still"; s.querySelectorAll("textarea").forEach((t) => t.classList.remove("dirty")); setState(s, "painted"); }));
+$("b_video").addEventListener("click", () => run("Filming",
+  () => [...document.querySelectorAll(".shot")].filter((s) => s.querySelector(".kind").textContent === "Still"),
+  (s) => { s.querySelector(".kind").textContent = "Clip"; setState(s, s.dataset.state === "accepted" ? "accepted" : "filmed"); }));
+$("b_publish").addEventListener("click", () => {
+  running = true; paintButtons();
+  $("status").textContent = "Publishing: mixing the voices and music under the shots...";
+  $("fill").style.width = "100%";
+  setTimeout(() => { running = false; $("status").textContent = "Published to otr/obs."; $("published").hidden = false; paintButtons(); }, 1500);
+});
+
+// The rendering shot in the fake data finishes on its own.
+setTimeout(() => {
+  const r = document.querySelector('.shot[data-state="rendering"]');
+  if (r) { r.querySelector(".kind").textContent = "Clip"; setState(r, "filmed"); paintButtons(); }
+}, 4000);
+
+$("toggle_intro").addEventListener("click", () => {
+  const first = $("intro").hidden;
+  $("intro").hidden = !first; $("board").hidden = first; $("summary").hidden = first;
+  $("toggle_intro").textContent = first ? "Show the board" : "Show the first visit";
+});
+$("first_go").addEventListener("click", () => $("toggle_intro").click());
+$("toggle_theme").addEventListener("click", () => {
+  const root = document.documentElement;
+  const dark = root.getAttribute("data-theme") === "dark" ||
+    (!root.getAttribute("data-theme") && matchMedia("(prefers-color-scheme: dark)").matches);
+  root.setAttribute("data-theme", dark ? "light" : "dark");
+});
+paintButtons();
+</script>
+</body>
+</html>

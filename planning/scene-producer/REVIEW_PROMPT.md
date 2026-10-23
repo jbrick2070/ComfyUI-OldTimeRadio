@@ -2,7 +2,7 @@
 
 Review the repository's **OTR Scene Producer implementation plan** as one scoped, overall-design pass. Challenge whether we are taking the right path and whether a smaller, clearer design would serve this ComfyUI workflow better. Do not implement code or start a multi-round review campaign.
 
-Plan: [OTR Scene Producer implementation plan](OTR-SCENE-PRODUCER-FINAL-HANDOFF.md), at `apple/OTR-SCENE-PRODUCER-FINAL-HANDOFF.md` from the repository root.
+Plan: [OTR Scene Producer plan](PLAN.md), at `planning/scene-producer/PLAN.md` from the repository root. The approved page design is `planning/scene-producer/mockup.html`.
 
 Use the actual repository checkout available in this review session, including a cloud checkout. Read `AGENTS.md` and `CLAUDE.md` before source tools. Verify claims against this tree and label assumptions; local Windows runtime instructions in the plan are not prerequisites for cloud design review. Do not claim tests, filesystem access outside this checkout or hardware verification you did not perform. This plan is the sole design baseline.
 
