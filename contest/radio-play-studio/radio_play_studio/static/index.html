@@ -258,7 +258,9 @@
   .actions #b_stills:enabled, .actions #b_video:enabled, .actions #b_publish:enabled {
     background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
   .actions .hint, .actions .error { font: .875rem/1.4 var(--sans); flex-basis: 100%; }
-  .actions .help { font: .8rem/1.4 var(--sans); }
+  /* The reason line takes the row's room and the save line sits at its end. */
+  .actions .hint { flex: 1 1 18rem; }
+  .actions .help { font: .8rem/1.4 var(--sans); margin-left: auto; }
   .actions .hint { color: var(--muted); }
   #saved.error { color: var(--bad); }
   @media (max-height: 520px) { .actions { position: static; } }
@@ -319,7 +321,7 @@
        a direct child of #board, so it sticks to the bottom of the window across the board. -->
   <section id="board" hidden>
     <div class="board-grid">
-      <div class="rail" tabindex="0" data-i18n-aria-label="board.rail" data-fb-aria-label="Stages and cast">
+      <div class="rail" role="region" tabindex="0" data-i18n-aria-label="board.rail" data-fb-aria-label="Stages and cast">
         <div class="panel">
           <div class="stages">
             <!-- showStage() writes each stage's FIRST span; the lamp is the cell's ::before. -->
@@ -966,6 +968,7 @@ async function openProject(pid) {
   if (!res.ok) throw new Error(body.error || res.statusText);
   clearTimeout(saveTimer); saveTimer = null;
   edits = savedEdits = 0;         // a board opens with nothing of its own unsaved
+  $("saved").classList.remove("error"); plain($("saved"), "");
   project = body.project;
   draft = JSON.parse(JSON.stringify(project.draft));
   history.replaceState(null, "", "#project=" + pid);
@@ -1363,8 +1366,9 @@ function edit(change) {
   edits += 1;
   refreshBoard();
   clearTimeout(saveTimer);
-  $("saved").classList.remove("error");
-  say($("saved"), "pstatus.saving");
+  const saved = $("saved");
+  saved.classList.remove("error");
+  if (!saved._msg || saved._msg.key !== "pstatus.saving") say(saved, "pstatus.saving");
   saveTimer = setTimeout(saveDraft, SAVE_DELAY_MS);
 }
 

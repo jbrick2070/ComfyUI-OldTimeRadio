@@ -161,6 +161,8 @@ def test_the_rail_is_reachable_by_keyboard_and_named_in_every_language():
     name comes from the language files."""
     rail = next(n for n in NODES if "rail" in n["class"])
     assert rail["attrs"].get("tabindex") == "0"
+    # A name on a generic div may be ignored; a region's is read.
+    assert rail["attrs"].get("role") == "region"
     key = rail["attrs"].get("data-i18n-aria-label")
     for code in CODES:
         assert json.loads((I18N_DIR / f"{code}.json").read_text(encoding="utf-8")).get(key), code
