@@ -730,6 +730,18 @@ def _seed_from_hash(request_hash, shot_id):
     return int(hashlib.sha256(src.encode("utf-8")).hexdigest()[:8], 16) & 0x7FFFFFFF
 
 
+def _segment_seed(seed, segment_index):
+    """The seed one segment of a beat samples from: segment 0 is the beat's
+    seed itself, byte for byte, and each later segment a different,
+    reproducible draw of it. Mixed into the seed, never passed to
+    ``_seed_from_hash`` as its second argument: that is read only when a shot
+    has no request hash, and every real shot has one."""
+    if not segment_index:
+        return seed
+    return int(hashlib.sha256(("%d#seg%d" % (int(seed), int(segment_index)))
+                              .encode("utf-8")).hexdigest()[:8], 16) & 0x7FFFFFFF
+
+
 def _producer_clip_take(ledger, shot):
     """The Scene Producer clip take this shot is filmed with (the direction
     Shot Lock put on the wire ledger); 0 on every other run."""
@@ -3902,11 +3914,16 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     #
     # Segment 0 keeps the historical value, so every single-clip beat in the
     # archive re-renders byte-identically; only successors move.
+    #
+    # THE FIRST FORM OF THIS NEVER VARIED ANYTHING (found 2026-10-22, fixed
+    # 2026-10-23). It passed "<shot>#seg<n>" as ``_seed_from_hash``'s second
+    # argument, which is read only when a shot has no request hash -- and
+    # every shot on this path has one. So from 2026-08-02 every segment of a
+    # multi-clip beat still sampled segment 0's seed, the very repetition this
+    # block exists to break. The segment is now mixed into the seed itself
+    # (_segment_seed), as the clip take below is.
     _seg_index = int(segment_index or 0)
-    _video_seed = _seed_from_hash(req_hash, shot.get("shot_id"))
-    if _seg_index:
-        _video_seed = _seed_from_hash(req_hash, "%s#seg%d"
-                                      % (shot.get("shot_id"), _seg_index))
+    _video_seed = _segment_seed(_seed_from_hash(req_hash, shot.get("shot_id")), _seg_index)
     # A SCENE PRODUCER CLIP TAKE ("Film again", chunk 4b) is another draw of
     # the same shot. Mixed into the seed itself: ``_seed_from_hash`` reads the
     # request hash alone whenever there is one, so a take passed through its
