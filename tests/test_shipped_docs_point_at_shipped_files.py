@@ -28,7 +28,7 @@ GITHUB_BLOB_ANY = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
 _REF = re.compile(r"(?<![/\w])apple/((?:[A-Za-z0-9_.\-]+/)*[A-Za-z0-9_.\-]+\.(?:md|yaml|json|txt))")
 _BARE = re.compile(r"(?<![/\w])([A-Za-z0-9_\-]+(?:--[A-Za-z0-9_.\-]+)?\.(?:md|yaml|json|txt))\b")
 #: Any URL: read for its GitHub file link, then kept out of the path scan.
-_URL = re.compile(r"https?://\S+")
+_URL = re.compile(r"(?i)https?://[^\s)\]`'\"<>,]+")
 #: A file link on GitHub: on main, or a permalink to a commit.
 _BLOB = re.compile(re.escape(GITHUB_BLOB_ANY) + r"(main|[0-9a-f]{7,40})/([^\s)\]<>\"'#?]+)")
 
@@ -79,20 +79,30 @@ def _apple_names() -> set:
     return {rel.rsplit("/", 1)[-1] for rel in _tracked("apple/")}
 
 
+def _dot_slash(text: str) -> str:
+    return re.sub(r"(?<![\w/])\./", "", text)
+
+
 def _local_spelling(line: str, tracked_all: set) -> str:
     """The line with every path spelled as git spells it and no URL left in
     it. A Windows spelling names the same file (Codex QA, 2026-10-23); so do
     a dot-slash or dot-backslash prefix, and a markdown-escaped underscore
     (a backslash before the underscore) is the underscore (Sonnet QA, same
     day) -- unless reading that backslash as a separator names a file git
-    holds (apple/_PRIVATE.md spelt the Windows way). A URL's query string is
-    not a local path (Codex QA on 05e51de4)."""
-    line = _URL.sub(" ", line)
-    separators = re.sub(r"(?<![\w/])\./", "", line.replace("\\", "/"))
-    if "\\_" in line and any(f"apple/{m}" in tracked_all for m in _REF.findall(separators)):
-        return separators
-    line = line.replace("\\_", "_").replace("\\", "/")
-    return re.sub(r"(?<![\w/])\./", "", line)
+    holds (apple/_PRIVATE.md spelt the Windows way), decided per token, so a
+    plain reference beside it never changes the reading (Sonnet QA on
+    c2832881). A URL's query string is not a local path, and a URL ends at a
+    bracket, a quote or a comma (Codex and Sonnet QA)."""
+    out = []
+    for token in _URL.sub(" ", line).split():
+        if "\\_" in token:
+            separators = _dot_slash(token.replace("\\", "/"))
+            if any(f"apple/{m}" in tracked_all for m in _REF.findall(separators)):
+                out.append(separators)
+                continue
+            token = token.replace("\\_", "_")
+        out.append(_dot_slash(token.replace("\\", "/")))
+    return " ".join(out)
 
 
 def _problems(text: str, patterns: list, names: set, tracked_all: set) -> list:
@@ -100,7 +110,8 @@ def _problems(text: str, patterns: list, names: set, tracked_all: set) -> list:
     for raw in text.splitlines():
         # Every file this line links on GitHub, bare URL or markdown link alike.
         linked = set()
-        for ref, target in _BLOB.findall(raw):
+        # A link may carry a markdown-escaped underscore (Sonnet QA on c2832881).
+        for ref, target in _BLOB.findall(raw.replace("\\_", "_")):
             target = target.rstrip(".,;:")       # a bare URL at the end of a sentence
             if not _held_in_git(ref, target, tracked_all):
                 problems.append(f"GitHub link to {target} at {ref}, which git does not hold")
@@ -166,6 +177,20 @@ def test_the_rule_catches_what_it_must_and_nothing_else():
     assert _problems("See .\\apple\\_PRIVATE.md", patterns + ["apple/_PRIVATE.md"],
                      names | {"_PRIVATE.md"}, tracked | {"apple/_PRIVATE.md"}) == [
         "apple/_PRIVATE.md is excluded by .comfyignore"]
+    # Sonnet QA on c2832881: the separator reading is chosen per token, a URL
+    # ends at a bracket, a quote or a comma and may be upper case, and a
+    # GitHub link may carry a markdown-escaped underscore.
+    excluded = ["apple/IDEOGRAM4_LICENSE_ATTESTATION.md is excluded by .comfyignore"]
+    assert _problems("See apple/INSTALL.md and apple/IDEOGRAM4\\_LICENSE\\_ATTESTATION.md",
+                     patterns, names, tracked) == excluded
+    assert _problems("[it](" + GITHUB_BLOB + "apple/IDEOGRAM4\\_LICENSE\\_ATTESTATION.md)",
+                     patterns, names, tracked) == []
+    for line in ("(https://x.test/a)(apple/IDEOGRAM4_LICENSE_ATTESTATION.md)",
+                 "[a](https://x.test/a)apple/IDEOGRAM4_LICENSE_ATTESTATION.md",
+                 "https://x.test/a,apple/IDEOGRAM4_LICENSE_ATTESTATION.md"):
+        assert _problems(line, patterns, names, tracked) == excluded, line
+    assert _problems("see HTTPS://example.test/?path=./apple/schema/anime.json",
+                     patterns, names, tracked) == []
     # A permalink to a commit is held against that commit's tree: this file at
     # the repository's first commit on main does not exist there. A shallow
     # clone's oldest commit is its cut, which may hold this file, so the

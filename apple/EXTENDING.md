@@ -361,6 +361,11 @@ show a shorter fetcher; that signature raises `TypeError` on its first
 real call. If you are unsure, the binding check below proves it without running
 your code.
 
+When your fetcher resolves a reference, return it as `source_meta["source_ref"]`:
+the ledger's `source_ref` is what the fetcher reports (or the RSS item it chose),
+never the widget's request, which is kept beside it as `requested_source_ref`
+when it differs.
+
 ### Activate it
 
 ```bash

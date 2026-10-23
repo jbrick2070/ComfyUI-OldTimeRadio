@@ -19,7 +19,7 @@ Story-path SOURCE BANK (multi-modal story schema). Selects which registered stor
 
 **Source to adapt** (`source_ref`) -- text; starts as empty.
 
-Optional source reference for source-bank lanes (for example a public-domain URL/id/title). Blank uses the bank's default source selection. This is not a fallback; unsupported nonblank references must fail loud in the consuming bank.
+Optional. A source id for the banks that adapt a text: Shakespeare and Public Domain read it (a 'source:unit' id from their manifests); my_story refuses one; the RSS and original banks ignore it, and the ledger keeps it only as requested_source_ref. Blank picks the bank's default. With Story bank on the roll a non-blank id is refused: a pinned source belongs to one bank.
 
 **Visual style** (`visual_style`) -- a choice from the dropdown.
 
