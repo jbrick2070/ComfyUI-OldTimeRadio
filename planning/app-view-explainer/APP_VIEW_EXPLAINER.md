@@ -10,6 +10,8 @@
 **Scene count:** 12 (+ end card)
 **Narration word count:** ~715
 
+**v3 note:** this explainer shows ComfyUI's own App Mode form, the one every install gets. The contest's Radio Play Studio is a separate custom web page; it would be its own explainer.
+
 **v2 changes from v1:**
 - Scenes 05, 07, 08 and 11 quote the help lines as the form says them after the 2026-10-23 QA folds (05e51de4, c2832881 and the Sonnet fold on it): Source "Not on roll; adapt banks only"; Visual style "Visualizer frames ignore it"; the still rows "Not every video lane uses it"; the voice rows "kokoro: ja/zh may need extras"; the checklists "… roll only; none = all".
 - Narration follows: only the two adapt banks read an id and the roll refuses it; the credits still name the style; some lanes take no still without saying so; Japanese and Mandarin may need two libraries; an empty checklist is all.
@@ -75,9 +77,9 @@ Dry narration over silence. One cue: a tuning dial — a dry, dead-air crackle w
 
 ## SCENE 05 — STORY BANK AND STYLE
 
-**VISUAL:** Three rows. STORY BANK, "Pick my_story to tell yours", with its dropdown drawn as a wireframe list fanning out: original, scifi_news_pro, media_archive, shakespeare, public_domain, my_story, and a top entry "roll (any eligible bank)" in solid magenta. SOURCE TO ADAPT, "Not on roll; adapt banks only". VISUAL STYLE, "Visualizer frames ignore it", with its own "roll (any style)" entry lit.
+**VISUAL:** Three rows. STORY BANK, "Pick my_story to tell yours", with its dropdown drawn as a wireframe list fanning out: original, scifi_news_pro, media_archive, shakespeare, public_domain, my_story, and a top entry "roll (any eligible bank)" in solid magenta. Beside each name a one-line wireframe caption: invented outright; from tonight's science news; inspired by an archive item; a Folger scene as written; a public-domain text adapted; your own idea. SOURCE TO ADAPT, "Not on roll; adapt banks only". VISUAL STYLE, "Visualizer frames ignore it", with its own "roll (any style)" entry lit.
 
-**NARRATION:** Story bank decides what kind of show it is. Leave it on roll and the pack picks one: an original drama, science fiction from tonight's science news, a story from the media archives, a scene of Shakespeare, a public-domain classic. Pick my story to tell your own. Source to adapt stays blank unless you have a source id; only the Shakespeare and public-domain banks read one, and the roll refuses it. Visual style restyles the pictures — but note the help line: the visualizer lanes the form ships with ignore it in their frames. The credits still name it.
+**NARRATION:** Story bank decides what kind of show it is. Leave it on roll and the pack picks one of six. Original: the writer invents a drama outright, from nothing. Sci-fi news: science fiction built from a science article pulled live tonight, so it needs the network. Media archive: a drama inspired by an archive or media-history item, also pulled live, invented rather than adapted. Shakespeare: a scene from the Folger texts, performed as written. Public domain: a public-domain text, adapted. My story: your own idea, from the boxes near the end of the form. The two live banks need the internet; the other four work offline. Source to adapt stays blank unless you have a source id; only the Shakespeare and public-domain banks read one, and the roll refuses it. Visual style restyles the pictures — but note the help line: the visualizer lanes the form ships with ignore it in their frames. The credits still name it.
 
 **ON-SCREEN TEXT:** STORY BANK · roll · my_story · SOURCE TO ADAPT · VISUAL STYLE
 
@@ -149,7 +151,7 @@ Dry narration over silence. One cue: a tuning dial — a dry, dead-air crackle w
 
 **VISUAL:** The My Story block: MY STORY - WHO IS IN IT, "Set Story bank to my_story"; CHARACTER PHOTOS (NAME = FILE), "Needs still: flux3_klein_ref"; MY STORY - WHAT HAPPENS, "Events, conflict, ending"; MY STORY - WHERE AND WHEN, "Place, era, mood"; MY STORY - BY, "Your name, or a pen name"; MY STORY - MUSIC IN WORDS, "e.g. surf rock, solo cello". A solid magenta line runs from the first row's help text up the form to STORY BANK. Below, SPACE SAVER, "Finished video is always kept", and the five roll checklists, drawn as collapsed wireframe chevrons, each with its help line "… roll only; none = all".
 
-**NARRATION:** My Story is where your own play goes: who is in it, what happens, where and when, who it is by, and your music, in words. The first help line is the one to read: set Story bank to my story, or these boxes are not read. Character photos paint a character from a picture, and need the flux3 klein ref still model. Space saver tidies the episode's folder; the finished video is always kept. The checklists at the foot narrow a roll; each is read only by its own roll, and an empty checklist means all of them.
+**NARRATION:** My Story is where your own play goes: who is in it, what happens, where and when, who it is by, and your music, in words. The first help line is the one to read: set Story bank to my story, or these boxes are not read. Character photos paint a character from a picture, and need the flux3 klein ref still model. Space saver tidies the episode's folder; the finished video is always kept. The checklists at the foot narrow a roll; Banks to roll ticks which of those six bank descriptions the roll may draw from; each is read only by its own roll, and an empty checklist means all of them.
 
 **ON-SCREEN TEXT:** MY STORY · "Set Story bank to my_story" · SPACE SAVER · CHECKLISTS
 
