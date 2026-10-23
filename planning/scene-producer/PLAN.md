@@ -21,7 +21,7 @@ An optional shot editor for Radio Play Studio, built and proven first on the My 
 | Request builder and receipts | `render_driver.build_request_from_shot`; `_RECEIPT_CAUSAL_KEYS` | The basis of the clip reuse key; receipts stay as they are |
 | `ExecutionBlocker(None)` | core `graph_utils.py` ~140, `execution.py` ~265 | Silently skips everything downstream; the prompt still ends as success |
 | `/view` | core `server.py` ~596 | Studio's server reads bundle files; no new route |
-| SDK and proxy | `comfy_sdk` jobs, outputs; proxy `app.py` | A blocked stage is a succeeded job; the job id is the ComfyUI prompt id; `client.jobs.get(id)` re-attaches after a Studio restart; clips surface under the `gifs` kind |
+| SDK and proxy | `comfy_sdk` jobs; proxy `app.py` | A blocked stage is a succeeded job; the job id is the ComfyUI prompt id; `client.jobs.get(id)` re-attaches after a Studio restart |
 
 ## Graph contract
 
@@ -49,25 +49,34 @@ An optional shot editor for Radio Play Studio, built and proven first on the My 
 
 **Direction JSON**, versioned: `project_id`, `stage`, `out` (the bundle this run writes), `source` (previous bundle's manifest digest; absent on the first run), scene notes keyed by scene id, per-card picture text and motion text keyed by shot id, take numbers per character, still and clip, and kept ids. No selection in V1: each stage acts on everything changed. Takes are sent in full on every run; Studio's project file is their source of truth.
 
-**The direction lives only on the wire.** Shot Lock puts the parsed direction, stage included, on the ledger it passes downstream as one runtime key, on every run, and clears it when the widget is blank. Node 89, the dispatcher and Batch read it from their wire input. The durable save and the freeze strip it. A blank-widget replay of a producer bundle therefore reaches the mux.
+**The direction lives only on the wire.** Shot Lock puts the parsed direction, stage included, on the ledger it passes downstream as one runtime key. With the widget blank it adds no key at all, and removes one inherited from a bundle. Node 89, the dispatcher and Batch read it from their wire input. The durable save and the freeze strip it. A blank-widget replay of a producer bundle therefore reaches the mux.
 
-**Validation is in the Workflow Validator.** `VALIDATE_INPUTS` cannot refuse a prompt: core drops only the outputs that depend on the failing node and still runs the writer. A blank or whitespace direction passes with no checks at all. Otherwise node 63's resolver checks shape and version, refuses a linked or non-literal direction, confines `project_id` and `out` to short safe names, refuses an `out` that exists, and matches `source` against the bundle in `replay_from`. These checks run before both `_queue_time_readiness_gates` calls, which otherwise roll lanes, preflight clouds and fetch assets. A raise there halts the prompt before any asset loads. Execution is sequential, so a duplicate queued behind its twin fails at node 63 once the first has frozen `out`.
+**Blank means byte-identical.** Every new write, hash and refusal is keyed on that runtime key. With the widget blank, Shot Lock adds nothing, the dispatcher stores no payload and keeps today's rows, Batch computes no reuse key, node 89 does not rebuild, and the resolver answers "not producer" without refusing anything. No shared index or helper changes behaviour unconditionally.
+
+**Validation is in the Workflow Validator.** `VALIDATE_INPUTS` cannot refuse a prompt: core drops only the outputs that depend on the failing node and still runs the writer. A blank or whitespace direction passes with no checks at all. Otherwise node 63's resolver checks shape and version, refuses a linked or non-literal direction, confines `project_id` and `out` to short safe names, and refuses an `out` that exists. On a replay it verifies the bundle with `load_replay_manifest`, which hashes every member, and matches `source` against it. It refuses image engines that differ from the bundle's. It refuses a Video or Publish direction whose picture texts or still takes differ from the bundle's `cards.json`, so unpainted edits can never be filmed. These checks run before both `_queue_time_readiness_gates` calls, which otherwise roll lanes, preflight clouds and fetch assets. A raise there halts the prompt before any asset loads. Execution is sequential, so a duplicate queued behind its twin fails at node 63 once the first has frozen `out`.
 
 ## Stages
 
-**Stills.** On replay Shot Lock writes card motion text into each shot row's free-form `creative` dict; takes are never written onto rows, because `ShotRow` forbids extra fields. On the first run the dispatcher stores the image prompt payload it received, before its own merge, as `images.producer_prompt_payload`. It must be added inside the dispatcher's own rebuild of the images section, which replaces the whole section with six named keys. On replay the image prompt node rebuilds from that payload. A card edit replaces only that object's prompt text, with the scene text appended; identity, co-references and every other field are kept, and no template or LLM runs. The dispatcher, in producer mode, runs its cached path instead of verify-only and mints only misses, portraits first.
+**Stills.** On replay Shot Lock writes card motion text into each shot row's free-form `creative` dict; takes are never written onto rows, because `ShotRow` forbids extra fields. On the first run the dispatcher stores the image prompt payload it received, before its own merge, as `images.producer_prompt_payload`. It must be added inside the dispatcher's own rebuild of the images section, which replaces the whole section with six named keys. On replay the image prompt node rebuilds from that payload. A card edit replaces only that object's prompt text, with the scene text appended; identity, co-references and every other field are kept, and no template or LLM runs. Only the Stills stage paints. There the dispatcher runs its cached path instead of verify-only and mints only misses, portraits first. In Video and Publish it keeps today's verify-only replay path and paints nothing.
 
-Take numbers above zero enter every seed branch: bookend, fixed mode, scene character and portrait. A character's take enters the identity seed of every scene still of that character, whether or not the lane mints a portrait. Studio's My Story graphs mint none without photos: scene stills take their identity from a hashed identity prompt. Take 0 is today's seed exactly. Kept objects keep their row whatever their key. Rows are one per object, newest wins, and the render driver's portrait indexes become newest-wins. Paint again raises the still's take; Film again raises only the clip's take and keeps the still. Node 12 renames the workspace on every run; Shot Lock already adopts the renamed id and rebases every path before the dispatcher, which prefers that wired id, so minting on replay writes into the right folder with no change.
+Take numbers above zero enter every seed branch: bookend, fixed mode, scene character and portrait. A character's take enters the identity seed of every scene still of that character, whether or not the lane mints a portrait. Studio's My Story graphs mint none without photos: scene stills take their identity from a hashed identity prompt. Take 0 is today's seed exactly. Kept objects keep their row whatever their key. In producer mode the dispatcher keeps one row per object, the newest replacing the old, so the render driver's first-row-wins portrait index needs no change. Paint again raises the still's take; Film again raises only the clip's take and keeps the still. Node 12 renames the workspace on every run; Shot Lock already adopts the renamed id and rebases every path before the dispatcher, which prefers that wired id, so minting on replay writes into the right folder with no change.
 
-**Video.** Each shot's reuse record lives in `video.producer_clip_reuse[shot_id]`, a map beside the shot rows, never on them, because `ShotRow` forbids extra fields. Paths are episode-relative. Shot Lock's replay branch re-stamps the imported video section, so the map survives; Batch writes it when it stamps its video section. It holds the full clip manifest row, receipts, segments and foley stem. Its key is a hash of every segment's request with image and audio paths replaced by file hashes, plus recipe id, model file path, size and mtime, engine id and version, and clip take. The clip's own sha is verified on use. A hit rehydrates Batch's clips and receipts, so render engines, the manifest, credits and foley rebuild exactly as if rendered. A miss re-renders the whole shot. The clip take re-derives the seed. Reuse is decided before any engine or cloud call. `_RECEIPT_CAUSAL_KEYS` is untouched, so old bundles still verify.
+**Video.** Each shot's reuse record lives in `video.producer_clip_reuse[shot_id]`, a map beside the shot rows, never on them, because `ShotRow` forbids extra fields. Paths are episode-relative. Shot Lock's replay branch re-stamps the imported video section, so the map survives; Batch writes it in producer mode when it stamps its video section.
 
-**Publish.** Batch, in the publish stage, raises before any engine if a shot lacks a verified reusable clip. Otherwise it rehydrates every shot, and composite, captions, credits and mux run as today. No generation weights load.
+**Clips survive a crash.** As each clip finishes, Batch also writes it, its foley stem and its reuse record into a per-project store, `_replay/p/<project>/clips/<key>/`, named by reuse key and never edited. Lookup checks the bundle's map first, then the store. A run that dies at shot 80 of 100 keeps the 79 finished clips, and the next run films only the rest. The Video freeze copies the clips it uses into its bundle, so every bundle stays self-contained.
+
+**Floors are failed cards.** A shot whose still or clip floored, to the scene still or to black, gets no reuse record and no cache row, and `cards.json` marks it failed. Publish refuses while any failed card is not kept. Keep on a failed card accepts its floor explicitly, so one stubborn shot can never trap a project. It holds the full clip manifest row, receipts, segments and foley stem. Its key is a hash of every segment's request with image and audio paths replaced by file hashes, plus recipe id, model file path, size and mtime, engine id and version, and clip take. The clip's own sha is verified on use. A hit rehydrates Batch's clips and receipts, so render engines, the manifest, credits and foley rebuild exactly as if rendered. A miss re-renders the whole shot. The clip take re-derives the seed. Reuse is decided before any engine or cloud call. `_RECEIPT_CAUSAL_KEYS` is untouched, so old bundles still verify.
+
+**Publish.** Batch, in the publish stage, raises before any engine if a shot lacks a verified reusable clip or a kept floor. Otherwise it rehydrates every shot, and composite, captions, credits and mux run as today. No generation weights load.
 
 **Freezer.** It moves to a helper in `nodes/` with relative imports. It raises `ReplayBundleError`, never `SystemExit`, which would kill ComfyUI's prompt worker, and takes an explicit destination. The CLI becomes a thin wrapper. It carries every member present: ledger, master, canon, stills, portraits, clips and `audio/foley`. Bundles live at `otr/episodes/_replay/p/<project>/<nn>-<stage>`, short for Windows path limits. Nothing is deleted automatically in V1: each stage run adds one bundle and one workspace, and the operator removes old ones by hand.
 
 **Readiness.** One pure resolver, called by node 63, `_otr_visual_assets` and the two cloud preflights. It finds Shot Lock by class type in the queued prompt, since the gate-in walker never reaches it, and refuses a graph with more than one. A Stills replay needs image-engine assets, a Video replay clip assets, Publish none, and no replay needs writer assets.
 
-**Known cost.** Node 12's CRT base video renders and renames on every stage, measured at about 53 frames a second, a few minutes for a typical episode. V1 accepts it.
+**Known costs, accepted for V1.**
+
+- **CRT base video.** Node 12 renders and renames it on every stage, at a measured 53 frames a second, which is a few minutes for a typical episode.
+- **Double hashing.** Node 63 hashes every bundle member, and the import hashes them all again.
 
 ## Studio
 
@@ -110,6 +119,7 @@ The approved design is `mockup.html`.
 | Selection of individual cards | Each stage acts on everything changed |
 | Template prompt rebuilds, per-field structured edits | One picture text and one motion text per card, plus scene text |
 | Multiple takes per card, history beyond the previous bundle | Rollback to older takes |
+| Image and clip previews from nodes on the canvas | Nothing in Studio, which reads the bundle. Each preview would also be probed and registered in the user's ComfyUI asset library. If canvas previews are wanted later, core's `HAS_INTERMEDIATE_OUTPUT` flag adds them without changing node order |
 | Banks other than My Story, auto-freezing ordinary episodes, reordering or splitting shots, bbox or location-image conditioning | Later; the backend is bank-agnostic |
 
 ## Build order
@@ -117,16 +127,15 @@ The approved design is `mockup.html`.
 Each chunk: scoped suite green on the Windows venv, named files only, pushed to `main`, then Composer and Sonnet QA on the pushed diff. Every chunk touches shared code, so each commit states that blank runs are unchanged and how that was measured.
 
 1. Freezer helper in `nodes/`; new members; `direction_json`; node 63 validation and resolver; canonical, generated workflows and parity tests.
-2. Shot Lock runtime stage and overlay; stage blockers in the dispatcher and Batch; producer-only UI outputs and bars.
-3. Prompt payload in the ledger; replay rebuild; dispatcher minting, takes, kept, newest-wins rows; Stills freeze and `cards.json`.
-4. Clip reuse map, takes, publish refusal; Video freeze.
+2. Shot Lock runtime key and overlay; stage blockers in the dispatcher and Batch; producer-only progress bars.
+3. Prompt payload in the ledger; replay rebuild; Stills-only minting, takes, kept, one row per object; Stills freeze and `cards.json`.
+4. Clip reuse map and clip store, takes, floors as failed cards, publish refusal; Video freeze.
 5. Studio page, recorded workflow, internal patcher, project file, restart, translations.
 6. Live proof on the real My Story workflow, then record it.
 
 ## Implementation traps
 
 - `ExecutionBlocker` is imported lazily from core, never redefined, and stubbed in tests. It is always given `None`; a message turns the skip into an execution error.
-- UI values are lists, and clips go under `gifs`.
 - Shot Lock's `IS_CHANGED(**kwargs)` stays as is; a test calls it with no arguments.
 - `prompt_objects` is node 89's payload as the dispatcher received it; the dispatcher's own merge raises on a duplicate id.
 - The freeze reads the post-rename workspace; node 12 renames before Shot Lock runs.
@@ -135,13 +144,21 @@ Each chunk: scoped suite green on the Windows venv, named files only, pushed to 
 
 ## Proof
 
-- **Blank widget:** on the 5080, node order, VRAM peak and the published file match a baseline. Old `[]` vectors, the app form and mux discovery are unchanged. A blank-widget replay of a producer bundle publishes.
+- **Blank widget:** on the 5080, node order, VRAM peak, the durable ledger and the published file match a baseline. Old `[]` vectors, the app form and mux discovery are unchanged. A blank-widget replay of a producer bundle publishes.
 - **Zero supplied images on My Story:** Stills, Video and Publish produce a playable final in `otr/obs/`. Master, cast and timing hashes equal bundle 1's. Only the first run calls an LLM. With photos supplied, the reference twin works the same way.
 - **One card edit:** exactly that still and that clip re-render; the reports show the rest reused.
 - **Paint again:** gives a different image, and take 0 is byte-identical to today. A portrait's Paint again repaints only that character's unkept shots.
 - **Film again:** reuses the still and re-renders the clip.
 - **Video, then Stills again, then Video:** re-renders only the changed shots, with foley intact.
-- **Duplicates and bad input:** a duplicate queued behind its twin, a tampered bundle, a linked direction, a missing still or changed audio is refused at node 63, before any model loads.
+- **Duplicates and bad input:** node 63 refuses each of these before any model loads:
+  - a duplicate queued behind its twin;
+  - a tampered bundle;
+  - a linked direction;
+  - a missing still or changed audio;
+  - a changed image engine;
+  - a Video run that still carries unpainted edits.
+- **Crash mid-Video:** the next Video run films only the shots that had not finished.
+- **Floors:** a floored shot shows Failed and blocks Publish until it is filmed again or kept.
 - **Publish:** with a shot missing, it refuses before any engine. Complete, it publishes and loads no generation weights.
 - **Studio restart:** a running job re-attaches, a finished one completes, and a failed one can run again.
 - **Widget:** `direction_json` is hidden behind Shot Lock's advanced toggle, absent from the app form, and its value survives a save and reload on the canvas.
