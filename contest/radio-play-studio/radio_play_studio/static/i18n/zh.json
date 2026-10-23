@@ -159,5 +159,15 @@
  "pstatus.saved": "已保存",
  "pstatus.stale": "这个项目在另一个窗口中被修改了。请重新加载查看。",
  "pstatus.missing": "无法打开该项目：{error}",
- "why.still_paint": "这张图没能画出来。请重画，或修改文字。"
+ "why.still_paint": "这张图没能画出来。请重画，或修改文字。",
+ "choice.stills.flux3_klein": "FLUX 3 Klein",
+ "choice.stills.flux3_klein_ref": "FLUX 3 Klein Ref",
+ "choice.stills.flux_gen1": "FLUX.1",
+ "choice.stills.ideogram4_local": "Ideogram 4",
+ "choice.stills.lumina_image": "Lumina Image",
+ "choice.stills.moss_image": "MOSS-Image",
+ "choice.stills.sd15": "Stable Diffusion 1.5",
+ "choice.stills.z_image_turbo": "Z-Image Turbo",
+ "hint.blank": "没有描述的画面：{n}。绘制前请先描述。",
+ "why.blank": "这幅画面还没有描述。绘制前请先描述。"
 }

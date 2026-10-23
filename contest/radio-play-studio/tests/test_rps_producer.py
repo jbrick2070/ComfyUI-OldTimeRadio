@@ -302,6 +302,21 @@ def test_a_replay_carries_only_what_differs_from_the_bundle_shown():
         producer.build_direction(project, "stills")
 
 
+def test_a_new_portrait_waits_for_a_stills_run_whether_or_not_a_still_names_it():
+    # Codex QA, 2026-10-23: no card's still names c1, so only the portrait
+    # shows the take; node 63 refuses Video until a Stills run paints it.
+    project = _shown()
+    project["view"]["cast"] = [{"char_id": "c1", "has_portrait": True, "take": 0},
+                               {"char_id": "c2", "has_portrait": False, "take": 0}]
+    project["draft"]["takes"]["characters"] = {"c1": 1, "c2": 1}
+    assert producer.recast(project) == ["c1"], "a cast member with no portrait is the cards' to say"
+    with pytest.raises(producer.ProjectError, match="paint the new portraits first: c1"):
+        producer.build_direction(project, "video")
+    assert producer.build_direction(project, "stills")["takes"]["characters"] == {"c1": 1, "c2": 1}
+    project["view"]["cast"][0]["take"] = 1          # the Stills run painted it
+    assert producer.recast(project) == []
+
+
 def test_publish_follows_a_video_run_and_bundle_numbers_never_repeat():
     with pytest.raises(producer.ProjectError, match="film them first"):
         producer.build_direction(_shown("stills"), "publish")
@@ -400,6 +415,34 @@ def test_a_bundle_cannot_name_media_outside_itself_or_unlisted(tmp_path):
             manifest["files"].append({"path": still, "sha256": "e" * 64})
         output[(folder, "manifest.json")] = json.dumps(manifest).encode()
         with pytest.raises(producer.ProjectError, match=refusal):
+            producer.adopt_bundle(tmp_path, project, "01-stills", reader(output),
+                                  attempt_id="a" * 32, source=None, stage="stills")
+
+
+def test_a_path_outside_the_bundle_is_refused_even_when_its_file_is_already_here(tmp_path):
+    # Codex QA, 2026-10-23: a file already copied in by its hash was never
+    # fetched, so its path was never checked; and a backslash is one part to
+    # a POSIX path, so "..\x" slipped past the ".." test.
+    project, clean, _direction = _frozen(tmp_path)
+    folder = f"{producer.REPLAY_ROOT}/{project['project_id']}/01-stills"
+    producer.adopt_bundle(tmp_path, project, "01-stills", reader(clean),
+                          attempt_id="a" * 32, source=None, stage="stills")
+    for name in ("../02-stills/stills/still_b001.png", r"..\02-stills\still_b001.png",
+                 "C:/stills/still_b001.png", "stills//still_b001.png", "./stills/still_b001.png"):
+        output = dict(clean)
+        manifest = json.loads(output[(folder, "manifest.json")])
+        cards = json.loads(output[(folder, "cards.json")])
+        real = cards["scenes"][0]["shots"][0]["still"]
+        digest = next(r["sha256"] for r in manifest["files"] if r["path"] == real)
+        cards["scenes"][0]["shots"][0]["still"] = name
+        body = json.dumps(cards).encode()
+        output[(folder, "cards.json")] = body
+        for row in manifest["files"]:
+            if row["path"] == "cards.json":
+                row["sha256"] = hashlib.sha256(body).hexdigest()
+        manifest["files"].append({"path": name, "sha256": digest})
+        output[(folder, "manifest.json")] = json.dumps(manifest).encode()
+        with pytest.raises(producer.ProjectError, match="outside itself"):
             producer.adopt_bundle(tmp_path, project, "01-stills", reader(output),
                                   attempt_id="a" * 32, source=None, stage="stills")
 

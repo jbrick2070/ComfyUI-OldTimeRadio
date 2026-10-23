@@ -159,5 +159,15 @@
  "pstatus.saved": "Saved",
  "pstatus.stale": "This project was changed in another window. Reload to see it.",
  "pstatus.missing": "That project cannot be opened: {error}",
- "why.still_paint": "This picture could not be painted. Paint it again, or change its words."
+ "why.still_paint": "This picture could not be painted. Paint it again, or change its words.",
+ "choice.stills.flux3_klein": "FLUX 3 Klein",
+ "choice.stills.flux3_klein_ref": "FLUX 3 Klein Ref",
+ "choice.stills.flux_gen1": "FLUX.1",
+ "choice.stills.ideogram4_local": "Ideogram 4",
+ "choice.stills.lumina_image": "Lumina Image",
+ "choice.stills.moss_image": "MOSS-Image",
+ "choice.stills.sd15": "Stable Diffusion 1.5",
+ "choice.stills.z_image_turbo": "Z-Image Turbo",
+ "hint.blank": "Pictures with no words: {n}. Describe them before painting.",
+ "why.blank": "This picture has no words yet. Describe it before painting."
 }

@@ -414,8 +414,7 @@ function build(list) {
     $("f_bank").addEventListener("change", () => setMode($("f_bank").value === MY_STORY_BANK ? "own" : "classic"));
     setMode($("f_bank").value === MY_STORY_BANK ? "own" : "classic");
   }
-  go.disabled = running || stageBusy;
-  $("direct").disabled = running || stageBusy;
+  buttons();
 }
 
 // -- The cast cards: one per character, each with an optional photo ---------
@@ -719,7 +718,7 @@ function watch(id) {
     say($("error"), "error.lost");
     $("error").hidden = false;
     say($("status"), "status.disconnected");
-    running = false; go.disabled = false; refreshBoard();
+    running = false; buttons(); refreshBoard();
   };
   es.onmessage = (m) => {
     const ev = JSON.parse(m.data);
@@ -745,14 +744,14 @@ function watch(id) {
       $("fill").style.width = "100%";
       say($("status"), "status.finished");
       showVideo($("result"), ev.run, ev.file);
-      running = false; go.disabled = false; refreshBoard();
+      running = false; buttons(); refreshBoard();
     } else if (ev.type === "error") {
       finished = true;
       es.close();
       plain($("error"), ev.message);
       $("error").hidden = false;
       say($("status"), "status.stopped");
-      running = false; go.disabled = false; refreshBoard();
+      running = false; buttons(); refreshBoard();
     }
   };
 }
@@ -771,7 +770,7 @@ function showVideo(box, run, file) {
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
-  go.disabled = true;
+  go.disabled = $("direct").disabled = true;
   $("run").hidden = false; $("error").hidden = true; $("result").hidden = true;
   $("fill").style.width = "0"; say($("status"), "status.checking");
   try {
@@ -786,7 +785,7 @@ form.addEventListener("submit", async (e) => {
     watch(body.id);
   } catch (err) {
     plain($("error"), err.message); $("error").hidden = false;
-    say($("status"), "status.not_started"); go.disabled = false;
+    say($("status"), "status.not_started"); buttons();
   }
 });
 
@@ -800,7 +799,8 @@ form.addEventListener("submit", async (e) => {
 // still changed or was painted again since it was filmed, its action or take
 // changed, or it was never filmed. A kept card is used as it is.
 let project = null, draft = null;
-let stageBusy = false;          // a stage of the open project is running
+let stageBusy = false;          // a stage is running, whichever project it belongs to
+let stagePid = null;            // the project that stage belongs to
 let saveTimer = null, saveChain = Promise.resolve(true);
 let edits = 0, savedEdits = 0;  // edits made, and how many of them the app holds
 const SAVE_DELAY_MS = 600;
@@ -821,6 +821,8 @@ async function openProject(pid) {
   const res = await fetch("/api/projects/" + pid);
   const body = await res.json();
   if (!res.ok) throw new Error(body.error || res.statusText);
+  clearTimeout(saveTimer); saveTimer = null;
+  edits = savedEdits = 0;         // a board opens with nothing of its own unsaved
   project = body.project;
   draft = JSON.parse(JSON.stringify(project.draft));
   history.replaceState(null, "", "#project=" + pid);
@@ -829,23 +831,34 @@ async function openProject(pid) {
 }
 
 // Read the project again, once a stage has ended. Unsaved edits are saved
-// first, so the draft the server sends back holds every one of them; one typed
-// while that save was on its way stays in the page's draft, to be saved next.
+// first, so the draft the server sends back holds every one of them. An edit
+// typed while the read was on its way stays in the page's draft, to be saved
+// next -- and so does the page's draft when a save landed after the read, so
+// an older revision never replaces a newer one (Codex QA, 2026-10-23).
 async function reloadProject() {
   if (!project) return;
   await saveDraft();
-  const typing = edits !== savedEdits;
+  const pid = project.project_id;
   try {
-    const res = await fetch("/api/projects/" + project.project_id);
+    const res = await fetch("/api/projects/" + pid);
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || res.statusText);
+    if (!project || project.project_id !== pid) return;   // the page moved on
     project = body.project;
-    if (!typing) draft = JSON.parse(JSON.stringify(project.draft));
+    if (edits === savedEdits && (project.draft.revision || 0) >= (draft.revision || 0)) {
+      draft = JSON.parse(JSON.stringify(project.draft));
+    }
     drawBoard();
   } catch (err) { plain($("perror"), err.message); $("perror").hidden = false; }
 }
 
-function closeProject() {
+// Unsaved edits are saved before the board closes. One that cannot be saved
+// keeps it open, with the reason beside the buttons (Codex QA, 2026-10-23:
+// an edit typed just before the press was dropped).
+async function closeProject() {
+  if (project && !(await saveDraft())) return;
+  clearTimeout(saveTimer); saveTimer = null;
+  edits = savedEdits = 0;
   project = draft = null;
   history.replaceState(null, "", location.pathname);
   folded(false);
@@ -900,6 +913,8 @@ function assess(card, scene) {
   const sid = card.shot_id, d = draft.cards[sid] || {};
   const keptStill = has(draft.kept.stills, sid), keptClip = has(draft.kept.clips, sid);
   const pictureEdit = card.picture_editable && d.picture_text != null && d.picture_text !== card.picture_text;
+  // Studio refuses a still with no words, so the page never offers to paint one.
+  const blank = !!pictureEdit && !String(d.picture_text).trim();
   const noteEdit = scene.note_editable && draft.scenes[scene.scene_id] != null
     && draft.scenes[scene.scene_id].note !== (scene.note || "");
   const stillTake = (draft.takes.stills[sid] || 0) !== (card.still_take || 0);
@@ -919,16 +934,22 @@ function assess(card, scene) {
   const clipFailed = card.clip_state === "failed" && !keptClip;
   const toFilm = !keptClip && !stillFailed && (stillDirty || motionEdit || clipTake || stale || !filmed);
   const changed = stillDirty || motionEdit || clipTake;
-  return {keptStill, keptClip, pictureEdit, motionEdit, stillDirty, stillFailed, clipTake,
+  return {keptStill, keptClip, pictureEdit, blank, motionEdit, stillDirty, stillFailed, clipTake,
           stale, clipFailed, toFilm, changed, failed: !changed && (stillFailed || clipFailed),
           filmed: filmed && !toFilm};
 }
 
+// What the board holds. A portrait taken again is painted by a Stills run
+// whether or not any card's still names its character, and Video waits for
+// it, as node 63 reads it (unpainted_characters).
 function counts() {
-  const c = {cards: 0, painted: 0, changed: 0, toFilm: 0, filmed: 0, failed: 0};
+  const c = {cards: 0, painted: 0, changed: 0, toFilm: 0, filmed: 0, failed: 0, blank: 0};
+  c.recast = (shown().cast || []).filter((m) => m.has_portrait &&
+    (draft.takes.characters[m.char_id] || 0) !== (m.take || 0)).length;
   eachCard((card, scene) => {
     const a = assess(card, scene);
     c.cards += 1;
+    if (a.blank) c.blank += 1;
     if (card.still) c.painted += 1;
     if (a.stillDirty) c.changed += 1;
     if (a.toFilm) c.toFilm += 1;
@@ -1176,26 +1197,30 @@ function saveDraft() {
   saveChain = saveChain.then(postDraft, postDraft);
   return saveChain;
 }
+// A save belongs to the draft it was sent for: one that lands after the page
+// has moved on to another project leaves that project's draft alone.
 async function postDraft() {
-  const sending = edits;
-  if (!project || !draft || sending === savedEdits) return true;
-  const body = {scenes: draft.scenes, cards: draft.cards, takes: draft.takes, kept: draft.kept};
+  const sending = edits, p = project, d = draft;
+  if (!p || !d || sending === savedEdits) return true;
+  const body = {scenes: d.scenes, cards: d.cards, takes: d.takes, kept: d.kept};
+  const current = () => draft === d;
   try {
-    const res = await fetch("/api/projects/" + project.project_id + "/draft", {
+    const res = await fetch("/api/projects/" + p.project_id + "/draft", {
       method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({draft: body, revision: draft.revision}),
+      body: JSON.stringify({draft: body, revision: d.revision}),
     });
     const out = await res.json();
     if (!res.ok) {
-      if (res.status === 409) say($("saved"), "pstatus.stale"); else plain($("saved"), out.error);
+      if (current()) {
+        if (res.status === 409) say($("saved"), "pstatus.stale"); else plain($("saved"), out.error);
+      }
       return false;
     }
-    draft.revision = out.revision;
-    savedEdits = sending;
-    say($("saved"), "pstatus.saved");
+    d.revision = out.revision;
+    if (current()) { savedEdits = sending; say($("saved"), "pstatus.saved"); }
     return true;
   } catch (err) {
-    plain($("saved"), err.message);
+    if (current()) plain($("saved"), err.message);
     return false;
   }
 }
@@ -1216,7 +1241,11 @@ function refreshBoard() {
     badge.className = "badge " + (state || (a.filmed ? "filmed" : ""));
     tx(badge, key, text);
     tx(kind, card.clip && !a.stale ? "kind.clip" : "kind.still", card.clip && !a.stale ? "Clip" : "Still");
-    if (a.failed && a.stillFailed) {
+    if (a.blank) {
+      tx(why, "why.blank", "This picture has no words yet. Describe it before painting.");
+      why.hidden = false;
+    }
+    else if (a.failed && a.stillFailed) {
       // Only a clip kept can publish a refused still as it is.
       if (["filmed", "failed", "kept"].includes(card.clip_state)) tx(why, "why.still", "This picture could not be painted.");
       else tx(why, "why.still_paint", "This picture could not be painted.");
@@ -1256,74 +1285,96 @@ function refreshBoard() {
   tx(video, c.toFilm ? "act.video_n" : "act.video", "Film the shots", null, {n: c.toFilm});
   tx(publish, "act.publish", "Publish the episode");
   const off = busy || held || !latest;
-  stills.disabled = off || !c.changed;
-  video.disabled = off || c.changed > 0 || !c.toFilm;
-  const ready = !!latest && latest.stage === "video" && !c.changed && !c.toFilm && !c.failed;
+  const paint = c.changed + c.recast;
+  stills.disabled = off || !paint || c.blank > 0;
+  video.disabled = off || paint > 0 || !c.toFilm;
+  const ready = !!latest && latest.stage === "video" && !paint && !c.toFilm && !c.failed;
   publish.disabled = off || !ready;
   const hint = $("hint");
   if (busy) say(hint, "hint.running");
   else if (held) say(hint, "hint.held");
-  else if (c.changed) say(hint, "hint.dirty");
+  else if (c.blank) say(hint, "hint.blank", {n: c.blank});
+  else if (paint) say(hint, "hint.dirty");
   else if (c.toFilm) say(hint, "hint.unfilmed");
   else if (c.failed) say(hint, "hint.failed", {n: c.failed});
   else if (project.published && ready) say(hint, "hint.published");
   else say(hint, "hint.ready");
-  showStage("stills", c.changed === 0 && c.cards > 0, "stage.stills_state", {painted: c.painted, changed: c.changed});
+  showStage("stills", paint === 0 && c.cards > 0, "stage.stills_state", {painted: c.painted, changed: c.changed});
   showStage("video", c.toFilm === 0 && c.cards > 0, "stage.video_state", {filmed: c.filmed, total: c.cards});
   const pubKey = project.published && ready ? "stage.publish_done" : ready ? "stage.publish_ready" : "stage.publish_wait";
   showStage("publish", !!project.published && ready, pubKey, {});
-  go.disabled = $("direct").disabled = busy;
+  buttons();
+}
+
+// Make and Direct are off while anything is being made -- an episode, or a
+// stage of any project -- and until the form has loaded: the app makes one
+// thing at a time.
+function buttons() {
+  go.disabled = $("direct").disabled = running || stageBusy || !fields.length;
 }
 
 function showStage(name, done, key, vars) {
   const el = $("stage_" + name);
   el.classList.toggle("done", done);
-  el.classList.toggle("on", stageBusy && watching === name);
+  el.classList.toggle("on", stageBusy && watching === name && stageShown());
   say(el.querySelector("span"), key, vars);
 }
 
 let watching = null;   // the stage being watched
+// The stage's progress shows on its own project's board, never on another's.
+const stageShown = () => !!project && project.project_id === stagePid;
 
 async function startStage(stageName) {
   if (stageBusy || !project) return;
+  const pid = project.project_id;
   $("perror").hidden = true;
   if (!(await saveDraft())) return;   // the stage carries the draft as saved
-  stageBusy = true; watching = stageName; refreshBoard();
+  stageBusy = true; watching = stageName; stagePid = pid; refreshBoard(); buttons();
   try {
-    const res = await fetch("/api/projects/" + project.project_id + "/stages", {
+    const res = await fetch("/api/projects/" + pid + "/stages", {
       method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({stage: stageName}),
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || res.statusText);
-    watchStage(body.id, stageName);
+    watchStage(body.id, stageName, pid);
   } catch (err) {
-    stageBusy = false; watching = null;
-    plain($("perror"), err.message); $("perror").hidden = false;
-    refreshBoard();
+    stageBusy = false; watching = stagePid = null;
+    if (stageShown() || (project && project.project_id === pid)) {
+      plain($("perror"), err.message); $("perror").hidden = false;
+    }
+    refreshBoard(); buttons();
   }
 }
 
-function watchStage(id, stageName) {
-  const pid = project ? project.project_id : null;
-  stageBusy = true; watching = stageName;
-  $("pfill").style.width = "0";
-  say($("pstatus"), STAGE_TEXT[stageName].run);
-  refreshBoard();
+function watchStage(id, stageName, pid) {
+  stageBusy = true; watching = stageName; stagePid = pid;
+  if (stageShown()) {
+    $("pfill").style.width = "0";
+    say($("pstatus"), STAGE_TEXT[stageName].run);
+  }
+  refreshBoard(); buttons();
   const es = new EventSource("/api/episodes/" + id + "/events");
   let finished = false, high = 0;   // a stage's bar is its own, and only moves forward
   const end = () => {
+    const shown = stageShown();
     finished = true; es.close();
-    stageBusy = false; watching = null;
-    if (project && project.project_id === pid) reloadProject(); else refreshBoard();
+    stageBusy = false; watching = stagePid = null;
+    buttons();
+    if (shown) reloadProject(); else refreshBoard();
   };
   es.onerror = () => {
     if (finished || es.readyState !== EventSource.CLOSED) return;
-    say($("perror"), "error.lost"); $("perror").hidden = false;
+    if (stageShown()) { say($("perror"), "error.lost"); $("perror").hidden = false; }
     end();
   };
   es.onmessage = (m) => {
     const ev = JSON.parse(m.data);
+    // Another project's stage only keeps the buttons off until it ends.
+    if (!stageShown()) {
+      if (ev.type === "done" || ev.type === "error") end();
+      return;
+    }
     if (ev.type === "progress") {
       high = Math.max(high, Math.round(ev.value * 100));
       $("pfill").style.width = high + "%";
@@ -1360,11 +1411,11 @@ $("direct").addEventListener("click", async () => {
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || res.statusText);
     await openProject(body.project_id);
-    watchStage(body.id, "stills");
+    watchStage(body.id, "stills", body.project_id);
   } catch (err) {
     $("run").hidden = false; plain($("error"), err.message); $("error").hidden = false;
     say($("status"), "status.not_started");
-    $("direct").disabled = go.disabled = false;
+    buttons();
   }
 });
 
@@ -1380,16 +1431,29 @@ async function resume() {
     list = (await (await fetch("/api/episodes")).json()).episodes || [];
   } catch (err) { return; }
   const stageRun = list.find((r) => r.project_id && !r.finished);
-  try {
-    if (stageRun) { await openProject(stageRun.project_id); watchStage(stageRun.id, stageRun.stage); }
-    else if (wantedProject) await openProject(wantedProject);
-  } catch (err) {
-    say($("notice"), "pstatus.missing", {error: err.message}); $("notice").hidden = false;
-  }
-  if (!project) listProjects();
-  if (project) return;
   const episodes = list.filter((r) => !r.project_id);
-  const run = episodes.find((r) => r.id === wanted) || episodes.find((r) => !r.finished);
+  // The project the address names opens; with none named, or one that is
+  // gone, the one whose stage is running (Codex QA, 2026-10-23: a running
+  // stage used to win over the address).
+  for (const pid of [wantedProject, stageRun && stageRun.project_id]) {
+    if (!pid || project) continue;
+    try { await openProject(pid); }
+    catch (err) { say($("notice"), "pstatus.missing", {error: err.message}); $("notice").hidden = false; }
+  }
+  // Anything being made keeps the buttons off until it ends, whichever board is open.
+  if (stageRun) watchStage(stageRun.id, stageRun.stage, stageRun.project_id);
+  if (!project) listProjects();
+  const making = episodes.find((r) => !r.finished);
+  if (project) {
+    if (making) {
+      $("run").hidden = false; $("error").hidden = true; $("result").hidden = true;
+      say($("status"), "status.resuming");
+      running = true; buttons(); refreshBoard();
+      watch(making.id);
+    }
+    return;
+  }
+  const run = episodes.find((r) => r.id === wanted) || making;
   if (!run) {
     if (wanted) {
       $("run").hidden = false;
@@ -1403,7 +1467,7 @@ async function resume() {
   $("run").hidden = false; $("error").hidden = true; $("result").hidden = true;
   if (run.finished) plain($("status"), ""); else say($("status"), "status.resuming");
   running = !run.finished;
-  go.disabled = running || !fields.length;
+  buttons();
   watch(run.id);
 }
 

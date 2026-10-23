@@ -314,6 +314,18 @@ def unpainted(project: dict) -> list:
     return waiting
 
 
+def recast(project: dict) -> list:
+    """The cast whose portrait the draft asks to paint again and no Stills
+    run has painted yet. A portrait is what a character's stills and shared
+    frames are drawn against, so node 63 refuses Video and Publish while one
+    is waiting, whether or not any card's still names the character -- and
+    Studio does too, before anything is sent."""
+    takes = project["draft"]["takes"]["characters"]
+    return [str(m.get("char_id")) for m in (project.get("view") or {}).get("cast") or []
+            if isinstance(m, dict) and m.get("has_portrait")
+            and int(takes.get(str(m.get("char_id")), 0)) != int(m.get("take") or 0)]
+
+
 def build_direction(project: dict, stage: str) -> dict:
     """The direction a stage run carries: the project's identity and the
     latest bundle's digest, the draft's edits that differ from what the
@@ -336,6 +348,9 @@ def build_direction(project: dict, stage: str) -> dict:
     if waiting:
         more = f" and {len(waiting) - 5} more" if len(waiting) > 5 else ""
         raise ProjectError("paint the changed pictures first: " + ", ".join(waiting[:5]) + more)
+    portraits = recast(project) if stage != "stills" else []
+    if portraits:
+        raise ProjectError("paint the new portraits first: " + ", ".join(portraits[:5]))
     direction["source"] = latest["digest"]
     view = project.get("view") or {}
     shown = {card["shot_id"]: card for scene in view.get("scenes", []) for card in scene["shots"]}
@@ -545,6 +560,17 @@ def read_output(comfyui_url: str, subfolder: str, name: str, timeout: float = 12
         raise ServerUnreachable(f"could not read {url} ({exc})") from exc
 
 
+def _inside_bundle(rel: str, out: str) -> PurePosixPath:
+    """A file a bundle names, proven inside it: relative, forward slashes
+    only, no empty, "." or ".." part and no drive or stream -- the paths the
+    pack's freezer writes. Checked for every file named, read or not."""
+    parts = rel.split("/")
+    if (not rel or "\\" in rel or ":" in rel or rel.startswith("/")
+            or any(part in ("", ".", "..") for part in parts)):
+        raise ProjectError(f"bundle {out} names {rel}, outside itself")
+    return PurePosixPath(rel)
+
+
 def adopt_bundle(out_dir: Path, project: dict, out: str, read_file: ReadFile,
                  *, attempt_id: str, source: Optional[str], stage: str) -> dict:
     """Read a finished stage's bundle and return its page view, its media
@@ -575,9 +601,7 @@ def adopt_bundle(out_dir: Path, project: dict, out: str, read_file: ReadFile,
         digest = listed.get(rel)
         if not digest or not _SHA_RE.fullmatch(digest):
             raise ProjectError(f"bundle {out} does not list {rel}")
-        path = PurePosixPath(rel)
-        if path.is_absolute() or ".." in path.parts:
-            raise ProjectError(f"bundle {out} names {rel}, outside itself")
+        path = _inside_bundle(rel, out)
         folder = "/".join((subfolder,) + path.parts[:-1])
         data = read_file(folder, path.name)
         if hashlib.sha256(data).hexdigest() != digest:
@@ -602,7 +626,7 @@ def adopt_bundle(out_dir: Path, project: dict, out: str, read_file: ReadFile,
         if not rel:
             return None
         rel = str(rel)
-        suffix = PurePosixPath(rel).suffix.lower()
+        suffix = _inside_bundle(rel, out).suffix.lower()
         if suffix not in MEDIA_SUFFIXES:
             raise ProjectError(f"bundle {out} names {rel}, which is not a picture or a clip")
         if not _SHA_RE.fullmatch(listed.get(rel, "")):

@@ -159,5 +159,15 @@
  "pstatus.saved": "Enregistré",
  "pstatus.stale": "Ce projet a été modifié dans une autre fenêtre. Rechargez pour le voir.",
  "pstatus.missing": "Impossible d'ouvrir ce projet : {error}",
- "why.still_paint": "Cette image n'a pas pu être peinte. Repeignez-la ou changez ses mots."
+ "why.still_paint": "Cette image n'a pas pu être peinte. Repeignez-la ou changez ses mots.",
+ "choice.stills.flux3_klein": "FLUX 3 Klein",
+ "choice.stills.flux3_klein_ref": "FLUX 3 Klein Ref",
+ "choice.stills.flux_gen1": "FLUX.1",
+ "choice.stills.ideogram4_local": "Ideogram 4",
+ "choice.stills.lumina_image": "Lumina Image",
+ "choice.stills.moss_image": "MOSS-Image",
+ "choice.stills.sd15": "Stable Diffusion 1.5",
+ "choice.stills.z_image_turbo": "Z-Image Turbo",
+ "hint.blank": "Images sans description : {n}. Décrivez-les avant de les peindre.",
+ "why.blank": "Cette image n'a pas encore de description. Décrivez-la avant de la peindre."
 }

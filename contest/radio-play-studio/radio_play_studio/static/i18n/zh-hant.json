@@ -159,5 +159,15 @@
  "pstatus.saved": "已儲存",
  "pstatus.stale": "這個專案在另一個視窗中被修改了。請重新載入查看。",
  "pstatus.missing": "無法開啟該專案：{error}",
- "why.still_paint": "這張圖沒能畫出來。請重畫，或修改文字。"
+ "why.still_paint": "這張圖沒能畫出來。請重畫，或修改文字。",
+ "choice.stills.flux3_klein": "FLUX 3 Klein",
+ "choice.stills.flux3_klein_ref": "FLUX 3 Klein Ref",
+ "choice.stills.flux_gen1": "FLUX.1",
+ "choice.stills.ideogram4_local": "Ideogram 4",
+ "choice.stills.lumina_image": "Lumina Image",
+ "choice.stills.moss_image": "MOSS-Image",
+ "choice.stills.sd15": "Stable Diffusion 1.5",
+ "choice.stills.z_image_turbo": "Z-Image Turbo",
+ "hint.blank": "沒有描述的畫面：{n}。繪製前請先描述。",
+ "why.blank": "這幅畫面還沒有描述。繪製前請先描述。"
 }

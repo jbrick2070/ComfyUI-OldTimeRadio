@@ -159,5 +159,15 @@
  "pstatus.saved": "保存しました",
  "pstatus.stale": "このプロジェクトは別のウィンドウで変更されました。再読み込みしてください。",
  "pstatus.missing": "そのプロジェクトを開けません: {error}",
- "why.still_paint": "この絵は描けませんでした。描き直すか、言葉を変えてください。"
+ "why.still_paint": "この絵は描けませんでした。描き直すか、言葉を変えてください。",
+ "choice.stills.flux3_klein": "FLUX 3 Klein",
+ "choice.stills.flux3_klein_ref": "FLUX 3 Klein Ref",
+ "choice.stills.flux_gen1": "FLUX.1",
+ "choice.stills.ideogram4_local": "Ideogram 4",
+ "choice.stills.lumina_image": "Lumina Image",
+ "choice.stills.moss_image": "MOSS-Image",
+ "choice.stills.sd15": "Stable Diffusion 1.5",
+ "choice.stills.z_image_turbo": "Z-Image Turbo",
+ "hint.blank": "説明のない絵: {n}。描く前に説明を書いてください。",
+ "why.blank": "この絵にはまだ説明がありません。描く前に説明を書いてください。"
 }

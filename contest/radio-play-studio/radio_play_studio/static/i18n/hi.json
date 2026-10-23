@@ -159,5 +159,15 @@
  "pstatus.saved": "सहेजा गया",
  "pstatus.stale": "यह प्रोजेक्ट किसी दूसरी विंडो में बदला गया। देखने के लिए पेज फिर से लोड कीजिए।",
  "pstatus.missing": "वह प्रोजेक्ट नहीं खुल सका: {error}",
- "why.still_paint": "यह चित्र नहीं बन सका। इसे फिर से बनाइए, या इसके शब्द बदलिए।"
+ "why.still_paint": "यह चित्र नहीं बन सका। इसे फिर से बनाइए, या इसके शब्द बदलिए।",
+ "choice.stills.flux3_klein": "FLUX 3 Klein",
+ "choice.stills.flux3_klein_ref": "FLUX 3 Klein Ref",
+ "choice.stills.flux_gen1": "FLUX.1",
+ "choice.stills.ideogram4_local": "Ideogram 4",
+ "choice.stills.lumina_image": "Lumina Image",
+ "choice.stills.moss_image": "MOSS-Image",
+ "choice.stills.sd15": "Stable Diffusion 1.5",
+ "choice.stills.z_image_turbo": "Z-Image Turbo",
+ "hint.blank": "बिना शब्दों के चित्र: {n}। पेंट करने से पहले उनका वर्णन करें।",
+ "why.blank": "इस चित्र में अभी कोई शब्द नहीं है। पेंट करने से पहले इसका वर्णन करें।"
 }

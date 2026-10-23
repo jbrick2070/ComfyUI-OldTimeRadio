@@ -159,5 +159,15 @@
  "pstatus.saved": "Salvato",
  "pstatus.stale": "Questo progetto è stato modificato in un'altra finestra. Ricarica per vederlo.",
  "pstatus.missing": "Impossibile aprire quel progetto: {error}",
- "why.still_paint": "Non è stato possibile dipingere questa immagine. Ridipingila o cambiane le parole."
+ "why.still_paint": "Non è stato possibile dipingere questa immagine. Ridipingila o cambiane le parole.",
+ "choice.stills.flux3_klein": "FLUX 3 Klein",
+ "choice.stills.flux3_klein_ref": "FLUX 3 Klein Ref",
+ "choice.stills.flux_gen1": "FLUX.1",
+ "choice.stills.ideogram4_local": "Ideogram 4",
+ "choice.stills.lumina_image": "Lumina Image",
+ "choice.stills.moss_image": "MOSS-Image",
+ "choice.stills.sd15": "Stable Diffusion 1.5",
+ "choice.stills.z_image_turbo": "Z-Image Turbo",
+ "hint.blank": "Immagini senza parole: {n}. Descrivile prima di dipingerle.",
+ "why.blank": "Questa immagine non ha ancora parole. Descrivila prima di dipingerla."
 }

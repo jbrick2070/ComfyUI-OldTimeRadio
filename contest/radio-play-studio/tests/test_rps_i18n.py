@@ -210,3 +210,13 @@ def test_a_file_that_exists_under_a_bad_name_is_never_served(app, tmp_path, monk
     status, _, body = _request(port, "GET", "/i18n/" + name)
     assert status == 404 and b"Planted" not in body
     assert available_languages() == [{"code": "en", "name": "English"}]
+
+
+def test_every_choice_a_translated_dropdown_offers_has_its_words(schemas):
+    """The page builds these keys from the choice itself, so the literal-key
+    test above cannot see them (Codex QA, 2026-10-23: the still models had none)."""
+    from radio_play_studio.form import describe_form
+    rows = {r["key"]: r for r in describe_form(schemas)}
+    missing = [f"choice.{key}.{_slug(c)}" for key in ("bank", "language", "stills")
+               for c in rows[key]["choices"] if f"choice.{key}.{_slug(c)}" not in EN]
+    assert missing == []
