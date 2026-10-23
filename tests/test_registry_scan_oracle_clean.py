@@ -36,11 +36,13 @@ def _oracle():
 #: 2026-10-22: Radio Play Studio ships in the zip to measure the registry's real
 #: verdict, knowing the replica predicts a Flag for its environment reads and its
 #: HTTP calls to the local ComfyUI. Those calls are what the app does, so they are
-#: not respelled. If the registry Flags the version, restore `contest/` in
-#: .comfyignore, delete this and the two app tests below, and drop the "ships
-#: inside the pack" note from contest/radio-play-studio/README.md; if it goes
-#: Active, the replica over-reports these rules for this code. The rest of the
-#: pack is held to zero, as before.
+#: not respelled. If the registry Flags the version, undo all of it together:
+#: restore `contest/` in .comfyignore; delete this, the SHIPPED_APP filter in the
+#: first test below (scan() unfiltered again) and the two app tests at the end;
+#: and drop "The pack carries this app from 2.3.37 on ..." from the install note
+#: in contest/radio-play-studio/README.md. If it goes Active, the replica
+#: over-reports these rules for this code. The rest of the pack is held to zero,
+#: as before.
 SHIPPED_APP = "contest/radio-play-studio/radio_play_studio/"
 
 
