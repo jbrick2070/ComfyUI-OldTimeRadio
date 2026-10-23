@@ -206,9 +206,8 @@ def clip_reuse_key(*, shot_id: str, requests: Iterable[Any], coverage_plan: Any,
     ``settings`` the environment settings that change bytes. Workspace paths,
     run ids and trace stamps never enter it, so the same shot keys the same in
     a fresh replay workspace."""
-    return key_of_body(_key_body(shot_id=shot_id, requests=requests,
-                                 coverage_plan=coverage_plan, engine=engine,
-                                 render_policy=render_policy, settings=settings))
+    return clip_key_and_body(shot_id=shot_id, requests=requests, coverage_plan=coverage_plan,
+                             engine=engine, render_policy=render_policy, settings=settings)[0]
 
 
 def _key_body(*, shot_id, requests, coverage_plan, engine, render_policy, settings) -> dict:
@@ -218,55 +217,103 @@ def _key_body(*, shot_id, requests, coverage_plan, engine, render_policy, settin
             "render_policy": render_policy, "settings": settings}
 
 
-def key_of_body(body: Any) -> str:
-    """The key of a causal body, as :func:`clip_reuse_key` hashes it."""
-    return hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=True,
-                                     separators=(",", ":"), default=str)
-                          .encode("utf-8")).hexdigest()
+#: A string longer than this is kept in a body as its hash and length: a
+#: 30,000-character OTR_* value would otherwise ride into every record and
+#: the ledger map 22 times (Codex QA on daa7adce).
+BODY_STRING_CAP = 1000
+#: A body logged whole (a miss against a record that kept none) stops here.
+LOGGED_BODY_CAP = 16000
 
 
-def clip_key_body(*, shot_id: str, requests: Iterable[Any], coverage_plan: Any,
-                  engine: Dict[str, Any], render_policy: Dict[str, Any],
-                  settings: Dict[str, Any]) -> Dict[str, Any]:
-    """The body :func:`clip_reuse_key` hashes, JSON-native, so a record can
-    keep it and a miss can name the field that moved (2026-10-23: a Film
-    again run re-filmed every chained shot of a project whose ledger had not
-    changed, and nothing could say why). ``key_of_body`` of this is the key."""
-    return json.loads(json.dumps(_key_body(shot_id=shot_id, requests=list(requests),
-                                           coverage_plan=coverage_plan, engine=engine,
-                                           render_policy=render_policy, settings=settings),
-                                 sort_keys=True, ensure_ascii=True, default=str))
+def clip_key_and_body(*, shot_id: str, requests: Iterable[Any], coverage_plan: Any,
+                      engine: Dict[str, Any], render_policy: Dict[str, Any],
+                      settings: Dict[str, Any]) -> "tuple[str, Dict[str, Any]]":
+    """The key and the body it hashes, from ONE projection of the requests --
+    a file a request names is read once, so the key and the body a record
+    keeps can never disagree (Codex QA on daa7adce: two projections read a
+    changing asset twice). The key is the hash of the raw body, exactly as
+    :func:`clip_reuse_key` has always made it; the body is that body made
+    JSON-native and compacted (:data:`BODY_STRING_CAP`), which is what a
+    record keeps and :func:`key_body_diff` reads. A non-string dict key sorts
+    differently once it is a string, so the body is not re-hashable to the
+    key, and nothing claims it is."""
+    raw = _key_body(shot_id=shot_id, requests=list(requests), coverage_plan=coverage_plan,
+                    engine=engine, render_policy=render_policy, settings=settings)
+    key = hashlib.sha256(json.dumps(raw, sort_keys=True, ensure_ascii=True,
+                                    separators=(",", ":"), default=str)
+                         .encode("utf-8")).hexdigest()
+    body = _compact(json.loads(json.dumps(raw, sort_keys=True, ensure_ascii=True, default=str)))
+    return key, body
 
 
-def key_body_diff(old: Any, new: Any, path: str = "", limit: int = 40) -> list:
-    """The dotted paths at which two causal bodies differ, deepest first
-    where a value is a dict or a list, at most ``limit`` of them."""
+def _compact(value: Any) -> Any:
+    """A JSON-native value with every long string kept as its hash and length.
+    Iterative: a body is as deep as its data, never as deep as the stack."""
+    if isinstance(value, str):
+        return _capped(value)
+    if not isinstance(value, (dict, list)):
+        return value
+    root: Any = {} if isinstance(value, dict) else []
+    work = [(value, root)]
+    while work:
+        src, dst = work.pop()
+        items = src.items() if isinstance(src, dict) else enumerate(src)
+        for name, item in items:
+            if isinstance(item, dict):
+                out: Any = {}
+            elif isinstance(item, list):
+                out = []
+            else:
+                out = _capped(item) if isinstance(item, str) else item
+            if isinstance(dst, dict):
+                dst[name] = out
+            else:
+                dst.append(out)
+            if isinstance(item, (dict, list)):
+                work.append((item, out))
+    return root
+
+
+def _capped(text: str) -> str:
+    if len(text) <= BODY_STRING_CAP:
+        return text
+    digest = hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()[:16]
+    return "sha256:%s (%d chars)" % (digest, len(text))
+
+
+def key_body_diff(old: Any, new: Any, limit: int = 40) -> list:
+    """The dotted paths at which two causal bodies differ, at most ``limit``
+    of them. Iterative and bounded: a deep or wide body never raises and
+    never walks past the limit (Codex QA on daa7adce). Scalars compare as
+    their JSON text, so an unchanged NaN is unchanged."""
     out: list = []
-
-    def walk(a: Any, b: Any, at: str) -> None:
-        if len(out) >= limit:
-            return
+    work = [(old, new, "")]
+    while work and len(out) < limit:
+        a, b, at = work.pop()
         if isinstance(a, dict) and isinstance(b, dict):
-            for name in sorted(set(a) | set(b)):
+            for name in sorted(set(a) | set(b), reverse=True):
                 here = "%s.%s" % (at, name) if at else str(name)
                 if name not in a or name not in b:
-                    out.append(here + (" (new)" if name not in a else " (gone)"))
+                    if len(out) < limit:
+                        out.append(here + (" (new)" if name not in a else " (gone)"))
                 else:
-                    walk(a[name], b[name], here)
+                    work.append((a[name], b[name], here))
         elif isinstance(a, list) and isinstance(b, list):
             if len(a) != len(b):
                 out.append("%s (%d -> %d items)" % (at, len(a), len(b)))
-            for i, (x, y) in enumerate(zip(a, b)):
-                walk(x, y, "%s[%d]" % (at, i))
-        elif a != b:
+            for i in range(min(len(a), len(b)) - 1, -1, -1):
+                work.append((a[i], b[i], "%s[%d]" % (at, i)))
+        elif _scalar_text(a) != _scalar_text(b):
             out.append("%s (%s -> %s)" % (at, _short(a), _short(b)))
+    return out[:limit]
 
-    walk(old, new, path)
-    return out
+
+def _scalar_text(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, ensure_ascii=True, default=str)
 
 
 def _short(value: Any, width: int = 48) -> str:
-    text = json.dumps(value, ensure_ascii=True, default=str)
+    text = _scalar_text(value)
     return text if len(text) <= width else text[:width - 3] + "..."
 
 
@@ -546,14 +593,18 @@ class ProducerClips:
     def _find(self, shot_id: str, key: str,
               body: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         with self._lock:
+            # Key and body are set TOGETHER, a missing body clearing the old
+            # one, so a commit can never pair this key with an earlier body
+            # (Codex QA on daa7adce).
             self._keys[shot_id] = key
-            if body is not None:
-                self._bodies[shot_id] = body
+            self._bodies[shot_id] = body
         record = self._bundle.get(shot_id)
+        bundle_failed = False
         if record is not None and record.get("key") == key:
             try:
                 return self._take(shot_id, record, self._in_bundle(record), "bundle")
             except ClipStoreError as exc:
+                bundle_failed = True
                 log.warning("[OTR.producer_clips] shot %s: the bundle's clip does not "
                             "verify (%s); trying the store", shot_id, exc)
         try:
@@ -562,7 +613,17 @@ class ProducerClips:
             log.error("[OTR.producer_clips] shot %s: %s; filming it again", shot_id, exc)
             return None
         if entry is None:
-            self._explain_miss(shot_id, key, body)
+            if bundle_failed:
+                # The same key: nothing causal moved; the files did.
+                log.warning("[OTR.producer_clips] shot %s: the bundle's clip did not verify "
+                            "and the store holds no copy under its key; filming it again",
+                            shot_id)
+            else:
+                try:
+                    self._explain_miss(shot_id, key, body)
+                except Exception as exc:  # noqa: BLE001 -- a diagnostic never fails a run
+                    log.warning("[OTR.producer_clips] shot %s NOT reused; the explanation "
+                                "failed (%s: %s)", shot_id, type(exc).__name__, exc)
             return None
         try:
             return self._take(shot_id, entry, self._from_store(key, entry), "store")
@@ -574,7 +635,7 @@ class ProducerClips:
     def _explain_miss(self, shot_id: str, key: str, body: Optional[Dict[str, Any]]) -> None:
         """A shot the last bundle filmed that this run cannot reuse says WHY:
         the fields of the causal body that moved, when the old record kept
-        its body; this run's whole body otherwise, so the next run can. A
+        its body; this run's body otherwise (capped), so the next run can. A
         shot the bundle never filmed is simply new and says nothing."""
         previous = self._bundle.get(shot_id)
         if previous is None or body is None:
@@ -587,10 +648,13 @@ class ProducerClips:
                         shot_id, str(previous.get("key", ""))[:12], key[:12], len(moved),
                         "; ".join(moved) or "nothing the body shows (a non-JSON value?)")
             return
+        text = json.dumps(body, sort_keys=True, ensure_ascii=True, default=str)
+        if len(text) > LOGGED_BODY_CAP:
+            text = text[:LOGGED_BODY_CAP] + "... (truncated; %d chars)" % len(text)
         log.warning("[OTR.producer_clips] shot %s NOT reused: filmed before under key %s, "
                     "whose record keeps no causal body (written before 2026-10-23); this "
                     "run's key %s, body: %s", shot_id, str(previous.get("key", ""))[:12],
-                    key[:12], json.dumps(body, sort_keys=True, ensure_ascii=True, default=str))
+                    key[:12], text)
 
     def _keep(self, shot_id: str) -> Dict[str, Any]:
         """A KEPT card's clip, used as it is whatever has changed since: the
@@ -683,15 +747,15 @@ class ProducerClips:
         clip is in the episode, and the stage's bundle carries it."""
         shot_id = str(shot_id)
         with self._lock:
+            # One critical section: the body is the one found with this key.
             key = self._keys.get(shot_id)
+            key_body = self._bodies.get(shot_id)
         if not key:
             return
         files = {role: str(clip.get(field) or "") for role, field in _PATH_FIELDS.items()
                  if clip.get(field)}
         # JSON-native from here on, so the record on disk, in the map and in
         # the next run's ledger are the same record.
-        with self._lock:
-            key_body = self._bodies.get(shot_id)
         body = json.loads(json.dumps(
             {"shot_id": shot_id, "attempts": [str(a) for a in attempts or ()],
              "clip_take": self.takes.get(shot_id, 0),

@@ -225,53 +225,107 @@ def test_a_miss_against_the_last_bundle_names_the_fields_that_moved(
     """2026-10-23: a Film-again run re-filmed every chained shot of a project
     whose ledger had not changed, and nothing said why. A record now keeps
     the body its key hashes, and a shot the last bundle filmed that this run
-    cannot reuse names the fields that moved."""
+    cannot reuse names the fields that moved -- the line is derived from the
+    two records' bodies here, never matched against canned text (Codex QA)."""
     import logging
     camera = cameras()
     first, _filmed, _producer = _film(camera, _workspace(tmp_path, "ep_a"))
-    record = _map(first)["shot_b002"]
-    assert PC.key_of_body(record["key_body"]) == record["key"]
+    old = _map(first)["shot_b002"]["key_body"]
+    assert old["shot_id"] == "shot_b002" and old["requests"][0]["text_prompt"] == PROMPTS["shot_b002"]
     with caplog.at_level(logging.WARNING, logger=PC.log.name):
-        _again, filmed, _producer = _film(camera, _workspace(
+        again, filmed, _producer = _film(camera, _workspace(
             tmp_path, "ep_b", prompts={"shot_b002": "a window lashed by a storm"}),
             bundle_map=_map(first))
     assert filmed == ["shot_b002"]
+    new = _map(again)["shot_b002"]["key_body"]
+    moved = PC.key_body_diff(old, new)
+    assert len(moved) == 1 and moved[0].startswith("requests[0].text_prompt ("), moved
     said = [r.getMessage() for r in caplog.records if "NOT reused" in r.getMessage()]
-    assert len(said) == 1 and "shot_b002" in said[0], said
-    assert "requests[0].text_prompt" in said[0], said[0]
-    assert "1 place(s)" in said[0], said[0]
+    assert len(said) == 1 and "shot shot_b002 NOT reused" in said[0], said
+    assert "differs in 1 place(s): " + "; ".join(moved) in said[0], said[0]
 
 
 def test_a_miss_against_a_record_with_no_body_logs_this_runs_body(
         producer_root, cameras, tmp_path, caplog):
     """A record written before bodies were kept cannot be diffed; the run
-    logs its own body so the run after it can."""
+    logs its own body -- the one its record then keeps -- so the run after
+    it can."""
     import logging
     camera = cameras()
     first, _filmed, _producer = _film(camera, _workspace(tmp_path, "ep_a"))
     bundle = {sid: {k: v for k, v in rec.items() if k != "key_body"}
               for sid, rec in _map(first).items()}
     with caplog.at_level(logging.WARNING, logger=PC.log.name):
-        _film(camera, _workspace(tmp_path, "ep_b",
-                                 prompts={"shot_b002": "a window lashed by a storm"}),
-              bundle_map=bundle)
+        again, _filmed, _producer = _film(camera, _workspace(
+            tmp_path, "ep_b", prompts={"shot_b002": "a window lashed by a storm"}),
+            bundle_map=bundle)
     said = [r.getMessage() for r in caplog.records if "NOT reused" in r.getMessage()]
     assert len(said) == 1 and "keeps no causal body" in said[0], said
-    assert '"shot_id": "shot_b002"' in said[0] and "a window lashed by a storm" in said[0]
+    body = _map(again)["shot_b002"]["key_body"]
+    assert json.dumps(body, sort_keys=True, ensure_ascii=True, default=str) in said[0]
 
 
-def test_the_key_body_is_json_and_hashes_to_the_key():
-    """The body a record keeps is the one the key hashes, JSON-native."""
+def test_a_bundle_clip_that_fails_to_verify_is_not_called_a_causal_change(
+        producer_root, cameras, tmp_path, caplog):
+    """The same key, files that do not verify, no copy in the store: the run
+    films again and says that -- it never reports a causal change it did not
+    see (Codex QA on daa7adce)."""
+    import logging
+    camera = cameras()
+    first, _filmed, _producer = _film(camera, _workspace(tmp_path, "ep_a"))
+    shutil.rmtree(PC.store_dir(PID))
+    with caplog.at_level(logging.WARNING, logger=PC.log.name):
+        _again, filmed, _producer = _film(camera, _workspace(tmp_path, "ep_b"),
+                                          bundle_map=_map(first))
+    assert filmed == sorted(PROMPTS)
+    messages = [r.getMessage() for r in caplog.records]
+    assert not [m for m in messages if "NOT reused" in m], messages
+    assert sum("did not verify and the store holds no copy" in m for m in messages) == len(PROMPTS)
+
+
+def test_a_second_find_with_no_body_clears_the_first(producer_root, tmp_path):
+    """Key and body are set together: a later lookup for the same shot with
+    no body leaves no earlier body for a commit to pair with the new key."""
+    producer = PC.ProducerClips(project_id=PID, episode_root=tmp_path / "ep", bundle_map=None)
+    assert producer._find("shot_x", "a" * 64, {"v": 2}) is None
+    assert producer._bodies["shot_x"] == {"v": 2}
+    assert producer._find("shot_x", "b" * 64, None) is None
+    assert producer._keys["shot_x"] == "b" * 64 and producer._bodies["shot_x"] is None
+
+
+def test_the_key_and_body_come_from_one_projection_and_the_body_is_bounded():
+    """The key is clip_reuse_key's hash, unchanged; the body is JSON, long
+    strings are kept as hash and length, and a nested non-string key is a
+    documented place where the body cannot be re-hashed to the key."""
     kw = dict(shot_id="shot_x", requests=[{"text_prompt": "a", "frames": (1, 2),
-                                           "plate_path": "C:/gone", "request_id": "r"}],
+                                           "plate_path": "C:/gone", "request_id": "r",
+                                           "nested": {2: "two", 10: "ten"}}],
               coverage_plan={"join": "chain"}, engine={"engine_id": "stub"},
-              render_policy={"device": "cuda"}, settings={"env": {}})
-    body = PC.clip_key_body(**kw)
+              render_policy={"device": "cuda"}, settings={"env": {"OTR_LONG": "x" * 5000}})
+    key, body = PC.clip_key_and_body(**kw)
+    assert key == PC.clip_reuse_key(**kw)
     assert json.loads(json.dumps(body)) == body
-    assert body["requests"][0] == {"text_prompt": "a", "frames": [1, 2]}
-    assert PC.key_of_body(body) == PC.clip_reuse_key(**kw)
-    assert PC.key_body_diff(body, dict(body, settings={"env": {"OTR_X": "1"}})) == [
-        "settings.env.OTR_X (new)"]
+    assert body["requests"][0]["frames"] == [1, 2] and "plate_path" not in body["requests"][0]
+    assert body["requests"][0]["nested"] == {"2": "two", "10": "ten"}
+    assert body["settings"]["env"]["OTR_LONG"].startswith("sha256:") and "(5000 chars)" in body["settings"]["env"]["OTR_LONG"]
+    assert len(json.dumps(body)) < 1500
+
+
+def test_the_body_diff_is_bounded_iterative_and_nan_safe():
+    wide = {"k%d" % i: i for i in range(1000)}
+    assert len(PC.key_body_diff({}, wide)) == 40
+    deep_a: dict = {}
+    deep_b: dict = {}
+    a, b = deep_a, deep_b
+    for _ in range(1200):
+        a["d"] = {}
+        b["d"] = {}
+        a, b = a["d"], b["d"]
+    b["leaf"] = 1
+    assert PC.key_body_diff(deep_a, deep_b) == ["d" * 0 + ".".join(["d"] * 1200) + ".leaf (new)"]
+    assert PC.key_body_diff({"x": float("nan")}, {"x": float("nan")}) == []
+    assert PC.key_body_diff({"l": [1, 2]}, {"l": [1, 2, 3]}) == ["l (2 -> 3 items)"]
+    assert PC.key_body_diff({"l": [1, 2]}, {"l": [1, 9]}) == ["l[1] (2 -> 9)"]
 
 
 def test_a_run_that_dies_keeps_every_shot_it_finished(producer_root, cameras, tmp_path):

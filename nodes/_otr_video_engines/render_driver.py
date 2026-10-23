@@ -4493,11 +4493,11 @@ def _reuse_filmed_clip(reuse, shot, requests, profile):
     what the episode took even when a run films nothing; its receipts say
     where it came from (:func:`_mark_reused_receipts`)."""
     sid = str(shot.get("shot_id") or "")
-    clips_module = _producer_clips_module()
-    inputs = _producer_clip_inputs(shot, requests, profile)
-    key = clips_module.clip_reuse_key(**inputs)
-    # The body travels with the key so a miss can say what moved.
-    found = reuse.find(sid, key, clips_module.clip_key_body(**inputs))
+    # One projection: the key and the body a record keeps cannot disagree,
+    # and a file a request names is read once (Codex QA on daa7adce).
+    key, body = _producer_clips_module().clip_key_and_body(
+        **_producer_clip_inputs(shot, requests, profile))
+    found = reuse.find(sid, key, body)
     if found is None:
         return None
     _LOG.warning("[OTR video] REUSED shot %s: filmed before under key %s, taken from "
