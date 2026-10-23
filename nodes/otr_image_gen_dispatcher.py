@@ -68,8 +68,10 @@ from . import _otr_vram_levers as _levers
 
 try:
     from ._otr_shared import env as otr_env
+    from ._otr_shared import still_seed_settings as _seed_settings
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
+    from _otr_shared import still_seed_settings as _seed_settings  # type: ignore
 
 #: Smallest plausible real PNG (8-byte signature + IHDR + IDAT + IEND). Anything
 #: smaller off the cross-process disk handoff is a 0-byte / truncated write,
@@ -217,11 +219,7 @@ def resolve_seed_and_mode(
     # run-to-run and open/inter/close share ONE canonical face.
     _oid = str(object_id or "")
     if str(kind or "") == "scene_open" or _oid == "radio_host_portrait":
-        try:
-            bookend = int(otr_env.get("OTR_RADIO_BOOKEND_SEED", 4242))
-        except (TypeError, ValueError):
-            bookend = 4242
-        return (_seed_for_take(bookend, take), "")
+        return (_seed_for_take(_seed_settings.bookend_seed(), take), "")
     cfg = seed_cfg if isinstance(seed_cfg, dict) else {}
     base = int(cfg.get("request_seed") or 0)
     if str(cfg.get("mode") or "request_hash") != "request_hash":
@@ -232,7 +230,7 @@ def resolve_seed_and_mode(
     # dies. Placed between `base` and the gate, it silently breaks the
     # documented mode='fixed' contract instead, which is worse.
     if (str(kind or "") == "scene_character" and char_id and portrait_prompt_hash
-            and otr_env.get("OTR_PORTRAIT_IDENTITY_SEED", "1") != "0"):
+            and _seed_settings.identity_seed_enabled()):
         # EXACTLY the portrait object's own draw: the portrait's object_id IS
         # the char_id (otr_meta_brief_image_prompt.py:1765), so this reproduces
         # the seed that character's portrait already rendered with, leaving the
@@ -2715,6 +2713,13 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         _painted = _PD.painted_takes(_producer)
         for _row in ep_rows:
             if not isinstance(_row, dict) or (_row.get("provenance") or {}).get("source") == "kept":
+                continue
+            if str(_row.get("kind") or "") == "portrait":
+                # The character take this portrait was painted with. A refused
+                # repaint adds no row, so the live portrait keeps the take it
+                # actually shows (Codex QA, 2026-10-22).
+                _who = str(_row.get("char_id") or _row.get("object_id") or "")
+                _row[_PD.ROW_IDENTITY_TAKE] = int(_painted["characters"].get(_who, 0) or 0)
                 continue
             _obj = _payload_objects.get(str(_row.get("object_id") or ""))
             if _obj is not None and _PD.object_shot_id(_obj):

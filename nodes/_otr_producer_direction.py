@@ -532,13 +532,23 @@ def prompt_image_engines(prompt: dict) -> Dict[str, str]:
 
 def _seed_config(mode: Any, request_seed: Any) -> Dict[str, Any]:
     """A seed configuration as the dispatcher reads one
-    (``resolve_seed_and_mode``): the mode, ``request_hash`` when empty, and
-    the request seed as an integer, 0 when empty."""
+    (``resolve_seed_and_mode``): the mode, ``request_hash`` when empty, the
+    request seed as an integer, 0 when empty -- and the two environment
+    settings that also move a still's seed, read by the dispatcher's own
+    reader (``_otr_shared.still_seed_settings``; Codex QA, 2026-10-22). This
+    process paints and checks alike, so a setting changed between two runs
+    of a project is a changed seed, and refused like one."""
+    try:
+        from ._otr_shared import still_seed_settings as _settings
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_shared import still_seed_settings as _settings  # type: ignore
     try:
         seed = int(request_seed or 0)
     except (TypeError, ValueError):
         seed = 0
-    return {"mode": str(mode or "request_hash"), "request_seed": seed}
+    return {"mode": str(mode or "request_hash"), "request_seed": seed,
+            "bookend_seed": _settings.bookend_seed(),
+            "identity_seed": _settings.identity_seed_enabled()}
 
 
 def policy_image_seed(image_policy: Any) -> Dict[str, Any]:
@@ -613,7 +623,9 @@ def _check_image_engines(prompt: dict, manifest: dict, bundle_name: str) -> None
             "bundle %s carries no image-seed stamp, so a producer run cannot continue it; "
             "it was not frozen by a producer stills run" % bundle_name)
     queued_seed = prompt_image_seed(prompt)
-    if queued_seed != _seed_config(stamped_seed.get("mode"), stamped_seed.get("request_seed")):
+    # Compared with the stamp AS STAMPED: rebuilt here, its environment half
+    # would be read from this run's environment and always agree.
+    if queued_seed != stamped_seed:
         raise DirectionError(
             "the image director's seed (%s) differs from the one bundle %s was painted "
             "with (%s); a producer run keeps its stills' seed" % (
@@ -636,7 +648,7 @@ def check_policy_matches_stamp(image_policy: Any, meta: Any) -> Optional[str]:
     differ = ["%s %s (stamped %s)" % (slot, _shown(painting[slot]), _shown(engines.get(slot)))
               for slot in IMAGE_SLOTS if painting[slot] != engines.get(slot)]
     seed_now = policy_image_seed(image_policy)
-    if seed_now != _seed_config(seed.get("mode"), seed.get("request_seed")):
+    if seed_now != seed:
         differ.append("seed %s (stamped %s)" % (_shown(seed_now), _shown(seed)))
     return "; ".join(differ) or None
 
@@ -725,6 +737,11 @@ CARDS_VERSION = 1
 #: Stamped on each card still's ledger row when it is painted; a kept row
 #: carries the digest of the paint it keeps, never of the texts since.
 ROW_INPUT_HASH = "producer_input_hash"
+#: Stamped on each portrait row a producer stills run paints: the character
+#: take it was painted with. A refused repaint leaves the old row, and its old
+#: take, live -- what was painted, never what was asked for (Codex QA,
+#: 2026-10-22).
+ROW_IDENTITY_TAKE = "producer_identity_take"
 
 
 def _hash_json(value: Any) -> str:
@@ -754,7 +771,14 @@ def still_input_digest(payload_hash: str, picture_text: str, note: str, char_id:
     one text moved between the picture and the note, paints the same pixels and
     must not be refused as unpainted. The seed configuration is not here: it is
     locked for the whole project (:func:`_check_image_engines`), like the
-    engines, so it cannot differ between a paint and a check."""
+    engines, so it cannot differ between a paint and a check.
+
+    KNOWINGLY NOT THE LAST WORD: the dispatcher's word substitutions (the
+    banana route) run after this, so two texts they turn into one prompt key
+    differently here. A Video run straight after such an edit is refused, and
+    the Stills run that clears it paints nothing -- its still is a cache hit
+    (Codex QA, 2026-10-22, weighed and left: the substitutions need the
+    bundle's ledger, which node 63 does not load)."""
     return _hash_json({"v": 2, "payload": str(payload_hash or ""),
                        "prompt": compose_picture(picture_text, note),
                        "char": str(char_id or ""), "identity_take": int(identity_take or 0),
@@ -840,6 +864,7 @@ def build_cards(ledger: dict, producer: Dict[str, Any], files: list) -> Dict[str
         creative = shot.get("creative") if isinstance(shot.get("creative"), dict) else {}
         editable = action_is_editable(shot)
         scene_id = scene_of.get(beat, "")
+        still_char = str((obj or {}).get("char_id") or "")
         still = media(row)
         state = ("kept" if shot_id in kept else
                  "painted" if still else
@@ -857,24 +882,39 @@ def build_cards(ledger: dict, producer: Dict[str, Any], files: list) -> Dict[str
             "still_take": int(stills.get(shot_id, 0) or 0), "clip_take": 0,
             "still_input_hash": str((row or {}).get(ROW_INPUT_HASH) or ""),
             "payload_hash": payload_object_hash(obj) if obj else "",
-            "still_char_id": str((obj or {}).get("char_id") or ""),
+            "still_char_id": still_char,
+            # The character take this card was last asked to paint with: with
+            # its texts and still take, a failed card's baseline.
+            "still_char_take": int(characters.get(still_char, 0) or 0) if still_char else 0,
             "engine_id": str((row or {}).get("engine_id") or ""),
             "still_dirty": False, "clip_dirty": False, "state": state,
         }
-        group = scenes.setdefault(scene_id, {"scene_id": scene_id,
-                                             "note": (raw.get("scenes") or {}).get(scene_id, ""),
-                                             "shots": []})
+        group = scenes.setdefault(scene_id, {
+            "scene_id": scene_id,
+            # Shots in no scene share a group the page shows, but no note can
+            # name it: a direction's scene ids are never empty (Codex QA,
+            # 2026-10-22).
+            "note_editable": bool(scene_id),
+            "note": (raw.get("scenes") or {}).get(scene_id, ""), "shots": []})
         group["shots"].append(card)
     cast = []
     for member in ledger.get("cast") or []:
         if not isinstance(member, dict) or not member.get("char_id"):
             continue
         char_id = str(member["char_id"])
-        picture = media(rows.get(char_id)) or next(
+        portrait = rows.get(char_id)
+        picture = media(portrait) or next(
             (card["still"] for group in scenes.values() for card in group["shots"]
              if card["char_id"] == char_id and card["still"]), "")
-        cast.append({"char_id": char_id, "name": str(member.get("name") or ""),
-                     "picture": picture, "take": int(characters.get(char_id, 0) or 0)})
+        cast.append({
+            "char_id": char_id, "name": str(member.get("name") or ""), "picture": picture,
+            # The take the character's portrait SHOWS, as stamped on its row
+            # when painted -- a refused repaint leaves the old one live -- and,
+            # with no portrait, the take their stills were asked for, which each
+            # card's own digest carries (Codex QA, 2026-10-22).
+            "has_portrait": portrait is not None,
+            "take": (int(portrait.get(ROW_IDENTITY_TAKE) or 0) if portrait is not None
+                     else int(characters.get(char_id, 0) or 0))})
     return {"version": CARDS_VERSION, "project_id": producer.get("project_id"),
             "attempt_id": producer.get("attempt_id"), "stage": producer.get("stage"),
             "bundle": producer.get("out"), "source": producer.get("source"),
@@ -903,8 +943,6 @@ def unpainted_shots(cards: Dict[str, Any], direction: Dict[str, Any]) -> list:
     kept = set(direction["kept"]["stills"])
     characters = direction["takes"]["characters"]
     stills = direction["takes"]["stills"]
-    painted_take = {str(m.get("char_id")): m.get("take") or 0
-                    for m in cards.get("cast") or [] if isinstance(m, dict)}
     pending = []
     for group in cards.get("scenes") or []:
         recorded_note = group.get("note", "")
@@ -921,22 +959,25 @@ def unpainted_shots(cards: Dict[str, Any], direction: Dict[str, Any]) -> list:
                 scene_note, characters.get(char_id, 0), stills.get(shot_id, 0))
             shown = card.get("still_input_hash") or _card_digest(
                 card, card.get("picture_text", ""), recorded_note,
-                painted_take.get(char_id, 0), card.get("still_take", 0))
+                card.get("still_char_take", 0), card.get("still_take", 0))
             if asked != shown:
                 pending.append(shot_id)
     return pending
 
 
 def unpainted_characters(cards: Dict[str, Any], direction: Dict[str, Any]) -> list:
-    """The cast whose take the direction changes from the one their pictures
-    were painted with. A character's take repaints the portrait and every still
-    painted from it, so a Video or Publish run that changes one is refused until
-    a Stills run has painted it -- whether or not any card's own digest names the
-    character (Sonnet QA, 2026-10-22: a cast member with no still of their own
-    would have been filmed with the old face)."""
+    """The cast whose portrait does not show the take the direction asks for.
+    A character's take repaints the portrait, which their stills and the frames
+    they share are drawn against, so a Video or Publish run that changes one is
+    refused until a Stills run has painted it -- whether or not any card's own
+    digest names the character (Sonnet QA, 2026-10-22: a cast member with no
+    still of their own would have been filmed with the old face). The take is
+    the one stamped on the portrait row as painted, so a refused repaint is not
+    taken for a painted one (Codex QA, the same day). A character with no
+    portrait shows the take only in their stills, whose digests carry it."""
     asked = direction["takes"]["characters"]
     return [str(m.get("char_id")) for m in cards.get("cast") or []
-            if isinstance(m, dict)
+            if isinstance(m, dict) and m.get("has_portrait")
             and int(asked.get(str(m.get("char_id")), 0)) != int(m.get("take") or 0)]
 
 
@@ -945,16 +986,20 @@ def check_direction_ids(cards: Dict[str, Any], direction: Dict[str, Any]) -> Non
     does not show, or asks a card for what it cannot take: a card, scene or
     character that is not there, a picture text or still take on a card with
     no still, an action on a card with none to edit, a kept still on a card
-    with no still to keep.
+    with no still to keep, a take on a character with no picture to take again.
 
     Each would otherwise do nothing at all, and an edit that does nothing looks
     like a broken edit (plan, "Direction JSON": unknown ids and motion edits on
     cards without an editable action are refused). Shot Lock refuses an unknown
-    or uneditable action again at run time, as a backstop."""
+    or uneditable action again at run time, as a backstop. Takes are sent in
+    full, so a take of 0 -- no take -- is never refused for having nothing to
+    take again."""
     shots = {str(card.get("shot_id")): card for group in cards.get("scenes") or []
              for card in group.get("shots") or [] if isinstance(card, dict)}
     scenes = {str(group.get("scene_id")) for group in cards.get("scenes") or []}
-    cast = {str(m.get("char_id")) for m in cards.get("cast") or [] if isinstance(m, dict)}
+    cast = {str(m.get("char_id")): m for m in cards.get("cast") or [] if isinstance(m, dict)}
+    drawn = {str(card.get("still_char_id")) for card in shots.values()
+             if card.get("still_char_id")}
     problems = []
     for label, ids, known in (
             ("card", list(direction["cards"]) + list(direction["takes"]["stills"])
@@ -970,12 +1015,16 @@ def check_direction_ids(cards: Dict[str, Any], direction: Dict[str, Any]) -> Non
 
     refuse([s for s, body in direction["cards"].items() if "picture_text" in body],
            lambda card: card.get("picture_editable"), "has no still to describe")
-    refuse(direction["takes"]["stills"], lambda card: card.get("picture_editable"),
-           "has no still to take again")
+    refuse([s for s, take in direction["takes"]["stills"].items() if take],
+           lambda card: card.get("picture_editable"), "has no still to take again")
     refuse([s for s, body in direction["cards"].items() if "motion_text" in body],
            lambda card: card.get("motion_editable"), "has no action to edit")
     refuse(direction["kept"]["stills"], lambda card: card.get("still"),
            "has no still to keep")
+    problems.extend("character %s has no picture to take again" % c
+                    for c, take in sorted(direction["takes"]["characters"].items())
+                    if take and c in cast and not cast[c].get("has_portrait")
+                    and c not in drawn)
     if problems:
         raise DirectionError("the direction does not fit bundle %s: %s"
                              % (cards.get("bundle"), "; ".join(problems[:8])))

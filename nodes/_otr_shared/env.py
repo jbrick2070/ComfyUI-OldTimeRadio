@@ -56,8 +56,8 @@ def get(name: str, default: Any = None) -> Any:
     opinion about either -- that is what makes the migration spelling-only.
 
     ``default`` is deliberately ``Any``, not ``str | None``: a live call site
-    passes an INT (``int(os.environ.get("OTR_RADIO_BOOKEND_SEED", 4242))`` in
-    ``otr_image_gen_dispatcher.py``), and a narrower annotation here would
+    passes an INT (the ``OTR_RADIO_BOOKEND_SEED`` read in
+    ``_otr_shared/still_seed_settings.py``), and a narrower annotation here would
     describe a contract this function does not enforce and the pack does not
     keep. Typing the knobs is the follow-on arc's job, with its own tests.
     """

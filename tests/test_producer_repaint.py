@@ -74,12 +74,20 @@ def studio(tmp_path):
         requires_flag=None, required_inputs=("text_prompt",), engine_version="1"))
     painted: list = []
 
-    def paint(request):
-        painted.append(str(request.get("object_id")))
-        return np.full((8, 8, 3), len(painted) % 250, dtype=np.uint8)
+    class Declined(Exception):
+        is_model_refusal = True
 
-    def run(ledger, payload, policy=None):
+    def run(ledger, payload, policy=None, refuse=()):
+        """Paint, the engine declining every object named in ``refuse``."""
         painted.clear()
+
+        def paint(request):
+            oid = str(request.get("object_id"))
+            if oid in refuse:
+                raise Declined("the model declined %s" % oid)
+            painted.append(oid)
+            return np.full((8, 8, 3), len(painted) % 250, dtype=np.uint8)
+
         led, _done, _report, _warn = D.dispatch_images(
             ledger, policy or POLICY, payload, gen_fn=paint, output_dir=str(tmp_path),
             lockdir=tmp_path / "lease.lockdir")
@@ -98,7 +106,7 @@ def _first_run(run):
     return led
 
 
-def _again(run, led, **changes):
+def _again(run, led, refuse=(), **changes):
     """A stills replay of ``led``: node 89's rebuild, then the dispatcher."""
     direction = dict(FIRST, attempt_id="0f8e1c2d-run2", out="02-stills", source="a" * 64)
     direction.update(changes)
@@ -106,7 +114,7 @@ def _again(run, led, **changes):
     wire = copy.deepcopy(led)
     wire[PD.RUNTIME_KEY] = direction
     payload, changed = MB.rebuild_producer_payload(wire, direction)
-    led2, painted = run(wire, payload)
+    led2, painted = run(wire, payload, refuse=refuse)
     return led2, painted, changed
 
 
@@ -208,9 +216,10 @@ def test_cards_record_what_each_still_was_painted_from(studio):
     assert first["state"] == "painted" and first["still"].startswith("stills/")
     assert first["still_input_hash"] == led["images"]["images"][1][PD.ROW_INPUT_HASH]
     assert cards["scenes"][1]["shots"][0]["motion_editable"] is False
-    assert cards["cast"] == [{"char_id": "c1", "name": "MARA", "take": 0,
+    assert cards["cast"] == [{"char_id": "c1", "name": "MARA", "take": 0, "has_portrait": True,
                               "picture": cards["cast"][0]["picture"]}]
     assert cards["cast"][0]["picture"].startswith("stills/c1_"), "portraits paint into stills/"
+    assert [g["note_editable"] for g in cards["scenes"]] == [True, True]
 
 
 def test_a_video_run_refuses_edits_its_stills_do_not_show(studio):
@@ -422,8 +431,23 @@ def test_a_character_take_waits_for_a_stills_run_without_a_still_of_its_own(stud
     assert PD.unpainted_characters(_cards(led), retake) == ["c1"]
     led2, painted, _changed = _again(studio, led, takes={"characters": {"c1": 1}})
     assert painted == ["c1"]
+    assert _rows(led)["c1"][PD.ROW_IDENTITY_TAKE] == 0
+    assert _rows(led2)["c1"][PD.ROW_IDENTITY_TAKE] == 1
     assert PD.unpainted_characters(_cards(led2), retake) == []
     assert PD.unpainted_characters(_cards(led2), _video()) == ["c1"], "takes are sent in full"
+
+
+def test_a_declined_portrait_retake_is_not_taken_for_a_painted_one(studio):
+    # Codex QA, 2026-10-22: the take asked for used to be recorded whatever
+    # the model did, so a declined retake reached Video with the old face.
+    led = _first_run(studio)
+    retake = {"characters": {"c1": 1}}
+    led2, painted, _changed = _again(studio, led, refuse=("c1",), takes=retake)
+    assert painted == []
+    assert _rows(led2)["c1"][PD.ROW_IDENTITY_TAKE] == 0, "the take-0 portrait is still live"
+    cards = _cards(led2)
+    assert (cards["cast"][0]["take"], cards["cast"][0]["has_portrait"]) == (0, True)
+    assert PD.unpainted_characters(cards, _video(takes=retake)) == ["c1"]
 
 
 def test_a_direction_names_only_what_its_bundles_cards_show(studio):
@@ -453,3 +477,11 @@ def test_a_direction_names_only_what_its_bundles_cards_show(studio):
             ({"kept": {"stills": ["shot_b003"]}}, "has no still to keep")):
         with pytest.raises(PD.DirectionError, match="shot_b003 " + words):
             PD.check_direction_ids(stillless, _video(**changes))
+    # Takes are sent in full: a take of 0 is no take, and never refused.
+    PD.check_direction_ids(stillless, _video(takes={"stills": {"shot_b003": 0}}))
+    # A cast member with no portrait and no still of their own.
+    stillless["cast"].append({"char_id": "c2", "name": "OTTO", "picture": "",
+                              "has_portrait": False, "take": 0})
+    PD.check_direction_ids(stillless, _video(takes={"characters": {"c2": 0}}))
+    with pytest.raises(PD.DirectionError, match="character c2 has no picture to take again"):
+        PD.check_direction_ids(stillless, _video(takes={"characters": {"c2": 1}}))

@@ -194,8 +194,11 @@ ENGINES = {"announcer_image_model": "z_image_turbo", "music_image_model": "z_ima
            "character_image_model": "z_image_turbo"}
 
 
-#: ...and the image seed configuration they are stamped with.
-SEED = {"mode": "request_hash", "request_seed": 0}
+#: ...and the image seed configuration they are stamped with: the image
+#: director's two widgets, and the two seed settings the environment leaves
+#: at their defaults.
+SEED = {"mode": "request_hash", "request_seed": 0, "bookend_seed": 4242,
+        "identity_seed": True}
 
 
 def _prompt(direction, replay_from="", picks=None):
@@ -692,6 +695,24 @@ def test_a_later_run_must_keep_the_projects_image_seed(producer_root, tmp_path, 
         PD.admit_prompt_direction(wired)
 
 
+@pytest.mark.parametrize("name, value", [("OTR_RADIO_BOOKEND_SEED", "7"),
+                                         ("OTR_PORTRAIT_IDENTITY_SEED", "0")])
+def test_the_seed_settings_outside_the_graph_are_locked_too(producer_root, tmp_path,
+                                                           monkeypatch, name, value):
+    # Codex QA, 2026-10-22: either setting moves still seeds, so changed
+    # between two runs it would repaint stills nobody edited.
+    bundle = _frozen_bundle(tmp_path, monkeypatch, PD.bundle_path(PID, "01-stills"))
+    assert PD.admit_prompt_direction(_continue(bundle, "02-stills"))
+    meta = {PD.META_IMAGE_ENGINES: dict(ENGINES), PD.META_IMAGE_SEED: dict(SEED)}
+    policy = {"image_models": {slot: {"engine_id": engine} for slot, engine in ENGINES.items()},
+              "seed": {"mode": "request_hash", "request_seed": 0}}
+    assert PD.check_policy_matches_stamp(policy, meta) is None
+    monkeypatch.setenv(name, value)
+    with pytest.raises(PD.DirectionError, match="image director's seed .* differs"):
+        PD.admit_prompt_direction(_continue(bundle, "02-stills"))
+    assert "seed" in PD.check_policy_matches_stamp(policy, meta)
+
+
 def test_the_run_time_check_reads_the_policy_actually_wired():
     meta = {PD.META_IMAGE_ENGINES: dict(ENGINES), PD.META_IMAGE_SEED: dict(SEED)}
     policy = {"image_models": {slot: {"engine_id": engine} for slot, engine in ENGINES.items()},
@@ -857,6 +878,8 @@ def _bundle_with_a_painted_card(tmp_path, monkeypatch):
     row = led["images"]["images"][0]
     row["object_id"] = "still_b001"
     row[PD.ROW_INPUT_HASH] = PD.card_still_digest(obj, "", raw, takes, {})
+    # c02's portrait, named as the dispatcher names one: by its character.
+    led["images"]["images"][1]["object_id"] = "c02"
     led["images"].update({PD.PAYLOAD_KEY: {"version": 1, "objects": [obj]},
                           PD.RAW_TEXTS_KEY: raw, PD.TAKES_KEY: takes})
     led_path.write_text(json.dumps(led), encoding="utf-8")
@@ -871,6 +894,9 @@ def test_a_producer_freeze_writes_a_verified_cards_json(producer_root, tmp_path,
     assert (cards["version"], cards["project_id"], cards["bundle"]) == (1, PID, "01-stills")
     assert card["shot_id"] == "shot_b001" and card["picture_text"] == "a lamp-lit desk"
     assert card["still"] == "stills/scene_b001.png" and card["still_input_hash"]
+    # The fixture's beat is in no scene: the page shows the group, and no
+    # note can name it (Codex QA, 2026-10-22).
+    assert cards["scenes"][0]["scene_id"] == "" and cards["scenes"][0]["note_editable"] is False
     plain = _frozen_bundle(tmp_path / "plain", monkeypatch, tmp_path / "plain_b" / "ep",
                            producer=False)
     assert not (plain / PD.CARDS_NAME).exists(), "an ordinary freeze writes no cards"
@@ -921,8 +947,8 @@ def test_node_63_refuses_what_the_bundle_does_not_show(producer_root, tmp_path, 
             with pytest.raises(PD.DirectionError,
                                match="does not fit bundle 01-stills: .*" + words):
                 PD.admit_prompt_direction(run(stage, **changes))
-    # The fixture's still carries no character, so only the cast's take shows
-    # c02's: a Video run waits for the Stills run that paints it.
+    # The fixture's still carries no character, so only c02's portrait shows
+    # the take: a Video run waits for the Stills run that paints it.
     with pytest.raises(PD.DirectionError, match="the take of c02 differs"):
         PD.admit_prompt_direction(run("video", takes={"characters": {"c02": 1}}))
     assert PD.admit_prompt_direction(run("stills", takes={"characters": {"c02": 1}}))
