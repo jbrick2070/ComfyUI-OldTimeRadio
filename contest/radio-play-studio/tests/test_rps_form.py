@@ -90,7 +90,8 @@ def test_the_real_workflow_has_each_node_the_form_addresses():
     except FileNotFoundError:
         pytest.skip("the default workflow is not reachable from here")
     ids = locate_nodes(json.loads(path.read_text(encoding="utf-8")))
-    assert set(ids) == {f.node_type for f in FIELDS} | {"OTR_MasterAudioMux"}
+    assert set(ids) == {f.node_type for f in FIELDS} | {"OTR_MasterAudioMux", "OTR_ShotLock"}
+    assert ids["OTR_ShotLock"], "a Scene Producer stage directs it"
     assert FIELDS_BY_KEY["bank"].input == "source_bank"
 
 

@@ -16,6 +16,8 @@ from .graph import GraphError, coerce_value, describe_input, has_input, node_id_
 
 WRITER = "OTR_LedgerScriptWriter"
 IMAGE_DIRECTOR = "OTR_ImageDirector"
+#: The node a Scene Producer stage directs (its ``direction_json``).
+SHOT_LOCK = "OTR_ShotLock"
 
 #: The story bank that reads the four My Story boxes, and their group on the page.
 MY_STORY_BANK = "my_story"
@@ -107,10 +109,11 @@ def locate_nodes(workflow: dict) -> dict:
 
     A type only optional fields use may be missing from a workflow (an
     audio-only graph has no still pictures to give a photo to); it maps to None
-    and those rows are left off."""
+    and those rows are left off. So does Shot Lock, which only a Scene
+    Producer stage sets."""
     needed = {f.node_type for f in FIELDS if not f.optional} | {EPISODE_NODE_TYPE}
     ids = {t: node_id_for_type(workflow, t) for t in sorted(needed)}
-    for t in sorted({f.node_type for f in FIELDS} - needed):
+    for t in sorted(({f.node_type for f in FIELDS} - needed) | {SHOT_LOCK}):
         present = [n for n in workflow.get("nodes") or [] if n.get("type") == t]
         ids[t] = node_id_for_type(workflow, t) if present else None
     return ids

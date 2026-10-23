@@ -1,4 +1,7 @@
-"""The local web app: a form, a live progress stream and a player.
+"""The local web app: a form, a live progress stream and a player -- and the
+Scene Producer's projects (``producer.py``): read them, save a draft, start a
+stage. Only a stage start takes the GPU; reads and drafts are answered while
+anything is being made.
 
 Standard library only. It listens on loopback, refuses requests whose Host is
 not loopback (a web page cannot reach it by DNS rebinding) and only takes JSON
@@ -19,6 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
+from . import producer
 from .graph import GraphError, ServerUnreachable
 from .photos import MAX_PHOTO_BYTES, PhotoError, upload_photo
 from .runner import Studio
@@ -43,6 +47,7 @@ PRESENCE_S = 20.0
 #: window is well above that: a background tab still counts as open.
 GPU_IDLE_S = 150.0
 _RANGE = re.compile(r"^bytes=(\d*)-(\d*)$")
+_PROJECT = r"([a-z0-9][a-z0-9-]{3,31})"
 
 
 def available_languages() -> list:
@@ -114,17 +119,42 @@ class Runs:
         """Check the choices against the server, then run the episode on a thread.
         A bad choice raises here, before any thread starts. A second episode while
         one is being made is refused: it would wait an hour behind it on the GPU."""
+        return self._launch(lambda: self.studio.build_graph(choices),
+                            lambda _graph: self.studio.stream(choices))
+
+    def start_stage(self, project_id: str, stage: str) -> Run:
+        """One Scene Producer stage of a project, the same way: checked here,
+        run on a thread, refused while anything else is being made."""
+        return self._launch(lambda: self.studio.prepare_stage(project_id, stage),
+                            self.studio.stream_stage)
+
+    def start_project(self, choices: dict) -> tuple:
+        """A new Scene Producer project for these choices, with its first
+        Stills run started: ``(project, run)``. The choices are checked
+        against the server before the project is made."""
         with self._lock:
             if self._busy():
                 raise Busy(_BUSY)
         self.studio.build_graph(choices)
+        project = producer.new_project(self.studio.settings.out_dir,
+                                       workflow=str(self.studio.workflow_for(choices)),
+                                       choices=choices)
+        return project, self.start_stage(project["project_id"], "stills")
+
+    def _launch(self, check, events) -> Run:
+        """``check()`` raises for a request that cannot run, before any thread
+        starts; ``events(checked)`` then yields the run's events on one."""
+        with self._lock:
+            if self._busy():
+                raise Busy(_BUSY)
+        checked = check()
         run = Run(uuid.uuid4().hex[:12])
         with self._lock:
             if self._busy():
                 raise Busy(_BUSY)
             self._runs[run.id] = run
             self._gpu_dirty = True
-        threading.Thread(target=self._drive, args=(run, choices), daemon=True).start()
+        threading.Thread(target=self._drive, args=(run, events, checked), daemon=True).start()
         return run
 
     def listing(self) -> list:
@@ -154,8 +184,8 @@ class Runs:
             self._gpu_dirty = False
             return True
 
-    def _drive(self, run: Run, choices: dict) -> None:
-        for event in self.studio.stream(choices):
+    def _drive(self, run: Run, events, checked) -> None:
+        for event in events(checked):
             run.add(event)
 
     def get(self, run_id: str) -> Run | None:
@@ -236,6 +266,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_file(I18N_DIR / name, "application/json; charset=utf-8")
         if path == "/api/episodes":
             return self._send_json(HTTPStatus.OK, {"episodes": self.runs.listing()})
+        if path == "/api/projects":
+            return self._send_json(HTTPStatus.OK, {"projects": producer.list_projects(
+                self.runs.studio.settings.out_dir)})
+        match = re.fullmatch(r"/api/projects/" + _PROJECT, path)
+        if match:
+            return self._project(match.group(1))
         match = re.fullmatch(r"/api/episodes/([0-9a-f]{12})/events", path)
         if match:
             return self._events(match.group(1))
@@ -249,7 +285,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _post(self) -> None:
         path = urlsplit(self.path).path
-        if path not in ("/api/episodes", "/api/presence", "/api/photos"):
+        project = re.fullmatch(r"/api/projects/" + _PROJECT + r"/(draft|stages)", path)
+        if path not in ("/api/episodes", "/api/presence", "/api/photos",
+                        "/api/projects") and not project:
             return self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
         if (self.headers.get("Content-Type") or "").split(";")[0].strip().lower() != "application/json":
             return self._send_json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "send application/json"})
@@ -257,6 +295,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._presence()
         if path == "/api/photos":
             return self._photo()
+        if path == "/api/projects":
+            return self._new_project()
+        if project:
+            return (self._draft if project.group(2) == "draft" else self._stage)(project.group(1))
         try:
             length = _body_length(self.headers)
             body = json.loads(self.rfile.read(length) or b"{}")
@@ -276,6 +318,74 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, GraphError) as exc:
             return self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         self._send_json(HTTPStatus.ACCEPTED, {"id": run.id})
+
+    def _body(self) -> dict:
+        """The posted JSON object; ValueError for anything else."""
+        length = _body_length(self.headers)
+        body = json.loads(self.rfile.read(length) or b"{}")
+        if not isinstance(body, dict):
+            raise ValueError("the body must be a JSON object")
+        return body
+
+    def _project(self, project_id: str) -> None:
+        try:
+            project = producer.load_project(self.runs.studio.settings.out_dir, project_id)
+        except producer.NoProject as exc:
+            return self._send_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+        except producer.ProjectError as exc:
+            return self._send_json(HTTPStatus.CONFLICT, {"error": str(exc)})
+        self._send_json(HTTPStatus.OK, {"project": project})
+
+    def _new_project(self) -> None:
+        """{"choices": {...}} -> a new project, its first Stills run started."""
+        try:
+            choices = self._body().get("choices", {})
+            if not isinstance(choices, dict):
+                raise ValueError("choices must be an object")
+        except (ValueError, TypeError) as exc:
+            return self._send_json(HTTPStatus.BAD_REQUEST, {"error": f"bad request: {exc}"})
+        self._start(lambda: self.runs.start_project(choices),
+                    lambda made: {"project_id": made[0]["project_id"], "id": made[1].id})
+
+    def _stage(self, project_id: str) -> None:
+        """{"stage": "stills" | "video" | "publish"} -> the stage's run."""
+        try:
+            stage = self._body().get("stage")
+        except (ValueError, TypeError) as exc:
+            return self._send_json(HTTPStatus.BAD_REQUEST, {"error": f"bad request: {exc}"})
+        self._start(lambda: self.runs.start_stage(project_id, stage),
+                    lambda run: {"project_id": project_id, "id": run.id})
+
+    def _start(self, start, reply) -> None:
+        """Start a run and answer for it: 202 with ``reply(started)``, or why
+        not -- 409 while the GPU or the project is busy, 404 for no project,
+        503 when ComfyUI cannot be reached, 400 for anything else wrong."""
+        try:
+            started = start()
+        except (Busy, producer.StageInFlight) as exc:
+            return self._send_json(HTTPStatus.CONFLICT, {"error": str(exc)})
+        except producer.NoProject as exc:
+            return self._send_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+        except ServerUnreachable as exc:
+            return self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(exc)})
+        except (ValueError, GraphError) as exc:
+            return self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        self._send_json(HTTPStatus.ACCEPTED, reply(started))
+
+    def _draft(self, project_id: str) -> None:
+        """{"draft": {...}, "revision": n} -> the new revision. Answered while
+        anything is being made: only stage starts take the GPU."""
+        try:
+            body = self._body()
+            project = producer.save_draft(self.runs.studio.settings.out_dir, project_id,
+                                          body.get("draft"), body.get("revision"))
+        except producer.NoProject as exc:
+            return self._send_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+        except producer.StaleDraft as exc:
+            return self._send_json(HTTPStatus.CONFLICT, {"error": str(exc)})
+        except (ValueError, TypeError) as exc:
+            return self._send_json(HTTPStatus.BAD_REQUEST, {"error": f"bad request: {exc}"})
+        self._send_json(HTTPStatus.OK, {"revision": project["draft"]["revision"]})
 
     def _presence(self) -> None:
         """A page saying it is open, or closing: {"page": id, "closing": bool}."""

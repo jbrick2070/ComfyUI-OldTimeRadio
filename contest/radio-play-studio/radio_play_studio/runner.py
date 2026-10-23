@@ -15,6 +15,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
+from . import producer
 from .config import REFERENCE_TWIN_SUFFIX, Settings, reference_twin, validate_url
 from .form import (EPISODE_NODE_TYPE, FIELDS_BY_KEY, MY_STORY_BANK, WRITER, apply_choices,
                    describe_form, locate_nodes)
@@ -85,6 +86,20 @@ def normalize_event(event: Any, graph_size: int = 0) -> dict | None:
     return None
 
 
+def stage_note(event: Any, graph_size: int) -> dict | None:
+    """One SDK event as a Scene Producer stage shows it: as
+    :func:`normalize_event` has it, with the node each progress frame belongs
+    to. A stage's bar is drawn from the raw node, step and total, never from
+    the episode's calibrated share: each stage runs its own part of the
+    graph, and an episode's timings would misread every one of them."""
+    note = normalize_event(event, graph_size)
+    if note is not None and note["type"] in ("progress", "step"):
+        node = getattr(event, "current_node", None)
+        if node is not None:
+            note["node"] = str(node)
+    return note
+
+
 def pick_episode_output(job: Any, node_id: str) -> Any:
     """The finished episode's video, from the mux node and nowhere else.
 
@@ -100,6 +115,31 @@ def pick_episode_output(job: Any, node_id: str) -> Any:
         "your OTR_OBS_DIR). If it is not there, the ComfyUI console says why "
         "('MasterAudioMux FAILED')."
     )
+
+
+def save_episode_output(job: Any, node_id: str, out_dir: Path) -> Path:
+    """Download the finished episode's video (:func:`pick_episode_output`)
+    into a fresh folder under ``out_dir`` and return its path."""
+    out = pick_episode_output(job, node_id)
+    dest_dir = Path(out_dir) / uuid.uuid4().hex[:12]
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / Path(str(out.name)).name
+    out.to_file(str(dest))
+    if not dest.is_file() or dest.stat().st_size == 0:
+        raise EpisodeMissing(f"the episode was not saved to {dest}")
+    return dest
+
+
+def submit_was_refused(exc: BaseException) -> bool:
+    """True when a submit that raised certainly queued nothing: the server
+    answered with a refusal (a 4xx -- node 63 refusing a direction is one),
+    or no connection was ever made. Anything else -- a read timeout, a
+    connection dropped mid-request, a 5xx from the bridge -- may have
+    queued the run."""
+    status = getattr(exc, "http_status", None)
+    if isinstance(status, int):
+        return 400 <= status < 500
+    return type(exc).__name__ in ("ConnectError", "ConnectTimeout")
 
 
 def is_transient(exc: BaseException) -> bool:
@@ -139,11 +179,15 @@ class Studio:
 
     def __init__(self, settings: Settings, *, client_factory: Callable[[str], Any] = make_client,
                  fetch: Callable[[str], dict] = fetch_object_info,
-                 now: Callable[[], float] = time.monotonic) -> None:
+                 now: Callable[[], float] = time.monotonic,
+                 read_output: Callable[[str, str], bytes] | None = None) -> None:
         self.settings = settings
         self._client_factory = client_factory
         self._fetch = fetch
         self._now = now
+        #: ``read_output(subfolder, name)``: a file from ComfyUI's output folder.
+        self._read_output = read_output or (
+            lambda subfolder, name: producer.read_output(settings.comfyui_url, subfolder, name))
 
     def options(self) -> list:
         workflow = load_workflow(self.settings.workflow_path)
@@ -165,7 +209,12 @@ class Studio:
     def build_graph(self, choices: dict) -> tuple[dict, dict]:
         """`(api_graph, node_ids)` for these choices, from the workflow on disk
         and the server's live node definitions."""
-        workflow = load_workflow(self.workflow_for(choices))
+        return self.build_graph_from(self.workflow_for(choices), choices)
+
+    def build_graph_from(self, workflow_path: Path, choices: dict) -> tuple[dict, dict]:
+        """`(api_graph, node_ids)` for these choices on a named workflow -- the
+        one a Scene Producer project recorded on its first run."""
+        workflow = load_workflow(workflow_path)
         schemas = self._fetch(self.settings.comfyui_url)
         graph = workflow_to_api_prompt(workflow, schemas)
         node_ids = locate_nodes(workflow)
@@ -229,13 +278,7 @@ class Studio:
                 yield {"type": "note", "message": f"live progress was lost ({exc}); still waiting on the job"}
             clock.observe(None)  # the stream is over: no node is running any more
             settle(job)
-            out = pick_episode_output(job, node_ids[EPISODE_NODE_TYPE])
-            dest_dir = self.settings.out_dir / uuid.uuid4().hex[:12]
-            dest_dir.mkdir(parents=True, exist_ok=True)
-            dest = dest_dir / Path(str(out.name)).name
-            out.to_file(str(dest))
-            if not dest.is_file() or dest.stat().st_size == 0:
-                raise EpisodeMissing(f"the episode was not saved to {dest}")
+            dest = save_episode_output(job, node_ids[EPISODE_NODE_TYPE], self.settings.out_dir)
             # A lost or reconnected stream bills its gap to whichever node was
             # seen last, and those times would mislead every later run. So does a
             # starved one: ComfyUI keeps ONE socket per client id (server.py,
@@ -252,7 +295,140 @@ class Studio:
         except Exception as exc:  # noqa: BLE001 - reported to the person, not swallowed
             yield {"type": "error", "message": describe_failure(exc)}
             return
-        yield {"type": "done", "path": str(dest), "run": dest_dir.name, "file": dest.name}
+        yield {"type": "done", "path": str(dest), "run": dest.parent.name, "file": dest.name}
+
+    # -- the Scene Producer -------------------------------------------------
+    def prepare_stage(self, project_id: str, stage: str) -> dict:
+        """Everything one stage run of a project sends, checked before any
+        thread starts: its direction, and the project's recorded workflow and
+        first-run choices with the stage's values set. Raises ProjectError,
+        GraphError or ServerUnreachable."""
+        project = producer.load_project(self.settings.out_dir, project_id)
+        if project["pending"] is not None:
+            raise producer.StageInFlight("this project already has a stage in flight")
+        direction = producer.build_direction(project, stage)
+        graph, node_ids = self.build_graph_from(Path(project["workflow"]), project["choices"])
+        latest = producer.latest_bundle(project)
+        replay_from = producer.bundle_subfolder(project_id, latest["out"]) if latest else ""
+        producer.patch_graph(graph, node_ids, direction, replay_from)
+        return {"project_id": project_id, "direction": direction, "graph": graph,
+                "node_ids": node_ids, "revision": project["draft"]["revision"]}
+
+    def stream_stage(self, plan: dict) -> Iterator[dict]:
+        """Run one prepared stage (:meth:`prepare_stage`) and report it as
+        events, as :meth:`stream` does: ``submitted``, the server's progress
+        -- each frame naming its node, for the stage's own bar -- then exactly
+        one of ``done`` (with the stage and the project, and for Publish the
+        saved video) or ``error``. Never raises.
+
+        The attempt is saved before anything is sent, and its job id the
+        moment the server answers. A run the server may or may not have
+        taken, a job whose end could not be confirmed, and a finished job
+        whose result is not yet saved here all stay pending: nothing more is
+        sent for the project until they are settled. Only a run refused
+        outright, or a job that ended failed with no complete bundle, lets
+        the project try again."""
+        out_dir = self.settings.out_dir
+        pid, direction = plan["project_id"], plan["direction"]
+        stage, attempt = direction["stage"], direction["attempt_id"]
+        base = {"stage": stage, "project_id": pid}
+
+        def error(message: str) -> dict:
+            return dict(base, type="error", message=message)
+
+        try:
+            producer.begin_attempt(out_dir, pid, direction, plan["graph"], plan["node_ids"],
+                                   plan["revision"])
+        except Exception as exc:  # noqa: BLE001 - reported, never raised
+            yield error(describe_failure(exc))
+            return
+        try:
+            client = self._client_factory(self.settings.api_url)
+            job = client.submit(client.workflows.from_json(plan["graph"]))
+        except Exception as exc:  # noqa: BLE001 - decided below
+            if submit_was_refused(exc):
+                producer.abandon_attempt(out_dir, pid, attempt, describe_failure(exc))
+                yield error(describe_failure(exc))
+            else:
+                producer.hold_attempt(out_dir, pid, attempt, "uncertain", describe_failure(exc))
+                yield error(f"{describe_failure(exc)}. The server may have taken this run, "
+                            "so Studio sends this project nothing more until it has looked.")
+            return
+        try:
+            producer.record_job(out_dir, pid, attempt, job.id)
+        except Exception as exc:  # noqa: BLE001 - the job runs; only the note of it failed
+            yield dict(base, type="note", message=f"the job's id was not saved ({exc})")
+        yield dict(base, type="submitted")
+        try:
+            for event in job.events():
+                note = stage_note(event, len(plan["graph"]))
+                if note:
+                    yield note
+        except Exception as exc:  # noqa: BLE001 - the stream is a view, settle() is the truth
+            yield dict(base, type="note",
+                       message=f"live progress was lost ({exc}); still waiting on the job")
+        failure = None
+        try:
+            settle(job)
+        except Exception as exc:  # noqa: BLE001 - decided below
+            if type(exc).__name__ != "JobFailed":
+                producer.hold_attempt(out_dir, pid, attempt, "running", describe_failure(exc))
+                yield error(f"lost touch with the run ({describe_failure(exc)}); it may "
+                            "still be going, so Studio sends this project nothing more "
+                            "until it has looked again.")
+                return
+            failure = exc
+        if stage == "publish":
+            yield self._finish_publish(plan, job, failure, error)
+        else:
+            yield self._finish_bundle(plan, failure, error)
+
+    def _finish_publish(self, plan: dict, job: Any, failure: BaseException | None,
+                        error: Callable[[str], dict]) -> dict:
+        """A Publish job's end: its video saved here, or why not."""
+        out_dir = self.settings.out_dir
+        pid, attempt = plan["project_id"], plan["direction"]["attempt_id"]
+        if failure is not None:
+            producer.abandon_attempt(out_dir, pid, attempt, describe_failure(failure))
+            return error(describe_failure(failure))
+        try:
+            dest = save_episode_output(job, plan["node_ids"][EPISODE_NODE_TYPE], out_dir)
+        except EpisodeMissing as exc:
+            producer.abandon_attempt(out_dir, pid, attempt, str(exc))
+            return error(str(exc))
+        except Exception as exc:  # noqa: BLE001 - made, not yet saved: never made again
+            producer.hold_attempt(out_dir, pid, attempt, "finishing", describe_failure(exc))
+            return error(f"the episode is made, but saving it here failed "
+                         f"({describe_failure(exc)}); Studio saves it without making it again.")
+        producer.finish_publish(out_dir, pid, attempt, dest.parent.name, dest.name)
+        return {"type": "done", "stage": "publish", "project_id": pid, "path": str(dest),
+                "run": dest.parent.name, "file": dest.name}
+
+    def _finish_bundle(self, plan: dict, failure: BaseException | None,
+                       error: Callable[[str], dict]) -> dict:
+        """A Stills or Video job's end: its bundle adopted, or why not. A job
+        that reports failure after its bundle was written still hands that
+        bundle over; one with no complete bundle lets the project try again."""
+        out_dir = self.settings.out_dir
+        direction = plan["direction"]
+        pid, attempt, stage = plan["project_id"], direction["attempt_id"], direction["stage"]
+        try:
+            project = producer.load_project(out_dir, pid)
+            view = producer.adopt_bundle(out_dir, project, direction["out"], self._read_output,
+                                         attempt_id=attempt, source=direction.get("source"))
+        except producer.BundleMissing as exc:
+            if failure is not None:
+                producer.abandon_attempt(out_dir, pid, attempt, describe_failure(failure))
+                return error(describe_failure(failure))
+            producer.hold_attempt(out_dir, pid, attempt, "finishing", str(exc))
+            return error(f"the run finished, but its bundle is not complete yet ({exc}); "
+                         "Studio looks for it again before sending this project anything more.")
+        except Exception as exc:  # noqa: BLE001 - finished, not yet adopted: never run again
+            producer.hold_attempt(out_dir, pid, attempt, "finishing", describe_failure(exc))
+            return error(f"the run finished, but its bundle could not be read here "
+                         f"({describe_failure(exc)}); Studio tries again without running it.")
+        producer.finish_bundle(out_dir, pid, attempt, view)
+        return {"type": "done", "stage": stage, "project_id": pid, "bundle": direction["out"]}
 
 
 class ProgressClock:
