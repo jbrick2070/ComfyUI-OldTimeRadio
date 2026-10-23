@@ -520,7 +520,14 @@ document.querySelectorAll(".shot").forEach((shot) => {
   shot.querySelectorAll("textarea").forEach((t) => t.addEventListener("input", () => markDirty(shot)));
   shot.querySelectorAll(".tools button").forEach((b) => {
     const text = b.textContent.trim();
-    if (text === "Paint again" || text === "Film again") b.addEventListener("click", () => markDirty(shot));
+    if (text === "Paint again") b.addEventListener("click", () => markDirty(shot));
+    // Film again keeps the still and only queues a new take of the clip.
+    if (text === "Film again") b.addEventListener("click", () => {
+      if (shot.dataset.state === "rendering") return;
+      shot.querySelector(".kind").textContent = "Still";
+      setState(shot, "painted", "Will film again");
+      paintButtons();
+    });
     if (text === "Keep" || text === "Kept") b.addEventListener("click", () => {
       const on = b.getAttribute("aria-pressed") !== "true";
       b.setAttribute("aria-pressed", on ? "true" : "false");
