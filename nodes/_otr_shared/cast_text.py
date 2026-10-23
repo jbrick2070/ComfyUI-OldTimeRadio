@@ -41,6 +41,7 @@ __all__ = [
     "CAST_TEXT_FIELDS", "field", "is_bodiless", "picture_appearance", "still_text",
     "video_text", "card_text",
     "identity_fields", "CHARACTER_KINDS", "normalize_kind", "kind_of",
+    "HEADLESS_KINDS", "is_headless",
 ]
 
 #: What a character IS, as the writer states it on the cast row. A row
@@ -57,6 +58,19 @@ def normalize_kind(value) -> str:
     the field existed."""
     kind = str(value or "").strip().lower()
     return kind if kind in CHARACTER_KINDS else "human"
+
+
+#: Kinds with NO HEAD OR FACE to frame (2026-10-22, operator: Flatland should
+#: be "geometrical shapes in an abstract land", and A Square came out a woman
+#: because every still asked for "the full head and face"). A machine -- and
+#: anything the writer calls one: a robot, a radio, one of Abbott's shapes --
+#: is framed whole; a cat or a dragon keeps its head and face.
+HEADLESS_KINDS = ("machine",)
+
+
+def is_headless(row) -> bool:
+    """True when the row's kind has no head or face to frame."""
+    return kind_of(row) in HEADLESS_KINDS
 
 
 def kind_of(row) -> str:

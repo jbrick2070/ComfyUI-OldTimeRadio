@@ -490,6 +490,17 @@ STILL_FRAMING_SCENE_CHARACTER = (
     "balanced landscape composition")
 
 
+#: The same two framings for a row with NO HEAD (``cast_text.is_headless``):
+#: the whole subject in view with space around it, never "head and shoulders"
+#: or "face unobstructed", which tell the image model to draw a person.
+STILL_FRAMING_PORTRAIT_HEADLESS = ("three-quarter framing, the whole subject in "
+                                   "view with clear space around it")
+STILL_FRAMING_SCENE_CHARACTER_HEADLESS = (
+    "cinematic medium shot, the character shown whole within a wide 16:9 "
+    "environment, clear space around it inside frame, balanced landscape "
+    "composition")
+
+
 def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
                          beat_id: str = "", char_entry: Any = None,
                          style: Any = None, unoccupied: bool = False) -> str:
@@ -551,7 +562,18 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
         terms = {}
     setting = ", ".join([str(t).strip() for t in (terms.get("setting") or [])
                          if str(t).strip()][:2])
-    if is_portrait:
+    _headless = False
+    if is_portrait or is_char_scene:
+        try:
+            from ._otr_shared.cast_text import is_headless
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_shared.cast_text import is_headless  # type: ignore
+        _headless = is_headless(char_entry if isinstance(char_entry, dict) else {})
+    if is_portrait and _headless:
+        framing = STILL_FRAMING_PORTRAIT_HEADLESS
+    elif is_char_scene and _headless:
+        framing = STILL_FRAMING_SCENE_CHARACTER_HEADLESS
+    elif is_portrait:
         framing = STILL_FRAMING_PORTRAIT
     elif is_char_scene:
         framing = STILL_FRAMING_SCENE_CHARACTER

@@ -215,7 +215,14 @@ WIDE_PORTRAIT_GEOMETRY = ("in-character cinematic medium shot, head and shoulder
                           "the head (never crop the top of the head)")
 
 
-def _style_anchor_for_aspect(aspect, style) -> str:
+#: The two geometries for a row with no head (``cast_text.is_headless``).
+PORTRAIT_GEOMETRY_HEADLESS = ("in-character cinematic three-quarter view, the "
+                              "whole subject in view with clear space around it")
+WIDE_PORTRAIT_GEOMETRY_HEADLESS = ("in-character cinematic medium shot, the whole "
+                                   "subject centred with clear space around it")
+
+
+def _style_anchor_for_aspect(aspect, style, char=None) -> str:
     """Framing anchor for a still's aspect: head-and-shoulders for WIDE (16:9) so
     the head is not cropped by the short frame, three-quarter for PORTRAIT.
 
@@ -228,8 +235,11 @@ def _style_anchor_for_aspect(aspect, style) -> str:
     Chunk A1: geometry stays Python; the LOOK segment comes from the resolved
     ``style`` pack. Callers pass the ALREADY-RESOLVED style; helpers never
     re-resolve."""
-    geometry = (WIDE_PORTRAIT_GEOMETRY if str(aspect).lower() == "wide"
-                else PORTRAIT_GEOMETRY)
+    wide = str(aspect).lower() == "wide"
+    if char is not None and _CAST_TEXT.is_headless(char):
+        geometry = WIDE_PORTRAIT_GEOMETRY_HEADLESS if wide else PORTRAIT_GEOMETRY_HEADLESS
+    else:
+        geometry = WIDE_PORTRAIT_GEOMETRY if wide else PORTRAIT_GEOMETRY
     return "%s, %s" % (geometry, style.portrait_look)
 
 #: The station ANNOUNCER is a synthetic, non-cast portrait subject (CastLock
@@ -1614,7 +1624,7 @@ def compose_image_prompt_fallback(meta: dict, char: dict, aspect: str = "portrai
         parts.append(appearance)
     if setting:
         parts.append(f"{setting} setting")
-    parts.append(_style_anchor_for_aspect(aspect, style=_vstyle))
+    parts.append(_style_anchor_for_aspect(aspect, style=_vstyle, char=char))
     return _ensure_gender_anchor(", ".join(parts), char)
 
 
@@ -1638,25 +1648,33 @@ def _build_char_prompt_request(char: dict, meta: dict, setting: str,
     appearance = _ensure_gender_anchor(
         _appearance_for_char([char], str(char.get("char_id") or "")),
         char)
-    framing = (
-        "head-and-shoulders medium framing, the subject centred with the FULL head "
-        "visible and headroom above the head so the top of the head is never cropped"
-        if str(aspect).lower() == "wide" else
-        "three-quarter framing showing the full head and upper body, with headroom "
-        "above the head so the top of the head is never cropped"
-    )
+    headless = _CAST_TEXT.is_headless(char)
+    if headless:
+        # No head, no face: frame the whole subject, and an object is exactly
+        # what this character may be (a machine, one of Abbott's shapes).
+        framing = "the whole subject in view with clear space around it"
+        never = "NEVER an empty room or scenery alone, and never a person"
+    else:
+        framing = (
+            "head-and-shoulders medium framing, the subject centred with the FULL head "
+            "visible and headroom above the head so the top of the head is never cropped"
+            if str(aspect).lower() == "wide" else
+            "three-quarter framing showing the full head and upper body, with headroom "
+            "above the head so the top of the head is never cropped"
+        )
+        never = "NEVER an empty room, an object, or scenery alone"
     return (
         "Write ONE vivid still-image portrait prompt (a single comma-separated "
         "line, no preamble) for this character. The image MUST depict the "
         f"CHARACTER THEMSELVES -- {_subject_clause(char)}, "
         f"{framing} -- IN CHARACTER "
-        "inside the story's world. NEVER an empty room, an object, or scenery "
-        "alone. Ground it in the appearance and the story setting; keep it "
+        f"inside the story's world. {never}. "
+        "Ground it in the appearance and the story setting; keep it "
         f"{_vstyle.portrait_instruction_look}.\n"
         f"character_appearance: {appearance or '(unspecified)'}\n"
         f"story_setting: {setting or '(unspecified)'}\n"
         "style_anchor: "
-        f"{_style_anchor_for_aspect(aspect, style=_vstyle)}\n"
+        f"{_style_anchor_for_aspect(aspect, style=_vstyle, char=char)}\n"
         "Do not include film-stock, film-grain, or lighting-style terms; "
         "they are appended automatically later.\n"
         "Do not mention radios, microphones, studios, or any broadcasting "
@@ -1705,21 +1723,25 @@ def _build_char_scene_request(char: dict, meta: dict, setting: str,
         if source_scene else
         "convey the ACTION and EMOTION of this beat. Translate the beat into what is "
         "VISIBLE (pose, expression, what they are doing)")
+    headless = _CAST_TEXT.is_headless(char)
+    shot = ("a medium/wide shot of the whole subject with space around it"
+            if headless else "a medium/wide shot with the full head and headroom")
+    never = ("NEVER an empty room or scenery alone, and never a person"
+             if headless else "NEVER an empty room, an object, or scenery alone")
     return (
         "Write ONE vivid cinematic STILL-image prompt (a single comma-separated "
         "line, no preamble) for a 16:9 LANDSCAPE shot of this character at THIS "
         "moment of the scene. The image MUST show the CHARACTER THEMSELVES -- "
-        f"{_subject_clause(char)} -- as the subject, a medium/wide shot "
-        "with the full head and headroom, framed inside the story's world; "
+        f"{_subject_clause(char)} -- as the subject, {shot}, "
+        "framed inside the story's world; "
         f"{scene_direction} -- do NOT write the "
-        "character's name, dialogue, narration, or any on-screen text. NEVER an "
-        "empty room, an object, or scenery alone.\n"
+        f"character's name, dialogue, narration, or any on-screen text. {never}.\n"
         f"character_appearance: {appearance or '(unspecified)'}\n"
         f"beat_action: {intent or '(unspecified)'}\n"
         f"emotion: {mood or '(unspecified)'}\n"
         f"they_are_saying: {said or '(unspecified)'}\n"
         f"story_setting: {setting or '(unspecified)'}\n"
-        f"style_anchor: {_style_anchor_for_aspect('wide', style=_vstyle)}\n"
+        f"style_anchor: {_style_anchor_for_aspect('wide', style=_vstyle, char=char)}\n"
         f"{_look_line}"
         "Do not include film-stock, film-grain, or lighting-style terms; "
         "they are appended automatically later.\n"

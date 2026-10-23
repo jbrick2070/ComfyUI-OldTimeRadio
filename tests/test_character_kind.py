@@ -114,3 +114,42 @@ def test_the_treatment_prompt_asks_for_kind():
     assert '"kind": "human"' in seam
     assert 'kind is what the character IS: "human", "animal", "machine" or "creature"' in seam
     assert "A human's appearance names their gender plainly -- a woman or a man" in seam
+
+
+# --------------------------------------------------------------------------- #
+# A machine has no head or face to frame (2026-10-22). Flatland's shapes were
+# asked for "the full head and face" in every still, and A Square came out a
+# woman. A machine is framed whole; every other kind is framed exactly as before.
+# --------------------------------------------------------------------------- #
+
+SQUARE = {"char_id": "c06", "name": "A Square", "gender": "male", "kind": "machine",
+          "appearance": "a flat square of polished brass"}
+
+
+def test_only_a_machine_is_headless():
+    assert CT.is_headless(SQUARE)
+    assert not any(CT.is_headless(row) for row in (JANE, CAT, dict(JANE, kind="creature")))
+
+
+def test_a_machine_is_framed_whole_and_never_drawn_as_a_person():
+    portrait = MB._build_char_prompt_request(SQUARE, META, "an abstract plane", "portrait")
+    scene = MB._build_char_scene_request(SQUARE, META, "an abstract plane", {"text": "Hm."})
+    for request in (portrait, scene):
+        assert "never a person" in request
+        assert "full head" not in request and "head-and-shoulders" not in request
+    assert MB.PORTRAIT_GEOMETRY_HEADLESS in portrait
+    assert MB.WIDE_PORTRAIT_GEOMETRY_HEADLESS in scene
+    assert MB.PORTRAIT_GEOMETRY_HEADLESS in MB.compose_image_prompt_fallback(META, SQUARE)
+    from nodes import _otr_story_brief_helpers as SB
+    still = compose_still_prompt(META, kind="portrait", char_entry=SQUARE)
+    assert SB.STILL_FRAMING_PORTRAIT_HEADLESS in still and "face unobstructed" not in still
+
+
+def test_every_other_kind_keeps_the_head_and_face_framing():
+    from nodes import _otr_story_brief_helpers as SB
+    for row in (JANE, CAT, dict(JANE, kind="creature")):
+        assert MB.PORTRAIT_GEOMETRY in MB.compose_image_prompt_fallback(META, row)
+        assert "NEVER an empty room, an object, or scenery alone" in \
+            MB._build_char_prompt_request(row, META, "a dock", "portrait")
+        assert SB.STILL_FRAMING_PORTRAIT in compose_still_prompt(
+            META, kind="portrait", char_entry=row)
