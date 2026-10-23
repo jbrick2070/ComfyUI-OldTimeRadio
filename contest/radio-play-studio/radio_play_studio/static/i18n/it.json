@@ -169,5 +169,8 @@
  "choice.stills.sd15": "Stable Diffusion 1.5",
  "choice.stills.z_image_turbo": "Z-Image Turbo",
  "hint.blank": "Immagini senza parole: {n}. Descrivile prima di dipingerle.",
- "why.blank": "Questa immagine non ha ancora parole. Descrivila prima di dipingerla."
+ "why.blank": "Questa immagine non ha ancora parole. Descrivila prima di dipingerla.",
+ "act.look_again": "Controlla di nuovo",
+ "act.forget": "Dimentica questa esecuzione",
+ "confirm.forget": "Dimenticare questa esecuzione? Se ComfyUI la sta ancora facendo, Studio non userà ciò che produce e questa fase potrà essere eseguita di nuovo."
 }

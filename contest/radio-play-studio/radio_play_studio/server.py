@@ -121,8 +121,18 @@ class Runs:
         self._pages: dict = {}          # page id -> when it last said it is open
         self._gpu_dirty = False         # this app has rendered since its last free
 
-    def _busy(self) -> bool:
-        return any(not r.finished for r in self._runs.values())
+    def _busy(self, settling: str = "") -> bool:
+        """Anything being made: a run of this app, or a project's attempt
+        ComfyUI may still be working on that no run is following -- after a
+        restart, or once Studio lost touch with it. ``settling`` is the
+        project a reconciliation is about to look at."""
+        if any(not r.finished for r in self._runs.values()):
+            return True
+        return bool(self._held(settling))
+
+    def _held(self, settling: str = "") -> list:
+        return [pid for pid, pending in producer.held_projects(self.studio.settings.out_dir)
+                if pid != settling and pending.get("state") in producer.MAY_BE_RUNNING]
 
     def start(self, choices: dict) -> Run:
         """Check the choices against the server, then run the episode on a thread.
@@ -134,34 +144,69 @@ class Runs:
     def start_stage(self, project_id: str, stage: str) -> Run:
         """One Scene Producer stage of a project, the same way: checked here,
         run on a thread, refused while anything else is being made."""
+        # The project's own pending attempt is prepare_stage's to refuse, by name.
         return self._launch(lambda: self.studio.prepare_stage(project_id, stage),
                             self.studio.stream_stage,
-                            {"project_id": project_id, "stage": stage})
+                            {"project_id": project_id, "stage": stage}, settling=project_id)
 
     def start_project(self, choices: dict) -> tuple:
         """A new Scene Producer project for these choices, with its first
         Stills run started: ``(project, run)``. The choices are checked
         against the server before the project is made."""
         with self._lock:
-            if self._busy():
-                raise Busy(_BUSY)
+            self._refuse_if_busy()
         self.studio.build_graph(choices)
         project = producer.new_project(self.studio.settings.out_dir,
                                        workflow=str(self.studio.workflow_for(choices)),
                                        choices=choices)
         return project, self.start_stage(project["project_id"], "stills")
 
-    def _launch(self, check, events, label: dict | None = None) -> Run:
+    def start_reconcile(self, project_id: str) -> Run:
+        """Look again at a project's pending attempt (Studio.reconcile_stage),
+        as a run the page follows like a stage. Refused while anything else
+        is being made, and for a project with nothing pending."""
+        def check() -> str:
+            pending = producer.load_project(self.studio.settings.out_dir,
+                                            project_id)["pending"]
+            if pending is None:
+                raise producer.ProjectError("this project has no run to look at again")
+            label["stage"] = pending["stage"]
+            return project_id
+
+        label = {"project_id": project_id, "stage": "", "reconcile": True}
+        return self._launch(check, self.studio.reconcile_stage, label, settling=project_id)
+
+    def resume_pending(self, wait: float = 3600.0) -> None:
+        """At start-up, look again at every project left pending, one after
+        another: a run that was going when Studio stopped is followed, a lost
+        submit found, a finished result saved."""
+        for project_id, _pending in producer.held_projects(self.studio.settings.out_dir):
+            try:
+                run = self.start_reconcile(project_id)
+            except Exception:  # noqa: BLE001 - it stays pending, and the page can look again
+                traceback.print_exc()
+                continue
+            with run.cond:
+                run.cond.wait_for(lambda: run.finished, timeout=wait)
+
+    def forget(self, project_id: str, attempt_id: str) -> dict:
+        """The person gives up on a pending attempt (producer.forget_attempt);
+        refused while a run of this app is following it."""
+        with self._lock:
+            if any(not r.finished and r.label.get("project_id") == project_id
+                   for r in self._runs.values()):
+                raise Busy("this project's run is being followed right now; wait for it")
+            return producer.forget_attempt(self.studio.settings.out_dir, project_id, attempt_id)
+
+    def _launch(self, check, events, label: dict | None = None, settling: str = "") -> Run:
         """``check()`` raises for a request that cannot run, before any thread
         starts; ``events(checked)`` then yields the run's events on one."""
         with self._lock:
-            if self._busy():
-                raise Busy(_BUSY)
+            self._refuse_if_busy(settling)
         checked = check()
         run = Run(uuid.uuid4().hex[:12], label)
         with self._lock:
-            if self._busy():
-                raise Busy(_BUSY)
+            self._refuse_if_busy(settling)
             self._runs[run.id] = run
             self._gpu_dirty = True
         try:
@@ -171,6 +216,14 @@ class Runs:
                 self._runs.pop(run.id, None)
             raise
         return run
+
+    def _refuse_if_busy(self, settling: str = "") -> None:
+        if any(not r.finished for r in self._runs.values()):
+            raise Busy(_BUSY)
+        held = self._held(settling)
+        if held:
+            raise Busy(f"project {held[0]} is waiting to hear how its last run ended; open it "
+                       "and look again, or forget that run")
 
     def listing(self) -> list:
         """Every episode and stage this app has started since it was launched,
@@ -313,7 +366,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _post(self) -> None:
         path = urlsplit(self.path).path
-        project = re.fullmatch(r"/api/projects/" + _PROJECT + r"/(draft|stages)", path)
+        project = re.fullmatch(r"/api/projects/" + _PROJECT + r"/(draft|stages|reconcile|forget)",
+                               path)
         if path not in ("/api/episodes", "/api/presence", "/api/photos",
                         "/api/projects") and not project:
             return self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
@@ -326,7 +380,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/projects":
             return self._new_project()
         if project:
-            return (self._draft if project.group(2) == "draft" else self._stage)(project.group(1))
+            return {"draft": self._draft, "stages": self._stage, "reconcile": self._reconcile,
+                    "forget": self._forget}[project.group(2)](project.group(1))
         try:
             length = _body_length(self.headers)
             body = json.loads(self.rfile.read(length) or b"{}")
@@ -383,6 +438,25 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(HTTPStatus.BAD_REQUEST, {"error": f"bad request: {exc}"})
         self._start(lambda: self.runs.start_stage(project_id, stage),
                     lambda run: {"project_id": project_id, "id": run.id})
+
+    def _reconcile(self, project_id: str) -> None:
+        """{} -> a run that looks again at the project's pending attempt."""
+        self._start(lambda: self.runs.start_reconcile(project_id),
+                    lambda run: {"project_id": project_id, "id": run.id,
+                                 "stage": run.label.get("stage", "")})
+
+    def _forget(self, project_id: str) -> None:
+        """{"attempt_id": id} -> the project, its pending attempt given up."""
+        try:
+            attempt_id = str(self._body().get("attempt_id") or "")
+            project = self.runs.forget(project_id, attempt_id)
+        except Busy as exc:
+            return self._send_json(HTTPStatus.CONFLICT, {"error": str(exc)})
+        except producer.NoProject as exc:
+            return self._send_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+        except (producer.ProjectError, ValueError, TypeError) as exc:
+            return self._send_json(HTTPStatus.CONFLICT, {"error": str(exc)})
+        self._send_json(HTTPStatus.OK, {"project": project})
 
     def _start(self, start, reply) -> None:
         """Start a run and answer for it: 202 with ``reply(started)``, or why
@@ -565,4 +639,6 @@ def make_server(studio: Studio, host: str = "127.0.0.1", port: int = 8765) -> Th
     server.daemon_threads = True
     server.runs = Runs(studio)  # type: ignore[attr-defined]
     threading.Thread(target=_watch_gpu, args=(server.runs,), daemon=True).start()
+    # A stage left pending when Studio last stopped is settled before anything new is sent.
+    threading.Thread(target=server.runs.resume_pending, daemon=True).start()
     return server

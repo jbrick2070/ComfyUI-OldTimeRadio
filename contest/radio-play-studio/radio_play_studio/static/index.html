@@ -210,6 +210,9 @@
       <button type="button" id="b_stills"></button>
       <button type="button" id="b_video" class="quiet"></button>
       <button type="button" id="b_publish" class="quiet"></button>
+      <!-- A run Studio lost track of: looked at again, never sent twice, or given up. -->
+      <button type="button" id="b_look" class="quiet" hidden data-i18n="act.look_again">Look again</button>
+      <button type="button" id="b_forget" class="quiet" hidden data-i18n="act.forget">Forget this run</button>
       <span class="hint" id="hint"></span>
       <!-- In the sticky bar, beside the buttons that raise it: never scrolled out of sight. -->
       <span class="error" id="perror" hidden></span>
@@ -809,6 +812,8 @@ const STAGE_TEXT = {
   video: {run: "pstatus.video", done: "pstatus.done_video"},
   publish: {run: "pstatus.publish", done: "pstatus.done_publish"},
 };
+// A look at a pending run names the stage it belongs to; any other is read as Stills.
+const stageText = (name) => STAGE_TEXT[name] || STAGE_TEXT.stills;
 let cardEls = {}, sceneEls = {}, personEls = {};
 
 function folded(on) {
@@ -1292,13 +1297,18 @@ function refreshBoard() {
   publish.disabled = off || !ready;
   const hint = $("hint");
   if (busy) say(hint, "hint.running");
-  else if (held) say(hint, "hint.held");
+  else if (held) {
+    say(hint, "hint.held");
+    if (project.pending.note) hint.textContent += " " + project.pending.note;
+  }
   else if (c.blank) say(hint, "hint.blank", {n: c.blank});
   else if (paint) say(hint, "hint.dirty");
   else if (c.toFilm) say(hint, "hint.unfilmed");
   else if (c.failed) say(hint, "hint.failed", {n: c.failed});
   else if (project.published && ready) say(hint, "hint.published");
   else say(hint, "hint.ready");
+  $("b_look").hidden = $("b_forget").hidden = !held;
+  $("b_look").disabled = $("b_forget").disabled = busy;
   showStage("stills", paint === 0 && c.cards > 0, "stage.stills_state", {painted: c.painted, changed: c.changed});
   showStage("video", c.toFilm === 0 && c.cards > 0, "stage.video_state", {filmed: c.filmed, total: c.cards});
   const pubKey = project.published && ready ? "stage.publish_done" : ready ? "stage.publish_ready" : "stage.publish_wait";
@@ -1351,7 +1361,7 @@ function watchStage(id, stageName, pid) {
   stageBusy = true; watching = stageName; stagePid = pid;
   if (stageShown()) {
     $("pfill").style.width = "0";
-    say($("pstatus"), STAGE_TEXT[stageName].run);
+    say($("pstatus"), stageText(stageName).run);
   }
   refreshBoard(); buttons();
   const es = new EventSource("/api/episodes/" + id + "/events");
@@ -1383,10 +1393,10 @@ function watchStage(id, stageName, pid) {
     } else if (ev.type === "step") {
       if (ev.steps) say($("pstatus"), "progress.step", {pct: high, step: ev.step, steps: ev.steps});
     } else if (ev.type === "submitted") {
-      say($("pstatus"), STAGE_TEXT[stageName].run);
+      say($("pstatus"), stageText(stageName).run);
     } else if (ev.type === "done") {
       $("pfill").style.width = "100%";
-      say($("pstatus"), STAGE_TEXT[stageName].done);
+      say($("pstatus"), stageText(stageName).done);
       end();
     } else if (ev.type === "error") {
       plain($("perror"), ev.message); $("perror").hidden = false;
@@ -1400,6 +1410,36 @@ $("b_stills").addEventListener("click", () => startStage("stills"));
 $("b_video").addEventListener("click", () => startStage("video"));
 $("b_publish").addEventListener("click", () => startStage("publish"));
 $("change_story").addEventListener("click", closeProject);
+// A pending run Studio cannot settle by itself -- it lost touch, or ComfyUI
+// could not say -- is looked at again on a press, and is never sent twice.
+$("b_look").addEventListener("click", async () => {
+  if (!project || stageBusy) return;
+  const pid = project.project_id;
+  $("perror").hidden = true;
+  try {
+    const res = await fetch("/api/projects/" + pid + "/reconcile", {
+      method: "POST", headers: {"Content-Type": "application/json"}, body: "{}",
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || res.statusText);
+    watchStage(body.id, body.stage, pid);
+  } catch (err) { plain($("perror"), err.message); $("perror").hidden = false; }
+});
+// Or it is given up, after the person says so: the project may run the stage again.
+$("b_forget").addEventListener("click", async () => {
+  if (!project || !project.pending || stageBusy) return;
+  if (!confirm(t("confirm.forget", null, "Forget this run?"))) return;
+  $("perror").hidden = true;
+  try {
+    const res = await fetch("/api/projects/" + project.project_id + "/forget", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({attempt_id: project.pending.attempt_id}),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || res.statusText);
+    await reloadProject();
+  } catch (err) { plain($("perror"), err.message); $("perror").hidden = false; }
+});
 $("direct").addEventListener("click", async () => {
   $("direct").disabled = go.disabled = true;
   $("error").hidden = true;

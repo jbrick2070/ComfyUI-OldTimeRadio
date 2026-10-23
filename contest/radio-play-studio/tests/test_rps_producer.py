@@ -12,6 +12,7 @@ import threading
 import pytest
 
 from radio_play_studio import producer
+from radio_play_studio import runner as rps_runner
 from radio_play_studio.form import EPISODE_NODE_TYPE, SHOT_LOCK
 from radio_play_studio.runner import Studio
 from radio_play_studio.server import make_server
@@ -39,6 +40,10 @@ class JobFailed(Exception):
 
 class ReadTimeout(Exception):
     """Named as httpx's: a submit that may have reached the server."""
+
+
+class NotFound(Exception):
+    """Named as the SDK's: the bridge has no record of a job."""
 
 
 class Refused(Exception):
@@ -90,6 +95,8 @@ class StageClient:
         self.freezes = True         # whether the run leaves its bundle
         self.on_submit = None       # called with the graph before anything else
         self.events = [Progress("41", 1, 4), Progress("41", 4, 4)]
+        self.jobs = self            # client.jobs.get(id)
+        self.made = {}              # job id -> the job, as the bridge recalls it
 
     def from_json(self, graph):
         return graph
@@ -110,7 +117,14 @@ class StageClient:
             freeze(self.output, direction, self.texts, self.filmed)
         outputs = ([FakeOutput("9", "otr_episode.mp4")]
                    if direction["stage"] == "publish" else [])
-        return StageJob("job-%d" % len(self.directions), self.events, self.fail, outputs)
+        job = StageJob("job-%d" % len(self.directions), self.events, self.fail, outputs)
+        self.made[job.id] = job
+        return job
+
+    def get(self, job_id):
+        if job_id not in self.made:
+            raise NotFound(job_id)
+        return self.made[job_id]
 
 
 def freeze(output, direction, texts, filmed=None):
@@ -179,9 +193,21 @@ def stage_settings(settings, workflow):
 def studio(stage_settings, stage_schemas):
     output = {}
     client = StageClient(output)
+    comfy = {"/queue": {"queue_running": [], "queue_pending": []}, "/history": {}}
+    slept = []
+
+    def comfy_json(path):
+        if comfy.get("down"):
+            raise producer.ServerUnreachable("ComfyUI is not answering")
+        if path.startswith("/history/"):
+            job_id = path[len("/history/"):]
+            return {k: v for k, v in comfy["/history"].items() if k == job_id}
+        return comfy[path.split("?")[0]]
+
     made = Studio(stage_settings, client_factory=lambda url: client,
-                  fetch=lambda url: stage_schemas, read_output=reader(output))
-    made.client, made.output = client, output
+                  fetch=lambda url: stage_schemas, read_output=reader(output),
+                  comfy_json=comfy_json, sleep=slept.append)
+    made.client, made.output, made.comfy, made.slept = client, output, comfy, slept
     return made
 
 
@@ -778,3 +804,175 @@ def test_a_stage_waits_its_turn_behind_an_episode(app, monkeypatch):
     _events(port, episode["id"])
     status, _ = _call(port, "POST", f"/api/projects/{pid}/stages", {"stage": "stills"})
     assert status == 202
+
+
+# --------------------------------------------------------------------------- #
+# restart and reconciliation (chunk 5c)
+# --------------------------------------------------------------------------- #
+
+def _sent(studio, pid, stage, record=True):
+    """A stage sent and taken, as if Studio stopped right after: the attempt
+    saved, the job made, its id saved only when ``record``."""
+    plan = studio.prepare_stage(pid, stage)
+    direction = producer.begin_attempt(studio.settings.out_dir, pid, stage, plan["graph"],
+                                       plan["node_ids"])
+    job = studio.client.submit(plan["graph"])
+    if record:
+        producer.record_job(studio.settings.out_dir, pid, direction["attempt_id"], job.id)
+    return direction, job, plan["graph"]
+
+
+def test_a_run_studio_lost_touch_with_is_followed_to_its_end_and_never_sent_again(studio):
+    pid = _project(studio)["project_id"]
+    _sent(studio, pid, "stills")
+    events = list(studio.reconcile_stage(pid))
+    assert events[-1]["type"] == "done" and events[-1]["stage"] == "stills"
+    project = _load(studio, pid)
+    assert project["pending"] is None and [b["out"] for b in project["bundles"]] == ["01-stills"]
+    assert len(studio.client.directions) == 1, "sent once, in all"
+
+
+def test_a_lost_submit_is_found_by_its_attempt_in_comfyuis_queue(studio):
+    pid = _project(studio)["project_id"]
+    direction, job, graph = _sent(studio, pid, "stills", record=False)
+    assert _load(studio, pid)["pending"]["state"] == "submitting"
+    other = json.loads(json.dumps(graph))
+    lock = next(n for n in other.values() if n.get("class_type") == SHOT_LOCK)
+    lock["inputs"]["direction_json"] = json.dumps(dict(direction, attempt_id="f" * 32))
+    studio.comfy["/queue"]["queue_running"] = [[1, job.id, graph, {}, []]]
+    studio.comfy["/queue"]["queue_pending"] = [[2, "someone-else", other, {}, []]]
+    events = list(studio.reconcile_stage(pid))
+    assert events[-1]["type"] == "done"
+    assert _load(studio, pid)["bundles"][0]["attempt_id"] == direction["attempt_id"]
+    assert len(studio.client.directions) == 1
+
+
+def test_a_lost_submit_comfyui_never_took_frees_the_project_only_after_every_look(studio):
+    pid = _project(studio)["project_id"]
+    plan = studio.prepare_stage(pid, "stills")
+    producer.begin_attempt(studio.settings.out_dir, pid, "stills", plan["graph"], plan["node_ids"])
+    events = list(studio.reconcile_stage(pid))
+    assert events[-1]["type"] == "error" and "never took" in events[-1]["message"]
+    assert studio.slept == [rps_runner.LOST_SUBMIT_GAP_S] * (rps_runner.LOST_SUBMIT_LOOKS - 1)
+    project = _load(studio, pid)
+    assert project["pending"] is None and "never took" in project["last_error"]["message"]
+    assert studio.client.directions == [], "nothing was ever sent"
+
+
+@pytest.mark.parametrize("trouble", ["two", "down"])
+def test_a_lost_submit_stays_pending_when_comfyui_cannot_say_which_run_it_is(studio, trouble):
+    pid = _project(studio)["project_id"]
+    _direction, job, graph = _sent(studio, pid, "stills", record=False)
+    if trouble == "two":
+        studio.comfy["/queue"]["queue_running"] = [[1, job.id, graph, {}, []]]
+        studio.comfy["/history"] = {"job-x": {"prompt": [0, "job-x", graph, {}, []]}}
+    else:
+        studio.comfy["down"] = True
+    events = list(studio.reconcile_stage(pid))
+    assert events[-1]["type"] == "error"
+    pending = _load(studio, pid)["pending"]
+    assert (pending["state"], pending["job_id"]) == ("uncertain", None)
+    assert studio.slept == [], "an answer that is not empty is never waited out"
+
+
+def test_a_job_the_bridge_forgot_is_read_from_comfyuis_own_history(studio):
+    pid = _project(studio)["project_id"]
+    _direction, job, _graph = _sent(studio, pid, "stills")
+    studio.client.made.clear()                   # the bridge restarted
+    studio.comfy["/history"] = {job.id: {"status": {"status_str": "success", "completed": True}}}
+    assert list(studio.reconcile_stage(pid))[-1]["type"] == "done"
+    assert _load(studio, pid)["bundles"][0]["out"] == "01-stills"
+
+
+def test_a_job_neither_bridge_nor_comfyui_knows_with_no_bundle_lets_the_project_try_again(studio):
+    pid = _project(studio)["project_id"]
+    studio.client.freezes = False
+    _sent(studio, pid, "stills")
+    studio.client.made.clear()
+    events = list(studio.reconcile_stage(pid))
+    assert events[-1]["type"] == "error" and "no longer has this run" in events[-1]["message"]
+    assert _load(studio, pid)["pending"] is None
+
+
+def test_a_job_comfyui_is_still_making_stays_pending(studio):
+    pid = _project(studio)["project_id"]
+    _direction, job, graph = _sent(studio, pid, "stills")
+    studio.client.made.clear()
+    studio.comfy["/queue"]["queue_running"] = [[1, job.id, graph, {}, []]]
+    assert list(studio.reconcile_stage(pid))[-1]["type"] == "error"
+    assert _load(studio, pid)["pending"]["state"] == "running"
+
+
+def test_a_publish_made_but_not_saved_is_saved_without_making_it_again(studio):
+    pid = _project(studio)["project_id"]
+    _run(studio, pid, "stills")
+    _run(studio, pid, "video")
+    direction, job, _graph = _sent(studio, pid, "publish")
+    producer.hold_attempt(studio.settings.out_dir, pid, direction["attempt_id"], "finishing",
+                          "the download failed")
+    done = list(studio.reconcile_stage(pid))[-1]
+    assert (done["type"], done["stage"]) == ("done", "publish")
+    assert (studio.settings.out_dir / done["run"] / done["file"]).read_bytes() == b"episode-bytes"
+    assert _load(studio, pid)["published"]["attempt_id"] == direction["attempt_id"]
+    assert [d["stage"] for d in studio.client.directions] == ["stills", "video", "publish"]
+
+
+def test_a_publish_the_bridge_forgot_is_fetched_from_where_comfyui_saved_it(studio):
+    pid = _project(studio)["project_id"]
+    _run(studio, pid, "stills")
+    _run(studio, pid, "video")
+    _direction, job, _graph = _sent(studio, pid, "publish")
+    studio.client.made.clear()
+    # "9": the stand-in workflow's episode node, as the job's own outputs name it.
+    studio.output[("otr/obs", "radio_play.mp4")] = b"episode-from-history"
+    studio.comfy["/history"] = {job.id: {
+        "status": {"status_str": "success", "completed": True},
+        "outputs": {"9": {"gifs": [{"filename": "radio_play.mp4", "subfolder": "otr/obs",
+                                    "type": "output"}]}}}}
+    done = list(studio.reconcile_stage(pid))[-1]
+    assert done["type"] == "done", done
+    assert (studio.settings.out_dir / done["run"] / done["file"]).read_bytes() == \
+        b"episode-from-history"
+    assert len(studio.client.directions) == 3
+
+
+def test_a_project_comfyui_may_still_be_working_for_keeps_every_run_waiting(studio):
+    from radio_play_studio.server import Busy, Runs
+    pid = _project(studio)["project_id"]
+    direction, job, graph = _sent(studio, pid, "stills", record=False)
+    producer.hold_attempt(studio.settings.out_dir, pid, direction["attempt_id"], "uncertain",
+                          "the answer was lost")
+    runs = Runs(studio)
+    with pytest.raises(Busy, match=pid):
+        runs.start({"bank": "my_story"})
+    other = _project(studio)["project_id"]
+    with pytest.raises(Busy, match=pid):
+        runs.start_stage(other, "stills")
+    with pytest.raises(producer.StageInFlight):
+        runs.start_stage(pid, "stills")
+    studio.comfy["/queue"]["queue_running"] = [[1, job.id, graph, {}, []]]
+    run = runs.start_reconcile(pid)
+    with run.cond:
+        run.cond.wait_for(lambda: run.finished, timeout=30)
+    assert run.events[-1]["type"] == "done" and _load(studio, pid)["pending"] is None
+    assert run.label == {"project_id": pid, "stage": "stills", "reconcile": True}
+
+
+def test_a_run_given_up_by_hand_frees_the_project(studio):
+    from radio_play_studio.server import Runs
+    pid = _project(studio)["project_id"]
+    direction, _job, _graph = _sent(studio, pid, "stills", record=False)
+    runs = Runs(studio)
+    with pytest.raises(producer.ProjectError):
+        runs.forget(pid, "0" * 32)                 # not the pending attempt
+    project = runs.forget(pid, direction["attempt_id"])
+    assert project["pending"] is None and "forgotten" in project["last_error"]["message"]
+
+
+def test_studio_settles_what_was_left_pending_when_it_starts(studio):
+    from radio_play_studio.server import Runs
+    pid = _project(studio)["project_id"]
+    _sent(studio, pid, "stills")
+    Runs(studio).resume_pending(wait=30)
+    assert _load(studio, pid)["pending"] is None
+    assert len(studio.client.directions) == 1

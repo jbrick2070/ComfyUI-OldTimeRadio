@@ -169,5 +169,8 @@
  "choice.stills.sd15": "Stable Diffusion 1.5",
  "choice.stills.z_image_turbo": "Z-Image Turbo",
  "hint.blank": "説明のない絵: {n}。描く前に説明を書いてください。",
- "why.blank": "この絵にはまだ説明がありません。描く前に説明を書いてください。"
+ "why.blank": "この絵にはまだ説明がありません。描く前に説明を書いてください。",
+ "act.look_again": "もう一度確認",
+ "act.forget": "この実行を忘れる",
+ "confirm.forget": "この実行を忘れますか？ComfyUIがまだ作成中でも、Studioはその結果を使わず、この段階をもう一度実行できます。"
 }

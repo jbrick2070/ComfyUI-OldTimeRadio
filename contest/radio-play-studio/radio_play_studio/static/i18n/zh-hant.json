@@ -169,5 +169,8 @@
  "choice.stills.sd15": "Stable Diffusion 1.5",
  "choice.stills.z_image_turbo": "Z-Image Turbo",
  "hint.blank": "沒有描述的畫面：{n}。繪製前請先描述。",
- "why.blank": "這幅畫面還沒有描述。繪製前請先描述。"
+ "why.blank": "這幅畫面還沒有描述。繪製前請先描述。",
+ "act.look_again": "重新查看",
+ "act.forget": "放棄這次執行",
+ "confirm.forget": "放棄這次執行？如果 ComfyUI 仍在製作，Studio 不會使用它的結果，並且可以重新執行這一階段。"
 }

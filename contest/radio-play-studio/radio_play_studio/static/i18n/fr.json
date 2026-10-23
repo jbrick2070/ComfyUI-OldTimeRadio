@@ -169,5 +169,8 @@
  "choice.stills.sd15": "Stable Diffusion 1.5",
  "choice.stills.z_image_turbo": "Z-Image Turbo",
  "hint.blank": "Images sans description : {n}. Décrivez-les avant de les peindre.",
- "why.blank": "Cette image n'a pas encore de description. Décrivez-la avant de la peindre."
+ "why.blank": "Cette image n'a pas encore de description. Décrivez-la avant de la peindre.",
+ "act.look_again": "Vérifier à nouveau",
+ "act.forget": "Oublier cette exécution",
+ "confirm.forget": "Oublier cette exécution ? Si ComfyUI la fait encore, Studio n'utilisera pas ce qu'elle produit, et cette étape pourra être relancée."
 }

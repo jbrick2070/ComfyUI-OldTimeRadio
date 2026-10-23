@@ -67,6 +67,7 @@ MAX_NOTE_CHARS = 2_000
 MAX_CARD_TEXT_CHARS = 4_000
 MAX_TAKE = 9_999
 _SHA_RE = re.compile(r"^[0-9a-f]{64}$")
+_ATTEMPT_RE = re.compile(r"^[0-9a-f]{32}$")
 #: Where a project's bundles sit under ComfyUI's output folder.
 REPLAY_ROOT = "otr/episodes/_replay/p"
 #: What a replay sets the story bank to: the writer's replay check accepts it,
@@ -488,6 +489,70 @@ def abandon_attempt(out_dir: Path, project_id: str, attempt_id: str, message: st
     return update_project(out_dir, project_id, _pending_change(attempt_id, apply))
 
 
+#: States of a pending attempt that ComfyUI may still be working on. A
+#: ``finishing`` attempt's run has ended; only its result is not saved here.
+MAY_BE_RUNNING = ("submitting", "uncertain", "running")
+
+
+def forget_attempt(out_dir: Path, project_id: str, attempt_id: str) -> dict:
+    """The person gives up on a pending attempt Studio cannot settle: the
+    project may run the stage again. If ComfyUI was still making it, its
+    result is never adopted -- the next attempt carries a new id."""
+    return abandon_attempt(out_dir, project_id, attempt_id,
+                           "this run was forgotten by hand before Studio could settle it")
+
+
+def held_projects(out_dir: Path) -> list:
+    """``(project_id, pending)`` for every project with an attempt pending,
+    oldest attempt first."""
+    held = []
+    for path in sorted((Path(out_dir) / PROJECTS_DIR).glob(f"*/{PROJECT_FILE}")):
+        try:
+            project = load_project(out_dir, path.parent.name)
+        except ProjectError:
+            continue
+        if project["pending"] is not None:
+            held.append((project["project_id"], project["pending"]))
+    return sorted(held, key=lambda item: item[1].get("started") or 0)
+
+
+def load_attempt(out_dir: Path, project_id: str, attempt_id: str) -> dict:
+    """An attempt as it was sent (:func:`begin_attempt`): its direction, its
+    graph and the graph's node ids."""
+    if not _ATTEMPT_RE.fullmatch(str(attempt_id or "")):
+        raise ProjectError(f"not an attempt id: {attempt_id!r}")
+    path = project_dir(out_dir, project_id) / ATTEMPTS_DIR / f"{attempt_id}.json"
+    try:
+        sent = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ProjectError(f"attempt {attempt_id} cannot be read: {exc}") from None
+    if not (isinstance(sent, dict) and isinstance(sent.get("direction"), dict)
+            and isinstance(sent.get("graph"), dict) and isinstance(sent.get("node_ids"), dict)
+            and sent["direction"].get("attempt_id") == attempt_id):
+        raise ProjectError(f"attempt {attempt_id} is not one Studio saved")
+    return sent
+
+
+def carries_attempt(prompt: Any, project_id: str, attempt_id: str) -> bool:
+    """True when a graph ComfyUI holds carries this attempt's direction --
+    the literal ``direction_json`` Studio set on Shot Lock, whatever id the
+    node has there."""
+    if not isinstance(prompt, dict):
+        return False
+    for node in prompt.values():
+        text = (node.get("inputs") or {}).get("direction_json") if isinstance(node, dict) else None
+        if not isinstance(text, str) or attempt_id not in text:
+            continue
+        try:
+            direction = json.loads(text)
+        except ValueError:
+            continue
+        if (isinstance(direction, dict) and direction.get("project_id") == project_id
+                and direction.get("attempt_id") == attempt_id):
+            return True
+    return False
+
+
 def carry_clip_stills(view: dict, previous: Optional[dict], stage: str) -> dict:
     """Note on each card the still its clip was filmed from (``clip_still``),
     so the page can tell a clip whose still has been painted again since. A
@@ -569,6 +634,18 @@ def _inside_bundle(rel: str, out: str) -> PurePosixPath:
             or any(part in ("", ".", "..") for part in parts)):
         raise ProjectError(f"bundle {out} names {rel}, outside itself")
     return PurePosixPath(rel)
+
+
+def read_json(comfyui_url: str, path: str, timeout: float = 30.0) -> Any:
+    """A JSON answer from ComfyUI itself (``/queue``, ``/history``) -- what
+    it is making and has made, whatever the bridge in front of it recalls.
+    ServerUnreachable when it cannot be asked."""
+    url = comfyui_url.rstrip("/") + path
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        raise ServerUnreachable(f"could not read {url} ({exc})") from None
 
 
 def adopt_bundle(out_dir: Path, project: dict, out: str, read_file: ReadFile,

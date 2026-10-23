@@ -169,5 +169,8 @@
  "choice.stills.sd15": "Stable Diffusion 1.5",
  "choice.stills.z_image_turbo": "Z-Image Turbo",
  "hint.blank": "Pictures with no words: {n}. Describe them before painting.",
- "why.blank": "This picture has no words yet. Describe it before painting."
+ "why.blank": "This picture has no words yet. Describe it before painting.",
+ "act.look_again": "Look again",
+ "act.forget": "Forget this run",
+ "confirm.forget": "Forget this run? If ComfyUI is still making it, Studio will not use what it makes, and this stage can be run again."
 }

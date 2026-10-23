@@ -169,5 +169,8 @@
  "choice.stills.sd15": "Stable Diffusion 1.5",
  "choice.stills.z_image_turbo": "Z-Image Turbo",
  "hint.blank": "Imagens sem palavras: {n}. Descreva-as antes de pintar.",
- "why.blank": "Esta imagem ainda não tem palavras. Descreva-a antes de pintá-la."
+ "why.blank": "Esta imagem ainda não tem palavras. Descreva-a antes de pintá-la.",
+ "act.look_again": "Verificar de novo",
+ "act.forget": "Esquecer esta execução",
+ "confirm.forget": "Esquecer esta execução? Se o ComfyUI ainda a estiver fazendo, o Studio não usará o que ela produzir, e esta etapa poderá ser executada de novo."
 }

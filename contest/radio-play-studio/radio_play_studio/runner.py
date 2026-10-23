@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import time
+import urllib.parse
 import uuid
 from pathlib import Path
 from typing import Any, Callable, Iterator
@@ -31,6 +32,14 @@ VIDEO_SUFFIXES = (".mp4", ".webm", ".mov", ".mkv")
 #: polls in a row are forgiven (a restart of the bridge, a dropped connection),
 #: and the longest pause between them. About ten minutes of outage in all.
 POLL_WINDOW_S = 60.0
+#: A submit whose answer was lost is looked for in ComfyUI's own queue and
+#: history this many times, this far apart, before an empty answer is
+#: believed: one empty look never lets the project send the run again.
+LOST_SUBMIT_LOOKS = 3
+LOST_SUBMIT_GAP_S = 20.0
+#: How much of ComfyUI's history a lost submit is looked for in: it was sent
+#: moments before Studio lost its answer, so it is among the newest.
+HISTORY_LOOKBACK = 256
 MAX_TRANSIENT = 20
 BACKOFF_CAP_S = 30.0
 
@@ -180,7 +189,9 @@ class Studio:
     def __init__(self, settings: Settings, *, client_factory: Callable[[str], Any] = make_client,
                  fetch: Callable[[str], dict] = fetch_object_info,
                  now: Callable[[], float] = time.monotonic,
-                 read_output: Callable[[str, str], bytes] | None = None) -> None:
+                 read_output: Callable[[str, str], bytes] | None = None,
+                 comfy_json: Callable[[str], Any] | None = None,
+                 sleep: Callable[[float], None] = time.sleep) -> None:
         self.settings = settings
         self._client_factory = client_factory
         self._fetch = fetch
@@ -188,6 +199,10 @@ class Studio:
         #: ``read_output(subfolder, name)``: a file from ComfyUI's output folder.
         self._read_output = read_output or (
             lambda subfolder, name: producer.read_output(settings.comfyui_url, subfolder, name))
+        #: ``comfy_json(path)``: ComfyUI's own answer for ``/queue``, ``/history``.
+        self._comfy_json = comfy_json or (
+            lambda path: producer.read_json(settings.comfyui_url, path))
+        self._sleep = sleep
 
     def options(self) -> list:
         workflow = load_workflow(self.settings.workflow_path)
@@ -373,6 +388,14 @@ class Studio:
         except Exception as exc:  # noqa: BLE001 - the job runs; only the note of it failed
             yield dict(base, type="note", message=f"the job's id was not saved ({exc})")
         yield dict(base, type="submitted")
+        yield from self._follow(plan, job, error)
+
+    def _follow(self, plan: dict, job: Any, error: Callable[[str], dict]) -> Iterator[dict]:
+        """A taken job, to its end: its progress, then its result saved here."""
+        out_dir = self.settings.out_dir
+        pid, stage = plan["project_id"], plan["stage"]
+        attempt = plan["direction"]["attempt_id"]
+        base = {"stage": stage, "project_id": pid}
         try:
             for event in job.events():
                 note = stage_note(event, len(plan["graph"]))
@@ -396,6 +419,181 @@ class Studio:
             yield self._finish_publish(plan, job, failure, error)
         else:
             yield self._finish_bundle(plan, failure, error)
+
+    # -- settling an attempt Studio lost track of ------------------------------
+    def reconcile_stage(self, project_id: str) -> Iterator[dict]:
+        """Settle a project's pending attempt without ever sending it again --
+        after Studio restarts, or when a run's end could not be confirmed.
+        Events as :meth:`stream_stage`; never raises.
+
+        A job whose id was saved is followed to its end through the bridge,
+        or, when the bridge has forgotten it, read from ComfyUI's own queue
+        and history: a Stills or Video run's complete bundle is adopted
+        however its job ended, and a Publish run's video is fetched from
+        where ComfyUI saved it. A submit whose answer was lost is looked for
+        by the attempt its direction carries: one match is its job; several,
+        or no answer, keep it pending; only an empty look, repeated, lets the
+        project try again (LOST_SUBMIT_LOOKS)."""
+        out_dir = self.settings.out_dir
+        try:
+            project = producer.load_project(out_dir, project_id)
+            pending = project["pending"]
+            if pending is None:
+                yield {"type": "done", "stage": "", "project_id": project_id, "settled": True}
+                return
+            sent = producer.load_attempt(out_dir, project_id, pending["attempt_id"])
+        except Exception as exc:  # noqa: BLE001 - reported, never raised
+            yield {"type": "error", "stage": "", "project_id": project_id,
+                   "message": describe_failure(exc)}
+            return
+        stage, attempt, state = pending["stage"], pending["attempt_id"], pending["state"]
+        base = {"stage": stage, "project_id": project_id}
+
+        def error(message: str) -> dict:
+            return dict(base, type="error", message=message)
+
+        plan = {"project_id": project_id, "stage": stage, "graph": sent["graph"],
+                "node_ids": sent["node_ids"], "direction": sent["direction"]}
+        job_id = pending.get("job_id")
+        if not job_id:
+            found, detail = self._find_lost_submit(project_id, attempt)
+            if found == "none":
+                producer.abandon_attempt(out_dir, project_id, attempt,
+                                         "ComfyUI never took this run")
+                yield error("ComfyUI never took this run, so nothing was made; the project "
+                            "can run this stage again.")
+                return
+            if found != "one":
+                producer.hold_attempt(out_dir, project_id, attempt, "uncertain", detail)
+                yield error(detail)
+                return
+            job_id = detail
+            producer.record_job(out_dir, project_id, attempt, job_id)
+            state = "running"
+        try:
+            client = self._client_factory(self.settings.api_url)
+            job = client.jobs.get(job_id)
+        except Exception as exc:  # noqa: BLE001 - decided below
+            if type(exc).__name__ != "NotFound":
+                producer.hold_attempt(out_dir, project_id, attempt, state, describe_failure(exc))
+                yield error(f"could not ask about this run ({describe_failure(exc)}); it "
+                            "stays pending, and Studio sends this project nothing more "
+                            "until it has looked again.")
+                return
+            yield self._settle_forgotten(plan, job_id, error)
+            return
+        yield dict(base, type="submitted")
+        yield from self._follow(plan, job, error)
+
+    def _find_lost_submit(self, project_id: str, attempt_id: str) -> tuple:
+        """Look for an attempt in ComfyUI's queue and recent history:
+        ``("one", job id)``, ``("many" | "unknown", why)``, or ``("none", "")``
+        once every look came back empty."""
+        for look in range(LOST_SUBMIT_LOOKS):
+            if look:
+                self._sleep(LOST_SUBMIT_GAP_S)
+            try:
+                queue = self._comfy_json("/queue")
+                history = self._comfy_json(f"/history?max_items={HISTORY_LOOKBACK}")
+            except Exception as exc:  # noqa: BLE001 - no answer is not an empty answer
+                return "unknown", (f"ComfyUI could not be asked whether it took this run "
+                                   f"({describe_failure(exc)}); it stays pending until it can.")
+            rows = [row for key in ("queue_running", "queue_pending")
+                    for row in (queue.get(key) or [] if isinstance(queue, dict) else [])]
+            prompts = [(row[1], row[2]) for row in rows
+                       if isinstance(row, (list, tuple)) and len(row) > 2]
+            for job_id, entry in (history.items() if isinstance(history, dict) else ()):
+                prompt = entry.get("prompt") if isinstance(entry, dict) else None
+                if isinstance(prompt, (list, tuple)) and len(prompt) > 2:
+                    prompts.append((job_id, prompt[2]))
+            ids = sorted({str(job_id) for job_id, prompt in prompts
+                          if producer.carries_attempt(prompt, project_id, attempt_id)})
+            if len(ids) == 1:
+                return "one", ids[0]
+            if ids:
+                return "many", (f"{len(ids)} runs in ComfyUI carry this attempt "
+                                f"({', '.join(ids[:3])}); Studio sends this project nothing "
+                                "more until the extra ones are gone.")
+        return "none", ""
+
+    def _comfy_knows(self, job_id: str) -> tuple:
+        """Where ComfyUI itself has a job: ``("queued", None)``, ``("done" |
+        "failed", its history entry)`` or ``("gone", None)``."""
+        queue = self._comfy_json("/queue")
+        for key in ("queue_running", "queue_pending"):
+            for row in (queue.get(key) or [] if isinstance(queue, dict) else []):
+                if isinstance(row, (list, tuple)) and len(row) > 1 and str(row[1]) == job_id:
+                    return "queued", None
+        history = self._comfy_json("/history/" + urllib.parse.quote(job_id, safe=""))
+        entry = history.get(job_id) if isinstance(history, dict) else None
+        if not isinstance(entry, dict):
+            return "gone", None
+        status = entry.get("status") if isinstance(entry.get("status"), dict) else {}
+        ok = status.get("status_str") == "success" and status.get("completed", True)
+        return ("done" if ok else "failed"), entry
+
+    def _settle_forgotten(self, plan: dict, job_id: str,
+                          error: Callable[[str], dict]) -> dict:
+        """A job the bridge has no record of (it restarted, or let it go):
+        ComfyUI's own queue and history say how it ended."""
+        out_dir = self.settings.out_dir
+        pid, stage = plan["project_id"], plan["stage"]
+        attempt = plan["direction"]["attempt_id"]
+        try:
+            where, entry = self._comfy_knows(job_id)
+        except Exception as exc:  # noqa: BLE001 - no answer settles nothing
+            producer.hold_attempt(out_dir, pid, attempt, "running", describe_failure(exc))
+            return error(f"ComfyUI could not be asked how this run ended "
+                         f"({describe_failure(exc)}); it stays pending.")
+        if where == "queued":
+            producer.hold_attempt(out_dir, pid, attempt, "running",
+                                  "ComfyUI is still making this run")
+            return error("ComfyUI is still making this run, but the bridge has lost it; look "
+                         "again once it ends.")
+        if stage != "publish":
+            # A complete bundle recovers the result however the job ended.
+            failure = None if where == "done" else RuntimeError(
+                "ComfyUI no longer has this run" if where == "gone" else "the run failed")
+            return self._finish_bundle(plan, failure, error)
+        if where != "done":
+            message = ("ComfyUI no longer has this run" if where == "gone"
+                       else "the Publish run failed")
+            producer.abandon_attempt(out_dir, pid, attempt, message)
+            return error(message + "; publish again.")
+        try:
+            dest = self._save_history_video(entry, plan["node_ids"][EPISODE_NODE_TYPE])
+        except EpisodeMissing as exc:
+            producer.abandon_attempt(out_dir, pid, attempt, str(exc))
+            return error(str(exc))
+        except Exception as exc:  # noqa: BLE001 - made, not yet saved: never made again
+            producer.hold_attempt(out_dir, pid, attempt, "finishing", describe_failure(exc))
+            return error(f"the episode is made, but saving it here failed "
+                         f"({describe_failure(exc)}); Studio saves it without making it again.")
+        producer.finish_publish(out_dir, pid, attempt, dest.parent.name, dest.name)
+        return {"type": "done", "stage": "publish", "project_id": pid, "path": str(dest),
+                "run": dest.parent.name, "file": dest.name}
+
+    def _save_history_video(self, entry: dict, node_id: str) -> Path:
+        """A finished Publish run's video, from the mux node's own outputs in
+        ComfyUI's history, read through ``/view`` into a fresh folder here."""
+        outputs = (entry.get("outputs") or {}).get(str(node_id)) or {}
+        files = [item for items in outputs.values() if isinstance(items, list)
+                 for item in items if isinstance(item, dict)]
+        found = next((item for item in files
+                      if str(item.get("filename", "")).lower().endswith(VIDEO_SUFFIXES)
+                      and item.get("type", "output") == "output"), None)
+        if found is None:
+            raise EpisodeMissing("the Publish run finished, but ComfyUI's history names no "
+                                 "video from the final mux; publish again.")
+        name = Path(str(found["filename"])).name
+        data = self._read_output(str(found.get("subfolder") or ""), name)
+        dest_dir = Path(self.settings.out_dir) / uuid.uuid4().hex[:12]
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / name
+        dest.write_bytes(data)
+        if dest.stat().st_size == 0:
+            raise EpisodeMissing(f"the episode was not saved to {dest}")
+        return dest
 
     def _finish_publish(self, plan: dict, job: Any, failure: BaseException | None,
                         error: Callable[[str], dict]) -> dict:
