@@ -1,7 +1,7 @@
 # The registry-card batch from planning/docs-ui-best-practice/PLAN.md, section A.
 # pyproject.toml fires a publish on push, so this lands with the next version
 # bump, as one commit: `git apply planning/docs-ui-best-practice/pyproject_next_bump.diff`,
-# then bump `version`. Needs assets/otr_icon_400.gif, which is committed.
+# then bump `version`. Needs assets/otr_icon_400.png, which is committed.
 diff --git a/pyproject.toml b/pyproject.toml
 index 45ff034c..d9fec070 100644
 --- a/pyproject.toml
@@ -47,7 +47,7 @@ index 45ff034c..d9fec070 100644
  # generator for it. No node or bank COUNT goes on the art (operator,
  # 2026-09-21) -- it was wrong and it rots.
 -Icon = "https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_icon.gif"
-+Icon = "https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_icon_400.gif"
++Icon = "https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_icon_400.png"
 +Banner = "https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_banner.jpg"
  
  [tool.pytest.ini_options]
