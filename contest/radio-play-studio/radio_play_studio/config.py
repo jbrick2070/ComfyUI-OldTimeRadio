@@ -32,6 +32,64 @@ def reference_twin(workflow_path: Path) -> Path:
     """``workflows/x.json`` -> ``workflows/x_flux3_ref.json`` (it may not exist)."""
     path = Path(workflow_path)
     return path.with_name(path.stem + REFERENCE_TWIN_SUFFIX + path.suffix)
+
+#: The machines the page offers first, in the order it shows them, each with the
+#: ways it can film; a machine's first way is its default. Every entry is a
+#: workflow the pack ships and its regression rounds run, so the page chooses
+#: among real graphs and never builds one of its own (operator, 2026-10-23:
+#: "first you choose ... AMD / Mac / NVIDIA 8/16/24 ... then it prepopulates
+#: those and from there you edit, so we can serve everyone via one page"). The
+#: three ways are his: TTS + Foley video, TTS w/ video, TTS w/ stills.
+MACHINES: tuple = (
+    ("nvidia8", (("foley", "otr_8gb_ltx25_foley.json"), ("video", "otr_8gb_video.json"),
+                 ("stills", "otr_8gb_still.json"))),
+    ("nvidia16", (("foley", WORKFLOW_NAME), ("video", "otr_16gb_video.json"),
+                  ("stills", "otr_16gb_still.json"))),
+    ("nvidia24", (("foley", "otr_24gb_foley.json"),)),
+    ("mac16", (("video", "otr_mac16_video.json"), ("stills", "otr_mac16_still.json"))),
+    ("amd", (("stills", "otr_amd_still.json"),)),
+    # No GPU at all: the cloud graphs. Comfy Cloud bills Comfy credits through the
+    # key the page holds; Google bills a Google key ComfyUI reads itself.
+    ("comfy_cloud", (("foley", "otr_cloud_deluxe_3act.json"), ("video", "otr_cloud_low.json"))),
+    ("google_cloud", (("stills", "otr_google_still.json"),)),
+)
+#: The machines that bill a cloud account rather than run on this machine.
+CLOUD_MACHINES = ("comfy_cloud", "google_cloud")
+
+
+def menu_lookup(name: str) -> tuple | None:
+    """`(machine, way)` for a workflow file name on the menu, else None."""
+    for machine, ways in MACHINES:
+        for way, workflow in ways:
+            if workflow == name:
+                return machine, way
+    return None
+
+
+def detect_machine(stats: dict) -> str | None:
+    """The menu machine ComfyUI's `/system_stats` describes, or None (a CPU, or
+    nothing reported). A guess for the page to start on, never a gate: the
+    person can pick another."""
+    devices = (stats or {}).get("devices") or []
+    if not devices:
+        return None
+    device = devices[0]
+    kind = str(device.get("type") or "").lower()
+    name = str(device.get("name") or "").lower()
+    if kind == "mps":
+        return "mac16"
+    if kind != "cuda":
+        return None
+    if "amd" in name or "radeon" in name:
+        return "amd"
+    gib = float(device.get("vram_total") or 0) / 2 ** 30
+    if gib >= 20:
+        return "nvidia24"
+    if gib >= 12:
+        return "nvidia16"
+    return "nvidia8" if gib > 0 else None
+
+
 #: The pack's folder under custom_nodes/: a git clone takes the repository's name,
 #: a registry install (ComfyUI Manager, comfy-cli) takes the node id.
 PACK_DIR_NAMES = ("ComfyUI-OldTimeRadio", "comfyui-old-time-radio")

@@ -5,6 +5,7 @@ import json
 import pathlib
 
 import pytest
+from conftest import STILL_ENGINES
 
 from radio_play_studio.config import find_workflow
 from radio_play_studio.form import (
@@ -162,12 +163,17 @@ def test_the_still_picker_sets_all_three_still_dropdowns(schemas, workflow):
                                   "music_image_model")] == ["moss_image"] * 3
 
 
-def test_the_still_picker_offers_open_weights_only(schemas, workflow):
+def test_the_still_picker_offers_every_engine_but_the_custom_row(schemas, workflow):
+    """Mix and match (operator, 2026-10-23): open and cloud engines on any machine;
+    only the custom-model row, which opens a node editor, is left off."""
     graph = workflow_to_api_prompt(workflow, schemas)
-    rows = {r["key"]: r for r in describe_form(schemas, graph, locate_nodes(workflow))}
-    assert rows["stills"]["choices"] == ["flux3_klein", "moss_image", "z_image_turbo"]
+    node_ids = locate_nodes(workflow)
+    rows = {r["key"]: r for r in describe_form(schemas, graph, node_ids)}
+    assert rows["stills"]["choices"] == [c for c in STILL_ENGINES if c != "+ Add Custom Model"]
+    apply_choices(graph, schemas, node_ids, {"stills": "cloud_flux_pro"})
+    assert graph[node_ids["OTR_VideoDirector"]]["inputs"]["music_image_model"] == "cloud_flux_pro"
     with pytest.raises(ValueError):
-        apply_choices(graph, schemas, locate_nodes(workflow), {"stills": "cloud_flux_pro"})
+        apply_choices(graph, schemas, node_ids, {"stills": "+ Add Custom Model"})
 
 
 def test_a_saved_cloud_still_engine_starts_the_picker_on_a_listed_one(schemas, workflow):

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import socket
 import sys
 from pathlib import Path
@@ -66,11 +67,17 @@ def _choices(args: argparse.Namespace) -> dict:
 LOOPBACK_BINDS = ("127.0.0.1", "localhost", "::1")
 
 
+def _comfy_key() -> str | None:
+    """The Comfy API key a headless submitter uses (OTR_COMFY_API_KEY), so a
+    Comfy Cloud run started here is paid for without a page typing it in."""
+    return os.environ.get("OTR_COMFY_API_KEY", "").strip() or None
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     if args.host not in LOOPBACK_BINDS:
         raise ValueError(f"--host {args.host!r}: this app has no login, so it only listens on this "
                          f"machine ({', '.join(LOOPBACK_BINDS)})")
-    studio = Studio(_settings(args))
+    studio = Studio(_settings(args), comfy_key=_comfy_key())
     server = make_server(studio, args.host, args.port)
     print(f"Radio Play Studio on http://{args.host}:{args.port}  (ComfyUI {studio.settings.comfyui_url}, "
           f"bridge {studio.settings.api_url}, episodes -> {studio.settings.out_dir})")
@@ -84,7 +91,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    studio = Studio(_settings(args))
+    studio = Studio(_settings(args), comfy_key=_comfy_key())
     code = 1
     for event in studio.stream(_choices(args)):
         if event["type"] == "progress":

@@ -99,3 +99,30 @@ README's "no cloud calls" line becomes "none unless you pick a cloud writer".
 4. Names and microcopy: are his three names clear on a page that speaks nine
    languages? (He chose them; suggest, do not overrule.)
 5. Anything in the anchor that is factually wrong against the files.
+
+## Decisions after the round (2026-10-23)
+
+Roster: Codex (gpt-6-astra) and agy (Gemini, via kibitz --no-profiles) on the
+files, Fable on judgment. The operator then reshaped the brief mid-round: a
+machine picker first ("AMD / Mac / NVIDIA 8/16/24 ... then it prepopulates"),
+cloud machines ("don't forget cloud too", "Comfy Cloud / Google Cloud"), a key
+box ("enter your API or say where you need to store it"), mix and match for
+stills, and A/B as one writer choice.
+
+- **A is now "your machine, then how it's filmed",** and every choice is a
+  workflow that already ships (`MACHINES` in config.py). That settles the
+  four-new-graphs (Codex) versus submit-time-patch (agy) split: neither is
+  needed. Ways without a reference twin run My Story without references; the
+  photo warning says so per workflow.
+- **Foley stays the default** (the operator's standing contest ruling), against
+  Fable's "default to stills".
+- **B is one creative-writer choice** with slot-A models for OpenRouter, Google
+  and Comfy; the technical writer stays the workflow's (all three reviewers).
+  Comfy stays in: agy and Fable cut it as unreachable, but the Comfy SDK's
+  `submit(api_key=...)` sends `extra_data.api_key_comfy_org`, so the page can
+  hold the key. A cloud writer on its "(enable ...)" line is refused before
+  submit (agy). The panel sends nothing unless touched, and its summary always
+  names the writer (Codex, Fable).
+- **Stills mix and match:** every engine but the custom-model row, cloud ones
+  marked paid.
+- **One dark theme** stays (operator), declining Codex's light option.

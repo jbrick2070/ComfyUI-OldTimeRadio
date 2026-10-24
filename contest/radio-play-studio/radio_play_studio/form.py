@@ -22,6 +22,17 @@ SHOT_LOCK = "OTR_ShotLock"
 #: The story bank that reads the four My Story boxes, and their group on the page.
 MY_STORY_BANK = "my_story"
 MY_STORY = "My story"
+#: The writer's own group: a closed panel on the page, sent only when changed.
+WRITER_GROUP = "Writer"
+#: The cloud writers the page offers, each with the slot-A model picker it reads.
+#: Slot A is the creative passes' slot and slot B the technical passes'; the page
+#: makes the writer one choice and leaves the technical passes on the workflow's
+#: own model (Codex, agy and Fable, 2026-10-23; operator: "A/B combined, one
+#: choice"). Comfy credits ride on the key the page holds (the SDK sends it as
+#: extra_data.api_key_comfy_org).
+CLOUD_WRITERS = {"openrouter:slot-a": "openrouter_slot_a_model",
+                 "google_api:slot-a": "google_api_slot_a_model",
+                 "comfy:slot-a": "comfy_slot_a_model"}
 
 
 @dataclass(frozen=True)
@@ -47,8 +58,9 @@ class Field:
 #: In the order they appear on the page. Language leads: it is the one choice
 #: every story makes (operator, 2026-10-23: "put language first").
 FIELDS: tuple = (
-    Field("language", "Language", WRITER, "episode_language",
-          "The language of the play.", "The show"),
+    Field("language", "Language of the play", WRITER, "episode_language",
+          "The language the play is written and spoken in. The page's own language is "
+          "the menu at the top right.", "The show"),
     Field("bank", "Story bank", WRITER, "source_bank",
           "Where the story comes from. Pick shakespeare or public_domain to adapt a "
           "classic, my_story to use your own details below, or roll to be surprised.",
@@ -65,16 +77,31 @@ FIELDS: tuple = (
           "stills. On the audio-reactive lanes it changes the file name, not the picture.",
           "The show"),
     Field("stills", "Still pictures", "OTR_VideoDirector", "character_image_model",
-          "The open model that paints every still the video starts from -- the "
-          "characters, the announcer and the music. moss_image (MOSS-Image, Apache-2.0, "
-          "about 13 GB the first time) is the 16 GB pick; flux3_klein is a little faster. "
-          "Tell my own story paints its characters from their pictures with flux3_klein "
-          "(flux3_klein_ref); pick another model to switch that off.",
+          "The model that paints every still the video starts from -- the characters, "
+          "the announcer and the music. Any machine can use any of them: the open ones "
+          "run here (moss_image is the 16 GB pick; flux3_klein is a little faster), and "
+          "the cloud ones are paid -- cloud_ and ideo through a Comfy key, google_image "
+          "through a Google key. Tell my own story paints its characters from their "
+          "pictures with flux3_klein (flux3_klein_ref); pick another model to switch that off.",
           "The show", also=("announcer_image_model", "music_image_model"),
-          # Open weights only: the app makes no cloud calls (README), so the cloud
-          # and partner lanes the pack's dropdown also lists are never offered.
-          exclude=("google_image", "ideo", "+ Add Custom Model"),
-          exclude_prefixes=("cloud_",)),
+          # Mix and match (operator, 2026-10-23: "people can mix and match whatever
+          # they want"): every engine but the custom-model row, which opens a node
+          # editor this page does not have.
+          exclude=("+ Add Custom Model",)),
+    Field("writer", "Writer", WRITER, "creative_writing_model",
+          "The model that writes the play. Local models run on this machine for free; "
+          "OpenRouter, Google and Comfy are paid cloud models and need a key.",
+          WRITER_GROUP, exclude=("openrouter:slot-b", "google_api:slot-b", "comfy:slot-b"),
+          optional=True),
+    Field("writer_openrouter", "OpenRouter model", WRITER, "openrouter_slot_a_model",
+          "Used when the writer is OpenRouter. Needs OPENROUTER_API_KEY where ComfyUI runs.",
+          WRITER_GROUP, optional=True),
+    Field("writer_google", "Google model", WRITER, "google_api_slot_a_model",
+          "Used when the writer is Google. Needs GEMINI_API_KEY (or GOOGLE_API_KEY) "
+          "where ComfyUI runs.", WRITER_GROUP, optional=True),
+    Field("writer_comfy", "Comfy model", WRITER, "comfy_slot_a_model",
+          "Used when the writer is Comfy. Bills Comfy credits through the key on this page.",
+          WRITER_GROUP, optional=True),
     Field("my_characters", "Who is in it", WRITER, "story_characters",
           "Names, how they know each other, what they are like. Put (she) or (he) "
           "right after a name and that character is voiced and drawn that way; "
@@ -192,7 +219,22 @@ def apply_choices(api_prompt: dict, schemas: dict, node_ids: dict, choices: dict
             info = _usable(describe_input(schemas, f.node_type, name), f)
             node["inputs"][name] = coerce_value(info, _blank_to_text(value, info), f.label)
     _check_my_story(api_prompt, node_ids)
+    _check_writer(api_prompt, node_ids)
     return api_prompt
+
+
+def _check_writer(api_prompt: dict, node_ids: dict) -> None:
+    """A cloud writer whose model picker is still on its "(enable ...)" or
+    "(select ...)" line has no model to call: said before submitting, not when
+    the writer fails minutes in."""
+    inputs = api_prompt.get(node_ids.get(WRITER) or "", {}).get("inputs", {})
+    slot = CLOUD_WRITERS.get(str(inputs.get("creative_writing_model") or ""))
+    if slot is None:
+        return
+    model = inputs.get(slot)
+    if isinstance(model, str) and (not model.strip() or model.startswith("(")):
+        raise GraphError(f"Writer: {inputs['creative_writing_model']} has no model picked; "
+                         "choose one in its model box, or pick a local writer")
 
 
 def _check_my_story(api_prompt: dict, node_ids: dict) -> None:

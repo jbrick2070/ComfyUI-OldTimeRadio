@@ -84,6 +84,26 @@
   .mode:has(input:checked) { border-color: var(--accent); }
   .mode:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
 
+  /* ---- your machine, how it's filmed, the writer panel and the key box ---- */
+  .picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px;
+           margin: 6px 0 12px; }
+  .pick { padding: 10px 14px; }
+  /* Seven machines fit one row on a wide screen. */
+  .machines { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
+  .machines .pick { padding: 8px 10px; }
+  .pick strong { font: 600 1rem/1.3 var(--sans); display: inline; }
+  .pick span { display: block; }
+  .pick .time { color: var(--accent-text); font-size: .85rem; margin-top: 2px; }
+  #group_Writer { border: 1px solid var(--line); background: var(--panel); border-radius: 12px;
+                  padding: 12px 18px; margin: 0 0 16px; }
+  #group_Writer > summary { cursor: pointer; font: 600 1rem var(--sans); min-height: 28px; }
+  #group_Writer #writer_reset { margin-top: 8px; }
+  #keys { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 12px; }
+  .keyrow b { display: block; font: 600 .95rem var(--sans); }
+  .keyrow .ok { color: var(--ok); font: .875rem var(--sans); }
+  .keyline { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+  .keyline input { flex: 1 1 16rem; width: auto; }
+
   /* ---- the cast editor on the landing (unchanged in shape) ---- */
   .cast { display: grid; gap: 12px; margin-top: 8px; }
   .card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg);
@@ -296,7 +316,12 @@
     .mode { padding: 12px 16px; }
     #form { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
             gap: 0 18px; align-items: start; }
-    #form > .modes { grid-column: 1 / -1; }
+    #form > .modes, #form > #group_setup { grid-column: 1 / -1; }
+    #form > #group_Writer { grid-column: 2; }
+    #form:has(#group_My_story[hidden]) > #group_Writer,
+    #form:not(:has(#group_My_story)) > #group_Writer { grid-column: 1 / -1; }
+    #group_setup { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 0 18px; }
+    #group_setup > #keys { grid-column: 1 / -1; }
     #form > fieldset { margin-bottom: 12px; }
     /* My story on the left, the show beside it; a classic story has only the show. */
     #form > #group_My_story { grid-column: 1; }
@@ -424,6 +449,28 @@ let fields = [];
 // this workflow, from the server; null when the server does not say, and then the
 // page makes no claim either way.
 let photoStills = null;
+// The machine menu the server offers (machines, each with its ways of filming),
+// and the workflow the form is drawn from; null on a server started on a graph
+// that is not on the menu.
+let menu = null, workflowName = null;
+// The fields a person changed, which survive a switch of machine or way: anything
+// left alone takes the new workflow's own value.
+const touched = new Set();
+// The writer's panel: sent only when a person changed something in it.
+const WRITER_GROUP = "Writer";
+const CLOUD_WRITERS = {"openrouter:slot-a": "writer_openrouter", "google_api:slot-a": "writer_google",
+                       "comfy:slot-a": "writer_comfy"};
+// What each cloud pick needs a key for. Comfy partner nodes bill the Comfy key;
+// Google's image, voice and writer models bill the Google key.
+const KEY_FOR_MACHINE = {comfy_cloud: "comfy", google_cloud: "google"};
+const KEY_FOR_WRITER = {"openrouter:slot-a": "openrouter", "google_api:slot-a": "google",
+                        "comfy:slot-a": "comfy"};
+let keyStatus = null;
+// One act on our test machines (planning/regression/ROUNDS.md, 2026-10-23), in
+// seconds: a guide, never a promise; the foley figure is the closed-SDK sibling's.
+const ONE_ACT_SECONDS = {"otr_16gb_still.json": 1543, "otr_16gb_video.json": 8849,
+                         "otr_16gb_foley_open.json": 12090, "otr_8gb_still.json": 617,
+                         "otr_8gb_video.json": 618, "otr_8gb_ltx25_foley.json": 3374};
 let running = false;   // an episode is being made: Make stays off
 
 // -- Translations -------------------------------------------------------------
@@ -551,6 +598,7 @@ function control(f) {
       const o = document.createElement("option");
       o.value = o.textContent = String(c);
       if (CHOICE_LABELS.has(f.key)) tx(o, "choice." + f.key + "." + slug(c), String(c));
+      else if (f.key === "writer" && CLOUD_WRITERS[c]) tx(o, "writer.handle." + slug(c), String(c));
       el.appendChild(o);
     }
     if (f.default != null) el.value = String(f.default);
@@ -571,6 +619,7 @@ function control(f) {
   }
   if (f.kind === "text" && f.placeholder) el.placeholder = f.placeholder;   // the pack's own example
   el.id = "f_" + f.key;
+  for (const kind of ["input", "change"]) el.addEventListener(kind, () => { touched.add(f.key); setupView(); });
   return el;
 }
 
@@ -581,9 +630,22 @@ let lastBank = null;
 function build(list) {
   fields = list;
   form.textContent = "";
+  if (menu) form.appendChild(setupBox());
   const boxes = {};
   for (const f of list) {
-    if (!boxes[f.group]) {
+    if (!boxes[f.group] && f.group === WRITER_GROUP) {
+      // Closed until opened, and its summary always says which writer will run.
+      const box = document.createElement("details");
+      box.id = "group_Writer";
+      const sm = document.createElement("summary");
+      sm.id = "writer_summary";
+      const reset = document.createElement("button");
+      reset.type = "button"; reset.className = "small quiet"; reset.id = "writer_reset";
+      tx(reset, "writer.reset", "Use the workflow's writer");
+      reset.addEventListener("click", resetWriter);
+      box.append(sm, reset);
+      boxes[f.group] = box;
+    } else if (!boxes[f.group]) {
       const box = document.createElement("fieldset");
       box.id = "group_" + f.group.replace(/\W+/g, "_");
       const lg = document.createElement("legend");
@@ -630,6 +692,193 @@ function build(list) {
   }
   buttons();
   photoWarn();
+  setupView();
+}
+
+// -- Your machine, then how it is filmed (operator, 2026-10-23: "first you choose
+// ... AMD / Mac / NVIDIA 8/16/24 ... then it prepopulates those and from there
+// you edit, so we can serve everyone via one page"). Each way is a workflow the
+// pack ships; picking one redraws the form from it.
+function setupBox() {
+  const box = document.createElement("fieldset");
+  box.id = "group_setup";
+  const lg = document.createElement("legend");
+  tx(lg, "setup.legend", "Your machine and how it's filmed");
+  box.appendChild(lg);
+  const machines = document.createElement("div");
+  machines.className = "picks machines"; machines.setAttribute("role", "radiogroup");
+  tx(machines, "setup.machine", "Your machine", "aria-label");
+  const current = menu.current;
+  for (const m of menu.machines) {
+    const card = document.createElement("label");
+    card.className = "mode pick";
+    const r = document.createElement("input");
+    r.type = "radio"; r.name = "machine"; r.value = m.key; r.id = "machine_" + m.key;
+    r.checked = m.key === current.machine;
+    r.addEventListener("change", () => {
+      const keep = m.ways.find((w) => w.key === current.way) || m.ways[0];
+      pickWorkflow(keep.workflow);
+    });
+    const name = document.createElement("strong");
+    tx(name, "machine." + m.key, m.key);
+    card.append(r, name);
+    const note = document.createElement("span");
+    if (m.key === menu.detected) tx(note, "machine.detected", "this machine");
+    else if (m.key in KEY_FOR_MACHINE) tx(note, "machine.no_gpu", "no GPU needed, paid");
+    if (note.textContent) card.appendChild(note);
+    machines.appendChild(card);
+  }
+  const ways = document.createElement("div");
+  ways.className = "picks ways"; ways.setAttribute("role", "radiogroup");
+  tx(ways, "setup.way", "How it's filmed", "aria-label");
+  const machine = menu.machines.find((m) => m.key === current.machine);
+  for (const w of machine ? machine.ways : []) {
+    const card = document.createElement("label");
+    card.className = "mode pick";
+    const r = document.createElement("input");
+    r.type = "radio"; r.name = "way"; r.value = w.workflow; r.id = "way_" + w.key;
+    r.checked = w.workflow === current.workflow;
+    r.addEventListener("change", () => pickWorkflow(w.workflow));
+    const name = document.createElement("strong");
+    tx(name, "way." + w.key, w.key);
+    const sub = document.createElement("span");
+    tx(sub, "way." + w.key + "_sub", "");
+    card.append(r, name, sub);
+    const secs = ONE_ACT_SECONDS[w.workflow];
+    if (secs) {
+      const time = document.createElement("span");
+      time.className = "time";
+      const span = secs >= 5400 ? t("time.h", {n: (secs / 3600).toFixed(1)}, (secs / 3600).toFixed(1) + " h")
+                                : t("time.min", {n: Math.round(secs / 60)}, Math.round(secs / 60) + " min");
+      tx(time, "way.time", "About " + span + " for one act on our test machine", null, {time: span});
+      card.appendChild(time);
+    }
+    ways.appendChild(card);
+  }
+  const keys = document.createElement("div");
+  keys.id = "keys"; keys.hidden = true;
+  box.append(machines, ways, keys);
+  return box;
+}
+
+async function pickWorkflow(name) {
+  if (!name || name === workflowName) return;
+  await loadOptions(name);
+}
+
+// The writer panel's summary, its cloud model rows, and the keys this set of
+// picks needs: redrawn on every change.
+function setupView() {
+  writerView();
+  keysView();
+}
+
+function writerView() {
+  const pick = $("f_writer"), sm = $("writer_summary");
+  if (!pick || !sm) return;
+  for (const [handle, key] of Object.entries(CLOUD_WRITERS))
+    if ($("row_" + key)) $("row_" + key).hidden = pick.value !== handle;
+  const option = pick.options[pick.selectedIndex];
+  const name = option ? option.textContent : pick.value;
+  // A cloud writer's name already says it is paid; the summary adds its model.
+  const model = pick.value in CLOUD_WRITERS && $("f_" + CLOUD_WRITERS[pick.value]);
+  if (model) say(sm, "writer.summary_model", {name, model: model.value});
+  else say(sm, "writer.summary", {name});
+  $("writer_reset").hidden = !fields.some((f) => f.group === WRITER_GROUP && touched.has(f.key));
+}
+
+function resetWriter() {
+  for (const f of fields) {
+    if (f.group !== WRITER_GROUP) continue;
+    const el = $("f_" + f.key);
+    if (el && f.default != null) el.value = String(f.default);
+    touched.delete(f.key);
+  }
+  setupView();
+}
+
+function keysNeeded() {
+  const need = new Set();
+  const machine = menu && menu.current.machine;
+  if (KEY_FOR_MACHINE[machine]) need.add(KEY_FOR_MACHINE[machine]);
+  const stills = $("f_stills") ? $("f_stills").value : "";
+  if (stills.startsWith("cloud_") || stills === "ideo") need.add("comfy");
+  if (stills === "google_image") need.add("google");
+  const writer = $("f_writer") ? $("f_writer").value : "";
+  if (KEY_FOR_WRITER[writer]) need.add(KEY_FOR_WRITER[writer]);
+  return [...need];
+}
+
+function keysView() {
+  const box = $("keys");
+  if (!box) return;
+  const need = keysNeeded();
+  box.hidden = !need.length;
+  // A key half typed stays put while the box redraws around it.
+  const typed = $("comfy_key") ? $("comfy_key").value : "";
+  box.textContent = "";
+  if (!need.length) return;
+  const head = document.createElement("strong");
+  tx(head, "keys.legend", "Keys these picks need");
+  box.appendChild(head);
+  for (const lane of need) {
+    const row = document.createElement("div");
+    row.className = "keyrow";
+    const name = document.createElement("b");
+    tx(name, "keys." + lane, lane);
+    row.appendChild(name);
+    const state = keyStatus && keyStatus[lane];
+    if (lane === "comfy") {
+      const status = document.createElement("span");
+      status.className = state && state.set ? "ok" : "help";
+      say(status, state && state.set ? "keys.comfy_set" : "keys.comfy_missing");
+      const help = document.createElement("p");
+      help.className = "help";
+      say(help, "keys.comfy_help");
+      const input = document.createElement("input");
+      input.type = "password"; input.id = "comfy_key"; input.autocomplete = "off"; input.value = typed;
+      tx(input, "keys.comfy", "Comfy key", "aria-label");
+      const use = document.createElement("button");
+      use.type = "button"; use.className = "small"; tx(use, "keys.save", "Use this key");
+      use.addEventListener("click", () => sendComfyKey(input.value));
+      const forget = document.createElement("button");
+      forget.type = "button"; forget.className = "small quiet"; tx(forget, "keys.forget", "Forget the key");
+      forget.hidden = !(state && state.set);
+      forget.addEventListener("click", () => sendComfyKey(""));
+      const line = document.createElement("div");
+      line.className = "keyline";
+      line.append(input, use, forget);
+      row.append(status, help, line);
+    } else {
+      const status = document.createElement("span");
+      status.className = state && state.file ? "ok" : "help";
+      say(status, state && state.file ? "keys.file_found" : "keys.file_missing");
+      const help = document.createElement("p");
+      help.className = "help";
+      say(help, "keys.file_help", {path: state ? state.path : lane + ".secret",
+                                   env: state ? state.env.join(" / ") : ""});
+      row.append(status, help);
+    }
+    box.appendChild(row);
+  }
+}
+
+async function refreshKeys() {
+  try {
+    const res = await fetch("/api/keys");
+    if (res.ok) keyStatus = await res.json();
+  } catch (err) { /* the box says "not set" until the server answers */ }
+  keysView();
+}
+
+async function sendComfyKey(key) {
+  try {
+    const res = await fetch("/api/keys/comfy", {method: "POST", headers: {"Content-Type": "application/json"},
+                                                body: JSON.stringify({key})});
+    if (res.ok) keyStatus = await res.json();
+  } catch (err) { /* the status line keeps saying what the server last said */ }
+  if ($("comfy_key")) $("comfy_key").value = "";
+  keysView();
 }
 
 // Photos only reach the stills through a model that paints from a picture.
@@ -932,23 +1181,56 @@ function collect() {
     // ...and my_story has no classic to adapt: the pack stops a run that names
     // one (_otr_story_input.py), so it is sent empty, over any saved value.
     if (f.key === "source_ref" && bank === MY_STORY_BANK) { out[f.key] = ""; continue; }
+    // The writer panel only speaks when someone changed it: closed and
+    // untouched, the run keeps the workflow's own writer.
+    if (f.group === WRITER_GROUP && !touched.has(f.key)) continue;
     const el = $("f_" + f.key);
     if (f.kind === "text" && el.value === "" ) continue;   // blank = the workflow's own value
     out[f.key] = (f.kind === "int" || f.kind === "float") ? Number(el.value) : el.value;
   }
+  if (menu && workflowName) out.workflow = workflowName;
   return out;
 }
 
-async function loadOptions() {
+// What a person typed or picked, so a new machine or way keeps it.
+function remember() {
+  const values = {};
+  for (const f of fields) {
+    const el = $("f_" + f.key);
+    if (el && (touched.has(f.key) || f.group === MY_STORY_GROUP)) values[f.key] = el.value;
+  }
+  return {values, own: !!($("mode_own") && $("mode_own").checked)};
+}
+
+function restore(saved) {
+  if (!saved) return;
+  for (const [key, value] of Object.entries(saved.values)) {
+    const el = $("f_" + key);
+    if (!el) continue;
+    if (el.tagName === "SELECT" && ![...el.options].some((o) => o.value === value)) continue;
+    el.value = value;
+  }
+  if (saved.own && $("mode_own")) setMode("own");
+  if ($("cast_list")) drawCast();
+  photoWarn();
+  setupView();
+}
+
+async function loadOptions(workflow) {
   // A ComfyUI that is busy rendering takes about 40 s to list its nodes.
   say($("notice"), "notice.asking");
   $("notice").hidden = false;
   try {
-    const res = await fetch("/api/options");
+    const res = await fetch("/api/options" + (workflow ? "?workflow=" + encodeURIComponent(workflow) : ""));
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || res.statusText);
+    const saved = fields.length ? remember() : null;
     photoStills = Array.isArray(body.photo_stills) ? body.photo_stills : null;
+    menu = body.menu || null;
+    workflowName = menu ? menu.current.workflow : null;
     build(body.fields);
+    restore(saved);
+    refreshKeys();
     $("notice").hidden = true;
   } catch (err) {
     say($("notice"), "notice.unreachable", {error: err.message});

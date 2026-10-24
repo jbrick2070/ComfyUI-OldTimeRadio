@@ -18,6 +18,11 @@ BANKS = ["roll (any eligible bank)", "original", "shakespeare", "my_story"]
 STYLES = ["roll (any style)", "noir", "pastel"]
 DIRECTOR = "OTR_VideoDirector"
 #: As the pack lists them: local engines, cloud lanes and the custom row together.
+#: The writer's model list as the pack shapes it: local models, then the cloud
+#: handles (slot A creative, slot B technical).
+WRITERS = ["google/gemma-4-12b-it", "comfy_native:gemma4-12b-int8-convrot",
+           "openrouter:slot-a", "openrouter:slot-b", "google_api:slot-a", "google_api:slot-b",
+           "comfy:slot-a", "comfy:slot-b"]
 STILL_ENGINES = ["cloud_flux_pro", "flux3_klein", "google_image", "ideo", "moss_image",
                  "z_image_turbo", "+ Add Custom Model"]
 
@@ -39,6 +44,13 @@ def writer_schema() -> dict:
             "story_plot": text(multiline=True),
             "story_setting": text(multiline=True),
             "story_author": text(),
+            "creative_writing_model": (WRITERS, {"default": WRITERS[1]}),
+            "openrouter_slot_a_model": (["(enable OpenRouter)", "~anthropic/claude-sonnet-latest"],
+                                        {"default": "(enable OpenRouter)"}),
+            "google_api_slot_a_model": (["(select Google API model)", "gemini-pro-latest"],
+                                        {"default": "(select Google API model)"}),
+            "comfy_slot_a_model": (["(enable Comfy Credits)", "anthropic/claude-sonnet-5"],
+                                   {"default": "(enable Comfy Credits)"}),
         },
     }}
 

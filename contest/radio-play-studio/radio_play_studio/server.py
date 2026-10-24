@@ -20,7 +20,7 @@ import uuid
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from . import producer
 from .graph import GraphError, ServerUnreachable
@@ -360,6 +360,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._options()
         if path == "/api/languages":
             return self._send_json(HTTPStatus.OK, {"languages": available_languages()})
+        if path == "/api/keys":
+            return self._send_json(HTTPStatus.OK, self.runs.studio.key_status())
         if path.startswith("/i18n/"):
             name = path[len("/i18n/"):]
             if _I18N_FILE.fullmatch(name):
@@ -388,7 +390,7 @@ class Handler(BaseHTTPRequestHandler):
         project = re.fullmatch(r"/api/projects/" + _PROJECT + r"/(draft|stages|reconcile|forget)",
                                path)
         if path not in ("/api/episodes", "/api/presence", "/api/photos",
-                        "/api/projects") and not project:
+                        "/api/projects", "/api/keys/comfy") and not project:
             self._discard_body()
             return self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
         if (self.headers.get("Content-Type") or "").split(";")[0].strip().lower() != "application/json":
@@ -398,6 +400,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._presence()
         if path == "/api/photos":
             return self._photo()
+        if path == "/api/keys/comfy":
+            return self._comfy_key()
         if path == "/api/projects":
             return self._new_project()
         if project:
@@ -541,6 +545,19 @@ class Handler(BaseHTTPRequestHandler):
             self.runs.page_open(page)
         self._send_json(HTTPStatus.OK, {"ok": True})
 
+    def _comfy_key(self) -> None:
+        """{"key": text} holds the Comfy API key for this server's runs; an empty
+        key forgets it. The reply says only whether one is held -- a key is never
+        sent back, written down or logged."""
+        try:
+            key = self._body().get("key")
+            if key is not None and not isinstance(key, str):
+                raise ValueError("send {'key': text}")
+        except (ValueError, TypeError):
+            return self._send_json(HTTPStatus.BAD_REQUEST, {"error": "send {'key': text}"})
+        self.runs.studio.comfy_key = (key or "").strip() or None
+        self._send_json(HTTPStatus.OK, self.runs.studio.key_status())
+
     def _photo(self) -> None:
         """A character's photo: {"data": data URL} -> {"file": stored name}."""
         try:
@@ -557,7 +574,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def _options(self) -> None:
         try:
-            self._send_json(HTTPStatus.OK, self.runs.studio.form())
+            query = parse_qs(urlsplit(self.path).query)
+            workflow = (query.get("workflow") or [None])[0]
+            self._send_json(HTTPStatus.OK, self.runs.studio.form(workflow))
+        except ValueError as exc:   # a workflow the page does not offer
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except (ServerUnreachable, GraphError) as exc:
             self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(exc)})
 

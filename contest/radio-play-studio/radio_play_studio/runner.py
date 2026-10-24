@@ -17,7 +17,8 @@ from pathlib import Path
 from typing import Any, Callable, Iterator
 
 from . import producer
-from .config import REFERENCE_TWIN_SUFFIX, Settings, reference_twin, validate_url
+from .config import (MACHINES, REFERENCE_TWIN_SUFFIX, Settings, detect_machine, menu_lookup,
+                     reference_twin, validate_url)
 from .form import (EPISODE_NODE_TYPE, FIELDS_BY_KEY, MY_STORY_BANK, WRITER, apply_choices,
                    describe_form, locate_nodes)
 from .graph import fetch_object_info, load_workflow, workflow_to_api_prompt
@@ -25,6 +26,8 @@ from .graph import fetch_object_info, load_workflow, workflow_to_api_prompt
 #: The still-engine dropdown the Still pictures field sets for the characters.
 DIRECTOR = FIELDS_BY_KEY["stills"].node_type
 STILLS_INPUT = FIELDS_BY_KEY["stills"].input
+#: The choice that names which menu workflow a run uses: routing, not a field.
+WORKFLOW_CHOICE = "workflow"
 #: A still engine that paints a character from that character's picture is named
 #: after its base engine with this suffix (flux3_klein -> flux3_klein_ref).
 REFERENCE_SUFFIX = "_ref"
@@ -196,7 +199,8 @@ class Studio:
                  now: Callable[[], float] = time.monotonic,
                  read_output: Callable[[str, str], bytes] | None = None,
                  comfy_json: Callable[[str], Any] | None = None,
-                 sleep: Callable[[float], None] = time.sleep) -> None:
+                 sleep: Callable[[float], None] = time.sleep,
+                 comfy_key: str | None = None) -> None:
         self.settings = settings
         self._client_factory = client_factory
         self._fetch = fetch
@@ -208,23 +212,101 @@ class Studio:
         self._comfy_json = comfy_json or (
             lambda path: producer.read_json(settings.comfyui_url, path))
         self._sleep = sleep
+        #: The Comfy API key runs are submitted with: from the page, or the
+        #: OTR_COMFY_API_KEY the command line passes in. Held in memory only --
+        #: never written, never logged, never sent back to a page.
+        self.comfy_key: str | None = (comfy_key or "").strip() or None
+        #: The machine ComfyUI reported, once it has ("" for none on the menu).
+        self._machine: str | None = None
 
-    def options(self, schemas: dict | None = None) -> list:
-        workflow = load_workflow(self.settings.workflow_path)
+    def key_status(self) -> dict:
+        """Which keys the cloud picks can find, never the keys themselves. The
+        Comfy key is the one this server holds. Google and OpenRouter are read
+        by ComfyUI itself, from its environment or from a key file in the pack
+        folder (nodes/_otr_shared/api_key_files.py); the page can only see the
+        files, so it says where to put a key and whether a file is there."""
+        root = Path(self.settings.workflow_path).resolve().parent.parent
+        status = {"comfy": {"set": bool(self.comfy_key), "env": ["OTR_COMFY_API_KEY"]}}
+        for lane, env in (("google", ["GEMINI_API_KEY", "GOOGLE_API_KEY", "OTR_GOOGLE_API_KEY"]),
+                          ("openrouter", ["OPENROUTER_API_KEY"])):
+            files = (root / f"{lane}.secret", root / f"{lane}_api_key.location")
+            status[lane] = {"file": any(f.is_file() and f.stat().st_size > 0 for f in files),
+                            "path": str(files[0]), "env": env}
+        return status
+
+    def _submit(self, client, workflow):
+        """Submit with the Comfy key when there is one: the SDK sends it as
+        extra_data.api_key_comfy_org, which pays for Comfy partner nodes."""
+        if self.comfy_key:
+            return client.submit(workflow, api_key=self.comfy_key)
+        return client.submit(workflow)
+
+    def options(self, schemas: dict | None = None, workflow_path: Path | None = None) -> list:
+        workflow = load_workflow(workflow_path or self.settings.workflow_path)
         if schemas is None:
             schemas = self._fetch(self.settings.comfyui_url)
         graph = workflow_to_api_prompt(workflow, schemas)
         return describe_form(schemas, graph, locate_nodes(workflow))
 
-    def form(self) -> dict:
-        """What the page draws: the form, and the still picks that use photos.
-        One read of the node definitions serves both; on a ComfyUI that is
-        rendering, that read is the slow part of opening the page."""
-        schemas = self._fetch(self.settings.comfyui_url)
-        fields = self.options(schemas)
-        return {"fields": fields, "photo_stills": self.photo_stills(fields, schemas)}
+    def menu(self) -> list | None:
+        """The machines and ways of filming this server can offer, as
+        `[{"key", "ways": [{"key", "workflow"}]}]`, or None when it was started on
+        a workflow that is not on the menu (it then runs that one, as before).
+        A way whose workflow is not beside the server's own is left off."""
+        base = Path(self.settings.workflow_path)
+        if menu_lookup(base.name) is None:
+            return None
+        machines = []
+        for machine, ways in MACHINES:
+            present = [{"key": way, "workflow": name} for way, name in ways
+                       if (base.parent / name).is_file()]
+            if present:
+                machines.append({"key": machine, "ways": present})
+        return machines
 
-    def photo_stills(self, fields: list, schemas: dict | None = None) -> list:
+    def detected_machine(self) -> str | None:
+        """The menu machine ComfyUI says it runs on, asked until it answers and
+        then remembered: the card does not change while this server runs, and a
+        ComfyUI busy rendering can be slow to answer /system_stats."""
+        if self._machine is None:
+            try:
+                self._machine = detect_machine(self._comfy_json("/system_stats")) or ""
+            except Exception:  # noqa: BLE001 -- a guess the page can live without
+                return None
+        return self._machine or None
+
+    def resolve_workflow(self, name: str | None) -> Path:
+        """The workflow file a run or a form asks for by name: the server's own
+        when none is named, otherwise a menu entry beside it. Anything else is
+        refused -- the page can only pick among the graphs the pack ships."""
+        base = Path(self.settings.workflow_path)
+        if not name or name == base.name:
+            return base
+        if self.menu() is None or menu_lookup(str(name)) is None:
+            raise ValueError(f"{name!r} is not one of the workflows this page offers")
+        path = base.parent / str(name)
+        if not path.is_file():
+            raise ValueError(f"{name} is not in {base.parent}")
+        return path
+
+    def form(self, workflow: str | None = None) -> dict:
+        """What the page draws for one workflow: its form, the still picks that
+        use photos, and the machine menu with the machine ComfyUI reports. One
+        read of the node definitions serves it all; on a ComfyUI that is
+        rendering, that read is the slow part of opening the page."""
+        path = self.resolve_workflow(workflow)
+        schemas = self._fetch(self.settings.comfyui_url)
+        fields = self.options(schemas, path)
+        body = {"fields": fields, "photo_stills": self.photo_stills(fields, schemas, path.name)}
+        machines = self.menu()
+        if machines is not None:
+            machine, way = menu_lookup(path.name)
+            body["menu"] = {"machines": machines, "detected": self.detected_machine(),
+                            "current": {"machine": machine, "way": way, "workflow": path.name}}
+        return body
+
+    def photo_stills(self, fields: list, schemas: dict | None = None,
+                     workflow: str | None = None) -> list:
         """The Still pictures choices whose My Story run paints the characters
         from their photos, so the page can say when a photo will go unused.
 
@@ -237,7 +319,7 @@ class Studio:
         if stills is None:
             return []
         choices = [str(c) for c in stills.get("choices") or []]
-        path = self.workflow_for({"bank": MY_STORY_BANK})
+        path = self.workflow_for({"bank": MY_STORY_BANK, WORKFLOW_CHOICE: workflow})
         workflow = load_workflow(path)
         if schemas is None:
             schemas = self._fetch(self.settings.comfyui_url)
@@ -250,10 +332,11 @@ class Studio:
         return out
 
     def workflow_for(self, choices: dict) -> Path:
-        """The workflow these choices run: a My Story run uses the workflow's
+        """The workflow these choices run: the menu workflow they name (the
+        server's own by default), and for a My Story run that workflow's
         reference twin when one ships beside it, so its characters are painted
         from their pictures; anything else runs the workflow as named."""
-        named = Path(self.settings.workflow_path)
+        named = self.resolve_workflow((choices or {}).get(WORKFLOW_CHOICE))
         if str((choices or {}).get("bank") or "") == MY_STORY_BANK:
             twin = reference_twin(named)
             if twin.is_file() and not named.stem.endswith(REFERENCE_TWIN_SUFFIX):
@@ -274,7 +357,8 @@ class Studio:
         node_ids = locate_nodes(workflow)
         director = graph.get(node_ids.get(DIRECTOR, ""), {}).get("inputs", {})
         saved_character = director.get(STILLS_INPUT)
-        apply_choices(graph, schemas, node_ids, copy.deepcopy(choices))
+        apply_choices(graph, schemas, node_ids,
+                      {k: copy.deepcopy(v) for k, v in (choices or {}).items() if k != WORKFLOW_CHOICE})
         # The page's Still pictures box shows the base model (flux3_klein), so a
         # run sends it back; on a graph whose characters use that model WITH
         # references (the My Story twin), they keep them -- never a silent loss.
@@ -294,7 +378,7 @@ class Studio:
             timing_file = timing_path(self.settings.out_dir, self.workflow_for(choices), acts, graph)
             clock = ProgressClock(load_timing(timing_file), now=self._now)
             client = self._client_factory(self.settings.api_url)
-            job = client.submit(client.workflows.from_json(graph))
+            job = self._submit(client, client.workflows.from_json(graph))
             yield {"type": "submitted"}
             stream_whole, last_status, most_done, settled = True, None, 0, False
             try:
@@ -412,7 +496,7 @@ class Studio:
             yield error(describe_failure(exc))
             return
         try:
-            job = client.submit(workflow)
+            job = self._submit(client, workflow)
         except Exception as exc:  # noqa: BLE001 - decided below
             if submit_was_refused(exc):
                 producer.abandon_attempt(out_dir, pid, attempt, describe_failure(exc))

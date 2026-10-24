@@ -6,8 +6,9 @@ Built for the Comfy [Open Source Higgsfield](https://comfy.org/open-source-higgs
 An open-source take on Higgsfield's Cinema Studio: where Cinema Studio directs a concept into
 shots, Radio Play Studio writes the whole story, casts it, and directs every beat. Every character
 keeps the same face and voice from shot to shot, and every shot is filmed with LTX on your own
-card, with voices, music and foley mixed under the picture. Open weights only, nothing to pay
-per episode; the app is MIT licensed, and each model keeps its own license (see License).
+card, with voices, music and foley mixed under the picture. By default it is open weights only,
+with nothing to pay per episode; cloud models are there if you pick them. The app is MIT licensed,
+and each model keeps its own license (see License).
 
 > **Demo video (1:53):** https://youtu.be/UeQQeVMaMVs
 
@@ -34,7 +35,8 @@ One press runs the [Old-Time Radio](https://github.com/jbrick2070/ComfyUI-OldTim
 The app reads the pack's shipped workflow, turns it into an API graph against your server's live
 node definitions, sets what a person chose, submits it through the Comfy SDK, follows it with a
 progress bar that knows how long each stage takes on *your* machine, and plays the finished
-episode. The app makes no Comfy Router or Comfy Cloud calls and holds no API key.
+episode. Left on its defaults it makes no cloud calls and needs no API key; a cloud machine, a
+cloud still model or a cloud writer is always something a person picked (see "Keys").
 
 ## What you need
 
@@ -45,7 +47,7 @@ episode. The app makes no Comfy Router or Comfy Cloud calls and holds no API key
   every model downloads itself from public, ungated repos with no Hugging Face token -- the
   writer and still models at pinned revisions, the rest checked against their published SHA-256.
 - By default, an NVIDIA card with 16 GB. Other cards run one of the pack's other workflows (see
-  "Pick the workflow for your GPU"). The first run downloads tens of GB of open weights.
+  "Your machine, and how it's filmed"). The first run downloads tens of GB of open weights.
 - Python 3.10 or newer for this app (its only packages are the Comfy SDK and the bridge). Built and run on Windows.
 
 ## Set up
@@ -94,13 +96,30 @@ python -m radio_play_studio run --bank shakespeare --source-ref "folger-midsumme
 python -m radio_play_studio export-graph graph_api.json     # the exact graph the app would submit
 ```
 
-### Pick the workflow for your GPU
+### Your machine, and how it's filmed
+
+The page starts by asking two things, and fills in the rest of the form from the answer:
+
+- **Your machine:** NVIDIA 8, 16 or 24 GB, a 16 GB Mac, AMD (ROCm), or no GPU at all through
+  Comfy Cloud or Google Cloud. It starts on the card your ComfyUI reports.
+- **How it's filmed:** **TTS + Foley video** (voices, moving pictures and their own sound effects),
+  **TTS w/ video** (voices and moving pictures) or **TTS w/ stills** (voices and still pictures with
+  slow motion), whichever that machine has. Each card shows about how long one act took on our
+  test machine.
+
+Every choice is a workflow the pack ships (the table is `MACHINES` in `radio_play_studio/config.py`),
+so the page never builds a graph of its own. Switching keeps what you typed and picked; anything you
+left alone takes the new workflow's own value. **Tell my own story** still uses a workflow's
+reference twin when it has one.
+
+### Pick the workflow by hand
 
 `--workflow` takes any of the pack's shipped graphs, so the same app runs on the machine each
 one is tuned for: for example `workflows/otr_8gb_ltx25_foley.json` on an 8 GB card,
 `workflows/otr_16gb_video.json` for silent LTX video on 16 GB, `workflows/otr_16gb_still.json`
 for a still with motion (minutes, not an hour), or `workflows/otr_app.json` for the pack's
-any-machine graph. The default is `otr_16gb_foley_open.json`: the 16 GB foley lane with every
+any-machine graph. A graph on the menu above keeps the menu; any other runs by itself with no
+menu. The default is `otr_16gb_foley_open.json`: the 16 GB foley lane with every
 model open weights (FLUX 3 Klein stills; the 1080p step is ffmpeg, no model). `otr_16gb_foley.json` is the
 same lane with NVIDIA RTX Video Super Resolution, a closed SDK.
 
@@ -135,7 +154,7 @@ language, acts, cast size, visual style and still model as usual and press **Mak
 
 ### Same faces in every shot
 
-Every model stays open weights. **Tell my own story** runs the default workflow's reference twin,
+With its default models everything is open weights. **Tell my own story** runs the default workflow's reference twin,
 `workflows/otr_16gb_foley_open_flux3_ref.json`, by itself: every character gets a portrait (or
 the photos on their card) and each still is painted from the portraits of everyone in the frame,
 so a face does not change from beat to beat. The other stories run `otr_16gb_foley_open.json`,
@@ -199,10 +218,33 @@ under `./episodes/projects/<project>/`, and the published episode in `otr/obs/` 
 
 ## What a person can choose
 
-Story bank, the classic to adapt, language, acts, cast size, visual style, the still model
-(**Still pictures**: local engines only, FLUX 3 Klein by default), the cast cards and the My Story boxes.
-Every dropdown is read live from your ComfyUI, so it offers exactly what your installed pack has.
-Everything else (voices, music, the video lane) keeps the workflow's own setting.
+Your machine and how it's filmed (above), the language of the play, the story bank, acts, cast
+size, visual style, the still model, the writer, the cast cards and the My Story boxes. Every
+dropdown is read live from your ComfyUI, so it offers exactly what your installed pack has.
+Everything else (voices, music) keeps the workflow's own setting.
+
+- **Still pictures** offers every engine the pack has, on any machine: mix and match. The open ones
+  run on your card; the cloud ones are marked paid.
+- **Writer** is a closed panel; its title always says which writer will run. Untouched, the run
+  keeps the workflow's own. Inside: the local models, and OpenRouter, Google and Comfy as paid cloud
+  writers, each with its model picker. The writer is the creative passes' model; the technical
+  passes that check the script's structure stay on the workflow's own model. A cloud writer with
+  no model picked is refused before anything is sent.
+- **Source to adapt** is not on the page (your own story is My Story); the command line still has
+  `--source-ref`.
+
+## Keys
+
+A cloud pick needs its key, and the page lists only the keys the current picks need:
+
+- **Comfy** (Comfy Cloud, the `cloud_` and `ideo` still models, the Comfy writer): type it on the
+  page, or start the Studio with `OTR_COMFY_API_KEY` set. The server holds it in memory and sends it
+  with each run the way ComfyUI expects (`extra_data.api_key_comfy_org`); it is never written to
+  disk, logged, or sent back to a page.
+- **Google** (Google Cloud, `google_image`, the Google writer) and **OpenRouter** (the OpenRouter
+  writer): ComfyUI reads these itself, so the page says where to put them -- the first line of
+  `google.secret` or `openrouter.secret` in the pack folder, or `GEMINI_API_KEY` /
+  `OPENROUTER_API_KEY` where ComfyUI runs -- and whether a key file is there.
 
 ## The page speaks nine languages
 
@@ -258,7 +300,8 @@ Run length follows the story: the number and length of the beats decide how many
   order, so the graph is built against your server's `/object_info`. A pack and a workflow from
   different versions are refused with a message naming the node, never sent.
 - **Never the cloud by accident.** The Comfy SDK talks to Comfy Cloud when `COMFY_BASE_URL` is unset.
-  The app always sets it to your local bridge first, and never offers a cloud model in its pickers.
+  The app always sets it to your local bridge first, starts on local models, and marks every cloud
+  choice as paid.
 - **A finished job is not a finished episode.** The run ends in success only when the video file is
   on disk.
 - **Local only.** The web app listens on loopback, refuses other Host headers and only accepts JSON
