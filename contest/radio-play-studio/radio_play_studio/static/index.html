@@ -841,9 +841,12 @@ function keysView() {
   if (!box) return;
   const need = keysNeeded();
   box.hidden = !need.length;
-  // The press bar names a key that is still missing, and jumps to the box.
-  const missing = need.filter((lane) => !(keyStatus && keyStatus[lane] &&
-                                          (keyStatus[lane].set || keyStatus[lane].file)));
+  // The press bar names a key that is surely missing, and jumps to the box: only
+  // the Comfy key, which this server holds, and only once the server has said.
+  // A Google or OpenRouter key may live in ComfyUI's own environment, which the
+  // page cannot see, so their rows say where it goes and the bar stays quiet.
+  const missing = need.filter((lane) => lane === "comfy" && keyStatus && keyStatus.comfy &&
+                                        !keyStatus.comfy.set);
   const note = $("keys_note");
   note.hidden = !missing.length;
   if (missing.length) say(note, "keys.missing", {names: missing.map((l) => t("keys." + l, null, l)).join(", ")});

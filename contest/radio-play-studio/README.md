@@ -5,8 +5,8 @@
 Built for the Comfy [Open Source Higgsfield](https://comfy.org/open-source-higgsfield) challenge.
 An open-source take on Higgsfield's Cinema Studio: where Cinema Studio directs a concept into
 shots, Radio Play Studio writes the whole story, casts it, and directs every beat. Every character
-keeps the same face and voice from shot to shot, and every shot is filmed with LTX on your own
-card, with voices, music and foley mixed under the picture. By default it is open weights only,
+keeps the same face and voice from shot to shot, and by default every shot is filmed with LTX
+on your own card, with voices, music and foley mixed under the picture. By default it is open weights only,
 with nothing to pay per episode; cloud models are there if you pick them. The app is MIT licensed,
 and each model keeps its own license (see License).
 
@@ -154,12 +154,13 @@ language, acts, cast size, visual style and still model as usual and press **Mak
 
 ### Same faces in every shot
 
-With its default models everything is open weights. **Tell my own story** runs the default workflow's reference twin,
-`workflows/otr_16gb_foley_open_flux3_ref.json`, by itself: every character gets a portrait (or
+With its default models everything is open weights. **Tell my own story** runs the chosen
+workflow's reference twin when one ships beside it -- for the default, `workflows/otr_16gb_foley_open_flux3_ref.json` -- by itself: every character gets a portrait (or
 the photos on their card) and each still is painted from the portraits of everyone in the frame,
-so a face does not change from beat to beat. The other stories run `otr_16gb_foley_open.json`,
-which paints each character from the written description on their cast card, so describe looks
-in fixed terms. The still model, FLUX 3 Klein, is open weights under the FLUX Kommunity License.
+so a face does not change from beat to beat. Only the 16 GB foley ways ship a twin today; on any
+other way, and for the other stories, the chosen workflow runs as named and paints each character
+from the written description on their cast card (the page says when photos would go unused), so
+describe looks in fixed terms. The still model, FLUX 3 Klein, is open weights under the FLUX Kommunity License.
 
 From the command line, the same boxes are flags. A card is one line of `--my-characters`, and a
 photo is a `Name = file` line naming a picture in ComfyUI's input folder:
