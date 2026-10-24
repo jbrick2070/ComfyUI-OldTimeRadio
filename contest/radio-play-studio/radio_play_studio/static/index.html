@@ -89,7 +89,7 @@
           display: flex; align-items: center; justify-content: center; overflow: hidden;
           color: var(--muted); font-size: 2rem; background: var(--panel); }
   .face img { width: 100%; height: 100%; object-fit: cover; }
-  .thumbs { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
   .thumb { position: relative; width: 48px; height: 48px; border-radius: 6px; overflow: hidden;
            border: 1px solid var(--line); }
   .thumb img { width: 100%; height: 100%; object-fit: cover; }
@@ -280,6 +280,55 @@
     .actions:has(#b_stills:enabled, #b_video:enabled, #b_publish:enabled) #b_video:disabled,
     .actions:has(#b_stills:enabled, #b_video:enabled, #b_publish:enabled) #b_publish:disabled { display: none; }
     .actions .hint { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  }
+  /* ---- a wide screen holds the whole landing (operator, 2026-10-23: "having it
+     all on one 1080p or 1440p page would be ideal"). Below 1280px nothing here
+     applies, so a laptop half-window and a phone keep the one column. ---- */
+  @media (min-width: 1280px) {
+    main:not(:has(#board:not([hidden]))) { max-width: min(1760px, 100%); padding: 18px 16px 0; }
+    h1 { font-size: 1.8rem; }
+    .tag { margin-bottom: 12px; }
+    .modes { margin-bottom: 14px; }
+    .mode { padding: 12px 16px; }
+    #form { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+            gap: 0 18px; align-items: start; }
+    #form > .modes { grid-column: 1 / -1; }
+    #form > fieldset { margin-bottom: 12px; }
+    /* My story on the left, the show beside it; a classic story has only the show. */
+    #form > #group_My_story { grid-column: 1; }
+    #form > #group_The_show { grid-column: 2; display: grid;
+                              grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+    #form:has(#group_My_story[hidden]) > #group_The_show,
+    #form:not(:has(#group_My_story)) > #group_The_show {
+      grid-column: 1 / -1; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+    #group_The_show > [id^="row_"] { min-width: 0; }
+    /* Long pickers and the still model take the whole row of their box. */
+    #row_source_ref, #row_stills { grid-column: 1 / -1; }
+    label { margin-top: 10px; }
+    /* The help keeps two lines and opens in full on the field it explains. */
+    fieldset .help:not(.warn) { display: -webkit-box; -webkit-box-orient: vertical;
+                                -webkit-line-clamp: 2; overflow: hidden; }
+    fieldset [id^="row_"]:is(:hover, :focus-within) > .help,
+    #cast_editor:is(:hover, :focus-within) > .help { -webkit-line-clamp: unset; overflow: visible; }
+    /* Who they are and how they look sit side by side on a card. */
+    .card-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 10px; }
+    .card-body > .who, .card-body > .tools { grid-column: 1 / -1; }
+    .card .face { width: 72px; height: 72px; }
+    .card .thumb { width: 36px; height: 36px; }
+    .card { grid-template-columns: 72px minmax(0, 1fr); }
+    /* The press stays on screen however long the story is. */
+    .gobar { position: sticky; bottom: 0; z-index: 2; background: var(--bg);
+             padding: 10px 0; border-top: 1px solid var(--line); flex-wrap: nowrap; }
+    .gobar button { flex: none; white-space: nowrap; }
+    .gobar #direct_help { flex: 1 1 auto; margin: 0; }
+  }
+  @media (min-width: 1600px) {
+    /* The cast two cards across, then the plot, setting and author side by side. */
+    #form > #group_My_story { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+                              gap: 0 16px; align-items: start; }
+    #group_My_story > #cast_editor { grid-column: 1 / -1; }
+    #cast_list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #form { grid-template-columns: minmax(0, 2.3fr) minmax(0, 1fr); }
   }
   @media (forced-colors: active) {
     .stage::before { border: 2px solid CanvasText; }
@@ -775,8 +824,12 @@ function castCard(c, i) {
   remove.type = "button"; remove.className = "small quiet"; tx(remove, "card.remove", "Remove character");
   remove.addEventListener("click", () => { cast.splice(i, 1); drawCast(); });
   tools.appendChild(remove);
+  tools.appendChild(thumbs);   // the photos sit at the end of the buttons' row
 
-  body.append(top, labelled("card.who", "Who they are", who), labelled("card.look", "How they look", look), tools, thumbs);
+  const whoBox = labelled("card.who", "Who they are", who), lookBox = labelled("card.look", "How they look", look);
+  whoBox.className = "said"; lookBox.className = "seen";
+  body.className = "card-body";
+  body.append(top, whoBox, lookBox, tools);
   el.append(face, body);
   return el;
 }
