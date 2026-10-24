@@ -137,14 +137,14 @@
         "nv16": "proven",
         "nv8": "proven"
       },
-      "note": "Proven on both NVIDIA cards by published episodes, read from the fk3i filename tag. 8 GB: it is the still engine of every otr_8gb_* graph, and the RTX 4060 Laptop published 39 episodes with it, among them the 2026-10-23 regression round's otr_8gb_still leg, marginalia_inversion_20261023_092210 (617 s for an 81.7 s episode). 16 GB: the RTX 5080 Laptop holds 57 published fk3i episodes, among them white_elephant_zh_20261022_034407. On the 4060 a still paints in about 14 s (16 steps).",
+      "note": "Proven on both NVIDIA cards by published episodes, read from the fk3i filename tag. 8 GB: it is the still engine of every otr_8gb_* graph, and the RTX 4060 Laptop published 39 episodes with it, among them the 2026-10-23 regression round's otr_8gb_still leg, marginalia_inversion_20261023_092210 (617 s for an 81.7 s episode, planning/regression/ROUNDS.md). 16 GB: the RTX 5080 Laptop holds 57 published fk3i episodes, among them white_elephant_zh_20261022_034407. On the 4060 a still paints in about 14 s (16 steps at about 1 s/it, the sampler bars in that box's server log).",
       "size_gb": null
     },
     "flux3_klein_ref": {
       "memory": {
         "nv16": "proven"
       },
-      "note": "The same model files as flux3_klein, with every character still painted from that character's portrait or the person's own photo. 16 GB: the RTX 5080 Laptop has published 14 My Story episodes with it (fk3r tag), among them sphere_visitation_20261022_110406 from otr_16gb_foley_flux3_ref. 8 GB: not yet run.",
+      "note": "The same model files as flux3_klein, with every character still painted from that character's portrait or the person's own photo. 16 GB: the RTX 5080 Laptop has published 14 My Story episodes with it (fk3r tag), among them sphere_visitation_20261022_110406 on the ltx25_foley_16gb lane (n16f tag); the filename does not name the graph. 8 GB: not yet run.",
       "size_gb": null
     },
     "flux_gen1": {
@@ -284,7 +284,7 @@
         "nv16": "proven",
         "nv8": "proven"
       },
-      "note": "Both NVIDIA cells proven 2026-10-23 on published episodes. 16 GB: the 5080 regression round's otr_16gb_still leg, final_duet_20261023_094104 (msim). 8 GB: otr_8gb_still with its three still engines switched to moss_image on the RTX 4060 Laptop, 1 act, afterlife_echoes_20261023_164258 (msim) -- the pack auto-downloaded all three files there first (SFT int8 ConvRot model, w4a8 GPTQ encoder, small VAE) with byte-verified sizes, peak VRAM 7,370 MiB of 8,188, no OOM. On the 4060 a MOSS still paints in about 69 s (25 steps at 2.75 s/it) against 14 s for flux3_klein (16 steps), and the leg ran 2,747 s for a 96.4 s episode (28.5 s/s, about 5 min of it the first-run download) against 617 s for 81.7 s (7.6 s/s) with flux3_klein the same day.",
+      "note": "Both NVIDIA cells proven 2026-10-23 on published episodes. 16 GB: the 5080 regression round's otr_16gb_still leg, final_duet_20261023_094104 (msim). 8 GB: otr_8gb_still with its three still engines switched to moss_image on the RTX 4060 Laptop, 1 act, afterlife_echoes_20261023_164258 (msim) -- the pack auto-downloaded all three files there first (SFT int8 ConvRot model, w4a8 GPTQ encoder, small VAE) with byte-verified sizes, peak VRAM 7,370 MiB of 8,188, no OOM. On the 4060 a MOSS still paints in about 69 s (25 steps at 2.75 s/it) against 14 s for flux3_klein (16 steps), both read from the sampler bars in that box's server log, and the leg ran 2,747 s for a 96.4 s episode (28.5 s/s, about 5 min of it the first-run download) against 617 s for 81.7 s (7.6 s/s) with flux3_klein the same day.",
       "size_gb": null
     },
     "mesh_stage": {
