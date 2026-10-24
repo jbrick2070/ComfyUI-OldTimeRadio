@@ -264,6 +264,14 @@
       },
       "size_gb": 10.0
     },
+    "moss_image": {
+      "memory": {
+        "nv16": "proven",
+        "nv8": "proven"
+      },
+      "note": "Both NVIDIA cells proven 2026-10-23 on published episodes. 16 GB: the 5080 regression round's otr_16gb_still leg, final_duet_20261023_094104 (msim). 8 GB: otr_8gb_still with its three still engines switched to moss_image on the RTX 4060 Laptop, 1 act, afterlife_echoes_20261023_164258 (msim) -- the pack auto-downloaded all three files there first (SFT int8 ConvRot model, w4a8 GPTQ encoder, small VAE) with byte-verified sizes, peak VRAM 7,370 MiB of 8,188, no OOM. On the 4060 a MOSS still paints in about 69 s (25 steps at 2.75 s/it) against 14 s for flux3_klein (16 steps), and the leg ran 2,747 s for a 96.4 s episode (28.5 s/s, about 5 min of it the first-run download) against 617 s for 81.7 s (7.6 s/s) with flux3_klein the same day.",
+      "size_gb": null
+    },
     "mesh_stage": {
       "memory": {
         "mac16": "fits",
