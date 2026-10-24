@@ -25,6 +25,11 @@ with OTR's MIT licence.
    `build_variants.py --all` and the four checks in CLAUDE.md section 0.
 7. **Two boxes.** `ListAgents` + `SendMessage` the peer window before touching a file it owns. State
    the 5080 / 4060 blast radius in every commit message (CLAUDE.md 0B).
+8. **No mid-run approvals (operator, 2026-10-24).** Nothing in this plan pauses a run to wait for a
+   person. Every row runs unattended end to end: the live view, hints and pings only report; the
+   environment stamp and the known-good snapshot write themselves; the drift report runs on demand;
+   the broadcast feed airs by default and pulling an episode from air is an optional action taken
+   afterwards. A failure in any of these is reported and never holds the render or the publish.
 
 ## What we are not taking, and why
 
@@ -186,7 +191,7 @@ drop on the page.
 | 3.1 | **Tab title shows the run.** While a stage runs: `(42%) Radio Play Studio`. A stage that finishes while the tab is hidden: `(1 ready)` until the tab is looked at. Strings through i18n. | The page sets no `document.title` and has no `visibilitychange` handler today |
 | 3.2 | **The running step in plain words** in the status line ("voicing the cast", "filming shot 12"), from the 1.1 label table. Labels become i18n keys, not English strings. | `runner.py:153` `stage_note` already carries `current_node` |
 | 3.3 | **Say when a step runs long.** When the running node passes its calibrated time, say "this step is taking longer than last time" instead of letting minutes-left sit still. | `runner.py:1022` `seconds_left`: an overrunning node contributes `max(0, history - elapsed)` = 0, so the estimate goes quiet without saying why |
-| 3.4 | **Before / after on a repainted card.** On a card with a new still take, flip or slide between the kept still and the new one, so keep vs new is a visual choice. Needs the previous take's file to still exist: confirm in the Scene Producer store first. | The anchor already plans "New take" badges (`DESIGN_ANCHOR.md:168`); takes live in `draft.takes` (`static/index.html:1576`) |
+| 3.4 | **Before / after on a repainted card.** On a card with a new still take, flip or slide between the kept still and the new one, so keep vs new is a visual choice. Only inside the Scene Producer's existing edit step; adds no stop of its own. Needs the previous take's file to still exist: confirm in the Scene Producer store first. | The anchor already plans "New take" badges (`DESIGN_ANCHOR.md:168`); takes live in `draft.takes` (`static/index.html:1576`) |
 | 3.5 | **Phone ping when a stage finishes**, reusing 1.3's `notify`. Where that function lives so both the scripts and Studio can import it is settled when this row is folded in. | Studio stages run for many minutes |
 
 Not proposed: a live preview on the cards. It would be a second moving thing and breaks the
