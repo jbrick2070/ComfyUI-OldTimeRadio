@@ -227,8 +227,11 @@ size, visual style, the still model, the writer, the cast cards and the My Story
 dropdown is read live from your ComfyUI, so it offers exactly what your installed pack has.
 Everything else (voices, music) keeps the workflow's own setting.
 
-- **Still pictures** offers every engine the pack has, on any machine: mix and match. The open ones
-  run on your card; the cloud ones are marked paid.
+- **Still pictures** and **Writer** offer what suits the machine you picked: a model the machines
+  table (`apple/MACHINES.md`) marks "not offered", OOM, "no" or too slow there is left off, and a
+  machine with no GPU writes with a cloud writer. Mix and match within that: the open models run on
+  your card, the cloud ones are marked paid. The list comes from `radio_play_studio/machine_choices.json`,
+  which `scripts/otr_dropdown_matrix.py` writes from the same cells as that table.
 - **Writer** is a closed panel; its title always says which writer will run. Untouched, the run
   keeps the workflow's own. Inside: the local models, and OpenRouter, Google and Comfy as paid cloud
   writers, each with its model picker. The writer is the creative passes' model; the technical

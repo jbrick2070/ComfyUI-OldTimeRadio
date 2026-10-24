@@ -260,3 +260,36 @@ def test_no_menu_machine_offers_foley_or_mime_where_it_is_not_proven():
     offered = {machine: {way for way, _ in ways} for machine, ways in MACHINES}
     assert offered["mac16"] == {"video", "stills"} and offered["amd"] == {"stills"}
     assert not any("mime" in name for _, ways in MACHINES for _, name in ways)
+
+
+def test_each_machine_offers_only_the_choices_its_column_allows():
+    """Operator, 2026-10-23: "only show the relevant options for that system"."""
+    from radio_play_studio.runner import relevant_choices
+    stills = {"key": "stills", "default": "sd15",
+              "choices": ["cloud_flux_pro", "flux3_klein", "moss_image", "sd15", "some_new_engine"]}
+    writer = {"key": "writer", "default": "Qwen/Qwen3.5-4B",
+              "choices": ["Qwen/Qwen3.5-4B", "mistralai/Mistral-Nemo-Instruct-2407",
+                          "openrouter:slot-a", "comfy_native:gemma4-e2b-it-int8-convrot"]}
+    mac = {r["key"]: r["choices"] for r in relevant_choices([stills, writer], "mac16")}
+    assert mac["stills"] == ["cloud_flux_pro", "sd15", "some_new_engine"], "unmeasured is not no"
+    assert "mistralai/Mistral-Nemo-Instruct-2407" not in mac["writer"]
+    assert "openrouter:slot-a" in mac["writer"] and "comfy_native:gemma4-e2b-it-int8-convrot" in mac["writer"]
+    big = {r["key"]: r["choices"] for r in relevant_choices([stills, writer], "nvidia16")}
+    assert {"flux3_klein", "moss_image"} <= set(big["stills"])
+    assert "mistralai/Mistral-Nemo-Instruct-2407" in big["writer"]
+    # A machine with no GPU writes in the cloud.
+    cloud = {r["key"]: r["choices"] for r in relevant_choices(
+        [dict(writer, default="comfy:slot-a")], "comfy_cloud")}
+    assert cloud["writer"] == ["openrouter:slot-a"] or set(cloud["writer"]) == {"openrouter:slot-a"}
+    # A row never loses the value it starts on.
+    kept = relevant_choices([dict(stills, default="moss_image")], "mac16")[0]
+    assert "moss_image" in kept["choices"]
+
+
+def test_the_choices_file_covers_every_machine_column():
+    from radio_play_studio.config import MACHINE_CHOICES, MATRIX_COLUMN
+    columns = MACHINE_CHOICES["machines"]
+    assert set(MATRIX_COLUMN.values()) <= set(columns)
+    for column in columns.values():
+        assert column["image"] and column["writer"]
+    assert set(MATRIX_COLUMN) >= {m for m, _ in MACHINES}

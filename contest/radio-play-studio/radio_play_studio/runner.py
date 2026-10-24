@@ -17,9 +17,10 @@ from pathlib import Path
 from typing import Any, Callable, Iterator
 
 from . import producer
-from .config import (MACHINES, REFERENCE_TWIN_SUFFIX, UNPROVEN, Settings, detect_machine, menu_lookup,
+from .config import (CLOUD_MACHINES, MACHINE_CHOICES, MACHINES, MATRIX_COLUMN, NOT_FOR_THIS_MACHINE,
+                     REFERENCE_TWIN_SUFFIX, UNPROVEN, Settings, detect_machine, menu_lookup,
                      reference_twin, validate_url)
-from .form import (EPISODE_NODE_TYPE, FIELDS_BY_KEY, MY_STORY_BANK, WRITER, apply_choices,
+from .form import (CLOUD_WRITERS, EPISODE_NODE_TYPE, FIELDS_BY_KEY, MY_STORY_BANK, WRITER, apply_choices,
                    describe_form, locate_nodes)
 from .graph import fetch_object_info, load_workflow, workflow_to_api_prompt
 
@@ -64,6 +65,30 @@ BACKOFF_CAP_S = 30.0
 #: this many losses in a row, with no frame between them, end the watch.
 LIVE_RETRY_LIMIT = 30
 LIVE_RETRY_PAUSE_S = 20.0
+
+
+def relevant_choices(fields: list, machine: str) -> list:
+    """The form for one machine: the still models and writers its column of
+    machine_choices.json rules out are left off the dropdowns, never the one a
+    row starts on. A choice the file does not name stays (unmeasured is not
+    "no"), and a run can still send any choice the pack accepts -- this is what
+    the page offers, not what the server allows."""
+    column = MACHINE_CHOICES.get("machines", {}).get(MATRIX_COLUMN.get(machine, ""), {})
+    kinds = {"stills": column.get("image") or {}, "writer": column.get("writer") or {}}
+    out = []
+    for row in fields:
+        cells = kinds.get(row["key"])
+        if cells and row.get("choices"):
+            row = dict(row, choices=[c for c in row["choices"]
+                                     if c == row.get("default")
+                                     or cells.get(str(c)) not in NOT_FOR_THIS_MACHINE])
+        if row["key"] == "writer" and machine in CLOUD_MACHINES and row.get("choices"):
+            # A machine with no GPU writes in the cloud: the table has no
+            # CPU verdict for a local writer, and on a CPU one would crawl.
+            row = dict(row, choices=[c for c in row["choices"]
+                                     if c == row.get("default") or c in CLOUD_WRITERS])
+        out.append(row)
+    return out
 
 
 class StreamGap:
@@ -338,21 +363,26 @@ class Studio:
         """`{label: value}` for what this workflow runs (USES), as it saved it;
         a label its graph cannot answer is left out. Remembered per file and
         modification time: the menu asks for every way on every page load."""
-        stamp = (str(path), path.stat().st_mtime_ns)
-        if stamp not in self._uses:
-            out = {}
-            try:
-                workflow = load_workflow(path)
-                graph = workflow_to_api_prompt(workflow, schemas)
-            except Exception:  # noqa: BLE001 -- a card without its models still works
-                graph, workflow = {}, {}
-            for label, node_type, name in USES:
-                ids = [str(n["id"]) for n in workflow.get("nodes") or [] if n.get("type") == node_type]
-                value = graph.get(ids[0], {}).get("inputs", {}).get(name) if len(ids) == 1 else None
-                if isinstance(value, str) and value:
-                    out[label] = value
-            self._uses[stamp] = out
-        return self._uses[stamp]
+        # The node definitions are part of the key: a pack update can change
+        # what an unchanged file converts to (Sonnet QA of edfe9fde).
+        defs = tuple(json.dumps(schemas.get(node_type, {}), sort_keys=True, default=str)
+                     for node_type in sorted({t for _, t, _ in USES}))
+        stamp = (str(path), path.stat().st_mtime_ns, hashlib.sha256("".join(defs).encode()).hexdigest())
+        if stamp in self._uses:
+            return self._uses[stamp]
+        try:
+            workflow = load_workflow(path)
+            graph = workflow_to_api_prompt(workflow, schemas)
+        except Exception:  # noqa: BLE001 -- a card without its models still works,
+            return {}        # and a failed read is never remembered
+        out = {}
+        for label, node_type, name in USES:
+            ids = [str(n["id"]) for n in workflow.get("nodes") or [] if n.get("type") == node_type]
+            value = graph.get(ids[0], {}).get("inputs", {}).get(name) if len(ids) == 1 else None
+            if isinstance(value, str) and value:
+                out[label] = value
+        self._uses[stamp] = out
+        return out
 
     def detected_machine(self) -> str | None:
         """The menu machine ComfyUI says it runs on, asked until it answers and
@@ -387,6 +417,9 @@ class Studio:
         path = self.resolve_workflow(workflow)
         schemas = self._fetch(self.settings.comfyui_url)
         fields = self.options(schemas, path)
+        on_menu = menu_lookup(path.name)
+        if on_menu is not None:
+            fields = relevant_choices(fields, on_menu[0])
         body = {"fields": fields, "photo_stills": self.photo_stills(fields, schemas, path.name)}
         machines = self.menu(schemas)
         if machines is not None:
