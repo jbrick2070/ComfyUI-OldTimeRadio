@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterator
 
 from . import producer
-from .config import (MACHINES, REFERENCE_TWIN_SUFFIX, Settings, detect_machine, menu_lookup,
+from .config import (MACHINES, REFERENCE_TWIN_SUFFIX, UNPROVEN, Settings, detect_machine, menu_lookup,
                      reference_twin, validate_url)
 from .form import (EPISODE_NODE_TYPE, FIELDS_BY_KEY, MY_STORY_BANK, WRITER, apply_choices,
                    describe_form, locate_nodes)
@@ -26,6 +26,13 @@ from .graph import fetch_object_info, load_workflow, workflow_to_api_prompt
 #: The still-engine dropdown the Still pictures field sets for the characters.
 DIRECTOR = FIELDS_BY_KEY["stills"].node_type
 STILLS_INPUT = FIELDS_BY_KEY["stills"].input
+#: What a way card names, and where each is read in its workflow: (label,
+#: node type, input). Read from the graph, so a card can never drift from it.
+USES = (("video", "OTR_VideoDirector", "character_video_model"),
+        ("stills", "OTR_VideoDirector", "character_image_model"),
+        ("voices", "OTR_CastLock", "char_voice_engine"),
+        ("music", "OTR_StableAudioTheme", "engine"),
+        ("writer", WRITER, "creative_writing_model"))
 #: The choice that names which menu workflow a run uses: routing, not a field.
 WORKFLOW_CHOICE = "workflow"
 #: A still engine that paints a character from that character's picture is named
@@ -233,6 +240,8 @@ class Studio:
         self.comfy_key: str | None = (comfy_key or "").strip() or None
         #: The machine ComfyUI reported, once it has ("" for none on the menu).
         self._machine: str | None = None
+        #: What each menu workflow uses, by (path, modification time).
+        self._uses: dict = {}
 
     def key_status(self) -> dict:
         """Which keys the cloud picks can find, never the keys themselves. The
@@ -300,21 +309,50 @@ class Studio:
         graph = workflow_to_api_prompt(workflow, schemas)
         return describe_form(schemas, graph, locate_nodes(workflow))
 
-    def menu(self) -> list | None:
+    def menu(self, schemas: dict | None = None) -> list | None:
         """The machines and ways of filming this server can offer, as
-        `[{"key", "ways": [{"key", "workflow"}]}]`, or None when it was started on
-        a workflow that is not on the menu (it then runs that one, as before).
-        A way whose workflow is not beside the server's own is left off."""
+        `[{"key", "ways": [{"key", "workflow", "uses"}]}]`, or None when it was
+        started on a workflow that is not on the menu (it then runs that one, as
+        before). A way whose workflow is not beside the server's own is left
+        off. Given the node definitions, each way also says what its workflow
+        uses (``uses``: video, stills, voices, music, writer)."""
         base = Path(self.settings.workflow_path)
         if menu_lookup(base.name) is None:
             return None
         machines = []
         for machine, ways in MACHINES:
-            present = [{"key": way, "workflow": name} for way, name in ways
-                       if (base.parent / name).is_file()]
+            present = []
+            for way, name in ways:
+                path = base.parent / name
+                if not path.is_file():
+                    continue
+                entry = {"key": way, "workflow": name, "proven": name not in UNPROVEN}
+                if schemas is not None:
+                    entry["uses"] = self.uses(path, schemas)
+                present.append(entry)
             if present:
                 machines.append({"key": machine, "ways": present})
         return machines
+
+    def uses(self, path: Path, schemas: dict) -> dict:
+        """`{label: value}` for what this workflow runs (USES), as it saved it;
+        a label its graph cannot answer is left out. Remembered per file and
+        modification time: the menu asks for every way on every page load."""
+        stamp = (str(path), path.stat().st_mtime_ns)
+        if stamp not in self._uses:
+            out = {}
+            try:
+                workflow = load_workflow(path)
+                graph = workflow_to_api_prompt(workflow, schemas)
+            except Exception:  # noqa: BLE001 -- a card without its models still works
+                graph, workflow = {}, {}
+            for label, node_type, name in USES:
+                ids = [str(n["id"]) for n in workflow.get("nodes") or [] if n.get("type") == node_type]
+                value = graph.get(ids[0], {}).get("inputs", {}).get(name) if len(ids) == 1 else None
+                if isinstance(value, str) and value:
+                    out[label] = value
+            self._uses[stamp] = out
+        return self._uses[stamp]
 
     def detected_machine(self) -> str | None:
         """The menu machine ComfyUI says it runs on, asked until it answers and
@@ -350,7 +388,7 @@ class Studio:
         schemas = self._fetch(self.settings.comfyui_url)
         fields = self.options(schemas, path)
         body = {"fields": fields, "photo_stills": self.photo_stills(fields, schemas, path.name)}
-        machines = self.menu()
+        machines = self.menu(schemas)
         if machines is not None:
             machine, way = menu_lookup(path.name)
             body["menu"] = {"machines": machines, "detected": self.detected_machine(),

@@ -98,6 +98,11 @@
   .pick strong { font: 600 1rem/1.3 var(--sans); display: inline; }
   .pick span { display: block; }
   .pick .time { color: var(--accent-text); font-size: .85rem; margin-top: 2px; }
+  /* What a way runs: one short line of models under its description. */
+  .pick .uses { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 4px;
+                font: .8rem/1.4 var(--sans); color: var(--ink); }
+  .pick .uses b { font-weight: 600; color: var(--muted); }
+  .pick .unproven { color: var(--bad); font: 600 .8rem/1.4 var(--sans); margin-top: 4px; }
   #group_Writer { border: 1px solid var(--line); background: var(--panel); border-radius: 12px;
                   padding: 12px 18px; margin: 0 0 16px; }
   #group_Writer > summary { cursor: pointer; font: 600 1rem var(--sans); min-height: 28px; }
@@ -755,6 +760,15 @@ function setupBox() {
     const sub = document.createElement("span");
     tx(sub, "way." + w.key + "_sub", "");
     card.append(r, name, sub);
+    if (w.uses) card.appendChild(usesLine(w.uses));
+    if (w.proven === false) {
+      // Offered because it was asked for, said plainly because no episode has
+      // been published from it yet.
+      const tag = document.createElement("span");
+      tag.className = "unproven";
+      tx(tag, "way.unproven", "Not yet proven: no published episode from it yet");
+      card.appendChild(tag);
+    }
     if (ONE_ACT_SECONDS[w.workflow]) {
       const time = document.createElement("span");
       time.className = "time";
@@ -773,6 +787,42 @@ function setupBox() {
   right.append(wayHead, ways);
   box.append(left, right);
   return box;
+}
+
+// What a way's workflow runs, named for a person: each model in its own
+// language-proof name, the still and writer through the page's own words.
+const MODEL_NAMES = {
+  ltx25_foley_16gb: "LTX 2.5 with foley", ltx25_foley_8gb: "LTX 2.5 with foley",
+  ltx25_foley_24gb: "LTX 2.5 with foley", ltx25_high_video: "LTX 2.5", ltx_8gb: "LTX 2 (8 GB)",
+  ltx098_low_video: "LTX 0.9.8", still_motion: "still with motion", still_flat: "still",
+  viz_camera: "audio visualiser", animatediff15_v3_haunted_video: "AnimateDiff",
+  animatediff15_lightning_video: "AnimateDiff Lightning", cloud_ltx25_foley_plus: "LTX 2.5 foley (cloud)",
+  cloud_vidu_q2_pro_fast_720p: "Vidu Q2 (cloud)", cloud_ltx25_audio_in: "LTX 2.5 audio-in (cloud)",
+  kokoro: "Kokoro", cloud_elevenlabs: "ElevenLabs (cloud)", google_tts: "Google voices (cloud)",
+  stable_audio_3: "Stable Audio 3", sonilo: "Sonilo (cloud)", google_lyria: "Lyria (cloud)",
+  musicgen: "MusicGen",
+};
+function modelName(kind, value) {
+  const id = String(value).replace(/ \([^)]*\)$/, "");     // "ltx25_foley_16gb (16:9)"
+  if (kind === "stills") return t("choice.stills." + slug(id), null, id);
+  if (kind === "writer") {
+    if (CLOUD_WRITERS[id]) return t("writer.handle." + slug(id), null, id);
+    return id.replace(/^comfy_native:/, "").replace(/^[^/]+\//, "");
+  }
+  return MODEL_NAMES[id] || id;
+}
+function usesLine(uses) {
+  const line = document.createElement("span");
+  line.className = "uses";
+  for (const kind of ["video", "stills", "voices", "music", "writer"]) {
+    if (!uses[kind]) continue;
+    const part = document.createElement("span");
+    const label = document.createElement("b");
+    tx(label, "uses." + kind, kind);
+    part.append(label, " " + modelName(kind, uses[kind]));
+    line.appendChild(part);
+  }
+  return line;
 }
 
 async function pickWorkflow(name) {

@@ -197,8 +197,7 @@
  "setup.machine": "マシン",
  "setup.way": "撮り方",
  "machine.nvidia8": "NVIDIA、8 GB",
- "machine.nvidia16": "NVIDIA、16 GB",
- "machine.nvidia24": "NVIDIA、24 GB",
+ "machine.nvidia16": "NVIDIA、16 GB 以上",
  "machine.mac16": "Mac、16 GB",
  "machine.amd": "AMD（ROCm）",
  "machine.comfy_cloud": "Comfy Cloud",
@@ -232,5 +231,11 @@
  "writer.summary_model": "脚本家：{name}（{model}）",
  "way.time_min": "{acts}幕で約{n}分（{gpu}で計測）",
  "way.time_h": "{acts}幕で約{n}時間（{gpu}で計測）",
- "keys.missing": "キーが必要です：{names}"
+ "keys.missing": "キーが必要です：{names}",
+ "uses.video": "動画",
+ "uses.stills": "静止画",
+ "uses.voices": "声",
+ "uses.music": "音楽",
+ "uses.writer": "脚本家",
+ "way.unproven": "未検証：これで公開されたエピソードはまだありません"
 }

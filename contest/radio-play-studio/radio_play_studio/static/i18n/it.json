@@ -197,8 +197,7 @@
  "setup.machine": "La tua macchina",
  "setup.way": "Come si filma",
  "machine.nvidia8": "NVIDIA, 8 GB",
- "machine.nvidia16": "NVIDIA, 16 GB",
- "machine.nvidia24": "NVIDIA, 24 GB",
+ "machine.nvidia16": "NVIDIA, 16 GB o più",
  "machine.mac16": "Mac, 16 GB",
  "machine.amd": "AMD (ROCm)",
  "machine.comfy_cloud": "Comfy Cloud",
@@ -232,5 +231,11 @@
  "writer.summary_model": "Autore: {name} -- {model}",
  "way.time_min": "Circa {n} min per {acts} atto/i, misurato su {gpu}",
  "way.time_h": "Circa {n} h per {acts} atto/i, misurato su {gpu}",
- "keys.missing": "Manca una chiave: {names}"
+ "keys.missing": "Manca una chiave: {names}",
+ "uses.video": "Video",
+ "uses.stills": "Immagini",
+ "uses.voices": "Voci",
+ "uses.music": "Musica",
+ "uses.writer": "Autore",
+ "way.unproven": "Non ancora provato: nessun episodio pubblicato con questo finora"
 }

@@ -197,8 +197,7 @@
  "setup.machine": "Your machine",
  "setup.way": "How it's filmed",
  "machine.nvidia8": "NVIDIA, 8 GB",
- "machine.nvidia16": "NVIDIA, 16 GB",
- "machine.nvidia24": "NVIDIA, 24 GB",
+ "machine.nvidia16": "NVIDIA, 16 GB or more",
  "machine.mac16": "Mac, 16 GB",
  "machine.amd": "AMD (ROCm)",
  "machine.comfy_cloud": "Comfy Cloud",
@@ -232,5 +231,11 @@
  "writer.summary_model": "Writer: {name} -- {model}",
  "way.time_min": "About {n} min for {acts} act(s), measured on {gpu}",
  "way.time_h": "About {n} h for {acts} act(s), measured on {gpu}",
- "keys.missing": "Needs a key: {names}"
+ "keys.missing": "Needs a key: {names}",
+ "uses.video": "Video",
+ "uses.stills": "Stills",
+ "uses.voices": "Voices",
+ "uses.music": "Music",
+ "uses.writer": "Writer",
+ "way.unproven": "Not yet proven: no published episode from it yet"
 }

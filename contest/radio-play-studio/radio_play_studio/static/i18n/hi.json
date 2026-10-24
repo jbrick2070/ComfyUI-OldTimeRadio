@@ -197,8 +197,7 @@
  "setup.machine": "आपकी मशीन",
  "setup.way": "फ़िल्मांकन का तरीका",
  "machine.nvidia8": "NVIDIA, 8 GB",
- "machine.nvidia16": "NVIDIA, 16 GB",
- "machine.nvidia24": "NVIDIA, 24 GB",
+ "machine.nvidia16": "NVIDIA, 16 GB या अधिक",
  "machine.mac16": "Mac, 16 GB",
  "machine.amd": "AMD (ROCm)",
  "machine.comfy_cloud": "Comfy Cloud",
@@ -232,5 +231,11 @@
  "writer.summary_model": "लेखक: {name} -- {model}",
  "way.time_min": "{acts} अंक के लिए लगभग {n} मिनट, {gpu} पर मापा गया",
  "way.time_h": "{acts} अंक के लिए लगभग {n} घंटे, {gpu} पर मापा गया",
- "keys.missing": "कुंजी चाहिए: {names}"
+ "keys.missing": "कुंजी चाहिए: {names}",
+ "uses.video": "वीडियो",
+ "uses.stills": "चित्र",
+ "uses.voices": "आवाज़ें",
+ "uses.music": "संगीत",
+ "uses.writer": "लेखक",
+ "way.unproven": "अभी परखा नहीं गया: इससे अभी तक कोई एपिसोड प्रकाशित नहीं हुआ"
 }

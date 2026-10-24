@@ -100,12 +100,15 @@ python -m radio_play_studio export-graph graph_api.json     # the exact graph th
 
 The page starts by asking two things, and fills in the rest of the form from the answer:
 
-- **Your machine:** NVIDIA 8, 16 or 24 GB, a 16 GB Mac, AMD (ROCm), or no GPU at all through
-  Comfy Cloud or Google Cloud. It starts on the card your ComfyUI reports.
+- **Your machine:** NVIDIA 8 GB, NVIDIA 16 GB or more, a 16 GB Mac, AMD (ROCm), or no GPU at all
+  through Comfy Cloud or Google Cloud. It starts on the card your ComfyUI reports.
 - **How it's filmed:** **TTS + Foley video** (voices, moving pictures and their own sound effects),
   **TTS w/ video** (voices and moving pictures) or **TTS w/ stills** (voices and still pictures with
-  slow motion), whichever that machine has. Each card shows about how long one act took on our
-  test machine.
+  slow motion), whichever that machine has proven: no foley or mime on a Mac, stills only on AMD.
+  Each card names what that workflow runs (video, stills, voices, music, writer), read from the
+  workflow itself, and how long the acts you set took on our test machine. The cloud ways are
+  offered but marked "not yet proven" until an episode from them is published (`UNPROVEN` in
+  `radio_play_studio/config.py`).
 
 Every choice is a workflow the pack ships (the table is `MACHINES` in `radio_play_studio/config.py`),
 so the page never builds a graph of its own. Switching keeps what you typed and picked; anything you

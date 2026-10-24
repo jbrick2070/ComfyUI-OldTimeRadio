@@ -43,9 +43,13 @@ def reference_twin(workflow_path: Path) -> Path:
 MACHINES: tuple = (
     ("nvidia8", (("foley", "otr_8gb_ltx25_foley.json"), ("video", "otr_8gb_video.json"),
                  ("stills", "otr_8gb_still.json"))),
+    # 16 GB and up: the 24 GB cards that have rendered episodes (rented RTX PRO
+    # 4000, A4500) ran these same graphs; otr_24gb_foley is a draft with no
+    # receipt, so it is not offered.
     ("nvidia16", (("foley", WORKFLOW_NAME), ("video", "otr_16gb_video.json"),
                   ("stills", "otr_16gb_still.json"))),
-    ("nvidia24", (("foley", "otr_24gb_foley.json"),)),
+    # No foley or mime on a Mac: LTX 0.9.8 video and stills with motion are the
+    # engines proven there (apple/MACHINES.md, Mac 16 GB column).
     ("mac16", (("video", "otr_mac16_video.json"), ("stills", "otr_mac16_still.json"))),
     ("amd", (("stills", "otr_amd_still.json"),)),
     # No GPU at all: the cloud graphs. Comfy Cloud bills Comfy credits through the
@@ -55,6 +59,17 @@ MACHINES: tuple = (
 )
 #: The machines that bill a cloud account rather than run on this machine.
 CLOUD_MACHINES = ("comfy_cloud", "google_cloud")
+#: Menu workflows with no published episode yet, and why. Offered (the operator
+#: asked for cloud, 2026-10-23) but marked "not yet proven" on the page; every
+#: other way has a hardware receipt (config/workflow_matrix.json) or proven
+#: engines on its machine (apple/MACHINES.md). Take a name off when an episode
+#: from it reaches otr/obs/.
+UNPROVEN: dict = {
+    "otr_cloud_deluxe_3act.json": "no published episode yet",
+    "otr_cloud_low.json": "two live runs died at assembly (PBUG-20260915-01, -03); "
+                          "fixed, not yet published since",
+    "otr_google_still.json": "no published episode yet",
+}
 
 
 def menu_lookup(name: str) -> tuple | None:
@@ -83,8 +98,6 @@ def detect_machine(stats: dict) -> str | None:
     if "amd" in name or "radeon" in name:
         return "amd"
     gib = float(device.get("vram_total") or 0) / 2 ** 30
-    if gib >= 20:
-        return "nvidia24"
     if gib >= 12:
         return "nvidia16"
     return "nvidia8" if gib > 0 else None

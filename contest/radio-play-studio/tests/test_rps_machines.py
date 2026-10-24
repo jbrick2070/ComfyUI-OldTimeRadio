@@ -30,7 +30,7 @@ def _device(kind, name, gib):
 @pytest.mark.parametrize("stats,machine", [
     (_device("cuda", "cuda:0 NVIDIA GeForce RTX 5080 Laptop GPU", 15.9), "nvidia16"),
     (_device("cuda", "cuda:0 NVIDIA GeForce RTX 4060 Laptop GPU", 8.0), "nvidia8"),
-    (_device("cuda", "cuda:0 NVIDIA GeForce RTX 4090", 24.0), "nvidia24"),
+    (_device("cuda", "cuda:0 NVIDIA GeForce RTX 4090", 24.0), "nvidia16"),
     (_device("cuda", "cuda:0 AMD Radeon AI PRO R9700", 32.0), "amd"),
     (_device("mps", "mps", 16.0), "mac16"),
     (_device("cpu", "cpu", 0), None),
@@ -230,3 +230,33 @@ def test_a_menu_name_that_links_outside_the_folder_is_refused(menu_settings, sch
         pytest.skip("this machine cannot make a symlink")
     with pytest.raises(ValueError):
         _menu_studio(menu_settings, schemas).resolve_workflow("otr_mac16_still.json")
+
+
+def test_each_way_names_what_its_workflow_uses_and_whether_it_is_proven(menu_settings, schemas,
+                                                                         workflow):
+    """Operator, 2026-10-23: the cards call out the video model, still model and
+    the rest, and an unproven path is not passed off as a proven one."""
+    folder = menu_settings.workflow_path.parent
+    (folder / "otr_google_still.json").write_text(json.dumps(workflow), encoding="utf-8")
+    studio = _menu_studio(menu_settings, schemas)
+    ways = {w["workflow"]: w for m in studio.menu(schemas) for w in m["ways"]}
+    uses = ways["otr_16gb_still.json"]["uses"]
+    # Read from the graph: the fixture's director saves flux3_klein, its writer
+    # its first default; it has no video lane, voices or music node to name.
+    assert uses["stills"] == "flux3_klein" and uses["writer"] == "comfy_native:gemma4-12b-int8-convrot"
+    assert "video" not in uses and "voices" not in uses
+    assert ways["otr_16gb_still.json"]["proven"] is True
+    assert ways["otr_google_still.json"]["proven"] is False
+    assert "uses" not in studio.menu()[0]["ways"][0], "no node definitions, no model names"
+
+
+def test_every_unproven_name_is_on_the_menu_and_says_why():
+    from radio_play_studio.config import UNPROVEN
+    for name, why in UNPROVEN.items():
+        assert menu_lookup(name) is not None and why.strip()
+
+
+def test_no_menu_machine_offers_foley_or_mime_where_it_is_not_proven():
+    offered = {machine: {way for way, _ in ways} for machine, ways in MACHINES}
+    assert offered["mac16"] == {"video", "stills"} and offered["amd"] == {"stills"}
+    assert not any("mime" in name for _, ways in MACHINES for _, name in ways)

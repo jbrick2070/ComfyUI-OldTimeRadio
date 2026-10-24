@@ -197,8 +197,7 @@
  "setup.machine": "你的機器",
  "setup.way": "拍攝方式",
  "machine.nvidia8": "NVIDIA，8 GB",
- "machine.nvidia16": "NVIDIA，16 GB",
- "machine.nvidia24": "NVIDIA，24 GB",
+ "machine.nvidia16": "NVIDIA，16 GB 以上",
  "machine.mac16": "Mac，16 GB",
  "machine.amd": "AMD（ROCm）",
  "machine.comfy_cloud": "Comfy Cloud",
@@ -232,5 +231,11 @@
  "writer.summary_model": "編劇：{name}（{model}）",
  "way.time_min": "{acts} 幕約 {n} 分鐘（在 {gpu} 測得）",
  "way.time_h": "{acts} 幕約 {n} 小時（在 {gpu} 測得）",
- "keys.missing": "需要金鑰：{names}"
+ "keys.missing": "需要金鑰：{names}",
+ "uses.video": "影片",
+ "uses.stills": "靜態圖",
+ "uses.voices": "聲音",
+ "uses.music": "音樂",
+ "uses.writer": "編劇",
+ "way.unproven": "尚未驗證：還沒有用它發布過任何一集"
 }
