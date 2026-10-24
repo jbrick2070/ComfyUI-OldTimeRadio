@@ -55,6 +55,8 @@ def test_options_list_the_form(app):
     status, _, body = _request(port, "GET", "/api/options")
     keys = [f["key"] for f in json.loads(body)["fields"]]
     assert status == 200 and keys[0] == "bank" and "acts" in keys
+    # The page warns from this list when a My Story photo would go unused.
+    assert isinstance(json.loads(body)["photo_stills"], list)
 
 
 def test_a_whole_episode_over_http(app):
@@ -158,7 +160,7 @@ def test_a_nul_in_an_episode_path_is_a_404(app):
 
 def test_an_unexpected_failure_is_a_json_500_not_an_empty_reply(app, monkeypatch):
     port, _ = app
-    monkeypatch.setattr(Studio, "options", lambda self: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(Studio, "form", lambda self: (_ for _ in ()).throw(RuntimeError("boom")))
     status, headers, reply = _request(port, "GET", "/api/options")
     assert status == 500 and "internal error" in json.loads(reply)["error"]
 

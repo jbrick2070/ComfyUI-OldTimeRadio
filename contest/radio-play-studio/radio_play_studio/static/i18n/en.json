@@ -75,6 +75,8 @@
  "photo.too_old": "This ComfyUI's Old-Time Radio pack is too old for photos; update it.",
  "photo.sending": "Sending the photo to your ComfyUI...",
  "photo.failed": "Photo not added: {error}",
+ "photo.unused": "Your photos will not be used: {model} cannot paint a character from a picture. Pick {models} to use them.",
+ "photo.unused_here": "Your photos will not be used: this workflow paints no character from a picture.",
  "status.checking": "Checking your choices...",
  "status.not_started": "Not started.",
  "status.disconnected": "Disconnected.",

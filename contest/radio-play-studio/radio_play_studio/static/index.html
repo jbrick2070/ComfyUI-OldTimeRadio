@@ -49,6 +49,9 @@
   legend { padding: 0 8px; font: 600 1rem var(--sans); }
   label { display: block; margin: 14px 0 4px; font: 600 .95rem var(--sans); }
   .help { color: var(--muted); font: .875rem/1.45 var(--sans); margin: 3px 0 0; }
+  /* A choice that quietly drops something the person gave: said beside the choice. */
+  .warn { font: 600 .875rem/1.45 var(--sans); margin: 6px 0 0; padding-left: 10px;
+          border-left: 3px solid var(--lamp); }
   select, input, textarea { width: 100%; min-height: 44px; padding: 9px 11px; font: inherit; color: var(--ink);
     background: var(--bg); border: 1px solid var(--field-line); border-radius: 8px; }
   textarea { min-height: 72px; resize: vertical; }
@@ -363,6 +366,10 @@
 const $ = (id) => document.getElementById(id);
 const form = $("form"), go = $("go");
 let fields = [];
+// The Still pictures choices that paint a My Story character from their photos on
+// this workflow, from the server; null when the server does not say, and then the
+// page makes no claim either way.
+let photoStills = null;
 let running = false;   // an episode is being made: Make stays off
 
 // -- Translations -------------------------------------------------------------
@@ -539,6 +546,13 @@ function build(list) {
     help.className = "help";
     tx(help, "field." + f.key + ".help", f.help);
     row.append(label, control(f), help);
+    if (f.key === "stills") {
+      const warn = document.createElement("p");
+      warn.id = "photo_warn"; warn.className = "warn";
+      warn.setAttribute("role", "status"); warn.hidden = true;
+      row.appendChild(warn);
+      row.querySelector("select").addEventListener("change", photoWarn);
+    }
     boxes[f.group].appendChild(row);
     // The characters box is written by the cast cards, and the photos box with it.
     if (f.key === "my_characters") boxes[f.group].appendChild(castEditor());
@@ -554,6 +568,23 @@ function build(list) {
     setMode($("f_bank").value === MY_STORY_BANK ? "own" : "classic");
   }
   buttons();
+  photoWarn();
+}
+
+// Photos only reach the stills through a model that paints from a picture.
+// When the Still pictures choice cannot, say so where it is chosen: the run
+// would otherwise go ahead and leave every photo unused without a word.
+function photoWarn() {
+  const warn = $("photo_warn"), pick = $("f_stills"), bank = $("f_bank");
+  if (!warn || !pick) return;
+  const own = bank && bank.value === MY_STORY_BANK;
+  const photos = cast.some((c) => c.photos.length);
+  const unused = own && photos && photoStills !== null && !photoStills.includes(pick.value);
+  warn.hidden = !unused;
+  if (!unused) { plain(warn, ""); return; }
+  // The first is the plain name the box shows on the reference twin (flux3_klein).
+  if (photoStills.length) say(warn, "photo.unused", {model: pick.value, models: photoStills[0]});
+  else say(warn, "photo.unused_here");
 }
 
 // -- The cast cards: one per character, each with an optional photo ---------
@@ -608,6 +639,7 @@ function syncCast() {
   const {text, photos} = castLines();
   if ($("f_my_characters")) $("f_my_characters").value = text;
   if ($("f_my_photos")) $("f_my_photos").value = photos;
+  photoWarn();
 }
 
 function castEditor() {
@@ -810,6 +842,7 @@ function setMode(mode) {
   for (const key of ["bank", "source_ref"]) if ($("row_" + key)) $("row_" + key).hidden = own;
   // Directing the shots is a My Story path (planning/scene-producer/PLAN.md).
   $("direct").hidden = $("direct_help").hidden = !own;
+  photoWarn();
 }
 
 function collect() {
@@ -840,6 +873,7 @@ async function loadOptions() {
     const res = await fetch("/api/options");
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || res.statusText);
+    photoStills = Array.isArray(body.photo_stills) ? body.photo_stills : null;
     build(body.fields);
     $("notice").hidden = true;
   } catch (err) {

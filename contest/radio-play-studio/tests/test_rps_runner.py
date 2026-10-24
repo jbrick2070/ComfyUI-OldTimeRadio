@@ -580,6 +580,46 @@ def test_the_still_box_keeps_the_twins_reference_stills(settings, schemas):
     assert director({"bank": "shakespeare", "stills": "flux3_klein"})["character_image_model"] == "flux3_klein"
 
 
+def test_photo_stills_names_the_picks_that_paint_from_photos(settings, schemas):
+    """The page warns when a photo would go unused, from this list: on a graph
+    whose My Story characters use flux3_klein_ref, picking flux3_klein keeps the
+    references (build_graph_from's rule) and so does picking the _ref engine by
+    name; nothing else paints from a picture. With no reference twin, none does."""
+    import json as _json
+    from radio_play_studio.runner import Studio
+    # The pack offers it on all three still dropdowns, so the page's one box does.
+    for spec in schemas["OTR_VideoDirector"]["input"]["required"].values():
+        spec[0].append("flux3_klein_ref")
+    studio = Studio(settings, client_factory=lambda url: None, fetch=lambda url: schemas)
+    fields = studio.options()
+    assert studio.photo_stills(fields) == ["flux3_klein_ref"]          # no twin yet
+    named = settings.workflow_path
+    twin_graph = _json.loads(named.read_text(encoding="utf-8"))
+    for node in twin_graph["nodes"]:
+        if node["type"] == "OTR_VideoDirector":
+            node["widgets_values"] = ["flux3_klein", "flux3_klein_ref", "flux3_klein"]
+    named.with_name(named.stem + "_flux3_ref.json").write_text(
+        _json.dumps(twin_graph), encoding="utf-8")
+    picks = studio.photo_stills(fields)
+    assert picks == ["flux3_klein", "flux3_klein_ref"]
+    assert "moss_image" not in picks
+    # The list and the graph agree: every pick on it submits reference stills,
+    # and a pick off it does not.
+    def character(stills):
+        graph, ids = studio.build_graph({"bank": "my_story", "stills": stills})
+        return graph[ids["OTR_VideoDirector"]]["inputs"]["character_image_model"]
+    for pick in picks:
+        assert character(pick).endswith("_ref")
+    assert not character("moss_image").endswith("_ref")
+    assert studio.photo_stills([f for f in fields if f["key"] != "stills"]) == []
+    # The page's one request reads the node definitions once for both halves.
+    reads = []
+    counted = Studio(settings, client_factory=lambda url: None,
+                     fetch=lambda url: reads.append(url) or schemas)
+    body = counted.form()
+    assert body["photo_stills"] == picks and body["fields"] == fields and len(reads) == 1
+
+
 def test_a_reference_graph_named_directly_keeps_its_reference_stills(settings, schemas):
     """Sonnet QA of a27b502c: --workflow naming the _flux3_ref graph itself."""
     import json as _json

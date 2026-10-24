@@ -75,6 +75,8 @@
  "photo.too_old": "O pacote Old-Time Radio deste ComfyUI é antigo demais para fotos; atualize-o.",
  "photo.sending": "Enviando a foto ao seu ComfyUI...",
  "photo.failed": "Foto não adicionada: {error}",
+ "photo.unused": "Suas fotos não serão usadas: {model} não pinta um personagem a partir de uma imagem. Escolha {models} para usá-las.",
+ "photo.unused_here": "Suas fotos não serão usadas: este fluxo de trabalho não pinta nenhum personagem a partir de uma imagem.",
  "status.checking": "Verificando as suas escolhas...",
  "status.not_started": "Não iniciado.",
  "status.disconnected": "Desconectado.",

@@ -25,6 +25,9 @@ from .graph import fetch_object_info, load_workflow, workflow_to_api_prompt
 #: The still-engine dropdown the Still pictures field sets for the characters.
 DIRECTOR = FIELDS_BY_KEY["stills"].node_type
 STILLS_INPUT = FIELDS_BY_KEY["stills"].input
+#: A still engine that paints a character from that character's picture is named
+#: after its base engine with this suffix (flux3_klein -> flux3_klein_ref).
+REFERENCE_SUFFIX = "_ref"
 
 VIDEO_SUFFIXES = (".mp4", ".webm", ".mov", ".mkv")
 
@@ -206,11 +209,45 @@ class Studio:
             lambda path: producer.read_json(settings.comfyui_url, path))
         self._sleep = sleep
 
-    def options(self) -> list:
+    def options(self, schemas: dict | None = None) -> list:
         workflow = load_workflow(self.settings.workflow_path)
-        schemas = self._fetch(self.settings.comfyui_url)
+        if schemas is None:
+            schemas = self._fetch(self.settings.comfyui_url)
         graph = workflow_to_api_prompt(workflow, schemas)
         return describe_form(schemas, graph, locate_nodes(workflow))
+
+    def form(self) -> dict:
+        """What the page draws: the form, and the still picks that use photos.
+        One read of the node definitions serves both; on a ComfyUI that is
+        rendering, that read is the slow part of opening the page."""
+        schemas = self._fetch(self.settings.comfyui_url)
+        fields = self.options(schemas)
+        return {"fields": fields, "photo_stills": self.photo_stills(fields, schemas)}
+
+    def photo_stills(self, fields: list, schemas: dict | None = None) -> list:
+        """The Still pictures choices whose My Story run paints the characters
+        from their photos, so the page can say when a photo will go unused.
+
+        Read from the graph a My Story run actually submits (its reference twin
+        when one ships), by the rule build_graph_from applies: a pick keeps the
+        graph's `<pick>_ref` character stills, and a `_ref` engine picked by name
+        is a reference engine itself. Empty when that graph paints no character
+        still from a picture, which makes every photo unused."""
+        stills = next((f for f in fields if f.get("key") == "stills"), None)
+        if stills is None:
+            return []
+        choices = [str(c) for c in stills.get("choices") or []]
+        path = self.workflow_for({"bank": MY_STORY_BANK})
+        workflow = load_workflow(path)
+        if schemas is None:
+            schemas = self._fetch(self.settings.comfyui_url)
+        graph = workflow_to_api_prompt(workflow, schemas)
+        director = graph.get(locate_nodes(workflow).get(DIRECTOR, ""), {}).get("inputs", {})
+        saved = str(director.get(STILLS_INPUT) or "")
+        out = [c for c in choices if c.endswith(REFERENCE_SUFFIX)]
+        if saved.endswith(REFERENCE_SUFFIX) and saved[:-len(REFERENCE_SUFFIX)] in choices:
+            out.insert(0, saved[:-len(REFERENCE_SUFFIX)])
+        return out
 
     def workflow_for(self, choices: dict) -> Path:
         """The workflow these choices run: a My Story run uses the workflow's
@@ -242,7 +279,7 @@ class Studio:
         # run sends it back; on a graph whose characters use that model WITH
         # references (the My Story twin), they keep them -- never a silent loss.
         chosen = str((choices or {}).get("stills") or "")
-        if isinstance(saved_character, str) and chosen and saved_character == chosen + "_ref":
+        if isinstance(saved_character, str) and chosen and saved_character == chosen + REFERENCE_SUFFIX:
             director[STILLS_INPUT] = saved_character
         return graph, node_ids
 

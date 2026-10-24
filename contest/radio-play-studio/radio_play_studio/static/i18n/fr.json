@@ -75,6 +75,8 @@
  "photo.too_old": "Le paquet Old-Time Radio de ce ComfyUI est trop ancien pour les photos ; mettez-le à jour.",
  "photo.sending": "Envoi de la photo à votre ComfyUI...",
  "photo.failed": "Photo non ajoutée : {error}",
+ "photo.unused": "Vos photos ne seront pas utilisées : {model} ne peut pas peindre un personnage d'après une image. Choisissez {models} pour les utiliser.",
+ "photo.unused_here": "Vos photos ne seront pas utilisées : ce workflow ne peint aucun personnage d'après une image.",
  "status.checking": "Vérification de vos choix...",
  "status.not_started": "Non démarré.",
  "status.disconnected": "Déconnecté.",

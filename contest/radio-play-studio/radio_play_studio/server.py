@@ -557,7 +557,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _options(self) -> None:
         try:
-            self._send_json(HTTPStatus.OK, {"fields": self.runs.studio.options()})
+            self._send_json(HTTPStatus.OK, self.runs.studio.form())
         except (ServerUnreachable, GraphError) as exc:
             self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(exc)})
 

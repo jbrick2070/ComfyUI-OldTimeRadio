@@ -45,7 +45,9 @@ def writer_schema() -> dict:
 
 def director_schema() -> dict:
     """The video director's three still-engine dropdowns, in the pack's order."""
-    pick = lambda: (STILL_ENGINES, {"default": "flux3_klein"})  # noqa: E731
+    # A fresh list each: a test that adds an engine to one dropdown must not
+    # change the others, or the next test's.
+    pick = lambda: (list(STILL_ENGINES), {"default": "flux3_klein"})  # noqa: E731
     return {"input": {"required": {"announcer_image_model": pick(),
                                    "character_image_model": pick(),
                                    "music_image_model": pick()}}}

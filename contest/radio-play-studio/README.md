@@ -118,7 +118,7 @@ Press **Tell my own story** at the top of the page. Everything here is optional.
 | Voice | he or she (the pack voices every character as a man or a woman), or leave it to the writer. |
 | Who they are | Their part in the story and what they are like. |
 | How they look | In fixed terms: age, build, face, hair, the clothes they always wear. Fixed terms are what keep a face the same from shot to shot. |
-| Photos (optional) | Up to three pictures of them (one face, blended). Their portrait is painted **from** it, in the episode's own style, and every still of them follows that portrait. The photo itself never appears in the episode. |
+| Photos (optional) | Up to three pictures of them (one face, blended). Their portrait is painted **from** it, in the episode's own style, and every still of them follows that portrait. The photo itself never appears in the episode. If the **Still pictures** choice cannot paint from a picture, a line under it says the photos will not be used. |
 
 **Load the example** fills the cards and the boxes below with a ready story: the author's own
 Jeffrey and MagnoliaRex, from his novel *Mime Lung Music Festival*.

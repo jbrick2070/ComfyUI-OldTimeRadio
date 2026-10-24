@@ -75,6 +75,8 @@
  "photo.too_old": "這個 ComfyUI 的 Old-Time Radio 套件太舊，不支援照片，請更新它。",
  "photo.sending": "正在把照片傳送到你的 ComfyUI……",
  "photo.failed": "照片未新增：{error}",
+ "photo.unused": "你的照片不會被使用：{model} 無法依照片繪製角色。要使用照片，請選擇 {models}。",
+ "photo.unused_here": "你的照片不會被使用：這個工作流程不會依照片繪製任何角色。",
  "status.checking": "正在檢查你的選擇……",
  "status.not_started": "未開始。",
  "status.disconnected": "已中斷連線。",
