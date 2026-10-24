@@ -42,7 +42,7 @@
   /* The icon's lettering: heavy, upper case, a purple shadow and the rule beneath it. */
   h1 { font: 800 2.1rem/1.15 var(--sans); text-transform: uppercase; letter-spacing: .04em;
        margin: 0 0 8px; padding-bottom: 6px; text-shadow: 3px 3px 0 var(--accent);
-       border-bottom: 3px solid var(--accent); }
+       border-bottom: 3px solid var(--lamp); }
   .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .tag { color: var(--muted); margin: 0 0 24px; max-width: 40rem; }
   #lang { width: auto; max-width: 12rem; min-height: 44px; padding: 6px 10px; font: .9rem var(--sans); }
@@ -88,6 +88,10 @@
   .picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px;
            margin: 6px 0 12px; }
   .pick { padding: 10px 14px; }
+  .pickhead { margin: 2px 0 0; font: 600 .875rem var(--sans); color: var(--muted); }
+  #keys { border: 1px solid var(--line); background: var(--panel); border-radius: 12px;
+          padding: 12px 18px; margin: 0 0 12px; }
+  #keys_note { color: var(--bad); font: 600 .9rem var(--sans); white-space: nowrap; }
   /* Seven machines fit one row on a wide screen. */
   .machines { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
   .machines .pick { padding: 8px 10px; }
@@ -98,7 +102,7 @@
                   padding: 12px 18px; margin: 0 0 16px; }
   #group_Writer > summary { cursor: pointer; font: 600 1rem var(--sans); min-height: 28px; }
   #group_Writer #writer_reset { margin-top: 8px; }
-  #keys { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 12px; }
+  #keys { display: grid; gap: 12px; }
   .keyrow b { display: block; font: 600 .95rem var(--sans); }
   .keyrow .ok { color: var(--ok); font: .875rem var(--sans); }
   .keyline { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
@@ -321,7 +325,7 @@
     #form:has(#group_My_story[hidden]) > #group_Writer,
     #form:not(:has(#group_My_story)) > #group_Writer { grid-column: 1 / -1; }
     #group_setup { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 0 18px; }
-    #group_setup > #keys { grid-column: 1 / -1; }
+
     #form > fieldset { margin-bottom: 12px; }
     /* My story on the left, the show beside it; a classic story has only the show. */
     #form > #group_My_story { grid-column: 1; }
@@ -338,8 +342,9 @@
     /* Only the landing's own field help: the board and the upload messages keep theirs whole. */
     #form [id^="row_"] > .help, #cast_editor > .help {
       display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-    #form [id^="row_"]:is(:hover, :focus-within) > .help,
-    #cast_editor:is(:hover, :focus-within) > .help { -webkit-line-clamp: unset; overflow: visible; }
+    /* Opened by focus, not by the pointer passing over: no reflow while reading. */
+    #form [id^="row_"]:focus-within > .help,
+    #cast_editor:focus-within > .help { -webkit-line-clamp: unset; overflow: visible; }
     /* Who they are and how they look sit side by side on a card. */
     .card-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 10px; }
     .card-body > .who, .card-body > .tools { grid-column: 1 / -1; }
@@ -378,8 +383,10 @@
 
   <p id="notice" hidden></p>
   <form id="form"></form>
+  <div id="keys" hidden></div>
   <div class="gobar" id="gobar">
     <button id="go" type="submit" form="form" disabled data-i18n="go.make">Make the episode</button>
+    <a id="keys_note" href="#keys" hidden></a>
     <button id="direct" type="button" class="quiet" hidden disabled data-i18n="go.direct">Direct the shots first</button>
     <p id="direct_help" class="help" hidden data-i18n="go.direct_help">The play is written, cast and voiced as usual, then it stops after the stills: one picture for every line. Change any picture, try one again, keep the ones you like, then film. Filming is the slow part, so it only films what changed.</p>
   </div>
@@ -453,6 +460,8 @@ let photoStills = null;
 // and the workflow the form is drawn from; null on a server started on a graph
 // that is not on the menu.
 let menu = null, workflowName = null;
+// A workflow's form is on its way: Make waits, and only the latest reply is drawn.
+let loadingForm = false, formRequest = 0;
 // The fields a person changed, which survive a switch of machine or way: anything
 // left alone takes the new workflow's own value.
 const touched = new Set();
@@ -467,10 +476,12 @@ const KEY_FOR_WRITER = {"openrouter:slot-a": "openrouter", "google_api:slot-a": 
                         "comfy:slot-a": "comfy"};
 let keyStatus = null;
 // One act on our test machines (planning/regression/ROUNDS.md, 2026-10-23), in
-// seconds: a guide, never a promise; the foley figure is the closed-SDK sibling's.
-const ONE_ACT_SECONDS = {"otr_16gb_still.json": 1543, "otr_16gb_video.json": 8849,
-                         "otr_16gb_foley_open.json": 12090, "otr_8gb_still.json": 617,
-                         "otr_8gb_video.json": 618, "otr_8gb_ltx25_foley.json": 3374};
+// seconds, with the card it was measured on: a guide, never a promise; the
+// foley figure is the closed-SDK sibling's.
+const RTX5080 = "RTX 5080 Laptop, 16 GB", RTX4060 = "RTX 4060 Laptop, 8 GB";
+const ONE_ACT_SECONDS = {"otr_16gb_still.json": [1543, RTX5080], "otr_16gb_video.json": [8849, RTX5080],
+                         "otr_16gb_foley_open.json": [12090, RTX5080], "otr_8gb_still.json": [617, RTX4060],
+                         "otr_8gb_video.json": [618, RTX4060], "otr_8gb_ltx25_foley.json": [3374, RTX4060]};
 let running = false;   // an episode is being made: Make stays off
 
 // -- Translations -------------------------------------------------------------
@@ -744,20 +755,23 @@ function setupBox() {
     const sub = document.createElement("span");
     tx(sub, "way." + w.key + "_sub", "");
     card.append(r, name, sub);
-    const secs = ONE_ACT_SECONDS[w.workflow];
-    if (secs) {
+    if (ONE_ACT_SECONDS[w.workflow]) {
       const time = document.createElement("span");
       time.className = "time";
-      const span = secs >= 5400 ? t("time.h", {n: (secs / 3600).toFixed(1)}, (secs / 3600).toFixed(1) + " h")
-                                : t("time.min", {n: Math.round(secs / 60)}, Math.round(secs / 60) + " min");
-      tx(time, "way.time", "About " + span + " for one act on our test machine", null, {time: span});
+      time.dataset.workflow = w.workflow;
       card.appendChild(time);
     }
     ways.appendChild(card);
   }
-  const keys = document.createElement("div");
-  keys.id = "keys"; keys.hidden = true;
-  box.append(machines, ways, keys);
+  // Visible captions: the two rows are different questions.
+  const machineHead = document.createElement("p");
+  machineHead.className = "pickhead"; tx(machineHead, "setup.machine", "Your machine");
+  const wayHead = document.createElement("p");
+  wayHead.className = "pickhead"; tx(wayHead, "setup.way", "How it's filmed");
+  const left = document.createElement("div"), right = document.createElement("div");
+  left.append(machineHead, machines);
+  right.append(wayHead, ways);
+  box.append(left, right);
   return box;
 }
 
@@ -771,6 +785,18 @@ async function pickWorkflow(name) {
 function setupView() {
   writerView();
   keysView();
+  timesView();
+}
+
+// Each way's time, for the acts the form asks for, on the card it was measured on.
+function timesView() {
+  const acts = Math.max(1, parseInt($("f_acts") ? $("f_acts").value : "1", 10) || 1);
+  for (const el of document.querySelectorAll(".pick .time[data-workflow]")) {
+    const [secs, gpu] = ONE_ACT_SECONDS[el.dataset.workflow];
+    const total = secs * acts;
+    if (total >= 5400) say(el, "way.time_h", {n: (total / 3600).toFixed(1), acts, gpu});
+    else say(el, "way.time_min", {n: Math.round(total / 60), acts, gpu});
+  }
 }
 
 function writerView() {
@@ -783,7 +809,7 @@ function writerView() {
   // A cloud writer's name already says it is paid; the summary adds its model.
   const model = pick.value in CLOUD_WRITERS && $("f_" + CLOUD_WRITERS[pick.value]);
   if (model) say(sm, "writer.summary_model", {name, model: model.value});
-  else say(sm, "writer.summary", {name});
+  else say(sm, "writer.summary", {name});   // "(runs here, free)"
   $("writer_reset").hidden = !fields.some((f) => f.group === WRITER_GROUP && touched.has(f.key));
 }
 
@@ -799,6 +825,7 @@ function resetWriter() {
 
 function keysNeeded() {
   const need = new Set();
+  if (!fields.length) return [];
   const machine = menu && menu.current.machine;
   if (KEY_FOR_MACHINE[machine]) need.add(KEY_FOR_MACHINE[machine]);
   const stills = $("f_stills") ? $("f_stills").value : "";
@@ -814,6 +841,12 @@ function keysView() {
   if (!box) return;
   const need = keysNeeded();
   box.hidden = !need.length;
+  // The press bar names a key that is still missing, and jumps to the box.
+  const missing = need.filter((lane) => !(keyStatus && keyStatus[lane] &&
+                                          (keyStatus[lane].set || keyStatus[lane].file)));
+  const note = $("keys_note");
+  note.hidden = !missing.length;
+  if (missing.length) say(note, "keys.missing", {names: missing.map((l) => t("keys." + l, null, l)).join(", ")});
   // A key half typed stays put while the box redraws around it.
   const typed = $("comfy_key") ? $("comfy_key").value : "";
   box.textContent = "";
@@ -1218,21 +1251,36 @@ function restore(saved) {
 
 async function loadOptions(workflow) {
   // A ComfyUI that is busy rendering takes about 40 s to list its nodes.
+  const mine = ++formRequest;
+  loadingForm = true;
+  buttons();
   say($("notice"), "notice.asking");
   $("notice").hidden = false;
   try {
     const res = await fetch("/api/options" + (workflow ? "?workflow=" + encodeURIComponent(workflow) : ""));
     const body = await res.json();
+    if (mine !== formRequest) return;            // a later pick is on its way
     if (!res.ok) throw new Error(body.error || res.statusText);
     const saved = fields.length ? remember() : null;
     photoStills = Array.isArray(body.photo_stills) ? body.photo_stills : null;
     menu = body.menu || null;
     workflowName = menu ? menu.current.workflow : null;
+    loadingForm = false;
     build(body.fields);
     restore(saved);
     refreshKeys();
     $("notice").hidden = true;
+    // The first form is the server's default; a page on another card starts on
+    // that card's own workflow (Codex: an 8 GB card must not open on 16 GB).
+    if (!saved && menu && menu.detected && menu.detected !== menu.current.machine) {
+      const machine = menu.machines.find((m) => m.key === menu.detected);
+      if (machine) return loadOptions((machine.ways.find((w) => w.key === menu.current.way) ||
+                                       machine.ways[0]).workflow);
+    }
   } catch (err) {
+    if (mine !== formRequest) return;
+    loadingForm = false;
+    buttons();
     say($("notice"), "notice.unreachable", {error: err.message});
     $("notice").hidden = false;
   }
@@ -1888,7 +1936,7 @@ function refreshBoard() {
 // stage of any project -- and until the form has loaded: the app makes one
 // thing at a time.
 function buttons() {
-  go.disabled = $("direct").disabled = running || stageBusy || !fields.length;
+  go.disabled = $("direct").disabled = running || stageBusy || loadingForm || !fields.length;
 }
 
 function showStage(name, done, key, vars) {

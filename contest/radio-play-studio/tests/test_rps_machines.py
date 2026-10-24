@@ -204,3 +204,29 @@ def test_the_page_can_hand_over_a_comfy_key_but_never_read_it_back(settings, sch
         assert status == 400
     finally:
         server.shutdown()
+
+
+@pytest.mark.parametrize("slot", [None, "", "   ", "(enable Comfy Credits)"])
+def test_a_cloud_writer_whose_slot_is_missing_or_blank_is_refused(slot):
+    """Codex QA of 1e77e064: an absent slot reached the graph as None and passed."""
+    from radio_play_studio.form import _check_writer
+    inputs = {"creative_writing_model": "comfy:slot-a"}
+    if slot is not None:
+        inputs["comfy_slot_a_model"] = slot
+    with pytest.raises(GraphError, match="has no model picked"):
+        _check_writer({"7": {"inputs": inputs}}, {"OTR_LedgerScriptWriter": "7"})
+    _check_writer({"7": {"inputs": {"creative_writing_model": "google/gemma-4-12b-it"}}},
+                  {"OTR_LedgerScriptWriter": "7"})
+
+
+def test_a_menu_name_that_links_outside_the_folder_is_refused(menu_settings, schemas, tmp_path):
+    """Codex QA of 1e77e064: an allowed file name must still be a file in the folder."""
+    outside = tmp_path / "elsewhere.json"
+    outside.write_text("{}", encoding="utf-8")
+    link = menu_settings.workflow_path.parent / "otr_mac16_still.json"
+    try:
+        link.symlink_to(outside)
+    except (OSError, NotImplementedError):
+        pytest.skip("this machine cannot make a symlink")
+    with pytest.raises(ValueError):
+        _menu_studio(menu_settings, schemas).resolve_workflow("otr_mac16_still.json")

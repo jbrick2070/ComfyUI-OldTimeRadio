@@ -285,7 +285,7 @@ class Studio:
         if self.menu() is None or menu_lookup(str(name)) is None:
             raise ValueError(f"{name!r} is not one of the workflows this page offers")
         path = base.parent / str(name)
-        if not path.is_file():
+        if not path.is_file() or path.resolve().parent != base.resolve().parent:
             raise ValueError(f"{name} is not in {base.parent}")
         return path
 

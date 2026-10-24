@@ -77,12 +77,8 @@ FIELDS: tuple = (
           "stills. On the audio-reactive lanes it changes the file name, not the picture.",
           "The show"),
     Field("stills", "Still pictures", "OTR_VideoDirector", "character_image_model",
-          "The model that paints every still the video starts from -- the characters, "
-          "the announcer and the music. Any machine can use any of them: the open ones "
-          "run here (moss_image is the 16 GB pick; flux3_klein is a little faster), and "
-          "the cloud ones are paid -- cloud_ and ideo through a Comfy key, google_image "
-          "through a Google key. Tell my own story paints its characters from their "
-          "pictures with flux3_klein (flux3_klein_ref); pick another model to switch that off.",
+          "Paints every still. Open models run here; paid ones run in the cloud and need a "
+          "key. Character photos only work with FLUX 3 Klein.",
           "The show", also=("announcer_image_model", "music_image_model"),
           # Mix and match (operator, 2026-10-23: "people can mix and match whatever
           # they want"): every engine but the custom-model row, which opens a node
@@ -232,7 +228,7 @@ def _check_writer(api_prompt: dict, node_ids: dict) -> None:
     if slot is None:
         return
     model = inputs.get(slot)
-    if isinstance(model, str) and (not model.strip() or model.startswith("(")):
+    if not isinstance(model, str) or not model.strip() or model.startswith("("):
         raise GraphError(f"Writer: {inputs['creative_writing_model']} has no model picked; "
                          "choose one in its model box, or pick a local writer")
 

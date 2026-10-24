@@ -239,8 +239,11 @@ A cloud pick needs its key, and the page lists only the keys the current picks n
 
 - **Comfy** (Comfy Cloud, the `cloud_` and `ideo` still models, the Comfy writer): type it on the
   page, or start the Studio with `OTR_COMFY_API_KEY` set. The server holds it in memory and sends it
-  with each run the way ComfyUI expects (`extra_data.api_key_comfy_org`); it is never written to
-  disk, logged, or sent back to a page.
+  with each run the way ComfyUI expects (`extra_data.api_key_comfy_org`); the app never writes it
+  to disk, logs it, or sends it back to a page. ComfyUI itself keeps it with each job in its own
+  queue and history, exactly as it does for its own sign-in, so treat your ComfyUI as you would
+  any program that holds the key.
+- **The press bar names a missing key** and jumps to the box, which sits just above it.
 - **Google** (Google Cloud, `google_image`, the Google writer) and **OpenRouter** (the OpenRouter
   writer): ComfyUI reads these itself, so the page says where to put them -- the first line of
   `google.secret` or `openrouter.secret` in the pack folder, or `GEMINI_API_KEY` /
