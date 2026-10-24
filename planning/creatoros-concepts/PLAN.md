@@ -48,8 +48,8 @@ with OTR's MIT licence.
 |---|---|---|---|
 | **S1 Headless ops** | 1.1 live view, 1.2 failure hints, 1.3 phone ping | `scripts/`, new `config/node_phase_labels.json` | None: each row has one verifiable answer. 1.1's preview half is a measurement first |
 | **S2 Environment fingerprint** | 2.1 stamp, 2.2 known-good + drift report | `nodes/` (ledger), `scripts/` | Full `kibitz-plugin:kibitz` arc: it is a ledger change |
-| **S3 Studio proposals** | 3.1 to 3.4 | `contest/radio-play-studio/` | Fold into `planning/studio-ui/DESIGN_ANCHOR.md` through its owner first |
-| **S4 Broadcast feed** | 4.1 | publish boundary, routes, `js/` | Operator decision D1, then a full arc |
+| **S3 Studio proposals** | 3.1 to 3.5 | `contest/radio-play-studio/` | Fold into `planning/studio-ui/DESIGN_ANCHOR.md` through its owner first |
+| **S4 Broadcast feed** | 4.1 | publish boundary, routes, `js/` | Full arc (D1 decided: A, air by default, pull from air) |
 
 Every chunk, every sprint: scoped suite + Bug Bible regression green, push to `main`, then
 Composer/Sonnet QA plus one driver-aware CLI lane on the pushed diff (CLAUDE.md 2026-09-19,
@@ -192,18 +192,16 @@ drop on the page.
 Not proposed: a live preview on the cards. It would be a second moving thing and breaks the
 anchor's lamp concept; the anchor's owner can revisit it.
 
-## S4 Broadcast feed (operator decision D1, then a full arc)
+## S4 Broadcast feed (D1 decided: A; full arc before code)
 
 **Gap.** The README's 24/7 broadcast points OBS at `otr/obs/`, so every leg airs, including probe
 legs whose harness label becomes the title card. `otr/obs/` must stay the dailies and the success
 signal, so the fix cannot touch it.
 
-**D1, for the operator.**
-- **A (recommended): air by default, pull from air.** A separate broadcast folder that OBS watches.
-  Every publish also adds a hardlink there (same volume, no extra disk). A review tab can pull an
-  episode from air (removes only the link) or put it back. The unattended 24/7 feed keeps working.
-- **B: curated.** Nothing airs until someone sends it to air.
-- **C: leave it as it is.** Skip S4.
+**D1, decided by the operator 2026-10-24: A, air by default, pull from air.** A separate broadcast
+folder that OBS watches. Every publish also adds a hardlink there (same volume, no extra disk). A
+review tab can pull an episode from air (removes only the link) or put it back. The unattended 24/7
+feed keeps working. Not chosen: B (curated, nothing airs until sent) and C (skip S4).
 
 **Constraints the arc must honour.**
 - The output-tree contract allows exactly `episodes` + `obs` at the `otr/` top level
@@ -233,6 +231,7 @@ signal, so the fix cannot touch it.
 1. **S1 now.** Scripts only, no graph change. Whichever coder window takes it messages the peer first.
 2. **S2 after its arc.** `nodes/` is 5080-owned. The arc settles the schema questions in 2.1.
 3. **S3 when the Studio page reaches the anchor's build.** Hand 3.1 to 3.5 to the anchor's owner.
-4. **S4 only after D1.** If the operator picks C, delete S4 from this file in the same commit.
+4. **S4 after its arc.** D1 is decided (A, 2026-10-24). The publish boundary and `nodes/` are
+   5080-owned; `js/` and the routes go with them.
 
 Delete each row from this file when it ships. Its receipt goes in the commit message, not here.
