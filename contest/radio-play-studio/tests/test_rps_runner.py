@@ -634,3 +634,6 @@ def test_a_reference_graph_named_directly_keeps_its_reference_stills(settings, s
     studio = Studio(settings, client_factory=lambda url: None, fetch=lambda url: schemas)
     built, ids = studio.build_graph({"bank": "shakespeare", "stills": "flux3_klein"})
     assert built[ids["OTR_VideoDirector"]]["inputs"]["character_image_model"] == "flux3_klein_ref"
+    # With no twin beside it, the named graph is the My Story graph, and its
+    # reference stills make the plain pick one that paints from photos.
+    assert studio.photo_stills(studio.options()) == ["flux3_klein", "flux3_klein_ref"]

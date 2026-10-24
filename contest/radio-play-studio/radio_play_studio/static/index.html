@@ -553,6 +553,10 @@ function build(list) {
       row.appendChild(warn);
       row.querySelector("select").addEventListener("change", photoWarn);
     }
+    if (f.key === "my_plot" || f.key === "my_setting") {
+      const box = row.querySelector("textarea, input");
+      if (box) box.addEventListener("input", photoWarn);
+    }
     boxes[f.group].appendChild(row);
     // The characters box is written by the cast cards, and the photos box with it.
     if (f.key === "my_characters") boxes[f.group].appendChild(castEditor());
@@ -578,13 +582,20 @@ function photoWarn() {
   const warn = $("photo_warn"), pick = $("f_stills"), bank = $("f_bank");
   if (!warn || !pick) return;
   const own = bank && bank.value === MY_STORY_BANK;
-  const photos = cast.some((c) => c.photos.length);
-  const unused = own && photos && photoStills !== null && !photoStills.includes(pick.value);
+  const given = cast.some((c) => c.photos.length);
+  // Nothing typed tells the author's own story, with his shipped photos of its
+  // two leads (nodes/_otr_story_input.py, would_apply_default_story): the cast,
+  // the plot and the setting are the boxes that count.
+  const typed = cast.some((c) => c.name.trim() || c.who.trim() || c.look.trim())
+    || ["my_plot", "my_setting"].some((k) => $("f_" + k) && $("f_" + k).value.trim());
+  const house = !given && !typed;
+  const unused = own && (given || house) && photoStills !== null && !photoStills.includes(pick.value);
   warn.hidden = !unused;
   if (!unused) { plain(warn, ""); return; }
   // The first is the plain name the box shows on the reference twin (flux3_klein).
-  if (photoStills.length) say(warn, "photo.unused", {model: pick.value, models: photoStills[0]});
-  else say(warn, "photo.unused_here");
+  if (!photoStills.length) say(warn, house ? "photo.unused_house_here" : "photo.unused_here");
+  else say(warn, house ? "photo.unused_house" : "photo.unused",
+           {model: pick.value, models: photoStills[0]});
 }
 
 // -- The cast cards: one per character, each with an optional photo ---------

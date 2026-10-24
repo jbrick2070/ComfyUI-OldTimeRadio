@@ -77,6 +77,8 @@
  "photo.failed": "Foto não adicionada: {error}",
  "photo.unused": "Suas fotos não serão usadas: {model} não pinta um personagem a partir de uma imagem. Escolha {models} para usá-las.",
  "photo.unused_here": "Suas fotos não serão usadas: este fluxo de trabalho não pinta nenhum personagem a partir de uma imagem.",
+ "photo.unused_house": "As fotos da história de exemplo não serão usadas: {model} não pinta um personagem a partir de uma imagem. Escolha {models} para usá-las.",
+ "photo.unused_house_here": "As fotos da história de exemplo não serão usadas: este fluxo de trabalho não pinta nenhum personagem a partir de uma imagem.",
  "status.checking": "Verificando as suas escolhas...",
  "status.not_started": "Não iniciado.",
  "status.disconnected": "Desconectado.",

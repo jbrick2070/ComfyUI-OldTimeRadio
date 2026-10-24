@@ -77,6 +77,8 @@
  "photo.failed": "写真を追加できませんでした：{error}",
  "photo.unused": "写真は使われません：{model}は写真から人物を描けません。写真を使うには{models}を選んでください。",
  "photo.unused_here": "写真は使われません：このワークフローは写真から人物を描きません。",
+ "photo.unused_house": "例の物語の写真は使われません：{model}は写真から人物を描けません。写真を使うには{models}を選んでください。",
+ "photo.unused_house_here": "例の物語の写真は使われません：このワークフローは写真から人物を描きません。",
  "status.checking": "選択内容を確認しています……",
  "status.not_started": "開始されませんでした。",
  "status.disconnected": "切断されました。",

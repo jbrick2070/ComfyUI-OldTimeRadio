@@ -77,6 +77,8 @@
  "photo.failed": "Photo non ajoutée : {error}",
  "photo.unused": "Vos photos ne seront pas utilisées : {model} ne peut pas peindre un personnage d'après une image. Choisissez {models} pour les utiliser.",
  "photo.unused_here": "Vos photos ne seront pas utilisées : ce workflow ne peint aucun personnage d'après une image.",
+ "photo.unused_house": "Les photos de l'histoire d'exemple ne seront pas utilisées : {model} ne peut pas peindre un personnage d'après une image. Choisissez {models} pour les utiliser.",
+ "photo.unused_house_here": "Les photos de l'histoire d'exemple ne seront pas utilisées : ce workflow ne peint aucun personnage d'après une image.",
  "status.checking": "Vérification de vos choix...",
  "status.not_started": "Non démarré.",
  "status.disconnected": "Déconnecté.",
