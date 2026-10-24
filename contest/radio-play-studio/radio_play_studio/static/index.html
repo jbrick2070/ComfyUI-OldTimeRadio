@@ -582,11 +582,13 @@ function photoWarn() {
   const warn = $("photo_warn"), pick = $("f_stills"), bank = $("f_bank");
   if (!warn || !pick) return;
   const own = bank && bank.value === MY_STORY_BANK;
-  const given = cast.some((c) => c.photos.length);
+  // Only named cards reach the run (castLines), photos and words alike.
+  const people = cast.filter((c) => c.name.trim());
+  const given = people.some((c) => c.photos.length);
   // Nothing typed tells the author's own story, with his shipped photos of its
   // two leads (nodes/_otr_story_input.py, would_apply_default_story): the cast,
   // the plot and the setting are the boxes that count.
-  const typed = cast.some((c) => c.name.trim() || c.who.trim() || c.look.trim())
+  const typed = people.length > 0
     || ["my_plot", "my_setting"].some((k) => $("f_" + k) && $("f_" + k).value.trim());
   const house = !given && !typed;
   const unused = own && (given || house) && photoStills !== null && !photoStills.includes(pick.value);
