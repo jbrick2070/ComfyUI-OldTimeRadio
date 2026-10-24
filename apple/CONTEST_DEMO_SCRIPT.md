@@ -1,5 +1,7 @@
 # Radio Play Studio -- demo video script (under 2 minutes)
 
+> **Since this was written (2026-10-23):** the Studio gained a machine picker (NVIDIA 8 GB, 16 GB or more, Mac, AMD, Comfy Cloud, Google Cloud), filming cards that name their models, per-machine still and writer choices, a closed writer panel, a key box for opt-in cloud picks, and the icon's purple colours. The default path is unchanged and still all open weights. This file is kept as the record of what was submitted or recorded; the current page is described in `contest/radio-play-studio/README.md`.
+
 The form requires: under 2 minutes, "your build in action and how you built it"; Most Innovative
 also requires saying why it is innovative. Judges "judge the work, not the video editing".
 Every model and tool must be named. Times are targets; total 1:55.

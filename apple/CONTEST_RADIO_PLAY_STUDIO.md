@@ -12,6 +12,11 @@ branch, then do the first unchecked step. Update this file in the same commit as
   `comfy-api-proxy` 0.1.6.
 - The demo video must name every model and tool used.
 - **Open weights only** (Open Weights prize): no Comfy Router, no partner nodes, no cloud writer.
+  **Since 2026-10-23 (operator):** the default path still is -- every model open weights, on the
+  card -- but the page also offers cloud machines, cloud still models and cloud writers as opt-in
+  choices, each marked paid, and the cloud ways marked "not yet proven". Whether that sits well
+  with the Open Weights category is the operator's call; the entry as submitted (10-22) predates
+  it, and its code link (`tree/main/contest/radio-play-studio`) now serves the new page.
 - LTX as the core video model also qualifies for the **$2,000 LTX VFX bonus**.
 
 ## Where things are

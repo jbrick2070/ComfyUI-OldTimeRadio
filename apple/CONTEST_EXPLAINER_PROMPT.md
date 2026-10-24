@@ -1,5 +1,7 @@
 # Prompt: write the explainer script for Radio Play Studio
 
+> **Since this was written (2026-10-23):** the Studio gained a machine picker (NVIDIA 8 GB, 16 GB or more, Mac, AMD, Comfy Cloud, Google Cloud), filming cards that name their models, per-machine still and writer choices, a closed writer panel, a key box for opt-in cloud picks, and the icon's purple colours. The default path is unchanged and still all open weights. This file is kept as the record of what was submitted or recorded; the current page is described in `contest/radio-play-studio/README.md`.
+
 Paste everything below the line into a writing model (or hand it to a person). It carries every
 fact the script needs; the writer must not invent any others. Written 2026-10-20 for Jeffrey A.
 Brick's entry to Comfy's Open Source Higgsfield challenge.

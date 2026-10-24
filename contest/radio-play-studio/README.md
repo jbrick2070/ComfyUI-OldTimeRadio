@@ -78,8 +78,9 @@ python -m radio_play_studio doctor     # checks ComfyUI, the pack, the SDK and t
 python -m radio_play_studio serve      # open http://127.0.0.1:8765
 ```
 
-Choose **A classic, or surprise me** or **Tell my own story**, press **Make the episode**, and watch
-the bar. The form starts on the workflow's own settings (three acts on the 16 GB foley workflow).
+Pick your machine and how it's filmed (it starts on the card your ComfyUI reports), choose
+**A classic, or surprise me** or **Tell my own story**, press **Make the episode**, and watch the
+bar. The form starts on the chosen workflow's own settings (three acts on the 16 GB foley workflow).
 The finished video plays in the page, is saved under `./episodes/<id>/`, and ComfyUI also
 publishes it to its own `output/otr/obs/` folder.
 
@@ -275,6 +276,12 @@ machine translations that no native speaker has reviewed yet, so corrections are
 
 ## Measured timings (RTX 5080 Laptop, 16 GB, ComfyUI 0.42.1, through the SDK and proxy)
 
+Two sets, and both are real. The Studio's own runs below were measured through the app, on the
+episodes those runs happened to write. The time on each filming card comes from the pack's
+regression round of 2026-10-23 (`planning/regression/ROUNDS.md`), run by a harness on each
+machine with whatever else was open, and scaled by the acts you set. Episode length moves both:
+a longer play films more beats.
+
 | Job | Time |
 |---|---|
 | One-act episode, 16 GB foley workflow (LTX 2.5 with sound), five runs | 57, 64, 64, 68 and 76 min |
@@ -303,6 +310,10 @@ Run length follows the story: the number and length of the beats decide how many
   says what it is waiting for, and a reload picks a run back up without waiting for it at all.
 - **FLUX 3 Klein needs ComfyUI v0.41.0** (its CLIPLoader type); an older core is refused before the
   10 GB download, with the update message, not after it.
+- **A lost progress stream used to freeze the bar.** On 2026-10-23 a foley episode's bar sat at 78%
+  for three hours while ComfyUI filmed shot after shot: the SDK reconnects a dropped connection,
+  but its own status check timed out against the busy server. The app now opens the stream again
+  while ComfyUI's queue still holds the job, and says so on the page.
 
 ## How it stays honest
 
@@ -312,6 +323,9 @@ Run length follows the story: the number and length of the beats decide how many
 - **Never the cloud by accident.** The Comfy SDK talks to Comfy Cloud when `COMFY_BASE_URL` is unset.
   The app always sets it to your local bridge first, starts on local models, and marks every cloud
   choice as paid.
+- **Only proven ways, said plainly.** The filming cards name what each workflow runs, read from the
+  workflow itself; a way with no published episode is marked "not yet proven"; and each machine's
+  dropdowns come from the same cells as the pack's machines table.
 - **A finished job is not a finished episode.** The run ends in success only when the video file is
   on disk.
 - **Local only.** The web app listens on loopback, refuses other Host headers and only accepts JSON
@@ -344,5 +358,6 @@ against the pack's real node definitions.
 The app is MIT, see [LICENSE](LICENSE). Model weights carry their own licenses, documented in the
 pack's `apple/IMAGE_MODELS.md` with their sources in `nodes/_otr_visual_assets.py`. Note that the
 default still model, FLUX 3 Klein, is under the FLUX Kommunity License: free for non-commercial
-use, with commercial use of its outputs limited to qualifying users. MOSS-Image (Apache-2.0) is the
-other Still pictures choice.
+use, with commercial use of its outputs limited to qualifying users. The other open still models
+keep their own licenses (MOSS-Image is Apache-2.0), and the cloud ones are their providers' paid
+services.

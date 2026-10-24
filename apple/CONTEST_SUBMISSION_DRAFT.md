@@ -1,5 +1,7 @@
 # Open Source Higgsfield -- submission form, draft answers
 
+> **Since this was written (2026-10-23):** the Studio gained a machine picker (NVIDIA 8 GB, 16 GB or more, Mac, AMD, Comfy Cloud, Google Cloud), filming cards that name their models, per-machine still and writer choices, a closed writer panel, a key box for opt-in cloud picks, and the icon's purple colours. The default path is unchanged and still all open weights. This file is kept as the record of what was submitted or recorded; the current page is described in `contest/radio-play-studio/README.md`.
+
 Form: https://form.typeform.com/to/V1dSQrkS (12 questions, read 2026-10-19; nothing was entered).
 **10-22: Claude filled Q1-Q10 in the browser pane at the operator's word (Q2 handles left blank,
 Q3 = builds custom nodes, Q6 parts = Comfy API + Comfy SDK, live link blank, the judges' blurb
