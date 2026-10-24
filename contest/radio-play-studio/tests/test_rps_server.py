@@ -54,7 +54,7 @@ def test_options_list_the_form(app):
     port, _ = app
     status, _, body = _request(port, "GET", "/api/options")
     keys = [f["key"] for f in json.loads(body)["fields"]]
-    assert status == 200 and keys[0] == "bank" and "acts" in keys
+    assert status == 200 and keys[0] == "language" and "bank" in keys and "acts" in keys
     # The page warns from this list when a My Story photo would go unused.
     assert isinstance(json.loads(body)["photo_stills"], list)
 

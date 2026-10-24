@@ -44,8 +44,11 @@ class Field:
     optional: bool = False
 
 
-#: In the order they appear on the page.
+#: In the order they appear on the page. Language leads: it is the one choice
+#: every story makes (operator, 2026-10-23: "put language first").
 FIELDS: tuple = (
+    Field("language", "Language", WRITER, "episode_language",
+          "The language of the play.", "The show"),
     Field("bank", "Story bank", WRITER, "source_bank",
           "Where the story comes from. Pick shakespeare or public_domain to adapt a "
           "classic, my_story to use your own details below, or roll to be surprised.",
@@ -53,8 +56,6 @@ FIELDS: tuple = (
     Field("source_ref", "Source to adapt", WRITER, "source_ref",
           "Optional. Name the classic to adapt (needs a named bank, not the roll).",
           "The show"),
-    Field("language", "Language", WRITER, "episode_language",
-          "The language of the play.", "The show"),
     Field("acts", "Acts", WRITER, "act_count",
           "More acts, a longer play.", "The show"),
     Field("cast_size", "Cast size", WRITER, "num_characters",

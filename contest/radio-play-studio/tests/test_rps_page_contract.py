@@ -91,8 +91,11 @@ def test_every_id_the_script_reads_by_name_exists():
     makes it (an id assigned in the script itself)."""
     read = set(re.findall(r'\$\("([a-z_0-9]+)"\)', CODE))
     made = set(re.findall(r'\.id = "([a-z_0-9]+)"', CODE))
-    # Ids the script makes from parts: a field's control is "f_" + its key.
-    made |= {"f_" + f.key for f in FIELDS} | {"mode_classic", "mode_own"}
+    # Ids the script makes from parts: a field's row is "row_" + its key and its
+    # control "f_" + its key.
+    made |= {"f_" + f.key for f in FIELDS} | {"row_" + f.key for f in FIELDS}
+    made |= {"mode_classic", "mode_own"}
+    assert 'row.id = "row_" + f.key' in CODE
     missing = sorted(read - set(BY_ID) - made)
     assert missing == []
     for name in ("stills", "video", "publish"):

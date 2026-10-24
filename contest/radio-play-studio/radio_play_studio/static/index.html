@@ -6,31 +6,32 @@
 <title>Radio Play Studio</title>
 <style>
   /* Radio Play Studio -- "Three lamps" (planning/studio-ui/DESIGN_ANCHOR.md).
-     A dark room, paper cards, and three things that can glow: the stage lamps.
-     By day (a light OS theme) the same room with the blinds open. */
+     The pack's own colours, read off its registry icon (assets/otr_icon_400.png):
+     night indigo, a deep purple for what you press (operator, 2026-10-23: "more
+     deep purple instead of pink"), the green of its waveform for the lamps, and
+     its violet grid. One theme, because that look is the show's. The serif is
+     the script and the sans is the console. Every text pair here clears WCAG
+     AA; --accent-text is the purple for words, --accent the purple for fills. */
   :root {
-    color-scheme: light dark;
-    --bg: #f4efe6; --panel: #fffdf8; --strip: #ece4d6; --ink: #2a2118; --muted: #6f6254;
-    --line: #d9ccb8; --field-line: #948470; --accent: #b4491f; --accent-ink: #fff8f0;
-    --ok: #2f6b3a; --bad: #a3261a; --bar: #e5d9c5; --kept: #70644f;
-    --lamp: #8a5200; --lamp-glow: transparent; --focus: #8a5200;
+    color-scheme: dark;
+    --bg: #12092f; --panel: #1c1240; --strip: #24184c; --ink: #f4edfb; --muted: #b9acdc;
+    --line: #3b2b70; --field-line: #7a64b8; --accent: #7c3aed; --accent-ink: #ffffff;
+    --accent-text: #b794ff;
+    --ok: #50f898; --bad: #ff8a7a; --bar: #2e2060; --kept: #9a8cc4;
+    --lamp: #50f898; --lamp-glow: rgba(80, 248, 152, .35); --focus: #50f898;
+    --grid: rgba(72, 48, 136, .18);
     --serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Noto Serif", serif;
     --sans: system-ui, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial,
             "Noto Sans Devanagari", "Hiragino Sans", "Yu Gothic", "Microsoft YaHei", sans-serif;
     --mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
   }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      color-scheme: dark;
-      --bg: #17130f; --panel: #211b15; --strip: #2a221b; --ink: #f0e6d6; --muted: #a89a86;
-      --line: #3a3026; --field-line: #867560; --accent: #e0703f; --accent-ink: #1a1007;
-      --ok: #7ec28a; --bad: #f08a7e; --bar: #3a3026; --kept: #8f826f;
-      --lamp: #ffd98a; --lamp-glow: rgba(255, 217, 138, .35); --focus: #ffd98a;
-    }
-  }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 var(--serif); }
+  /* The icon's grid, faint, behind everything; the panels sit on it opaque. */
+  body { margin: 0; color: var(--ink); font: 16px/1.5 var(--serif); background-color: var(--bg);
+         background-image: linear-gradient(var(--grid) 1px, transparent 1px),
+                           linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+         background-size: 56px 56px; }
   main { max-width: 760px; margin: 0 auto; padding: 28px 16px 64px; }
   /* The board takes the room it needs; the landing and the single run keep a reading measure. */
   main:has(#board:not([hidden])) { max-width: min(1360px, 100%); }
@@ -38,7 +39,10 @@
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
   /* ---- masthead ---- */
-  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 6px; }
+  /* The icon's lettering: heavy, upper case, a purple shadow and the rule beneath it. */
+  h1 { font: 800 2.1rem/1.15 var(--sans); text-transform: uppercase; letter-spacing: .04em;
+       margin: 0 0 8px; padding-bottom: 6px; text-shadow: 3px 3px 0 var(--accent);
+       border-bottom: 3px solid var(--accent); }
   .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .tag { color: var(--muted); margin: 0 0 24px; max-width: 40rem; }
   #lang { width: auto; max-width: 12rem; min-height: 44px; padding: 6px 10px; font: .9rem var(--sans); }
@@ -59,7 +63,7 @@
            border-radius: 8px; background: var(--accent); color: var(--accent-ink); cursor: pointer; }
   button:disabled { opacity: .5; cursor: default; }
   .small { padding: 8px 14px; font-size: .875rem; }
-  .quiet { background: transparent; color: var(--accent); border: 1px solid var(--field-line); }
+  .quiet { background: transparent; color: var(--accent-text); border: 1px solid var(--field-line); }
   .quiet[aria-pressed="true"] { border-color: var(--ok); color: var(--ok); }
   #error, .error { color: var(--bad); white-space: pre-wrap; }
   #notice { color: var(--bad); font-family: var(--sans); }
@@ -106,7 +110,7 @@
   .gobar #go { font-size: 1.05rem; padding: 12px 26px; }
   #direct_help { flex-basis: 100%; }
   #projects { margin-top: 14px; }
-  #projects a { color: var(--accent); margin-right: 10px; }
+  #projects a { color: var(--accent-text); margin-right: 10px; }
 
   /* ---- the single run ---- */
   #run { max-width: 760px; margin-top: 18px; }
@@ -198,7 +202,7 @@
   details.scene > summary .count { color: var(--muted); font: .85rem var(--mono); font-variant-numeric: tabular-nums; }
   .flag { font: 600 .78rem var(--sans); font-variant-numeric: tabular-nums; padding: 2px 9px; border-radius: 10px; border: 1px solid var(--line);
           color: var(--muted); background: var(--panel); }
-  .flag.changed { border-color: var(--accent); color: var(--accent); }
+  .flag.changed { border-color: var(--accent); color: var(--accent-text); }
   .flag.failed { border-color: var(--bad); color: var(--bad); }
   .scenebody { padding: 14px 16px 16px; container-type: inline-size; }
   .scenenote { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center;
@@ -234,7 +238,7 @@
   .shot.failed .still img { filter: grayscale(1) brightness(.6); }
   .badge { display: inline-block; font: 600 .78rem var(--sans); padding: 2px 9px; border-radius: 10px;
            border: 1px solid var(--line); color: var(--muted); margin-left: 6px; vertical-align: middle; }
-  .badge.changed { border-color: var(--accent); color: var(--accent); }
+  .badge.changed { border-color: var(--accent); color: var(--accent-text); }
   .badge.failed { border-color: var(--bad); color: var(--bad); }
   .badge.kept { border-color: var(--kept); color: var(--kept); }
   .badge.filmed { border-color: var(--ok); color: var(--ok); }
@@ -303,7 +307,7 @@
       grid-column: 1 / -1; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
     #group_The_show > [id^="row_"] { min-width: 0; }
     /* Long pickers and the still model take the whole row of their box. */
-    #row_source_ref, #row_stills { grid-column: 1 / -1; }
+    #row_stills { grid-column: 1 / -1; }
     label { margin-top: 10px; }
     /* The help keeps two lines and opens in full on the field it explains. */
     /* Only the landing's own field help: the board and the upload messages keep theirs whole. */
@@ -611,6 +615,9 @@ function build(list) {
     // The characters box is written by the cast cards, and the photos box with it.
     if (f.key === "my_characters") boxes[f.group].appendChild(castEditor());
     if (f.key === "my_characters" || f.key === "my_photos") row.hidden = true;
+    // Naming a classic by hand is the command line's job (--source-ref); on the
+    // page a story of your own is My story (operator, 2026-10-23).
+    if (f.key === "source_ref") row.hidden = true;
   }
   const bank = list.find((f) => f.key === "bank");
   const ownStory = boxes[MY_STORY_GROUP] && bank && bank.choices.includes(MY_STORY_BANK);
@@ -906,7 +913,7 @@ function setMode(mode) {
   if (own && bank.value !== MY_STORY_BANK) { lastBank = bank.value; bank.value = MY_STORY_BANK; }
   if (!own && bank.value === MY_STORY_BANK) bank.value = lastBank || bank.options[0].value;
   $("group_" + MY_STORY_GROUP.replace(/\W+/g, "_")).hidden = !own;
-  for (const key of ["bank", "source_ref"]) if ($("row_" + key)) $("row_" + key).hidden = own;
+  if ($("row_bank")) $("row_bank").hidden = own;
   // Directing the shots is a My Story path (planning/scene-producer/PLAN.md).
   $("direct").hidden = $("direct_help").hidden = !own;
   photoWarn();
