@@ -253,12 +253,14 @@ class Studio:
         """The job's live events, opened again whenever the stream is lost while
         ComfyUI's queue still holds the job; each loss is a StreamGap. Raises
         the last loss once the job has left the queue, or after
-        LIVE_RETRY_LIMIT losses with no frame between them."""
+        LIVE_RETRY_LIMIT losses with no progress between them -- the status
+        snapshot every connection opens with is not progress (Sonnet QA)."""
         losses = 0
         while True:
             try:
                 for event in job.events():
-                    losses = 0
+                    if type(event).__name__ != "StatusChange":
+                        losses = 0
                     yield event
                 return
             except Exception as exc:  # noqa: BLE001 - judged below, raised if final

@@ -695,3 +695,29 @@ def test_a_lost_stream_is_not_reopened_once_the_job_has_left_the_queue(settings,
     assert OnceStream.opened == 1, "a job ComfyUI no longer holds is not listened to again"
     assert events[-1]["type"] == "done"
     assert any("still waiting on the job" in e.get("message", "") for e in events)
+
+
+def test_a_stream_that_dies_after_its_opening_status_still_runs_out(settings, schemas):
+    """Sonnet QA of f9837f34: the status snapshot a connection opens with must
+    not reset the count of losses, or the limit never applies."""
+    from radio_play_studio import runner
+    from radio_play_studio.runner import Studio
+
+    class SnapshotThenDie(FakeJob):
+        id = "prompt-3"
+        opened = 0
+
+        def events(self):
+            SnapshotThenDie.opened += 1
+            yield StatusChange("running")
+            raise TimeoutError("timed out")
+
+    video = FakeOutput("otr_episode.mp4")
+    video.node_id = "9"
+    client = FakeClient(SnapshotThenDie([], [video]))
+    queue = {"queue_running": [[0, "prompt-3", {}]], "queue_pending": []}
+    studio = Studio(settings, client_factory=lambda url: client, fetch=lambda url: schemas,
+                    comfy_json=lambda path: queue, sleep=lambda s: None)
+    events = list(studio.stream({}))
+    assert SnapshotThenDie.opened == runner.LIVE_RETRY_LIMIT + 1
+    assert events[-1]["type"] == "done"
