@@ -95,7 +95,7 @@ and marked not yet proven.
 **VISUAL:** A closed panel labelled "Writer: gemma4-12b-int8-convrot (runs here, free)". It opens:
 the local models, then OpenRouter, Google Gemini and Comfy, each tagged (cloud, paid). Picking
 OpenRouter reveals one model row. Below the form, just above the press bar, a key box draws itself:
-COMFY KEY with a masked field; GOOGLE KEY with a file path. The press bar shows "Needs a key: Comfy
+COMFY KEY with a masked field (for a cloud still); OPENROUTER KEY with a file path. The press bar shows "Needs a key: Comfy
 key" in a warm tone.
 
 **NARRATION:** The writer sits in a closed panel, and its title always says who will write and

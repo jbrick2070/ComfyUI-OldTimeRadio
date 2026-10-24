@@ -3,8 +3,9 @@
 The script is planning/studio-explainer/STUDIO_EXPLAINER.md, in the house
 motion-graphics format (one block per scene: VISUAL, NARRATION, ON-SCREEN
 TEXT). This draws one wireframe frame per scene in the Studio's own palette
-(contest/radio-play-studio/radio_play_studio/static/index.html: ink, panel,
-paper, muted, line, clay), narrates each scene with the local Kokoro voice,
+(contest/radio-play-studio/radio_play_studio/static/index.html, read off the
+pack's registry icon: indigo, panel, lavender, muted, line, a deep purple
+accent and the waveform green), narrates each scene with the local Kokoro voice,
 and pipes the frames to ffmpeg. It shares its engine -- fonts, dashes, glows,
 narration, the timeline, the mix, the ffmpeg pipe -- with
 tools/render_explainer.py, the App Mode cut.
@@ -29,12 +30,13 @@ from render_explainer import (FPS, H, REPO, SR, W, dashed, ease, font, mix_audio
 
 SCRIPT = REPO / "planning" / "studio-explainer" / "STUDIO_EXPLAINER.md"
 
-# The Studio's palette, as its page declares it for the dark scheme.
-INK, PANEL = (23, 19, 15), (33, 27, 21)
-PAPER, MUTED, LINE = (240, 230, 214), (168, 154, 134), (58, 48, 38)
-CLAY, CLAY_INK = (224, 112, 63), (26, 16, 7)
-OK, BAD = (126, 194, 138), (240, 138, 126)
-RAISED = (44, 36, 28)
+# The Studio's palette, as its page declares it (the registry icon's colours).
+INK, PANEL = (18, 9, 47), (28, 18, 64)                      # --bg, --panel
+LAVENDER, MUTED, LINE = (244, 237, 251), (185, 172, 220), (59, 43, 112)
+ACCENT, ACCENT_INK = (124, 58, 237), (255, 255, 255)        # --accent, white lettering
+ACCENT_TEXT = (183, 148, 255)                               # --accent-text: purple for words
+OK, BAD = (80, 248, 152), (255, 138, 122)                   # the waveform green, --bad
+RAISED = (40, 28, 86)
 
 # The page's own words (static/i18n/en.json), never retyped.
 STAGES = [("Stills", "22 painted, 1 to paint"), ("Video", "21 of 22 filmed"),
@@ -87,7 +89,7 @@ def background(t: float) -> Image.Image:
         phase = ((k + t * 0.35) % 11) / 11
         y = horizon + int((H - horizon) * phase ** 1.9)
         d.line([(0, y), (W, y)], fill=col, width=1)
-    d.line([(0, horizon), (W, horizon)], fill=CLAY + (90,), width=2)
+    d.line([(0, horizon), (W, horizon)], fill=ACCENT + (90,), width=2)
     img.paste(layer, (0, 0), layer)
     return img
 
@@ -105,11 +107,11 @@ def caption(d: ImageDraw.ImageDraw, frame: Image.Image, text: str):
     f = font("mono", 28)
     while d.textlength(text, font=f) > W - 80 and len(text) > 10:
         text = text[:-4] + "…"
-    d.text((40, H - 54), text, font=f, fill=CLAY)
+    d.text((40, H - 54), text, font=f, fill=ACCENT_TEXT)
 
 
 def title(d: ImageDraw.ImageDraw, n: int, text: str):
-    d.text((60, 44), text.upper(), font=font("title", 40), fill=PAPER)
+    d.text((60, 44), text.upper(), font=font("title", 40), fill=LAVENDER)
     d.text((60, 96), "SCENE %02d" % n, font=font("mono", 20), fill=MUTED)
 
 
@@ -136,30 +138,30 @@ def font_for(text: str, size: int):
 
 
 def box(d, xy, lit=False, fill=None, width=2):
-    d.rectangle(xy, fill=fill, outline=CLAY if lit else LINE, width=3 if lit else width)
+    d.rectangle(xy, fill=fill, outline=ACCENT if lit else LINE, width=3 if lit else width)
 
 
 def button(d, frame, xy, label, kind="quiet", size=22, lit=False):
     """kind: 'primary' (solid clay), 'quiet' (outlined), 'dim' (outlined, muted)."""
     x0, y0, x1, y1 = xy
     if kind == "primary":
-        d.rounded_rectangle(xy, radius=8, fill=CLAY)
-        ink = CLAY_INK
+        d.rounded_rectangle(xy, radius=8, fill=ACCENT)
+        ink = ACCENT_INK
     else:
-        d.rounded_rectangle(xy, radius=8, outline=CLAY if lit else LINE, width=2)
-        ink = PAPER if kind == "quiet" else MUTED
+        d.rounded_rectangle(xy, radius=8, outline=ACCENT if lit else LINE, width=2)
+        ink = LAVENDER if kind == "quiet" else MUTED
     f = font("bold", size)
     tw = d.textlength(label, font=f)
     d.text(((x0 + x1 - tw) / 2, y0 + (y1 - y0 - size) / 2 - 3), label, font=f, fill=ink)
     if lit:
-        glow_rect(frame, xy, CLAY, 8)
+        glow_rect(frame, xy, ACCENT, 8)
 
 
 def badge(d, x, y, text, tone="clay", size=16):
     f = font("bold", size)
     tw = int(d.textlength(text, font=f))
-    bg, ink = {"clay": ((59, 42, 26), (240, 160, 122)), "ok": ((31, 51, 36), OK),
-               "bad": ((58, 34, 32), BAD), "kept": ((44, 41, 34), (200, 185, 163))}[tone]
+    bg, ink = {"clay": ((45, 26, 90), ACCENT_TEXT), "ok": ((16, 48, 34), OK),
+               "bad": ((58, 26, 40), BAD), "kept": ((40, 34, 70), (200, 190, 230))}[tone]
     d.rounded_rectangle((x, y, x + tw + 20, y + size + 12), radius=999, fill=bg)
     d.text((x + 10, y + 4), text, font=f, fill=ink)
     return tw + 20
@@ -185,7 +187,7 @@ def text_box(d, xy, label, text, lit=False, rows=2):
     box(d, xy, lit=lit, fill=INK)
     f = font("body", 18)
     for i, line in enumerate(wrap(d, text, f, x1 - x0 - 24)[:rows]):
-        d.text((x0 + 12, y0 + 8 + i * 24), line, font=f, fill=PAPER)
+        d.text((x0 + 12, y0 + 8 + i * 24), line, font=f, fill=LAVENDER)
 
 
 def still(d, xy, label="", lit=False, redraw=0.0):
@@ -194,7 +196,7 @@ def still(d, xy, label="", lit=False, redraw=0.0):
     box(d, xy, lit=lit, fill=RAISED)
     cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
     w, h = x1 - x0, y1 - y0
-    col = CLAY if lit else MUTED
+    col = ACCENT if lit else MUTED
     # console
     d.rectangle((cx - w * 0.3, cy, cx + w * 0.3, cy + h * 0.3), outline=col, width=2)
     for i in range(5):
@@ -207,7 +209,7 @@ def still(d, xy, label="", lit=False, redraw=0.0):
               outline=col)
     if redraw > 0 and math_sin_window(redraw) > 0.2:
         # The redraw: the frame flashes clay for the beat the still is repainted.
-        d.rectangle(xy, outline=CLAY, width=4)
+        d.rectangle(xy, outline=ACCENT, width=4)
     if label:
         d.text((x0 + 10, y1 - 30), label, font=font("mono", 15), fill=MUTED)
 
@@ -222,7 +224,7 @@ def card(frame, d, xy, who, line, picture, motion, lit_box=None, lane_fixed=Fals
     x0, y0, x1, y1 = xy
     box(d, xy, lit=lit, fill=PANEL)
     if lit:
-        glow_rect(frame, xy, CLAY, 8)
+        glow_rect(frame, xy, ACCENT, 8)
     sw = int((x1 - x0) * 0.26)
     still(d, (x0 + 18, y0 + 18, x0 + 18 + sw, y0 + 18 + int(sw * 9 / 16)), lit=lit_box == "still",
           redraw=redraw)
@@ -230,10 +232,10 @@ def card(frame, d, xy, who, line, picture, motion, lit_box=None, lane_fixed=Fals
     tx = x0 + 36 + sw
     bw = x1 - 190 - tx
     f = font("body", 20)
-    d.text((tx, y0 + 18), who, font=font("bold", 20), fill=CLAY)
+    d.text((tx, y0 + 18), who, font=font("bold", 20), fill=ACCENT_TEXT)
     yy = y0 + 46
     for ln in wrap(d, line, f, bw)[:2]:
-        d.text((tx, yy), ln, font=f, fill=PAPER)
+        d.text((tx, yy), ln, font=f, fill=LAVENDER)
         yy += 26
     text_box(d, (tx, yy + 32, tx + bw, yy + 32 + 62), "Picture", picture, lit=lit_box == "picture")
     if lane_fixed:
@@ -255,20 +257,20 @@ def stage_markers(frame, d, x, y, w, scale=1.0, lit_until=3, bar=0.62):
         state_of = "done" if i == 0 else ("on" if i == 1 else "off")
         if i < lit_until:
             if state_of == "done":
-                d.ellipse((cx - r, y, cx + r, y + 2 * r), fill=CLAY)
-                d.text((cx - 6 * scale, y + 2 * scale), str(i + 1), font=font("bold", int(20 * scale)), fill=CLAY_INK)
+                d.ellipse((cx - r, y, cx + r, y + 2 * r), fill=ACCENT)
+                d.text((cx - 6 * scale, y + 2 * scale), str(i + 1), font=font("bold", int(20 * scale)), fill=ACCENT_INK)
             elif state_of == "on":
-                d.ellipse((cx - r, y, cx + r, y + 2 * r), outline=CLAY, width=3)
-                d.text((cx - 6 * scale, y + 2 * scale), str(i + 1), font=font("bold", int(20 * scale)), fill=CLAY)
+                d.ellipse((cx - r, y, cx + r, y + 2 * r), outline=ACCENT, width=3)
+                d.text((cx - 6 * scale, y + 2 * scale), str(i + 1), font=font("bold", int(20 * scale)), fill=ACCENT)
             else:
                 d.ellipse((cx - r, y, cx + r, y + 2 * r), outline=LINE, width=3)
                 d.text((cx - 6 * scale, y + 2 * scale), str(i + 1), font=font("bold", int(20 * scale)), fill=MUTED)
         d.text((cx + r + 12, y - 2), name, font=font("bold", int(24 * scale)),
-               fill=PAPER if state_of != "off" else MUTED)
+               fill=LAVENDER if state_of != "off" else MUTED)
         d.text((cx + r + 12, y + int(28 * scale)), state, font=font("mono", int(17 * scale)), fill=MUTED)
     by = y + int(66 * scale)
     d.rectangle((x, by, x + w, by + 8), fill=LINE)
-    d.rectangle((x, by, x + int(w * bar), by + 8), fill=CLAY)
+    d.rectangle((x, by, x + int(w * bar), by + 8), fill=ACCENT)
     return int(80 * scale)
 
 
@@ -276,11 +278,11 @@ def portrait(d, xy, name, lit=False):
     box(d, xy, lit=lit, fill=RAISED)
     x0, y0, x1, y1 = xy
     cx = (x0 + x1) // 2
-    col = CLAY if lit else MUTED
+    col = ACCENT if lit else MUTED
     r = (x1 - x0) // 5
     d.ellipse((cx - r, y0 + (y1 - y0) * 0.18, cx + r, y0 + (y1 - y0) * 0.18 + 2 * r), outline=col, width=2)
     d.arc((cx - 2 * r, y0 + (y1 - y0) * 0.52, cx + 2 * r, y1 + r), 180, 360, fill=col, width=2)
-    d.text((x0 + 8, y1 - 28), name, font=font("bold", 16), fill=PAPER)
+    d.text((x0 + 8, y1 - 28), name, font=font("bold", 16), fill=LAVENDER)
 
 
 def action_bar(frame, d, y, pressed=0.0, lit=True, counts=True):
@@ -306,9 +308,9 @@ def action_bar(frame, d, y, pressed=0.0, lit=True, counts=True):
 
 def window(d, xy, name, dark=False):
     x0, y0, x1, y1 = xy
-    d.rectangle(xy, fill=INK if dark else PANEL, outline=LINE if dark else PAPER, width=2)
-    d.rectangle((x0, y0, x1, y0 + 40), fill=RAISED, outline=LINE if dark else PAPER, width=2)
-    d.text((x0 + 14, y0 + 8), name, font=font("bold", 20), fill=MUTED if dark else PAPER)
+    d.rectangle(xy, fill=INK if dark else PANEL, outline=LINE if dark else LAVENDER, width=2)
+    d.rectangle((x0, y0, x1, y0 + 40), fill=RAISED, outline=LINE if dark else LAVENDER, width=2)
+    d.text((x0 + 14, y0 + 8), name, font=font("bold", 20), fill=MUTED if dark else LAVENDER)
 
 
 # --------------------------------------------------------------------------- #
@@ -327,21 +329,31 @@ def scene_frame(scene: dict, t: float, sources: list) -> Image.Image:
         redraw = (t - 0.5) / 0.2 if 0.5 < t < 0.7 else 0.0
         card(frame, d, (980, 280, 1860, 640), "Jeffrey", CARD_LINE, CARD_PICTURE, CARD_MOTION,
              lit_box=lit, redraw=redraw, lit=t > 0.3)
-        d.text((60, 320), "ONE PICTURE.", font=font("title", 110), fill=PAPER)
-        d.text((60, 450), "ONE STILL. ONE CLIP.", font=font("title", 72), fill=CLAY)
+        d.text((60, 320), "ONE PICTURE.", font=font("title", 110), fill=LAVENDER)
+        d.text((60, 450), "ONE STILL. ONE CLIP.", font=font("title", 72), fill=ACCENT)
         d.text((60, 560), "The other twenty-one are reused.", font=font("body", 36), fill=MUTED)
 
     elif n == 2:
         # The Studio page: title, language picker, two mode cards, the two buttons.
-        x, y = 260, 170
-        d.rectangle((x, y, x + 1400, y + 720), fill=PANEL, outline=LINE, width=2)
-        d.text((x + 40, y + 36), "Radio Play Studio", font=font("title", 44), fill=PAPER)
-        d.text((x + 40, y + 100), "Press the button. Your own ComfyUI writes, casts, performs and films a radio play.",
+        x, y = 260, 150
+        d.rectangle((x, y, x + 1400, y + 790), fill=PANEL, outline=LINE, width=2)
+        d.text((x + 40, y + 30), "RADIO PLAY STUDIO", font=font("title", 44), fill=ACCENT)
+        d.text((x + 37, y + 27), "RADIO PLAY STUDIO", font=font("title", 44), fill=LAVENDER)
+        d.rectangle((x + 40, y + 86, x + 520, y + 90), fill=OK)        # the green rule
+        d.text((x + 40, y + 104), "Press the button. Your own ComfyUI writes, casts, performs and films a radio play.",
                font=font("body", 22), fill=MUTED)
+        # Your machine and how it's filmed: one row of chips above the story path.
+        for i, (label, value) in enumerate([("Your machine", "NVIDIA, 16 GB or more"),
+                                            ("How it's filmed", "TTS + Foley video")]):
+            cx = x + 40 + i * 470
+            d.text((cx, y + 142), label, font=font("body", 18), fill=MUTED)
+            box(d, (cx, y + 168, cx + 440, y + 214), lit=True, fill=INK)
+            d.text((cx + 16, y + 178), value, font=font("bold", 22), fill=LAVENDER)
+        y += 70
         lx = x + 1000
         box(d, (lx, y + 36, x + 1360, y + 80), fill=INK)
-        d.text((lx + 14, y + 44), "English", font=font("body", 22), fill=PAPER)
-        d.polygon([(x + 1330, y + 52), (x + 1346, y + 52), (x + 1338, y + 64)], fill=PAPER)
+        d.text((lx + 14, y + 44), "English", font=font("body", 22), fill=LAVENDER)
+        d.polygon([(x + 1330, y + 52), (x + 1346, y + 52), (x + 1338, y + 64)], fill=LAVENDER)
         for i, lang in enumerate(LANGUAGES):
             d.text((lx + 14, y + 96 + i * 26), lang, font=font_for(lang, 18), fill=MUTED)
         cards = [("A classic, or surprise me", "Adapt Shakespeare or a public-domain story, or roll the dice.", True),
@@ -349,20 +361,134 @@ def scene_frame(scene: dict, t: float, sources: list) -> Image.Image:
         for i, (head, sub, on) in enumerate(cards):
             cy = y + 170 + i * 150
             box(d, (x + 40, cy, x + 940, cy + 120), lit=on and (i == 1 or t < 0.35), fill=INK)
-            d.ellipse((x + 62, cy + 46, x + 86, cy + 70), outline=CLAY if on else LINE, width=3,
-                      fill=CLAY if (on and i == 1 and t > 0.35) else None)
-            d.text((x + 104, cy + 24), head, font=font("bold", 28), fill=PAPER)
+            d.ellipse((x + 62, cy + 46, x + 86, cy + 70), outline=ACCENT if on else LINE, width=3,
+                      fill=ACCENT if (on and i == 1 and t > 0.35) else None)
+            d.text((x + 104, cy + 24), head, font=font("bold", 28), fill=LAVENDER)
             d.text((x + 104, cy + 66), sub, font=font("body", 20), fill=MUTED)
         button(d, frame, (x + 40, y + 500, x + 360, y + 560), "Make the episode", "primary", 24)
         button(d, frame, (x + 384, y + 500, x + 700, y + 560), "Direct the shots first", "quiet", 22,
                lit=t > 0.6)
         if t > 0.6:
-            dashed(d, (x + 980, y + 470), (x + 712, y + 530), PAPER, width=3)
-            d.text((x + 990, y + 446), "the quiet button", font=font("mono", 20), fill=PAPER)
+            dashed(d, (x + 980, y + 470), (x + 712, y + 530), LAVENDER, width=3)
+            d.text((x + 990, y + 446), "the quiet button", font=font("mono", 20), fill=LAVENDER)
         d.text((x + 40, y + 600), "Direct the shots first: the play is written, cast and voiced as usual, then it stops after the stills.",
                font=font("body", 20), fill=MUTED)
 
     elif n == 3:
+        # Your machine, then how it is filmed; past t=0.55 the machine switches to the Mac.
+        mac = t > 0.55
+        machines = [("NVIDIA, 8 GB", ""), ("NVIDIA, 16 GB or more", "this machine"),
+                    ("Mac, 16 GB", ""), ("AMD (ROCm)", ""),
+                    ("Comfy Cloud", "no GPU needed, paid"), ("Google Cloud", "no GPU needed, paid")]
+        d.text((120, 146), "Your machine", font=font("bold", 24), fill=MUTED)
+        for i, (name, note) in enumerate(machines):
+            x = 120 + i * 285
+            on = (i == 2) if mac else (i == 1)
+            box(d, (x, 184, x + 268, 290), lit=on, fill=PANEL)
+            if on:
+                glow_rect(frame, (x, 184, x + 268, 290), ACCENT, 8)
+            d.ellipse((x + 14, 202, x + 34, 222), outline=ACCENT if on else LINE, width=3,
+                      fill=ACCENT if on else None)
+            d.text((x + 44, 198), name, font=font("bold", 19), fill=LAVENDER)
+            if note:
+                d.text((x + 44, 236), note, font=font("body", 17),
+                       fill=OK if note == "this machine" else MUTED)
+            if i >= 4:
+                dashed(d, (x + 14, 300), (x + 254, 300), LAVENDER, width=2)
+                d.text((x + 14, 306), "NOT YET PROVEN", font=font("mono", 16), fill=LAVENDER)
+        d.text((120, 346), "How it's filmed", font=font("bold", 24), fill=MUTED)
+        times = "for 3 act(s), measured on RTX 5080 Laptop, 16 GB"
+        ways = ([("TTS w/ video", "Voices and moving pictures",
+                  "Video LTX 0.9.8 · Stills Stable Diffusion 1.5 · Voices Kokoro · Music Stable Audio 3", ""),
+                 ("TTS w/ stills", "Voices and still pictures with slow motion",
+                  "Video still with motion · Stills Stable Diffusion 1.5 · Voices Kokoro · Music Stable Audio 3", "")]
+                if mac else
+                [("TTS + Foley video", "Voices, moving pictures and their own sound effects",
+                  "Video LTX 2.5 with foley · Stills FLUX 3 Klein · Voices Kokoro · Music Stable Audio 3",
+                  "About 10.1 h " + times),
+                 ("TTS w/ video", "Voices and moving pictures",
+                  "Video LTX 2.5 · Stills MOSS-Image · Voices Kokoro · Music Stable Audio 3",
+                  "About 7.4 h " + times),
+                 ("TTS w/ stills", "Voices and still pictures with slow motion",
+                  "Video still with motion · Stills MOSS-Image · Voices Kokoro · Music Stable Audio 3",
+                  "About 77 min " + times)])
+        for i, (name, sub, uses, time_line) in enumerate(ways):
+            x = 120 + i * 570
+            box(d, (x, 384, x + 550, 600), lit=i == 0, fill=PANEL)
+            d.text((x + 20, 398), name, font=font("bold", 26), fill=LAVENDER)
+            d.text((x + 20, 438), sub, font=font("body", 19), fill=MUTED)
+            for k, ln in enumerate(wrap(d, uses, font("body", 17), 510)[:2]):
+                d.text((x + 20, 474 + k * 23), ln, font=font("body", 17), fill=LAVENDER)
+            for k, ln in enumerate(wrap(d, time_line, font("body", 16), 510)[:2]):
+                d.text((x + 20, 528 + k * 21), ln, font=font("body", 16), fill=ACCENT_TEXT)
+        if mac:
+            x = 120 + 2 * 570
+            dashed(d, (x, 384), (x + 550, 384), LINE, width=2)
+            dashed(d, (x, 600), (x + 550, 600), LINE, width=2)
+            d.text((x + 20, 470), "No foley on a Mac", font=font("bold", 24), fill=MUTED)
+        # The Still pictures dropdown: it loses what the machine cannot run.
+        stills = (["Stable Diffusion 1.5", "FLUX Pro (cloud, paid)", "Gemini image (Google, paid)",
+                   "Ideogram 4 (cloud, paid)"] if mac else
+                  ["FLUX 3 Klein", "MOSS-Image", "Z-Image Turbo", "Ideogram 4", "FLUX.1",
+                   "FLUX Pro (cloud, paid)", "Gemini image (Google, paid)"])
+        d.text((120, 640), "Still pictures", font=font("bold", 24), fill=MUTED)
+        box(d, (120, 676, 760, 676 + 34 * len(stills) + 16), fill=INK)
+        for k, name in enumerate(stills):
+            d.text((140, 686 + k * 34), name, font=font("body", 21),
+                   fill=LAVENDER if "paid" not in name else MUTED)
+
+    elif n == 4:
+        # The writer panel, closed, then open; then the key box above the press bar.
+        opened, picked, keys = t > 0.28, t > 0.5, t > 0.7
+        x0, x1 = 300, 1620
+        summary = ("Writer: OpenRouter (cloud, paid) -- ~anthropic/claude-sonnet-latest" if picked
+                   else "Writer: gemma4-12b-int8-convrot (runs here, free)")
+        box(d, (x0, 160, x1, 216), lit=True, fill=PANEL)
+        # The disclosure triangle, drawn: the body font has no glyph for it.
+        if opened:
+            d.polygon([(x0 + 20, 180), (x0 + 38, 180), (x0 + 29, 194)], fill=LAVENDER)
+        else:
+            d.polygon([(x0 + 22, 176), (x0 + 36, 186), (x0 + 22, 196)], fill=LAVENDER)
+        d.text((x0 + 50, 172), summary, font=font("bold", 24), fill=LAVENDER)
+        if opened:
+            rows = [("comfy_native:gemma4-12b-int8-convrot", "runs here, free"),
+                    ("Qwen/Qwen3.5-4B", "runs here, free"),
+                    ("OpenRouter (cloud, paid)", ""), ("Google Gemini (cloud, paid)", ""),
+                    ("Comfy (cloud, paid)", "")]
+            box(d, (x0, 226, x1, 226 + 44 * len(rows) + 20), fill=INK)
+            for k, (name, note) in enumerate(rows):
+                yy = 240 + k * 44
+                on = (k == 2) if picked else (k == 0)
+                if on:
+                    d.rectangle((x0 + 8, yy - 4, x1 - 8, yy + 36), fill=RAISED)
+                d.text((x0 + 24, yy), name, font=font("body", 22),
+                       fill=ACCENT_TEXT if "paid" in name else LAVENDER)
+                if note:
+                    d.text((x0 + 760, yy + 2), note, font=font("body", 18), fill=OK)
+            if picked:
+                d.text((x0, 488), "OpenRouter model", font=font("body", 20), fill=MUTED)
+                box(d, (x0, 516, x0 + 640, 560), lit=True, fill=INK)
+                d.text((x0 + 16, 526), "~anthropic/claude-sonnet-latest", font=font("body", 22), fill=LAVENDER)
+        if keys:
+            box(d, (x0, 600, x1, 820), fill=PANEL)
+            d.text((x0 + 24, 616), "Keys these picks need", font=font("bold", 24), fill=LAVENDER)
+            d.text((x0 + 24, 660), "Comfy key", font=font("bold", 20), fill=LAVENDER)
+            d.text((x0 + 24, 688), "No Comfy key yet.", font=font("body", 18), fill=MUTED)
+            box(d, (x0 + 24, 716, x0 + 640, 756), fill=INK)
+            d.text((x0 + 40, 724), "••••••••••••", font=font("body", 22), fill=LAVENDER)
+            button(d, frame, (x0 + 660, 716, x0 + 860, 756), "Use this key", "primary", 18)
+            d.text((x0 + 920, 660), "OpenRouter key", font=font("bold", 20), fill=LAVENDER)
+            for k, ln in enumerate(wrap(d, "ComfyUI reads this key itself: put it on the first line of "
+                                           "openrouter.secret in the pack folder, or set OPENROUTER_API_KEY "
+                                           "where ComfyUI runs.", font("body", 18), 380)[:4]):
+                d.text((x0 + 920, 690 + k * 24), ln, font=font("body", 18), fill=MUTED)
+        d.rectangle((0, 860, W, 956), fill=PANEL)
+        d.line([(0, 860), (W, 860)], fill=LINE, width=2)
+        button(d, frame, (40, 886, 360, 930), "Make the episode", "primary", 22)
+        if keys:
+            d.text((390, 896), "Needs a key: Comfy key", font=font("bold", 22), fill=BAD)
+
+    elif n == 5:
         # The board in three bands.
         bands = [("Stages", 0.12), ("Cast", 0.38), ("Scenes", 0.5), ("One bar", 0.75)]
         lit = {name: t >= at for name, at in bands}
@@ -370,36 +496,36 @@ def scene_frame(scene: dict, t: float, sources: list) -> Image.Image:
         d.rectangle((x0 - 20, 150, x0 + 1500, 940), fill=PANEL, outline=LINE, width=2)
         stage_markers(frame, d, x0 + 20, 190, 1400, scale=1.0)
         if lit["Stages"]:
-            glow_rect(frame, (x0, 170, x0 + 1460, 290), CLAY, 8)
+            glow_rect(frame, (x0, 170, x0 + 1460, 290), ACCENT, 8)
         for i, name in enumerate(CAST):
             portrait(d, (x0 + 20 + i * 150, 330, x0 + 150 + i * 150, 500), name, lit=lit["Cast"])
             button(d, frame, (x0 + 20 + i * 150, 508, x0 + 150 + i * 150, 540), "Paint again", "quiet", 14)
         if lit["Cast"]:
-            glow_rect(frame, (x0, 320, x0 + 480, 550), CLAY, 8)
+            glow_rect(frame, (x0, 320, x0 + 480, 550), ACCENT, 8)
         sx = x0 + 540
         for i, (name, extra) in enumerate([("Scene 1", "9 shots · the announcer"), ("Scene 2", "13 shots · 1 changed")]):
             yy = 330 + i * 110
             box(d, (sx, yy, x0 + 1460, yy + 90), lit=lit["Scenes"], fill=INK)
-            d.text((sx + 20, yy + 18), name, font=font("bold", 26), fill=PAPER)
+            d.text((sx + 20, yy + 18), name, font=font("bold", 26), fill=LAVENDER)
             d.text((sx + 20, yy + 54), extra, font=font("body", 18), fill=MUTED)
             for k in range(6):
                 box(d, (sx + 360 + k * 90, yy + 16, sx + 436 + k * 90, yy + 74), fill=RAISED, width=1)
         if lit["Scenes"]:
-            glow_rect(frame, (sx - 10, 320, x0 + 1470, 550), CLAY, 8)
+            glow_rect(frame, (sx - 10, 320, x0 + 1470, 550), ACCENT, 8)
         action_bar(frame, d, 830, lit=lit["One bar"])
         if lit["One bar"]:
-            glow_rect(frame, (0, 830, W, 926), CLAY, 8)
+            glow_rect(frame, (0, 830, W, 926), ACCENT, 8)
 
-    elif n == 4:
+    elif n == 6:
         # The three markers, large, with their exact state lines.
         lit_until = 1 + int(min(2, t * 3.3))
         stage_markers(frame, d, 240, 420, 1440, scale=2.0, lit_until=lit_until)
         for i, (name, state) in enumerate(STAGES):
             cx = 240 + i * 480 + 60
             d.text((cx, 300), '"%s"' % state, font=font("mono", 22),
-                   fill=CLAY if i < lit_until else LINE)
+                   fill=ACCENT if i < lit_until else LINE)
 
-    elif n == 5:
+    elif n == 7:
         # The cast strip; a dashed line from Jeffrey's portrait to his cards.
         for i, name in enumerate(CAST):
             lit = name == "Jeffrey" and t > 0.35
@@ -415,14 +541,14 @@ def scene_frame(scene: dict, t: float, sources: list) -> Image.Image:
             dim = tone == "kept"
             box(d, (1180, cy, 1800, cy + 100), fill=INK if not dim else PANEL,
                 lit=(who == "Jeffrey" and not dim and t > 0.5))
-            d.text((1200, cy + 14), who, font=font("bold", 20), fill=CLAY if not dim else MUTED)
+            d.text((1200, cy + 14), who, font=font("bold", 20), fill=ACCENT if not dim else MUTED)
             badge(d, 1200, cy + 50, state, tone)
             if who == "Jeffrey" and t > 0.5:
                 if not dim:
-                    dashed(d, (360 + 260, 450), (1180, cy + 50), PAPER, width=2)
-        d.text((1180, 950), "dashed: where a new portrait would reach", font=font("mono", 18), fill=PAPER)
+                    dashed(d, (360 + 260, 450), (1180, cy + 50), LAVENDER, width=2)
+        d.text((1180, 950), "dashed: where a new portrait would reach", font=font("mono", 18), fill=LAVENDER)
 
-    elif n == 6:
+    elif n == 8:
         # One card, full frame, each element lit as it is named; a lane-fixed twin.
         order = [None, "still", None, "picture", "motion", "paint", "film", "keep"]
         lit = order[min(len(order) - 1, int(t * len(order)))]
@@ -431,9 +557,9 @@ def scene_frame(scene: dict, t: float, sources: list) -> Image.Image:
         card(frame, d, (1300, 560, 1880, 900), "ANNOUNCER", "Good evening.",
              "a vintage tabletop tube radio receiver in a broadcast booth", "", lane_fixed=True,
              badge_text="Filmed", badge_tone="ok")
-        d.text((1300, 520), "where the lane fixes the motion:", font=font("mono", 18), fill=PAPER)
+        d.text((1300, 520), "where the lane fixes the motion:", font=font("mono", 18), fill=LAVENDER)
 
-    elif n == 7:
+    elif n == 9:
         # Seven badges, lighting in turn.
         lit_n = 1 + int(t * 8)
         for i, text in enumerate(BADGES):
@@ -447,23 +573,23 @@ def scene_frame(scene: dict, t: float, sources: list) -> Image.Image:
                        font=font("body", 22), fill=MUTED)
             else:
                 d.rounded_rectangle((160, y, 160 + 360, y + 40), radius=999, outline=LINE, width=2)
-        d.text((1200, 300), "7 STATES", font=font("title", 72), fill=PAPER)
+        d.text((1200, 300), "7 STATES", font=font("title", 72), fill=LAVENDER)
         d.text((1200, 400), "FAILED BLOCKS", font=font("title", 72), fill=BAD)
         d.text((1200, 490), "PUBLISH", font=font("title", 72), fill=BAD)
 
-    elif n == 8:
+    elif n == 10:
         # The sticky bar, large; the clay button depresses at the end.
         action_bar(frame, d, 440, pressed=1.0 if t > 0.88 else 0.0)
-        glow_rect(frame, (0, 440, W, 536), CLAY, 6)
+        glow_rect(frame, (0, 440, W, 536), ACCENT, 6)
         lines = ["Only what changed is made again.",
                  "A Stills run paints the changed stills and keeps the rest.",
                  "A Video run films the shots that are not filmed yet, or that you changed.",
                  "Publish mixes the voices and music under the filmed clips and loads no generation weights."]
         for i, ln in enumerate(lines):
             if t > 0.15 + i * 0.17:
-                d.text((120, 600 + i * 48), ln, font=font("body", 28), fill=PAPER if i == 0 else MUTED)
+                d.text((120, 600 + i * 48), ln, font=font("body", 28), fill=LAVENDER if i == 0 else MUTED)
 
-    elif n == 9:
+    elif n == 11:
         # The receipts ledger: four solid rows, one dashed.
         rows = [("one picture edit", "1 still repainted"), ("then Video", "1 clip filmed, 21 reused"),
                 ("one motion edit", "1 clip filmed, 21 reused"), ("no edit", "22 reused")]
@@ -472,20 +598,20 @@ def scene_frame(scene: dict, t: float, sources: list) -> Image.Image:
         for i, (a, b) in enumerate(rows):
             yy = y + i * 120
             if t > 0.12 + i * 0.16:
-                d.rectangle((x, yy, x + 1500, yy + 90), outline=CLAY, width=3, fill=PANEL)
-                d.text((x + 30, yy + 24), a, font=font("bold", 32), fill=PAPER)
-                d.text((x + 700, yy + 24), "→", font=font("bold", 32), fill=CLAY)
-                d.text((x + 780, yy + 24), b, font=font("mono", 32), fill=CLAY)
+                d.rectangle((x, yy, x + 1500, yy + 90), outline=ACCENT, width=3, fill=PANEL)
+                d.text((x + 30, yy + 24), a, font=font("bold", 32), fill=LAVENDER)
+                d.text((x + 700, yy + 24), "→", font=font("bold", 32), fill=ACCENT)
+                d.text((x + 780, yy + 24), b, font=font("mono", 32), fill=ACCENT)
         yy = y + 4 * 120
         if t > 0.8:
             for (a, b) in [((x, yy), (x + 1500, yy)), ((x, yy + 90), (x + 1500, yy + 90)),
                            ((x, yy), (x, yy + 90)), ((x + 1500, yy), (x + 1500, yy + 90))]:
-                dashed(d, a, b, PAPER, width=2)
-            d.text((x + 30, yy + 24), "your edit", font=font("bold", 32), fill=PAPER)
-            d.text((x + 700, yy + 24), "→", font=font("bold", 32), fill=PAPER)
-            d.text((x + 780, yy + 24), "?", font=font("mono", 32), fill=PAPER)
+                dashed(d, a, b, LAVENDER, width=2)
+            d.text((x + 30, yy + 24), "your edit", font=font("bold", 32), fill=LAVENDER)
+            d.text((x + 700, yy + 24), "→", font=font("bold", 32), fill=LAVENDER)
+            d.text((x + 780, yy + 24), "?", font=font("mono", 32), fill=LAVENDER)
 
-    elif n == 10:
+    elif n == 12:
         # Two windows; ComfyUI goes dark and comes back; one card re-films.
         dark = 0.3 < t < 0.55
         window(d, (120, 200, 920, 900), "Radio Play Studio")
@@ -494,14 +620,14 @@ def scene_frame(scene: dict, t: float, sources: list) -> Image.Image:
         if 0.3 < t:
             d.text((160, 380), "ComfyUI no longer has this run.", font=font("mono", 22), fill=BAD if t < 0.6 else MUTED)
         if t > 0.6:
-            d.text((160, 420), "Video, again:", font=font("bold", 22), fill=PAPER)
+            d.text((160, 420), "Video, again:", font=font("bold", 22), fill=LAVENDER)
         for k in range(6):
             yy = 470 + k * 64
             refilm = k == 1 and t > 0.6
             box(d, (160, yy, 880, yy + 52), lit=refilm, fill=INK)
             d.text((180, yy + 14), ["shot_shot_001_b1", "shot_shot_001_b2", "shot_shot_001_b3",
                                     "shot_shot_001_b4", "shot_shot_001_b5", "shot_shot_001_b6"][k],
-                   font=font("mono", 18), fill=PAPER if refilm else MUTED)
+                   font=font("mono", 18), fill=LAVENDER if refilm else MUTED)
             if t > 0.6:
                 badge(d, 640, yy + 10, "filming" if refilm else "REUSED", "clay" if refilm else "kept", 14)
         if not dark:
@@ -511,7 +637,7 @@ def scene_frame(scene: dict, t: float, sources: list) -> Image.Image:
         else:
             d.text((1300, 540), "— off —", font=font("mono", 28), fill=LINE)
 
-    elif n == 11:
+    elif n == 13:
         # Three branches of a folder tree; the obs file solid clay.
         def tree(x, y, items, lit_last=False):
             for i, (depth, name) in enumerate(items):
@@ -519,9 +645,9 @@ def scene_frame(scene: dict, t: float, sources: list) -> Image.Image:
                 last = lit_last and i == len(items) - 1
                 if depth:
                     d.line([(xx - 30, yy - 20), (xx - 30, yy + 14), (xx - 8, yy + 14)], fill=LINE, width=2)
-                d.text((xx, yy), name, font=font("mono", 24), fill=CLAY if last else PAPER)
+                d.text((xx, yy), name, font=font("mono", 24), fill=ACCENT if last else LAVENDER)
                 if last:
-                    d.polygon([(xx - 60, yy + 4), (xx - 60, yy + 28), (xx - 40, yy + 16)], fill=CLAY)
+                    d.polygon([(xx - 60, yy + 4), (xx - 60, yy + 28), (xx - 40, yy + 16)], fill=ACCENT)
         if t > 0.05:
             tree(140, 200, [(0, "output/"), (1, "otr/"), (2, "episodes/"), (3, "_replay/"), (4, "p/"), (5, "‹project›/"),
                             (6, "01-stills/"), (6, "02-stills/"), (6, "03-video/"), (6, "…"), (6, "clips/")])
@@ -540,10 +666,10 @@ def end_card_frame(t: float, sources: list) -> Image.Image:
     frame = Image.new("RGB", (W, H), (0, 0, 0))
     d = ImageDraw.Draw(frame)
     if t > 0.25:
-        d.text((120, 160), "SOURCES", font=font("mono", 34), fill=CLAY)
+        d.text((120, 160), "SOURCES", font=font("mono", 34), fill=ACCENT_TEXT)
         scroll = int(40 * ease((t - 0.25) / 0.75))
         for i, line in enumerate(sources):
-            d.text((120, 240 + i * 52 - scroll), "• " + line, font=font("mono", 26), fill=CLAY)
+            d.text((120, 240 + i * 52 - scroll), "• " + line, font=font("mono", 26), fill=ACCENT_TEXT)
     return frame
 
 
