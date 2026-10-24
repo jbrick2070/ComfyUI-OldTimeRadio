@@ -90,7 +90,7 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `sd15` | **auto** | 2.0 GiB | fits | **proven** | **proven** | ? | too slow |
 | `lumina_image` | **auto** | 10.0 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `flux3_klein` | **auto** | 10.3 GiB | **proven** | **proven** | not offered | ? | not offered |
-| `flux3_klein_ref` | **auto** | 10.3 GiB | ? | **proven** | not offered | ? | not offered |
+| `flux3_klein_ref` | **auto** | 10.3 GiB | **proven** | **proven** | not offered | ? | not offered |
 | `moss_image` | **auto** | 12.1 GiB | **proven** | **proven** | not offered | ? | not offered |
 | `flux_gen1` | **auto** | 16.1 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `z_image_turbo` | **auto** | 19.3 GiB | **proven** | **proven** | not offered | **proven** | not offered |

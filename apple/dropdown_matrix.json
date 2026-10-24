@@ -142,9 +142,10 @@
     },
     "flux3_klein_ref": {
       "memory": {
-        "nv16": "proven"
+        "nv16": "proven",
+        "nv8": "proven"
       },
-      "note": "The same model files as flux3_klein, with every character still painted from that character's portrait or the person's own photo. 16 GB: the RTX 5080 Laptop has published 14 My Story episodes with it (fk3r tag), among them sphere_visitation_20261022_110406 on the ltx25_foley_16gb lane (n16f tag); the filename does not name the graph. 8 GB: not yet run.",
+      "note": "The same model files as flux3_klein, with every character still painted from that character's portrait or the person's own photo. 16 GB: the RTX 5080 Laptop has published 14 My Story episodes with it (fk3r tag), among them sphere_visitation_20261022_110406 on the ltx25_foley_16gb lane (n16f tag); the filename does not name the graph. 8 GB: proven 2026-10-23 on the RTX 4060 Laptop -- otr_8gb_still with its character stills switched to flux3_klein_ref, the operator's GUSTO My Story cast of four, 1 act, published side_b_20261023_173305 (fk3r): 16 character stills painted from the four characters' portraits (otr_ref_* references in that box's server log), peak VRAM 7,495 MiB of 8,188, no OOM, 3,335 s for a 113.0 s episode (29.5 s/s). No photos were given, so the portraits came from the cast text.",
       "size_gb": null
     },
     "flux_gen1": {
