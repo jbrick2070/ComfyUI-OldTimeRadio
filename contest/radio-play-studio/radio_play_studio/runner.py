@@ -50,6 +50,21 @@ LOST_SUBMIT_GAP_S = 20.0
 HISTORY_LOOKBACK = 256
 MAX_TRANSIENT = 20
 BACKOFF_CAP_S = 30.0
+#: A live stream the SDK gives up on is opened again while ComfyUI's own queue
+#: still holds the job: on 2026-10-23 a 16 GB foley episode's bar sat at 78 %
+#: for three hours while ComfyUI filmed shot after shot, because the SDK's status
+#: check timed out against a busy server and nothing listened after that. Only
+#: this many losses in a row, with no frame between them, end the watch.
+LIVE_RETRY_LIMIT = 30
+LIVE_RETRY_PAUSE_S = 20.0
+
+
+class StreamGap:
+    """A lost live stream that is being opened again; the frames in between are
+    gone, so a run with a gap is never a timing measurement."""
+
+    def __init__(self, exc: BaseException) -> None:
+        self.exc = exc
 
 
 class EpisodeMissing(RuntimeError):
@@ -234,6 +249,41 @@ class Studio:
                             "path": str(files[0]), "env": env}
         return status
 
+    def _live(self, job: Any) -> Iterator[Any]:
+        """The job's live events, opened again whenever the stream is lost while
+        ComfyUI's queue still holds the job; each loss is a StreamGap. Raises
+        the last loss once the job has left the queue, or after
+        LIVE_RETRY_LIMIT losses with no frame between them."""
+        losses = 0
+        while True:
+            try:
+                for event in job.events():
+                    losses = 0
+                    yield event
+                return
+            except Exception as exc:  # noqa: BLE001 - judged below, raised if final
+                losses += 1
+                if losses > LIVE_RETRY_LIMIT or not self._still_queued(getattr(job, "id", None)):
+                    raise
+                yield StreamGap(exc)
+                self._sleep(LIVE_RETRY_PAUSE_S)
+
+    def _still_queued(self, job_id: Any) -> bool:
+        """Whether ComfyUI's queue says it holds this job, running or waiting. A
+        queue that cannot be read says nothing, and the watch ends there: the
+        run is still waited on to its end (settle), only the bar stops."""
+        if not job_id:
+            return False
+        try:
+            queue = self._comfy_json("/queue")
+        except Exception:  # noqa: BLE001 - no answer, no reason to listen again
+            return False
+        for key in ("queue_running", "queue_pending"):
+            for entry in (queue or {}).get(key) or ():
+                if isinstance(entry, (list, tuple)) and len(entry) > 1 and entry[1] == job_id:
+                    return True
+        return False
+
     def _submit(self, client, workflow):
         """Submit with the Comfy key when there is one: the SDK sends it as
         extra_data.api_key_comfy_org, which pays for Comfy partner nodes."""
@@ -382,7 +432,12 @@ class Studio:
             yield {"type": "submitted"}
             stream_whole, last_status, most_done, settled = True, None, 0, False
             try:
-                for event in job.events():
+                for event in self._live(job):
+                    if isinstance(event, StreamGap):
+                        stream_whole = False
+                        yield {"type": "note", "message": f"live progress dropped ({event.exc}); "
+                                                          "listening again"}
+                        continue
                     if type(event).__name__ == "StatusChange":
                         status = str(getattr(event, "status", ""))
                         # comfy-api-proxy opens every connection with the job's
@@ -520,7 +575,11 @@ class Studio:
         attempt = plan["direction"]["attempt_id"]
         base = {"stage": stage, "project_id": pid}
         try:
-            for event in job.events():
+            for event in self._live(job):
+                if isinstance(event, StreamGap):
+                    yield dict(base, type="note", message=f"live progress dropped ({event.exc}); "
+                                                          "listening again")
+                    continue
                 note = stage_note(event, len(plan["graph"]))
                 if note:
                     yield note

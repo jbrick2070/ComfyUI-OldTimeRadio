@@ -637,3 +637,61 @@ def test_a_reference_graph_named_directly_keeps_its_reference_stills(settings, s
     # With no twin beside it, the named graph is the My Story graph, and its
     # reference stills make the plain pick one that paints from photos.
     assert studio.photo_stills(studio.options()) == ["flux3_klein", "flux3_klein_ref"]
+
+
+def test_a_lost_stream_is_opened_again_while_comfyui_holds_the_job(settings, schemas):
+    """2026-10-23: the bar sat at 78 % for three hours while ComfyUI filmed shot
+    after shot, because nothing listened after the SDK gave up on the stream."""
+    from radio_play_studio.runner import Studio
+
+    class FlakyStream(FakeJob):
+        id = "prompt-1"
+
+        def __init__(self, *a, **kw):
+            super().__init__(*a, **kw)
+            self.opened = 0
+
+        def events(self):
+            self.opened += 1
+            if self.opened == 1:
+                yield Progress(0.25, "filming")
+                raise TimeoutError("timed out")
+            yield Progress(0.75, "filming")
+            yield StatusChange("success")
+
+    video = FakeOutput("otr_episode.mp4")
+    video.node_id = "9"
+    job = FlakyStream([], [video])
+    client = FakeClient(job)
+    queue = {"queue_running": [[0, "prompt-1", {}]], "queue_pending": []}
+    studio = Studio(settings, client_factory=lambda url: client, fetch=lambda url: schemas,
+                    comfy_json=lambda path: queue, sleep=lambda s: None)
+    events = list(studio.stream({}))
+    kinds = [e["type"] for e in events]
+    assert job.opened == 2 and kinds[-1] == "done"
+    assert any(e["type"] == "note" and "listening again" in e["message"] for e in events)
+    assert [e["value"] for e in events if e["type"] == "progress"] == [0.25, 0.75]
+
+
+def test_a_lost_stream_is_not_reopened_once_the_job_has_left_the_queue(settings, schemas):
+    from radio_play_studio.runner import Studio
+
+    class OnceStream(FakeJob):
+        id = "prompt-2"
+        opened = 0
+
+        def events(self):
+            OnceStream.opened += 1
+            raise TimeoutError("timed out")
+            yield  # pragma: no cover - makes this a generator
+
+    video = FakeOutput("otr_episode.mp4")
+    video.node_id = "9"
+    client = FakeClient(OnceStream([], [video]))
+    studio = Studio(settings, client_factory=lambda url: client, fetch=lambda url: schemas,
+                    comfy_json=lambda path: {"queue_running": [], "queue_pending": []},
+                    sleep=lambda s: None)
+    events = list(studio.stream({}))
+    assert OnceStream.opened == 1, "a job ComfyUI no longer holds is not listened to again"
+    assert events[-1]["type"] == "done"
+    assert any("still waiting on the job" in e.get("message", "") for e in events)
