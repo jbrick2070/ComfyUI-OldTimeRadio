@@ -132,6 +132,21 @@
       },
       "size_gb": null
     },
+    "flux3_klein": {
+      "memory": {
+        "nv16": "proven",
+        "nv8": "proven"
+      },
+      "note": "Proven on both NVIDIA cards by published episodes, read from the fk3i filename tag. 8 GB: it is the still engine of every otr_8gb_* graph, and the RTX 4060 Laptop published 39 episodes with it, among them the 2026-10-23 regression round's otr_8gb_still leg, marginalia_inversion_20261023_092210 (617 s for an 81.7 s episode). 16 GB: the RTX 5080 Laptop holds 57 published fk3i episodes, among them white_elephant_zh_20261022_034407. On the 4060 a still paints in about 14 s (16 steps).",
+      "size_gb": null
+    },
+    "flux3_klein_ref": {
+      "memory": {
+        "nv16": "proven"
+      },
+      "note": "The same model files as flux3_klein, with every character still painted from that character's portrait or the person's own photo. 16 GB: the RTX 5080 Laptop has published 14 My Story episodes with it (fk3r tag), among them sphere_visitation_20261022_110406 from otr_16gb_foley_flux3_ref. 8 GB: not yet run.",
+      "size_gb": null
+    },
     "flux_gen1": {
       "memory": {
         "mac16": "oom",
