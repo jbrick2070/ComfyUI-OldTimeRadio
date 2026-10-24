@@ -251,7 +251,9 @@ A cloud pick needs its key, and the page lists only the keys the current picks n
   to disk, logs it, or sends it back to a page. ComfyUI itself keeps it with each job in its own
   queue and history, exactly as it does for its own sign-in, so treat your ComfyUI as you would
   any program that holds the key.
-- **The press bar names a missing key** and jumps to the box, which sits just above it.
+- **The press bar names a missing Comfy key** and jumps to the box, which sits just above it. It
+  stays quiet about Google and OpenRouter: their keys may sit in ComfyUI's own environment, which
+  the page cannot see, so their rows say where a key goes and whether a key file is there.
 - **Google** (Google Cloud, `google_image`, the Google writer) and **OpenRouter** (the OpenRouter
   writer): ComfyUI reads these itself, so the page says where to put them -- the first line of
   `google.secret` or `openrouter.secret` in the pack folder, or `GEMINI_API_KEY` /
@@ -276,19 +278,20 @@ machine translations that no native speaker has reviewed yet, so corrections are
 
 ## Measured timings (RTX 5080 Laptop, 16 GB, ComfyUI 0.42.1, through the SDK and proxy)
 
-Two sets, and both are real. The Studio's own runs below were measured through the app, on the
-episodes those runs happened to write. The time on each filming card comes from the pack's
-regression round of 2026-10-23 (`planning/regression/ROUNDS.md`), run by a harness on each
-machine with whatever else was open, and scaled by the acts you set. Episode length moves both:
-a longer play films more beats.
+Two sets, measured on different days and different graphs, and both are real. The first was
+measured through the app on 2026-10-19, the day it was added, on the episodes those runs happened
+to write. The second is the pack's regression round of 2026-10-23 (`planning/regression/ROUNDS.md`),
+run by a harness with whatever else was open; by then the 16 GB video and stills workflows paint
+with MOSS-Image, which takes longer per still, and those episodes ran about three minutes. The
+time on each filming card is the second set, scaled by the acts you set.
 
-| Job | Time |
-|---|---|
-| One-act episode, 16 GB foley workflow (LTX 2.5 with sound), five runs | 57, 64, 64, 68 and 76 min |
-| One-act episode, 16 GB LTX video workflow (silent picture) | 65 min |
-| One-act episode, 16 GB stills-with-motion workflow | 5 min |
-| Where a foley hour goes (averaged over the runs) | video about 95% (60 of 64 min); the writer about 1 min; all stills about 2 min |
-| Progress bar against the wall clock, a 68-minute episode | within 4 points throughout |
+| Job | 2026-10-19, through the app | 2026-10-23 regression round |
+|---|---|---|
+| One-act episode, 16 GB foley | 57, 64, 64, 68 and 76 min (five runs, `otr_16gb_foley_open`) | 202 min, a 186 s episode (`otr_16gb_foley`, the closed-SDK sibling) |
+| One-act episode, 16 GB LTX video (silent picture) | 65 min | 147 min, a 173 s episode |
+| One-act episode, 16 GB stills with motion | 5 min | 26 min, a 182 s episode |
+| Where a foley hour goes (averaged over the 10-19 runs) | video about 95% (60 of 64 min); the writer about 1 min; all stills about 2 min | |
+| Progress bar against the wall clock, a 68-minute episode | within 4 points throughout | |
 
 Run length follows the story: the number and length of the beats decide how many frames LTX films.
 

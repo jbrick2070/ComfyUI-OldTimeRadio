@@ -18,8 +18,7 @@
 
 Facts in this script come from the Radio Play Studio page as served (its English strings), the
 "Direct the shots" section of its README, and the live proofs recorded in
-`planning/scene-producer/PLAN.md` on 2026-10-23. Every number on screen is one of those
-receipts. This explainer is about the Studio, the full-screen web page the pack ships; the App
+`planning/scene-producer/PLAN.md` on 2026-10-23. Every number on screen is one of those receipts, except the filming-card times in Scene 03, which come from the regression round of 2026-10-23 (`planning/regression/ROUNDS.md`). This explainer is about the Studio, the full-screen web page the pack ships; the App
 Mode form inside ComfyUI has its own explainer.
 
 ---
@@ -79,13 +78,13 @@ card switches to MAC 16 GB: the foley card dissolves, two remain, and the still-
 loses entries. The two cloud cards carry a dashed lavender tag, NOT YET PROVEN.
 
 **NARRATION:** The page starts with two questions. Your machine: it starts on the card your ComfyUI
-reports. Then how it is filmed: TTS plus Foley video, TTS with video, or TTS with stills, and only
-the ways that machine has proven. Each card names its video model, still model, voices, music and
+reports. Then how it is filmed: TTS plus Foley video, TTS with video, or TTS with stills, and on
+a graphics card, only the ways proven on it. Each card names its video model, still model, voices, music and
 writer, read from the workflow itself, and how long your acts took on our test machine. Pick a Mac
 and the foley card goes, and so do the still models a Mac cannot run. The cloud ways are offered,
 and marked not yet proven.
 
-**ON-SCREEN TEXT:** YOUR MACHINE · HOW IT'S FILMED · PROVEN WAYS ONLY · NOT YET PROVEN
+**ON-SCREEN TEXT:** YOUR MACHINE · HOW IT'S FILMED · PROVEN ON THIS MACHINE · CLOUD: NOT YET PROVEN
 
 **TRANSITION:** The chosen way card drops into the form, which fills itself in.
 
