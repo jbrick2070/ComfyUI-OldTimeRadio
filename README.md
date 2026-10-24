@@ -695,9 +695,27 @@ at a glance without opening any of them:
 <title>_<timestamp>__<style>__<video>__<image>__<tts>__<bank>__<writer>__<music>_final.mp4
 ```
 
-A lane that renders no stills reports `none` in the image field. Point OBS, or any
-player with a watch folder, at `otr/obs/` for a continuous broadcast -- new
-episodes appear there as they render.
+A lane that renders no stills reports `none` in the image field.
+
+### Continuous 24/7 broadcast (OBS automation)
+
+Run the pipeline as a live generative broadcast: each finished episode loads into OBS as soon as it is published.
+
+**Prerequisites:**
+
+- [OBS Studio](https://obsproject.com/download)
+- [Media Playlist Source (OBS plugin)](https://obsproject.com/forum/resources/media-playlist-source.1765/)
+- [Directory Sorter for OBS](https://github.com/CodeYan01/directory_sorter_for_obs) (Python script)
+
+**Setup:**
+
+1. Install OBS and the Media Playlist Source plugin.
+2. In OBS: **Tools > Scripts > Python Settings**, point to your Python install.
+3. Load the `directory_sorter_for_obs` script and point it at `<your ComfyUI output folder>/otr/obs/`.
+4. Add a **Media Playlist Source** scene item pointed at the same folder.
+5. OBS picks up each new MP4 as the pipeline publishes it.
+
+> **Tip:** If the GPU is saturated by inference, set OBS to encode on the integrated GPU (QSV AV1 or HEVC) so the stream stays smooth.
 
 ---
 
