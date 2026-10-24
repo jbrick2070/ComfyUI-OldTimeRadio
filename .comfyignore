@@ -330,14 +330,13 @@ scripts/_tmp_*
 config/experiments/
 apple/FRESH_INSTALL_4060_2026-09-25.md
 
-# 2026-10-22 (operator): Radio Play Studio ships inside the pack zip as an experiment --
-# the scan replica predicts a Flag for its environment reads and its HTTP calls to the
-# local ComfyUI. If the registry Flags the version, put back the single line
-# `contest/` here (and see SHIPPED_APP in tests/test_registry_scan_oracle_clean.py
-# for the rest of the undo). Its tests and the demo reel tools never ship.
-contest/radio-play-studio/tests/
-contest/radio-play-studio/demo_video/
-contest/radio-play-studio/.gitignore
+# Radio Play Studio does not ship in the pack zip; it installs from GitHub (its
+# README says how). It shipped from 2.3.37 to 2.3.38 as an experiment, and the scan
+# replica predicted a Flag for its environment reads and its HTTP calls to the
+# local ComfyUI. Operator, 2026-10-23: "I don't want people pulling a wonky old
+# version from the Comfy registry" -- a Flag on every version keeps Manager on
+# 2.3.20, so the zip is held to zero findings and the app stays on GitHub.
+contest/
 
 # 2026-10-23 (docs audit, planning/docs-ui-best-practice/PLAN.md): internal
 # records that were shipping beside the guides. The README's guide table is
