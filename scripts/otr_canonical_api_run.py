@@ -57,7 +57,6 @@ if str(HERE) not in sys.path:
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-import otr_env_drift  # noqa: E402
 import otr_notify  # noqa: E402
 from otr_api import (  # noqa: E402
     COMFYUI_URL,
@@ -683,22 +682,6 @@ def announce_result(
               flush=True)
 
 
-def record_known_good_after_success(prompt: dict, prompt_id: str,
-                                    episode: str | None) -> str:
-    """A SUCCESS whose obs file is on disk makes that episode's environment the
-    known-good snapshot (PLAN row 2.2). One line for the leg log; never raises,
-    and nothing it finds changes the leg's result or exit code."""
-    if not episode:
-        return "known-good not recorded: the episode id was not read"
-    try:
-        obs_path, obs_why = published_obs_file(prompt, prompt_id)
-        if not obs_path:
-            return f"known-good not recorded: {obs_why}"
-        return otr_env_drift.record_known_good(episode)
-    except Exception as exc:  # noqa: BLE001 -- reported, never raised
-        return f"known-good not recorded: {type(exc).__name__}: {exc}"
-
-
 def preview_plan(preview_file: str | None,
                  env_method: str | None) -> tuple[str | None, str | None]:
     """``(method for submit_prompt, start line)`` for ``--preview-file``. Pure.
@@ -952,8 +935,6 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[canonical-api] ERROR {err}", flush=True)
         announce_result(prompt, prompt_id, status, err, episode, elapsed_s)
         return 1
-    print(f"[canonical-api] {record_known_good_after_success(prompt, prompt_id, episode)}",
-          flush=True)
     announce_result(prompt, prompt_id, status, err, episode, elapsed_s)
     return 0
 

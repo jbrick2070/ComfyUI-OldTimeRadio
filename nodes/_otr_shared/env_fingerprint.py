@@ -24,6 +24,8 @@ WHAT IT RECORDS, AND WHAT IT NEVER DOES.
 """
 from __future__ import annotations
 
+import datetime
+import json
 import os
 import platform
 import re
@@ -38,6 +40,9 @@ except ImportError:  # pragma: no cover -- flat load
 
 #: Bump when a field changes meaning, so a reader can tell two shapes apart.
 ENV_VERSION = 1
+#: This machine's last environment that published an episode (PLAN row 2.2):
+#: ``<otr_state_dir()>/known_good_env.json``, per machine, never in git.
+KNOWN_GOOD_NAME = "known_good_env.json"
 
 _NVIDIA_SMI_TIMEOUT_S = 5
 _SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -284,10 +289,53 @@ def stamp(meta: Dict[str, Any]) -> bool:
     return True
 
 
+def known_good_path() -> str:
+    try:
+        from .. import _otr_paths
+    except ImportError:  # pragma: no cover -- flat load
+        import _otr_paths  # type: ignore
+    return str(_otr_paths.otr_state_dir() / KNOWN_GOOD_NAME)
+
+
+def write_known_good(episode: str, env: Dict[str, Any], env_version: Any, how: str,
+                     path: Optional[str] = None) -> str:
+    """Write the known-good snapshot (atomically) and return its path."""
+    path = path or known_good_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    payload = {
+        "episode": episode,
+        "recorded_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+        "how": how,
+        "env_version": env_version,
+        "env": env,
+    }
+    partial = "%s.%d.part" % (path, os.getpid())
+    with open(partial, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2, ensure_ascii=False)
+        fh.write("\n")
+    os.replace(partial, path)
+    return path
+
+
+def record_known_good(episode: str) -> str:
+    """An episode was just published: this process's environment is this
+    machine's known-good. Called by OTR_MasterAudioMux once the obs copy is
+    accepted, because only this process knows its own environment and the
+    episode's own ledger may be gone a moment later (a full asset cleanup
+    deletes the episode folder). One report line; never raises."""
+    try:
+        path = write_known_good(str(episode or "episode id not read"), fingerprint(),
+                                ENV_VERSION, "published")
+    except Exception as exc:  # noqa: BLE001 -- reported, never raised
+        return "known-good not recorded (%s)" % type(exc).__name__
+    return "known-good recorded (%s)" % os.path.basename(path)
+
+
 def _reset_cache_for_tests() -> None:
     global _CACHE
     with _LOCK:
         _CACHE = None
 
 
-__all__ = ["ENV_VERSION", "fingerprint", "compute", "stamp", "git_commit", "pack_state"]
+__all__ = ["ENV_VERSION", "KNOWN_GOOD_NAME", "fingerprint", "compute", "stamp", "git_commit",
+           "pack_state", "known_good_path", "write_known_good", "record_known_good"]

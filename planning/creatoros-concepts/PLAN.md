@@ -54,18 +54,8 @@ with OTR's MIT licence.
 
 ## The plan at a glance
 
-| Sprint | Left | Touches |
-|---|---|---|
-| **S1 Headless ops** | 1.1 residual: previews on the LTX video walk | measurement only |
-
-## S1 residual
-
-### 1.1 Previews on the LTX video walk
-
-`--preview-file` is shipped (cc85dc49). Measured on `otr_16gb_still` (MOSS-Image): 425 preview frames,
-the last 74,135 bytes, with `latent2rgb`. Not yet measured on the LTX video walk, where
-`QuietInnerBars` may silence them: a one-act canonical leg (`--act-count 1`) on `otr_16gb_video`
-with `--preview-file`, then read `LIVE ... preview_nodes=` in the leg log. Frames arrive: record the
-count here and delete this row. None: record that, and delete the row.
+Nothing is left. Row 1.1's last measurement is in: on the LTX video walk (`otr_16gb_video`, one act,
+2026-10-24) every preview frame came from the stills node and the video walk sent none
+(`preview_nodes=91:325`), so `--preview-file` shows the stills, then holds the last one.
 
 Delete each row from this file when it ships. Its receipt goes in the commit message, not here.

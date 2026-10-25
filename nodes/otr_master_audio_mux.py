@@ -1617,6 +1617,26 @@ except ImportError:  # pragma: no cover -- flat import harnesses
     )
 
 
+def _record_known_good(episode: str, obs_copy: str) -> str:
+    """One report line; never raises -- the episode is already published.
+
+    Only a publish into THE obs folder (``_otr_paths.otr_obs_dir``, not this
+    module's patchable ``_obs_dir``) speaks for this machine; a publish into
+    any other folder -- a test's own -- leaves the real snapshot alone."""
+    try:
+        try:
+            from ._otr_shared import env_fingerprint
+            from ._otr_paths import otr_obs_dir
+        except ImportError:  # pragma: no cover -- flat (sys.path) test import
+            from _otr_shared import env_fingerprint  # type: ignore
+            from _otr_paths import otr_obs_dir  # type: ignore
+        if not _same_file_path(os.path.dirname(obs_copy), str(otr_obs_dir())):
+            return "known-good not recorded (this publish is not in the obs folder)"
+        return env_fingerprint.record_known_good(episode)
+    except Exception as exc:  # noqa: BLE001 -- reported, never raised
+        return "known-good not recorded (%s)" % type(exc).__name__
+
+
 def _obs_basename(final: str) -> str:
     """The OPERATOR-FACING filename for the published episode.
 
@@ -2431,6 +2451,12 @@ class OTRMasterAudioMux:
                     "published to OBS anyway -> %s",
                     decision.summary(), obs_copy,
                 )
+            # THE KNOWN-GOOD ENVIRONMENT (CreatorOS row 2.2): an episode just
+            # reached otr/obs, so what this process runs on is this machine's
+            # known-good, for scripts/otr_env_drift.py. Recorded here, not by
+            # a runner afterwards: the asset cleanup below can delete the
+            # episode's ledger, and only this process knows its own env.
+            report.append(_record_known_good(_episode_stem(silent_video_path), obs_copy))
             # N2 (truthful ledger): this terminal node restamps
             # final_video_path over the pre-credits/pre-mux video it is handed.
             report.append(self._stamp_terminal_paths(

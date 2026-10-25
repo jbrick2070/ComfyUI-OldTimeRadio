@@ -16,19 +16,17 @@ Every ledger carries the environment its run rendered on in ``meta.env``
   python scripts/otr_env_drift.py --freeze <episode>
       make that episode's environment the known-good snapshot by hand
 
-The canonical runner writes the snapshot by itself when a leg ends SUCCESS
-with its obs file on disk. Output: Python, torch, CUDA and the driver first,
+OTR_MasterAudioMux writes the snapshot by itself each time an episode reaches
+otr/obs/ (any runner: the canonical script, the app, the Studio). Output: Python, torch, CUDA and the driver first,
 then the GPU, the OS and ComfyUI, then packs changed (old -> new), added and
 removed. Exit 0 when nothing differs, 1 when something does, 2 when an input
-cannot be read. Nothing here writes anywhere except ``--freeze`` and
-``record_known_good`` (the snapshot file, under the output tree, never in git).
+cannot be read. Nothing here writes anywhere except ``--freeze`` (the snapshot file, under the
+output tree, never in git).
 """
 from __future__ import annotations
 
 import argparse
-import datetime
 import json
-import os
 import pathlib
 import sys
 from typing import Any
@@ -120,8 +118,8 @@ def load_known_good() -> tuple[str, dict]:
     path = known_good_path()
     if not path.is_file():
         raise DriftInputError(
-            "no known-good snapshot at %s yet: one is written when a canonical "
-            "leg ends SUCCESS with its obs file on disk, or by --freeze <episode>"
+            "no known-good snapshot at %s yet: one is written each time an "
+            "episode reaches otr/obs, or by --freeze <episode>"
             % path)
     data = _read_json(path)
     env = data.get("env")
@@ -131,39 +129,9 @@ def load_known_good() -> tuple[str, dict]:
 
 
 def write_known_good(episode: str, env: dict, env_version: Any, how: str) -> pathlib.Path:
-    path = known_good_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "episode": episode,
-        "recorded_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
-        "how": how,
-        "env_version": env_version,
-        "env": env,
-    }
-    partial = path.with_name(path.name + ".part")
-    partial.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
-                       encoding="utf-8")
-    os.replace(partial, path)
-    return path
-
-
-def record_known_good(episode: str | None) -> str:
-    """After a confirmed SUCCESS: this episode's environment becomes the
-    known-good snapshot. Returns one line for the leg log. Never raises: a
-    snapshot that cannot be written is reported and changes nothing."""
-    if not episode:
-        return "known-good not recorded: the episode id was not read"
-    try:
-        path = ledger_path_for(episode)
-        data = _read_json(path)
-        meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
-        _episode, env = env_of_ledger(path)
-        out = write_known_good(episode, env, meta.get("env_version"), "runner SUCCESS")
-    except DriftInputError as exc:
-        return "known-good not recorded: %s" % exc
-    except Exception as exc:  # noqa: BLE001 -- reported, never raised
-        return "known-good not recorded: %s: %s" % (type(exc).__name__, exc)
-    return "known-good recorded: %s -> %s" % (episode, out.name)
+    from nodes._otr_shared import env_fingerprint
+    return pathlib.Path(env_fingerprint.write_known_good(
+        episode, env, env_version, how, path=str(known_good_path())))
 
 
 def diff_env(old: dict, new: dict) -> list[str]:

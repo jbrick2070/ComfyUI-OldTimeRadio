@@ -25,7 +25,6 @@ sys.path.insert(0, str(_REPO / "scripts"))
 
 from nodes import production_ledger as PL  # noqa: E402
 from nodes._otr_shared import env_fingerprint as EF  # noqa: E402
-import otr_canonical_api_run as canonical  # noqa: E402
 import otr_env_drift as drift  # noqa: E402
 
 SHA_A = "a" * 40
@@ -353,66 +352,55 @@ def test_no_arguments_compares_the_newest_stamped_episode_with_known_good(tree, 
     assert "driver: 590.10 -> 595.71" in out
 
 
-def test_record_known_good_writes_the_snapshot_and_never_raises(tree):
-    _episode(tree, "ep_ok", NEW_ENV)
-    assert drift.record_known_good("ep_ok") == (
-        "known-good recorded: ep_ok -> " + drift.KNOWN_GOOD_NAME)
-    snap = json.loads((tree / "_shared" / "state" / drift.KNOWN_GOOD_NAME).read_text(encoding="utf-8"))
-    assert snap["env"] == NEW_ENV and snap["how"] == "runner SUCCESS"
-    assert drift.record_known_good(None) == "known-good not recorded: the episode id was not read"
-    assert drift.record_known_good("missing").startswith("known-good not recorded: no episode")
-    _episode(tree, "ep_unstamped", None)
-    assert "has no meta.env" in drift.record_known_good("ep_unstamped")
-    assert [p.name for p in (tree / "_shared" / "state").iterdir()] == [drift.KNOWN_GOOD_NAME]
+# --- the known-good snapshot, written at publish ------------------------------
+
+def test_record_known_good_writes_this_process_env_and_never_raises(tmp_path, monkeypatch):
+    target = tmp_path / "state" / EF.KNOWN_GOOD_NAME
+    monkeypatch.setattr(EF, "known_good_path", lambda: str(target))
+    monkeypatch.setattr(EF, "compute", lambda: {"python": "now"})
+    assert EF.record_known_good("signal_lost_x_20261024_000000") == (
+        "known-good recorded (%s)" % EF.KNOWN_GOOD_NAME)
+    snap = json.loads(target.read_text(encoding="utf-8"))
+    assert snap["episode"] == "signal_lost_x_20261024_000000"
+    assert snap["env"] == {"python": "now"} and snap["how"] == "published"
+    assert snap["env_version"] == EF.ENV_VERSION
+    assert [p.name for p in target.parent.iterdir()] == [EF.KNOWN_GOOD_NAME]
+
+    def unwritable():
+        raise PermissionError(5, "denied")
+
+    monkeypatch.setattr(EF, "known_good_path", unwritable)
+    assert EF.record_known_good("x") == "known-good not recorded (PermissionError)"
 
 
-# --- the runner's known-good step -------------------------------------------
-
-def test_the_runner_records_known_good_only_for_a_confirmed_obs_file(monkeypatch):
-    recorded = []
-    monkeypatch.setattr(canonical.otr_env_drift, "record_known_good",
-                        lambda ep: recorded.append(ep) or "known-good recorded: %s" % ep)
-    monkeypatch.setattr(canonical, "published_obs_file", lambda *a: (None, "the obs file is zero bytes"))
-    assert canonical.record_known_good_after_success({}, "p", "ep") == (
-        "known-good not recorded: the obs file is zero bytes")
-    assert canonical.record_known_good_after_success({}, "p", None) == (
-        "known-good not recorded: the episode id was not read")
-    assert recorded == []
-    monkeypatch.setattr(canonical, "published_obs_file", lambda *a: ("x_final.mp4", ""))
-    assert canonical.record_known_good_after_success({}, "p", "ep") == "known-good recorded: ep"
-    monkeypatch.setattr(canonical, "published_obs_file",
-                        lambda *a: (_ for _ in ()).throw(RuntimeError("history broke")))
-    assert canonical.record_known_good_after_success({}, "p", "ep") == (
-        "known-good not recorded: RuntimeError: history broke")
+def test_the_mux_records_known_good_after_the_obs_copy_and_before_cleanup():
+    """The full asset cleanup deletes the episode folder, ledger and all, so the
+    snapshot cannot wait for a runner to read the ledger afterwards (the live
+    leg of 2026-10-24 found exactly that)."""
+    source = (_REPO / "nodes" / "otr_master_audio_mux.py").read_text(encoding="utf-8")
+    publish = source.index("obs_copy = self._publish_to_obs(final)")
+    record = source.index("report.append(_record_known_good(_episode_stem(silent_video_path), obs_copy))")
+    assert publish < record
+    cleanup_calls = [i for i in range(len(source)) if source.startswith("self._asset_cleanup(", i)]
+    assert cleanup_calls and all(record < i for i in cleanup_calls)
 
 
-def test_main_prints_the_known_good_line_after_success(monkeypatch, tmp_path, capsys):
-    class _Live:
-        def __init__(self, *a, **k):
-            pass
+def test_the_mux_hook_never_raises(monkeypatch):
+    from nodes import otr_master_audio_mux as mux
 
-        def start(self):
-            return self
+    def broken(episode):
+        raise RuntimeError("disk gone")
 
-        def set_prompt_id(self, pid):
-            pass
+    monkeypatch.setattr(EF, "record_known_good", broken)
+    from nodes import _otr_paths
+    real_obs = str(_otr_paths.otr_obs_dir())
+    assert mux._record_known_good("ep", real_obs + "/x_final.mp4") == (
+        "known-good not recorded (RuntimeError)")
 
-        def wrap(self, on_tick):
-            return on_tick
 
-        def stop(self):
-            pass
-
-        def summary(self):
-            return "text_frames=0"
-
-    monkeypatch.setattr(canonical, "build_api_prompt", lambda _args: ({}, []))
-    monkeypatch.setattr(canonical, "LiveView", _Live)
-    monkeypatch.setattr(canonical, "submit_prompt", lambda p, client_id=None: "pid")
-    monkeypatch.setattr(canonical, "poll_history", lambda *a, **k: ("SUCCESS", ""))
-    monkeypatch.setattr(canonical, "episode_of_prompt", lambda pid: "ep")
-    monkeypatch.setattr(canonical, "record_known_good_after_success",
-                        lambda prompt, pid, ep: "known-good recorded: %s" % ep)
-    assert canonical.main(["--dump-prompt", str(tmp_path / "p.json")]) == 0
-    out = capsys.readouterr().out
-    assert out.index("RESULT SUCCESS") < out.index("[canonical-api] known-good recorded: ep")
+def test_a_publish_outside_the_obs_folder_never_writes_the_real_snapshot(monkeypatch, tmp_path):
+    from nodes import otr_master_audio_mux as mux
+    monkeypatch.setattr(EF, "record_known_good",
+                        lambda ep: pytest.fail("a test publish must not write the snapshot"))
+    assert mux._record_known_good("ep", str(tmp_path / "x_final.mp4")) == (
+        "known-good not recorded (this publish is not in the obs folder)")
