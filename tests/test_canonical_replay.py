@@ -745,3 +745,20 @@ def test_the_freezer_refuses_when_no_master_matches_or_none_is_stamped(tmp_path)
     with pytest.raises(PL.ReplayBundleError):
         freezer.find_master(ep, dict(_digest_ledger(outside),
                                      final_audio_path=str(outside)))
+
+
+def test_a_replay_records_todays_environment_not_its_sources(frozen, monkeypatch):
+    """meta.env names the machine a run rendered on (CreatorOS row 2.1). The
+    source ledger carries the SOURCE machine's; the replay renders here."""
+    from nodes._otr_shared import env_fingerprint as EF
+    src_ledger = next((frozen["bundle"]).rglob("*_ledger.json"))
+    data = json.loads(src_ledger.read_text(encoding="utf-8"))
+    assert "env" not in data["meta"] or data["meta"]["env"] != {"python": "today"}
+    EF._reset_cache_for_tests()
+    monkeypatch.setattr(EF, "compute", lambda: {"python": "today"})
+    try:
+        meta = PL.import_replay_bundle(str(frozen["bundle"])).data["meta"]
+    finally:
+        EF._reset_cache_for_tests()
+    assert meta["env"] == {"python": "today"}
+    assert meta["env_version"] == EF.ENV_VERSION

@@ -133,6 +133,12 @@ Lineage:
                    legacy so the requirement never fired. A dropped receipt
                    was indistinguishable from history, which is how a coda
                    with zero readers survived for months.
+  l4-2026-08-07 + ADDITIVE (2026-10-24, no bump): meta.env and
+                   meta.env_version, the environment a run rendered on
+                   (ComfyUI, every pack, Python, torch, CUDA, GPU, driver,
+                   OS; nodes/_otr_shared/env_fingerprint.py). Stamped by
+                   Ledger.save on the first save; re-stamped by a replay
+                   import. Optional: read with ``meta.get("env")``.
 
 Reader pattern for all l3-2026-05-08 fields: ALWAYS use
 ``dict.get(field, default)`` with the documented default. Older

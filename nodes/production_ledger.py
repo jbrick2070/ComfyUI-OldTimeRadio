@@ -72,6 +72,10 @@ except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
 
 try:
+    from ._otr_shared import env_fingerprint as otr_env_fingerprint
+except ImportError:  # pragma: no cover - flat test imports
+    from _otr_shared import env_fingerprint as otr_env_fingerprint  # type: ignore
+try:
     from ._otr_shared.pathbudget import long_path as _long_path
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared.pathbudget import long_path as _long_path  # type: ignore
@@ -581,9 +585,14 @@ REPLAY_MANIFEST_SCHEMA = "otr_replay_bundle_v1"
 #: `asset_cleanup` (row 0b, 2026-09-25) is a per-run housekeeping choice, not
 #: story content: the writer's replay branch re-stamps it from THIS run's
 #: widget, so a replay never inherits its source's choice to delete things.
+#:
+#: `env` / `env_version` (CreatorOS row 2.1, 2026-10-24) name the machine a run
+#: rendered on. A replay runs on TODAY's machine, so `import_replay_bundle`
+#: re-stamps them from this process right after popping the source's.
 _REPLAY_RUN_VOLATILE_META = (
     "render_engines", "render_trace", "render_trace_version", "phase_ms",
     "video_readiness", "audio_motion_profile", "paths", "asset_cleanup",
+    "env", "env_version",
 )
 
 
@@ -841,6 +850,10 @@ def import_replay_bundle(bundle_dir: str, new_episode_id: Optional[str] = None) 
     # the source's run-volatile telemetry and terminal pointers do not carry over
     for key in _REPLAY_RUN_VOLATILE_META:
         meta.pop(key, None)
+    # Re-stamped HERE, not left to `Ledger.save`: the save merges with any
+    # ledger already on disk at the new path, and that file's `env` would win
+    # over an absent one in memory.
+    otr_env_fingerprint.stamp(meta)
     for key in ("final_audio_path", "final_video_path"):
         data[key] = None
     for key in ("obs_publish", "obs_path", "published_path"):
@@ -1959,6 +1972,15 @@ class Ledger:
                 # Best-effort: a meta-stamping failure must NEVER break
                 # the actual ledger write.
                 log.warning("[Ledger] meta.paths stamp failed: %s", exc)
+
+            # CreatorOS row 2.1: what this run rendered on (ComfyUI, every
+            # pack, Python, torch, CUDA, GPU, driver, OS) in meta.env, stamped
+            # on the first save and kept after -- the disk merge above carries
+            # it forward. Read-only metadata: nothing branches on it.
+            try:
+                otr_env_fingerprint.stamp(merged.setdefault("meta", {}))
+            except Exception as exc:  # noqa: BLE001 -- never breaks the write
+                log.warning("[Ledger] meta.env stamp failed: %s", exc)
 
             # Atomic write: temp file + replace.
             #
