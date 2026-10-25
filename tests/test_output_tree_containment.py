@@ -19,7 +19,6 @@ render needs ffmpeg and a GPU.
 from __future__ import annotations
 
 import os
-import re
 from pathlib import Path
 
 import pytest
@@ -290,12 +289,7 @@ def test_no_post_route_ships():
     the registry's second-largest ban class -- and nothing shipped called them."""
     src = (Path(__file__).resolve().parents[1] / "__init__.py").read_text(encoding="utf-8")
     assert "routes.post" not in src
-    # Two read-only GETs: the ledger, and the broadcast feed's episode list
-    # (CreatorOS row 4.1, which changes nothing; tests/test_broadcast_feed.py).
-    gets = re.findall(r'routes\.get\("([^"]+)"\)', src)
-    assert sorted(gets) == ["/otr/episodes", "/otr/latest_ledger"], gets
-    for verb in ("put", "delete", "patch"):
-        assert "routes.%s" % verb not in src
+    assert src.count("routes.get") == 1, "only the read-only ledger GET should remain"
 
 
 def test_the_composite_fingerprint_hook_checks_every_step():

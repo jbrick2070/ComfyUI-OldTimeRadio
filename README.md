@@ -711,18 +711,9 @@ Run the pipeline as a live generative broadcast: each finished episode loads int
 
 1. Install OBS and the Media Playlist Source plugin.
 2. In OBS: **Tools > Scripts > Python Settings**, point to your Python install.
-3. Load the `directory_sorter_for_obs` script and point it at the broadcast feed, `<your ComfyUI output folder>/otr/episodes/_shared/broadcast/`.
+3. Load the `directory_sorter_for_obs` script and point it at `<your ComfyUI output folder>/otr/obs/`.
 4. Add a **Media Playlist Source** scene item pointed at the same folder.
 5. OBS picks up each new MP4 as the pipeline publishes it.
-
-**The broadcast feed.** Every episode published to `otr/obs/` is also linked into the feed folder, so it airs by default. The link is a hardlink: no second copy on disk, and `otr/obs/` itself is never touched. To keep an episode off air, or put it back, use the episode's file name (the ComfyUI sidebar tab **On air** lists them and copies the command):
-
-```bash
-python scripts/otr_broadcast.py pull "<episode file name>"
-python scripts/otr_broadcast.py put_back "<episode file name>"
-```
-
-`python scripts/otr_broadcast.py` on its own lists every episode and whether it is on air. If OBS is playing an episode when you pull it, the pull waits ("pull pending") and finishes on the next publish, ComfyUI start or `python scripts/otr_broadcast.py sync`. The feed must be on the same drive as `otr/obs/`; if `OTR_OBS_DIR` points to another drive, the server log says the feed could not be linked.
 
 > **Tip:** If the GPU is saturated by inference, set OBS to encode on the integrated GPU (QSV AV1 or HEVC) so the stream stays smooth.
 

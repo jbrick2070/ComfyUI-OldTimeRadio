@@ -491,29 +491,6 @@ try:
         return _otr_web.Response(status=204, headers=_OTR_CORS_HEADERS)
 
     print("[OldTimeRadio] HTTP route registered: GET /otr/latest_ledger (with CORS)")
-
-    # THE BROADCAST FEED, READ-ONLY (CreatorOS row 4.1). Every published episode
-    # and whether it is on air, for the "On air" sidebar tab. File names only,
-    # never a path, and nothing here changes the feed: pulling and putting back
-    # are scripts/otr_broadcast.py (see the POST note below this block).
-    @_otr_PromptServer.instance.routes.get("/otr/episodes")
-    async def _otr_episodes(request):
-        try:
-            try:
-                from .nodes._otr_shared import broadcast_feed as _otr_feed
-            except Exception:  # noqa: BLE001
-                from _otr_shared import broadcast_feed as _otr_feed  # type: ignore
-            return _otr_web.json_response(
-                {"ok": True, "episodes": _otr_feed.list_episodes()},
-                headers=_OTR_CORS_HEADERS)
-        except Exception as exc:
-            print(f"[OldTimeRadio] /otr/episodes failed: {type(exc).__name__}: {exc}")
-            return _otr_web.json_response(
-                {"ok": False, "reason": "the episode list could not be read; see "
-                                        "the ComfyUI console for the reason"},
-                status=500, headers=_OTR_CORS_HEADERS)
-
-    print("[OldTimeRadio] HTTP route registered: GET /otr/episodes (read-only)")
 except _OTRDuplicateRoute:
     print("[OldTimeRadio] HTTP route skipped (duplicate pack folder)")
 except Exception as _otr_route_err:
@@ -542,31 +519,6 @@ try:
     _otr_boot_sweep()
 except Exception as _otr_janitor_err:  # noqa: BLE001 -- PD1
     print(f"[OldTimeRadio] janitor boot sweep skipped: {_otr_janitor_err}")
-
-# The broadcast feed (CreatorOS row 4.1): bring it in line with otr/obs at boot,
-# so a publish whose sync failed, a hand-deleted obs file or a pull that was
-# pending (OBS held the file) is put right. Links only; obs is never touched.
-# On a daemon thread: OTR_OBS_DIR may be pinned to a slow or disconnected drive,
-# and a listing that hangs must not hold up node registration. Fail-soft.
-if _otr_dup is None:
-    def _otr_boot_feed_sync():
-        try:
-            from .nodes._otr_shared.broadcast_feed import sync as _otr_feed_sync
-            _otr_feed_report = _otr_feed_sync()
-            print("[OldTimeRadio] broadcast feed: %d linked, %d relinked, %d removed, "
-                  "%d pull pending, %d errors" % tuple(
-                      len(_otr_feed_report[k]) for k in
-                      ("linked", "relinked", "removed", "pending", "errors")))
-        except Exception as _otr_feed_err:  # noqa: BLE001 -- PD1
-            print("[OldTimeRadio] broadcast feed sync skipped: %s"
-                  % type(_otr_feed_err).__name__)
-
-    try:
-        import threading as _otr_threading
-        _otr_threading.Thread(target=_otr_boot_feed_sync, name="otr-feed-boot-sync",
-                              daemon=True).start()
-    except Exception as _otr_feed_err:  # noqa: BLE001 -- PD1
-        print(f"[OldTimeRadio] broadcast feed sync skipped: {type(_otr_feed_err).__name__}")
 
 # =====================================================================
 # THE WRITER'S MODEL FOLDER (2026-09-25): register ComfyUI's `LLM` model
