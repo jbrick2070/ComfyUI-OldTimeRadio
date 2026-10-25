@@ -19,11 +19,12 @@ export function commandFor(episode, onAir) {
     return `python scripts/otr_broadcast.py ${action} "${name}"`;
 }
 
-/** "3 of 5 on air", or the reason the list is empty. */
+/** "3 of 5 on air", or the reason the list is empty. Takes the rows the tab
+ *  draws (`rowView`), so it counts the same `onAir` the rows show. */
 export function summaryLine(rows) {
     const list = Array.isArray(rows) ? rows : [];
     if (!list.length) return "No published episodes yet.";
-    const onAir = list.filter((r) => r && r.on_air).length;
+    const onAir = list.filter((r) => r && r.onAir).length;
     return `${onAir} of ${list.length} on air`;
 }
 

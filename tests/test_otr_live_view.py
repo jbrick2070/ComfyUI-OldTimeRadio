@@ -184,6 +184,16 @@ def test_early_state_from_our_own_prompt_is_kept_when_its_id_arrives(api, labels
         "running", "7", 3, 9)
 
 
+def test_a_foreign_broadcast_after_our_own_early_frame_is_still_dropped(api, labels):
+    """Our frame first, then another client's `execution_interrupted`: the
+    early state is mixed, so it is dropped rather than left saying finished."""
+    state = _state(api, labels)
+    state.apply_text(_text("executing", node="7", prompt_id="mine"))
+    state.apply_text(_text("execution_interrupted", prompt_id="theirs"))
+    state.adopt_prompt_id("mine")
+    assert state.snapshot()["state"] == "waiting"
+
+
 def test_early_frames_that_name_no_prompt_are_kept(api, labels):
     state = _state(api, labels)
     state.apply_text(_text("executing", node="1"))

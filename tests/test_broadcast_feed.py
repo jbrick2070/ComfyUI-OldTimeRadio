@@ -165,10 +165,56 @@ def test_the_listing_is_read_only_and_names_files_never_paths(tree):
     assert str(tree.obs) not in text and str(tree.feed) not in text
 
 
-def test_an_unreadable_pulled_list_is_reported_and_read_as_empty(tree):
-    (tree.shared / "state").mkdir(parents=True)
-    (tree.shared / "state" / BF.PULLED_FILENAME).write_text("{not json", encoding="utf-8")
-    assert BF.load_pulled() == []
+@pytest.mark.parametrize("text", ["{not json", '{"pulled": "x"}', "[]"])
+def test_an_unreadable_pulled_list_changes_nothing_and_is_named(tree, text):
+    """It is the record of what must NOT air: read as empty, it would put every
+    pulled episode back on."""
+    BF.sync()
+    BF.pull(A)
+    (tree.shared / "state" / BF.PULLED_FILENAME).write_text(text, encoding="utf-8")
+    report = BF.sync()
+    assert report["linked"] == [] and report["removed"] == []
+    assert "pulled list" in report["errors"][0] and "left as it is" in report["errors"][0]
+    assert not (tree.feed / A).exists(), "the pulled episode stays off air"
+    with pytest.raises(BF.BroadcastError, match="pulled list"):
+        BF.pull(B)
+    assert (tree.feed / B).exists()
+
+
+def test_an_obs_folder_that_cannot_be_listed_takes_nothing_off_air(tree, monkeypatch):
+    BF.sync()
+    real_listdir = os.listdir
+
+    def denied(path):
+        if Path(path) == tree.obs:
+            raise PermissionError(5, "Access is denied")
+        return real_listdir(path)
+
+    monkeypatch.setattr(BF.os, "listdir", denied)
+    report = BF.sync()
+    assert report["removed"] == []
+    assert "obs folder cannot be listed" in report["errors"][0]
+    assert sorted(p.name for p in tree.feed.iterdir()) == [A, B]
+    with pytest.raises(BF.BroadcastError, match="cannot be listed"):
+        BF.pull(A)
+
+
+def test_a_feed_held_by_another_process_is_waited_for_then_reported(tree, monkeypatch):
+    """The server's sync and a CLI pull must not interleave: the lock is an OS
+    lock on a file, so another handle (another process) holds it out."""
+    monkeypatch.setattr(BF, "_LOCK_WAIT_S", 0.3)
+    lock_path = tree.shared / "state" / BF.LOCK_FILENAME
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    other = open(lock_path, "a+b")
+    try:
+        BF._os_lock(other)
+        report = BF.sync()
+        assert "another process held the feed" in report["errors"][0]
+        assert not tree.feed.exists() or list(tree.feed.iterdir()) == []
+    finally:
+        BF._os_unlock(other)
+        other.close()
+    assert sorted(BF.sync()["linked"]) == [A, B]
 
 
 def test_the_cli_lists_pulls_and_refuses(tree, capsys):
@@ -217,8 +263,11 @@ def test_no_route_changes_the_feed():
     assert "list_episodes()" in route
     for verb in ("sync(", "pull(", "put_back(", ".act("):
         assert verb not in route, verb
-    boot = init[init.index("broadcast_feed import sync"):]
-    assert "_otr_feed_sync()" in boot[:400]
+    boot = init[init.index("def _otr_boot_feed_sync"):]
+    assert "_otr_feed_sync()" in boot[:600]
+    assert "Thread(target=_otr_boot_feed_sync" in boot and "daemon=True" in boot[:1500], (
+        "the boot sync runs off the import thread, so a slow obs drive cannot hold up "
+        "node registration")
 
 
 def _node():

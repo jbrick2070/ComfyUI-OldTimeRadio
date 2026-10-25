@@ -34,11 +34,13 @@ THE RULES.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
 import threading
-from typing import Any, Dict, List, Optional
+import time
+from typing import Any, Dict, Iterator, List, Optional
 
 try:
     from .. import _otr_paths
@@ -50,11 +52,19 @@ log = logging.getLogger("OTR.broadcast")
 FEED_DIRNAME = "broadcast"
 PULLED_FILENAME = "broadcast_pulled.json"
 PUBLISHED_SUFFIX = "_final.mp4"
+LOCK_FILENAME = "broadcast.lock"
+_LOCK_WAIT_S = 10.0
 _LOCK = threading.Lock()
 
 
 class BroadcastError(ValueError):
     """A request the feed refuses, in words safe to send back to a browser."""
+
+
+class FeedStateUnreadable(OSError):
+    """The obs listing or the pulled list cannot be read. The feed is left as
+    it is: reading either one as EMPTY would take every episode off air, or put
+    every pulled one back on."""
 
 
 def obs_dir() -> str:
@@ -70,12 +80,17 @@ def _pulled_path() -> str:
 
 
 def published_names() -> List[str]:
-    """Every published episode in the obs folder, by file name."""
-    try:
-        names = os.listdir(obs_dir())
-    except OSError:
-        return []
+    """Every published episode in the obs folder, by file name. An obs folder
+    that cannot be listed raises ``FeedStateUnreadable``; a missing one is
+    empty (nothing published yet)."""
     base = obs_dir()
+    try:
+        names = os.listdir(base)
+    except FileNotFoundError:
+        return []
+    except OSError as exc:
+        raise FeedStateUnreadable(
+            "the obs folder cannot be listed (%s)" % type(exc).__name__) from None
     return sorted(n for n in names
                   if n.endswith(PUBLISHED_SUFFIX) and os.path.isfile(os.path.join(base, n)))
 
@@ -86,33 +101,93 @@ def _checked_name(name: Any) -> str:
     if (not text or text != os.path.basename(text) or "/" in text or "\\" in text
             or text in (".", "..") or not text.endswith(PUBLISHED_SUFFIX)):
         raise BroadcastError("not an episode name")
-    if text not in published_names():
+    try:
+        names = published_names()
+    except FeedStateUnreadable as exc:
+        raise BroadcastError(str(exc)) from None
+    if text not in names:
         raise BroadcastError("no published episode by that name")
     return text
 
 
 def load_pulled() -> List[str]:
+    """The pulled list; empty when no file exists yet. A file that cannot be
+    read, or does not hold a list, raises ``FeedStateUnreadable``: it is the
+    operator's record of what must NOT air, so it is never guessed at."""
     try:
         with open(_pulled_path(), "r", encoding="utf-8") as fh:
             data = json.load(fh)
     except FileNotFoundError:
         return []
     except (OSError, ValueError) as exc:
-        log.warning("[OTR.broadcast] the pulled list cannot be read (%s); "
-                    "treating nothing as pulled", type(exc).__name__)
-        return []
+        raise FeedStateUnreadable(
+            "the pulled list %s cannot be read (%s); fix or delete it"
+            % (PULLED_FILENAME, type(exc).__name__)) from None
     pulled = data.get("pulled") if isinstance(data, dict) else None
-    return sorted({str(n) for n in pulled if isinstance(n, str)}) if isinstance(pulled, list) else []
+    if not isinstance(pulled, list):
+        raise FeedStateUnreadable(
+            "the pulled list %s holds no list; fix or delete it" % PULLED_FILENAME)
+    return sorted({n for n in pulled if isinstance(n, str)})
 
 
 def _save_pulled(pulled: List[str]) -> None:
     path = _pulled_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    partial = path + ".part"
+    partial = "%s.%d.part" % (path, os.getpid())
     with open(partial, "w", encoding="utf-8") as fh:
         json.dump({"pulled": sorted(set(pulled))}, fh, indent=2, ensure_ascii=False)
         fh.write("\n")
     os.replace(partial, path)
+
+
+@contextlib.contextmanager
+def _locked() -> Iterator[None]:
+    """One feed writer at a time, across processes: the server's sync and a
+    ``scripts/otr_broadcast.py pull`` must not interleave, or a pull that
+    lands between a sync's read of the pulled list and its link pass is
+    undone. A thread lock inside this process, plus an OS lock on a file in
+    the state folder across processes."""
+    with _LOCK:
+        path = str(_otr_paths.otr_state_dir() / LOCK_FILENAME)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        fh = open(path, "a+b")
+        try:
+            deadline = time.monotonic() + _LOCK_WAIT_S
+            while True:
+                try:
+                    _os_lock(fh)
+                    break
+                except OSError:
+                    if time.monotonic() >= deadline:
+                        raise FeedStateUnreadable(
+                            "another process held the feed for %d s" % _LOCK_WAIT_S) from None
+                    time.sleep(0.1)
+            try:
+                yield
+            finally:
+                _os_unlock(fh)
+        finally:
+            fh.close()
+
+
+def _os_lock(fh) -> None:
+    fh.seek(0)
+    if os.name == "nt":
+        import msvcrt
+        msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def _os_unlock(fh) -> None:
+    fh.seek(0)
+    if os.name == "nt":
+        import msvcrt
+        msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
 
 
 def _is_link_to(link: str, target: str) -> bool:
@@ -148,14 +223,16 @@ def sync(published_into: Optional[str] = None) -> Dict[str, Any]:
     own folder, say) is reported and leaves the feed alone."""
     report: Dict[str, Any] = {"linked": [], "relinked": [], "removed": [],
                               "pending": [], "errors": []}
-    if published_into is not None and not _same_dir(published_into, obs_dir()):
-        report["errors"].append(
-            "this publish went to a folder that is not the canonical obs "
-            "folder, which is the only one the feed mirrors")
-        return report
     try:
-        with _LOCK:
+        if published_into is not None and not _same_dir(published_into, obs_dir()):
+            report["errors"].append(
+                "this publish went to a folder that is not the canonical obs "
+                "folder, which is the only one the feed mirrors")
+            return report
+        with _locked():
             _sync_locked(report)
+    except FeedStateUnreadable as exc:
+        report["errors"].append("%s; the feed was left as it is" % exc)
     except Exception as exc:  # noqa: BLE001 -- reported, never raised
         report["errors"].append("%s: the feed could not be synced" % type(exc).__name__)
     if report["errors"]:
@@ -218,12 +295,15 @@ def _sync_locked(report: Dict[str, Any]) -> None:
 def pull(name: Any) -> Dict[str, Any]:
     """Take an episode off air. Its obs file is untouched."""
     episode = _checked_name(name)
-    with _LOCK:
-        pulled = load_pulled()
-        if episode not in pulled:
-            pulled.append(episode)
-            _save_pulled(pulled)
-        why = _unlink(os.path.join(feed_dir(), episode))
+    try:
+        with _locked():
+            pulled = load_pulled()
+            if episode not in pulled:
+                pulled.append(episode)
+                _save_pulled(pulled)
+            why = _unlink(os.path.join(feed_dir(), episode))
+    except FeedStateUnreadable as exc:
+        raise BroadcastError(str(exc)) from None
     if why:
         return {"episode": episode, "state": "pull pending",
                 "reason": "the feed file is %s; it is removed on the next sync" % why}
@@ -233,9 +313,12 @@ def pull(name: Any) -> Dict[str, Any]:
 def put_back(name: Any) -> Dict[str, Any]:
     """Put a pulled episode back on air."""
     episode = _checked_name(name)
-    with _LOCK:
-        pulled = [n for n in load_pulled() if n != episode]
-        _save_pulled(pulled)
+    try:
+        with _locked():
+            pulled = [n for n in load_pulled() if n != episode]
+            _save_pulled(pulled)
+    except FeedStateUnreadable as exc:
+        raise BroadcastError(str(exc)) from None
     report = sync()
     on_air = os.path.exists(os.path.join(feed_dir(), episode))
     out = {"episode": episode, "state": "on air" if on_air else "not on air"}

@@ -1231,19 +1231,19 @@ class LiveState:
         #: changes whenever it does.
         self.last_preview: bytes | None = None
         self.preview_serial = 0
-        #: The first prompt id a frame named while ours was still unknown (the
+        #: Every prompt id a frame named while ours was still unknown (the
         #: websocket opens before ``submit_prompt`` returns one).
-        self._early_prompt_id: str | None = None
+        self._early_prompt_ids: set[str] = set()
 
     def _is_ours(self, data: dict) -> bool:
         """A frame for another prompt on a shared queue is not ours."""
         frame_prompt = data.get("prompt_id")
         if not self.prompt_id:
             # Ours is not known yet, so every frame is taken -- our own first
-            # frames can land before ``set_prompt_id`` -- but the id they name
+            # frames can land before ``set_prompt_id`` -- but every id they name
             # is kept so ``adopt_prompt_id`` can tell whose they were.
-            if frame_prompt and self._early_prompt_id is None:
-                self._early_prompt_id = str(frame_prompt)
+            if frame_prompt:
+                self._early_prompt_ids.add(str(frame_prompt))
             return True
         return frame_prompt is None or frame_prompt == self.prompt_id
 
@@ -1251,10 +1251,12 @@ class LiveState:
         """Ours is now known. State taken from frames that named a DIFFERENT
         prompt (a broadcast such as another client's ``execution_interrupted``)
         is dropped; state from frames that named this one is kept."""
-        early = self._early_prompt_id
+        early = self._early_prompt_ids
         self.prompt_id = prompt_id
-        self._early_prompt_id = None
-        if early is not None and early != prompt_id:
+        self._early_prompt_ids = set()
+        # ANY other prompt among them, not only the first: our own frame can
+        # arrive first and a broadcast for someone else's prompt after it.
+        if early - {prompt_id}:
             self.finished = False
             self._set_node(None)
             self.value = None

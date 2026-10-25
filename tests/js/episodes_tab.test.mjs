@@ -27,7 +27,7 @@ test("a name that would break the quoting is refused, not escaped", () => {
 
 test("the summary counts what is on air", () => {
     assert.equal(summaryLine([]), "No published episodes yet.");
-    assert.equal(summaryLine([{ on_air: true }, { on_air: false }, { on_air: true }]),
+    assert.equal(summaryLine([{ onAir: true }, { onAir: false }, { onAir: true }]),
                  "2 of 3 on air");
     assert.equal(summaryLine(null), "No published episodes yet.");
 });
@@ -51,7 +51,9 @@ test("a failed or malformed response shows its reason and no rows", () => {
     assert.deepEqual(readResponse({ ok: false, reason: "see the console" }),
                      { rows: [], error: "see the console" });
     assert.deepEqual(readResponse(null), { rows: [], error: "The episode list could not be read." });
-    const ok = readResponse({ ok: true, episodes: [{ episode: NAME, state: "on air" }] });
+    const ok = readResponse({ ok: true, episodes: [{ episode: NAME, state: "on air", on_air: true }] });
     assert.equal(ok.error, null);
     assert.equal(ok.rows[0].onAir, true);
+    // The count the tab prints is taken from the rows it draws.
+    assert.equal(summaryLine(ok.rows), "1 of 1 on air");
 });

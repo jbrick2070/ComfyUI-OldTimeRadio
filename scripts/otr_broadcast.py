@@ -49,7 +49,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("episode", nargs="?", default=None)
     args = parser.parse_args(argv)
     if args.action == "list":
-        _print_list()
+        try:
+            _print_list()
+        except broadcast_feed.FeedStateUnreadable as exc:
+            print("[broadcast] cannot list: %s" % exc)
+            return 2
         return 0
     if args.action in ("pull", "put_back") and not args.episode:
         parser.error("%s needs the episode's file name" % args.action)

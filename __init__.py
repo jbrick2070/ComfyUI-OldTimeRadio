@@ -546,15 +546,25 @@ except Exception as _otr_janitor_err:  # noqa: BLE001 -- PD1
 # The broadcast feed (CreatorOS row 4.1): bring it in line with otr/obs at boot,
 # so a publish whose sync failed, a hand-deleted obs file or a pull that was
 # pending (OBS held the file) is put right. Links only; obs is never touched.
-# Fail-soft, like the janitor above.
+# On a daemon thread: OTR_OBS_DIR may be pinned to a slow or disconnected drive,
+# and a listing that hangs must not hold up node registration. Fail-soft.
 if _otr_dup is None:
+    def _otr_boot_feed_sync():
+        try:
+            from .nodes._otr_shared.broadcast_feed import sync as _otr_feed_sync
+            _otr_feed_report = _otr_feed_sync()
+            print("[OldTimeRadio] broadcast feed: %d linked, %d relinked, %d removed, "
+                  "%d pull pending, %d errors" % tuple(
+                      len(_otr_feed_report[k]) for k in
+                      ("linked", "relinked", "removed", "pending", "errors")))
+        except Exception as _otr_feed_err:  # noqa: BLE001 -- PD1
+            print("[OldTimeRadio] broadcast feed sync skipped: %s"
+                  % type(_otr_feed_err).__name__)
+
     try:
-        from .nodes._otr_shared.broadcast_feed import sync as _otr_feed_sync
-        _otr_feed_report = _otr_feed_sync()
-        print("[OldTimeRadio] broadcast feed: %d linked, %d relinked, %d removed, "
-              "%d pull pending, %d errors" % tuple(
-                  len(_otr_feed_report[k]) for k in
-                  ("linked", "relinked", "removed", "pending", "errors")))
+        import threading as _otr_threading
+        _otr_threading.Thread(target=_otr_boot_feed_sync, name="otr-feed-boot-sync",
+                              daemon=True).start()
     except Exception as _otr_feed_err:  # noqa: BLE001 -- PD1
         print(f"[OldTimeRadio] broadcast feed sync skipped: {type(_otr_feed_err).__name__}")
 
