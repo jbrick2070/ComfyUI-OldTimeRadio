@@ -111,7 +111,11 @@ def newest_stamped_ledger() -> pathlib.Path:
         except DriftInputError:
             continue
         return path
-    raise DriftInputError("no episode under %s carries meta.env yet" % root)
+    raise DriftInputError(
+        "no episode under %s carries meta.env: nothing to compare yet. A full "
+        "asset cleanup deletes a published episode's ledger, so this usually "
+        "finds the ledger of a run that FAILED -- the one worth comparing with "
+        "the known-good snapshot -- and there is none" % root)
 
 
 def load_known_good() -> tuple[str, dict]:
