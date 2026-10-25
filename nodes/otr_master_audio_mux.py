@@ -1617,6 +1617,25 @@ except ImportError:  # pragma: no cover -- flat import harnesses
     )
 
 
+def _air_on_broadcast(published_into: str) -> str:
+    """Sync the broadcast feed after a publish; one report line. Never raises:
+    the episode is already published, and a feed problem must not undo that."""
+    try:
+        try:
+            from ._otr_shared import broadcast_feed
+        except ImportError:  # pragma: no cover -- flat (sys.path) test import
+            from _otr_shared import broadcast_feed  # type: ignore
+        rep = broadcast_feed.sync(published_into)
+    except Exception as exc:  # noqa: BLE001 -- reported, never raised
+        log.warning("[OTR_MasterAudioMux] broadcast feed NOT synced: %s",
+                    type(exc).__name__)
+        return "broadcast feed NOT synced (%s)" % type(exc).__name__
+    if rep["errors"]:
+        return "broadcast feed NOT fully synced: %s" % rep["errors"][0]
+    return "broadcast feed synced (%d linked, %d relinked, %d removed)" % (
+        len(rep["linked"]), len(rep["relinked"]), len(rep["removed"]))
+
+
 def _obs_basename(final: str) -> str:
     """The OPERATOR-FACING filename for the published episode.
 
@@ -2431,6 +2450,11 @@ class OTRMasterAudioMux:
                     "published to OBS anyway -> %s",
                     decision.summary(), obs_copy,
                 )
+            # ON AIR BY DEFAULT (CreatorOS row 4.1, operator D1 = A): the 24/7
+            # broadcast watches its own feed folder, and every publish is
+            # linked into it. After the obs copy is accepted, never before, and
+            # it only reports: the obs file is already the deliverable.
+            report.append(_air_on_broadcast(os.path.dirname(obs_copy)))
             # N2 (truthful ledger): this terminal node restamps
             # final_video_path over the pre-credits/pre-mux video it is handed.
             report.append(self._stamp_terminal_paths(

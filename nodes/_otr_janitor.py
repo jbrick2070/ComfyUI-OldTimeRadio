@@ -53,6 +53,9 @@ tmp/    scratch (TEMP/TMP/OTR_GPU_LEASE_DIR). Janitor-swept: stale
         entries are auto-deleted after an age threshold. Do not store
         anything you want to keep here.
 state/  per-machine runtime state (news_history.json, node run reports).
+broadcast/  the 24/7 broadcast feed OBS watches: a hardlink to every
+        published otr/obs/ episode that is on air (scripts/otr_broadcast.py
+        pulls or puts one back). Links only; deleting one never touches obs.
 
 Contract (2026-06-11 output-tree consolidation): the otr/ top level is
 EXACTLY episodes/ + obs/.
