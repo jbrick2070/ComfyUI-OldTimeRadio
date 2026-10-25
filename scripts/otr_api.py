@@ -12,6 +12,14 @@ This module exposes:
   * `poll_history(prompt_id, timeout_s=1800, on_tick=None)
         -> tuple[str, str]`
                 -- returns ("SUCCESS"|"FAIL"|"TIMEOUT", error_message_if_any).
+  * `LiveView(client_id, api_prompt)` -- a websocket listener for the SAME
+        `client_id` passed to `submit_prompt`: which node is running and how
+        far along it is. `view.wrap(on_tick)` adds it to the `poll_history`
+        status dict under a `live` key; `format_live(snapshot)` prints it.
+        Display only: it never gates, retries or changes a render.
+
+Failures a person can act on get a one-line `-- hint: ...` from
+`scripts/otr_known_failures.py` (the execution error, and a refused prompt).
 
 The module reads `COMFYUI_URL` from the env (default
 `http://127.0.0.1:8000`) so callers can target a non-default host.
@@ -23,11 +31,16 @@ This is the deliberate fix for BUG-LOCAL-002.
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import json
 import os
+import re
+import struct
 import sys
+import threading
 import time
+import urllib.parse
 import uuid
 from typing import Any, Callable
 
@@ -44,6 +57,12 @@ NOTE_NODE_TYPES = frozenset({"Note", "MarkdownNote"})
 COMFYUI_URL = os.environ.get("COMFYUI_URL", "http://127.0.0.1:8000")
 DEFAULT_POLL_S = 5
 DEFAULT_TIMEOUT_S = 1800
+
+#: Values ComfyUI accepts for a per-prompt ``extra_data.preview_method``
+#: (``LatentPreviewMethod``). Sent only when OTR_PREVIEW_METHOD is set: the
+#: opt-in for the live-view preview probe (PLAN row 1.1), so the default submit
+#: is exactly what it was before.
+_PREVIEW_METHODS = frozenset({"none", "auto", "latent2rgb", "taesd"})
 
 # Widget-capable input types. Mirrors soak_operator's set; any spec whose
 # type is one of these (or a `list` of literal choices, i.e. a dropdown)
@@ -753,14 +772,27 @@ def submit_prompt(api_prompt: dict, client_id: str | None = None) -> str:
         # api_key_comfy_org hidden input (execution.py). The SERVER never
         # reads this env var; only the submitter does, right here.
         body_out["extra_data"] = {"api_key_comfy_org": comfy_key}
+    preview_method = os.environ.get("OTR_PREVIEW_METHOD", "").strip().lower()
+    if preview_method:
+        # The live-view preview probe (PLAN row 1.1). A typo is the operator's
+        # to hear about now, not a silently ignored setting.
+        if preview_method not in _PREVIEW_METHODS:
+            raise ValueError(
+                f"OTR_PREVIEW_METHOD={preview_method!r} is not one of "
+                f"{sorted(_PREVIEW_METHODS)!r}"
+            )
+        body_out.setdefault("extra_data", {})["preview_method"] = preview_method
     resp = requests.post(
         f"{COMFYUI_URL}/prompt",
         json=body_out,
         timeout=30,
     )
     if resp.status_code != 200:
+        # The hint is read from the WHOLE body: the 500-character cut below
+        # lands before `node_errors`, which is where a bad dropdown value is.
         raise RuntimeError(
             f"POST /prompt -> HTTP {resp.status_code}: {resp.text[:500]}"
+            + _hint_suffix(resp.text)
         )
     body = resp.json()
 
@@ -768,6 +800,7 @@ def submit_prompt(api_prompt: dict, client_id: str | None = None) -> str:
     if error:
         raise RuntimeError(
             f"submit_prompt: ComfyUI returned error: {error!r}"
+            + _hint_suffix(repr(error))
         )
     node_errors = body.get("node_errors")
     if node_errors:
@@ -776,6 +809,7 @@ def submit_prompt(api_prompt: dict, client_id: str | None = None) -> str:
         # classifies as graph_widget without polling a zombie prompt_id.
         raise RuntimeError(
             f"submit_prompt: ComfyUI returned node_errors: {node_errors!r}"
+            + _hint_suffix(repr(node_errors))
         )
 
     prompt_id = body.get("prompt_id")
@@ -789,6 +823,25 @@ def submit_prompt(api_prompt: dict, client_id: str | None = None) -> str:
 #: How much of the failing traceback to keep. The frames that name OUR code are
 #: at the END, so the tail is what matters.
 _ERROR_TRACEBACK_FRAMES = 12
+
+
+def _hint_suffix(source: object) -> str:
+    """`` -- hint: ...`` when ``source`` is a known platform failure, else ``""``.
+
+    The table lives in ``scripts/otr_known_failures.py`` (PLAN row 1.2). A hint
+    is advice appended to a message that is already complete, so nothing here
+    may raise or remove the diagnosis it rides on: if the table cannot be
+    loaded or errors, the suffix SAYS so instead of the failure going quiet.
+    """
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+        if here not in sys.path:
+            sys.path.insert(0, here)
+        import otr_known_failures
+        hint = otr_known_failures.hint_for(source)
+    except Exception as exc:  # noqa: BLE001 -- reported, never raised
+        return " -- hint: unavailable (%s: %s)" % (type(exc).__name__, exc)
+    return " -- hint: %s" % hint if hint else ""
 
 
 def describe_execution_error(messages) -> str:
@@ -840,15 +893,22 @@ def describe_execution_error(messages) -> str:
                 str(payload.get("exception_message", "")).strip(),
             ]
             frames = payload.get("traceback") or []
+            tail = []
             if isinstance(frames, (list, tuple)) and frames:
-                lines.append("traceback (last %d frames):"
-                             % min(len(frames), _ERROR_TRACEBACK_FRAMES))
-                lines.extend(str(f).rstrip()
-                             for f in frames[-_ERROR_TRACEBACK_FRAMES:])
+                tail = [str(f).rstrip()
+                        for f in frames[-_ERROR_TRACEBACK_FRAMES:]]
+            # The hint sits right under the headline, not after twelve
+            # traceback frames where a reader scanning the leg log misses it.
+            hint = _hint_suffix("\n".join(lines + tail)).strip()
+            if hint:
+                lines.append(hint)
+            if tail:
+                lines.append("traceback (last %d frames):" % len(tail))
+                lines.extend(tail)
             return "\n".join(line for line in lines if line)
     except Exception:
         pass
-    return str(messages)[:500]
+    return str(messages)[:500] + _hint_suffix(str(messages))
 
 
 #: Consecutive REFUSED connections to /history before the poll asks /queue
@@ -1021,6 +1081,383 @@ def poll_history(
 
 
 # ---------------------------------------------------------------------------
+# Live view -- which node is running, and how far along (PLAN row 1.1)
+# ---------------------------------------------------------------------------
+# WHY. `poll_history` reads /history, which says nothing about a prompt until it
+# finishes, so the leg log read `pending` for the whole of a video walk that
+# runs for most of an episode. The nodes already report (node_progress.py
+# drives ComfyUI's progress bar) and ComfyUI sends those frames on the
+# websocket of the client_id that submitted the prompt. Nobody was listening.
+#
+# DISPLAY ONLY. Nothing here gates, retries or alters a render. A listener that
+# cannot connect says so in its snapshot ("unavailable" plus the reason); it
+# does not print nothing.
+
+#: Plain-words node labels. tests/test_otr_live_view.py fails when a class
+#: listed in node_list.json has no entry here.
+PHASE_LABELS_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "config", "node_phase_labels.json")
+
+#: ComfyUI's binary websocket frames start with a big-endian uint32 event type
+#: (``protocol.BinaryEventTypes``). Only the two preview types are counted.
+_BINARY_PREVIEW_IMAGE = 1
+_BINARY_PREVIEW_IMAGE_WITH_METADATA = 4
+
+#: Largest websocket message the listener accepts. A preview frame is small;
+#: this only keeps one oversized frame from closing the socket.
+_WS_MAX_MSG_BYTES = 16 * 1024 * 1024
+
+
+def load_phase_labels(path: str | None = None) -> dict:
+    """Read ``config/node_phase_labels.json`` into ``{"classes", "patterns"}``.
+
+    Raises on a missing or malformed file: the caller (``LiveView``) turns that
+    into a note on its snapshot, so a live view that cannot name nodes says so
+    rather than showing invented names.
+    """
+    with open(path or PHASE_LABELS_PATH, "r", encoding="utf-8") as fh:
+        raw = json.load(fh)
+    classes = {str(k): str(v) for k, v in (raw.get("classes") or {}).items()}
+    patterns = [(re.compile(row["match"]), str(row["label"]))
+                for row in (raw.get("patterns") or [])]
+    return {"classes": classes, "patterns": patterns}
+
+
+def label_for_class(class_type: str | None, labels: dict) -> str | None:
+    """The plain label for a node class: exact entry, else the first matching
+    pattern, else the class name itself -- never an invented phrase."""
+    if not class_type:
+        return None
+    exact = labels["classes"].get(class_type)
+    if exact:
+        return exact
+    for pattern, label in labels["patterns"]:
+        if pattern.search(class_type):
+            return label
+    return class_type
+
+
+def websocket_url(base_url: str, client_id: str) -> str:
+    """``http://host:8000`` + client id -> ``ws://host:8000/ws?clientId=...``."""
+    base = base_url.rstrip("/")
+    if base.startswith("https://"):
+        base = "wss://" + base[len("https://"):]
+    elif base.startswith("http://"):
+        base = "ws://" + base[len("http://"):]
+    return "%s/ws?clientId=%s" % (base, urllib.parse.quote(client_id, safe=""))
+
+
+def _as_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+class LiveState:
+    """The latest thing ComfyUI said about one prompt. Pure: no sockets, no
+    threads, so every frame shape is unit-testable."""
+
+    def __init__(self, class_by_node: dict | None = None,
+                 labels: dict | None = None, prompt_id: str | None = None):
+        self.class_by_node = dict(class_by_node or {})
+        self.labels = labels or {"classes": {}, "patterns": []}
+        self.prompt_id = prompt_id
+        self.node: str | None = None
+        self.class_type: str | None = None
+        self.label: str | None = None
+        self.value: int | None = None
+        self.max: int | None = None
+        self.finished = False
+        self.text_frames = 0
+        self.preview_frames = 0
+        self.preview_bytes = 0
+        self.other_binary_frames = 0
+
+    def _is_ours(self, data: dict) -> bool:
+        """A frame for another prompt on a shared queue is not ours."""
+        if not self.prompt_id:
+            return True
+        frame_prompt = data.get("prompt_id")
+        return frame_prompt is None or frame_prompt == self.prompt_id
+
+    def _set_node(self, node_id: Any) -> None:
+        node = None if node_id is None else str(node_id)
+        if node != self.node:
+            self.value = None
+            self.max = None
+        self.node = node
+        if node is None:
+            self.class_type = None
+            self.label = None
+            return
+        class_type = self.class_by_node.get(node)
+        if class_type is None and ":" in node:
+            # A node inside a subgraph reports "<parent>:<child>"; the parent
+            # is the one the submitted prompt names.
+            class_type = self.class_by_node.get(node.split(":", 1)[0])
+        self.class_type = class_type
+        self.label = label_for_class(class_type, self.labels)
+
+    def apply_text(self, message: Any) -> None:
+        """Take one text frame: the decoded dict, or the JSON string it came in."""
+        if isinstance(message, (str, bytes)):
+            try:
+                message = json.loads(message)
+            except ValueError:
+                return
+        if not isinstance(message, dict):
+            return
+        kind = message.get("type")
+        data = message.get("data")
+        if not isinstance(data, dict):
+            return
+        self.text_frames += 1
+        if not self._is_ours(data):
+            return
+        if kind == "execution_start":
+            self.finished = False
+            self._set_node(None)
+        elif kind == "executing":
+            node = data.get("node")
+            # `node` is null when the prompt has run out of nodes.
+            self.finished = node is None
+            self._set_node(node)
+        elif kind == "progress":
+            if data.get("node") is not None:
+                self._set_node(data.get("node"))
+            self.value = _as_int(data.get("value"))
+            self.max = _as_int(data.get("max"))
+        elif kind == "progress_state":
+            nodes = data.get("nodes")
+            running = [entry for entry in (nodes.values() if isinstance(nodes, dict) else ())
+                       if isinstance(entry, dict) and entry.get("state") == "running"]
+            if running:
+                entry = running[0]
+                self._set_node(entry.get("real_node_id") or entry.get("node_id"))
+                self.value = _as_int(entry.get("value"))
+                self.max = _as_int(entry.get("max"))
+        elif kind in ("execution_success", "execution_error",
+                      "execution_interrupted"):
+            self.finished = True
+
+    def apply_binary(self, frame: bytes) -> None:
+        """Count one binary frame; only the preview types are tracked."""
+        if len(frame) < 8:
+            self.other_binary_frames += 1
+            return
+        (event_type,) = struct.unpack(">I", frame[:4])
+        if event_type in (_BINARY_PREVIEW_IMAGE,
+                          _BINARY_PREVIEW_IMAGE_WITH_METADATA):
+            self.preview_frames += 1
+            self.preview_bytes = len(frame)
+        else:
+            self.other_binary_frames += 1
+
+    def snapshot(self) -> dict:
+        if self.finished:
+            state = "finished"
+        elif self.node is not None:
+            state = "running"
+        else:
+            state = "waiting"
+        return {
+            "state": state,
+            "node": self.node,
+            "class": self.class_type,
+            "label": self.label,
+            "value": self.value,
+            "max": self.max,
+            "frames": self.text_frames,
+            "preview_frames": self.preview_frames,
+            "preview_bytes": self.preview_bytes,
+        }
+
+
+def format_live(snapshot: dict | None) -> str:
+    """One heartbeat-sized phrase for a ``LiveView`` snapshot:
+    ``node 7 Writing the script 34/96``."""
+    if not snapshot:
+        return "none"
+    state = snapshot.get("state")
+    note = snapshot.get("note")
+    suffix = " [%s]" % note if note else ""
+    if state == "unavailable":
+        return "unavailable (%s)%s" % (snapshot.get("reason", "unknown"), suffix)
+    if state == "finished":
+        return "finished" + suffix
+    if state == "waiting":
+        return ("connected, no node reported yet" if snapshot.get("connected")
+                else "connecting") + suffix
+    parts = ["node %s" % snapshot.get("node")]
+    if snapshot.get("label"):
+        parts.append(str(snapshot["label"]))
+    if snapshot.get("max"):
+        parts.append("%s/%s" % (snapshot.get("value") or 0, snapshot["max"]))
+    return " ".join(parts) + suffix
+
+
+class LiveView:
+    """A websocket listener for ONE submitted prompt (a daemon thread).
+
+    Create it BEFORE ``submit_prompt`` and pass the SAME ``client_id`` there:
+    ComfyUI sends a prompt's frames only to the socket of the client that
+    submitted it. ``wrap(on_tick)`` hands ``poll_history`` a tick function that
+    adds ``status["live"]``; ``stop()`` ends the thread.
+    """
+
+    def __init__(self, client_id: str, api_prompt: dict | None = None,
+                 base_url: str | None = None, labels: dict | None = None):
+        self.client_id = client_id
+        self._base_url = base_url
+        self._lock = threading.Lock()
+        self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._connected = False
+        self._reason: str | None = None
+        self._note: str | None = None
+        if labels is None:
+            try:
+                labels = load_phase_labels()
+            except Exception as exc:  # noqa: BLE001 -- reported on the snapshot
+                labels = {"classes": {}, "patterns": []}
+                self._note = "labels unreadable: %s: %s" % (type(exc).__name__, exc)
+        class_by_node: dict = {}
+        if isinstance(api_prompt, dict):
+            for node_id, spec in api_prompt.items():
+                if isinstance(spec, dict):
+                    class_by_node[str(node_id)] = spec.get("class_type")
+        self._state = LiveState(class_by_node, labels)
+
+    def start(self) -> "LiveView":
+        thread = threading.Thread(target=self._run, name="otr-live-view",
+                                  daemon=True)
+        self._thread = thread
+        try:
+            thread.start()
+        except Exception as exc:  # noqa: BLE001 -- reported on the snapshot
+            self._set_reason("could not start the listener thread: %s: %s"
+                             % (type(exc).__name__, exc))
+        return self
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        thread = self._thread
+        if (thread is not None and thread.is_alive()
+                and thread is not threading.current_thread()):
+            thread.join(timeout=5)
+
+    def set_prompt_id(self, prompt_id: str) -> None:
+        """Once ``submit_prompt`` has returned, ignore frames for other prompts."""
+        with self._lock:
+            self._state.prompt_id = prompt_id
+
+    def snapshot(self) -> dict:
+        with self._lock:
+            snap = self._state.snapshot()
+            snap["connected"] = self._connected
+            if self._note:
+                snap["note"] = self._note
+            if self._reason and snap["state"] != "finished":
+                snap["state"] = "unavailable"
+                snap["reason"] = self._reason
+        return snap
+
+    def summary(self) -> str:
+        """The frame counts for the end-of-leg line (the preview measurement)."""
+        with self._lock:
+            state = self._state
+            return ("text_frames=%d preview_frames=%d last_preview_bytes=%d "
+                    "other_binary_frames=%d"
+                    % (state.text_frames, state.preview_frames,
+                       state.preview_bytes, state.other_binary_frames))
+
+    def wrap(self, on_tick: Callable[[float, dict], None] | None = None
+             ) -> Callable[[float, dict], None]:
+        """A ``poll_history`` tick function: adds ``status["live"]``, then
+        calls ``on_tick`` (if any) with the same arguments."""
+        def _tick(elapsed_s: float, status: dict) -> None:
+            try:
+                status["live"] = self.snapshot()
+            except Exception as exc:  # noqa: BLE001 -- reported, never raised
+                status["live"] = {
+                    "state": "unavailable",
+                    "reason": "snapshot failed: %s: %s" % (type(exc).__name__, exc),
+                }
+            if on_tick is not None:
+                on_tick(elapsed_s, status)
+        return _tick
+
+    # -- listener thread ----------------------------------------------------
+    def _set_reason(self, reason: str) -> None:
+        with self._lock:
+            self._connected = False
+            self._reason = reason
+
+    def _set_connected(self) -> None:
+        with self._lock:
+            self._connected = True
+            self._reason = None
+
+    def _on_text(self, data: Any) -> None:
+        with self._lock:
+            self._state.apply_text(data)
+
+    def _on_binary(self, data: bytes) -> None:
+        with self._lock:
+            self._state.apply_binary(data)
+
+    def _run(self) -> None:
+        try:
+            asyncio.run(self._listen())
+        except Exception as exc:  # noqa: BLE001 -- reported on the snapshot
+            self._set_reason("listener stopped: %s: %s" % (type(exc).__name__, exc))
+
+    async def _close_when_stopped(self, ws: Any) -> None:
+        while not self._stop_event.is_set():
+            await asyncio.sleep(0.2)
+        await ws.close()
+
+    async def _listen(self) -> None:
+        try:
+            import aiohttp
+        except Exception as exc:  # noqa: BLE001 -- reported on the snapshot
+            self._set_reason("aiohttp is not importable (%s: %s)"
+                             % (type(exc).__name__, exc))
+            return
+        url = websocket_url(self._base_url or COMFYUI_URL, self.client_id)
+        while not self._stop_event.is_set():
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.ws_connect(
+                            url, heartbeat=30,
+                            max_msg_size=_WS_MAX_MSG_BYTES) as ws:
+                        self._set_connected()
+                        watcher = asyncio.ensure_future(
+                            self._close_when_stopped(ws))
+                        try:
+                            async for msg in ws:
+                                if msg.type == aiohttp.WSMsgType.TEXT:
+                                    self._on_text(msg.data)
+                                elif msg.type == aiohttp.WSMsgType.BINARY:
+                                    self._on_binary(msg.data)
+                                else:
+                                    break
+                        finally:
+                            watcher.cancel()
+                if not self._stop_event.is_set():
+                    self._set_reason("websocket closed; reconnecting")
+            except Exception as exc:  # noqa: BLE001 -- reported on the snapshot
+                self._set_reason("websocket %s: %s"
+                                 % (type(exc).__name__, str(exc)[:100]))
+            for _ in range(20):  # 2 s back-off that still wakes on stop()
+                if self._stop_event.is_set():
+                    break
+                await asyncio.sleep(0.1)
+
+
+# ---------------------------------------------------------------------------
 # GATE B S2 -- the headless profile seam (the drift kill, decision doc sec. 8)
 # ---------------------------------------------------------------------------
 #: Headless creative whitelist -- MIRROR of
@@ -1163,6 +1600,12 @@ __all__ = [
     "workflow_to_api_prompt",
     "submit_prompt",
     "poll_history",
+    "LiveView",
+    "LiveState",
+    "format_live",
+    "load_phase_labels",
+    "label_for_class",
+    "websocket_url",
     "UNREACHABLE_STRIKES",
     "VANISHED_CHECK_EVERY",
     "SERVER_GONE_MARKER",

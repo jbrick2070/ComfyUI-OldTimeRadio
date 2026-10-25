@@ -11,6 +11,24 @@ operator asks for an API render/smoke:
 * Convert with scripts/otr_api.py and fail loud on schema/widget drift -- the
   conversion reads the SERVER's /object_info, so a server carrying an older
   pack than the graph refuses at the widget-count check rather than drifting.
+
+While the leg runs, three display-only helpers report; none of them changes
+or gates the render, and a runtime failure in any of them is printed and
+ignored:
+
+* LIVE VIEW. The heartbeat line carries ``live="node 7 Rendering the video
+  34/96"``, read from ComfyUI's websocket (labels: config/node_phase_labels.json).
+  The ``[canonical-api] LIVE`` line after RESULT counts the frames seen.
+  ``OTR_PREVIEW_METHOD`` (none | auto | latent2rgb | taesd) asks ComfyUI for
+  preview frames for this prompt; unset leaves the server's own setting alone,
+  and an unknown value is refused before anything is queued.
+* FAILURE HINTS. A failure line ends with ``-- hint: ...`` when its text
+  matches a known platform failure (scripts/otr_known_failures.py).
+* PHONE PING. ``OTR_NOTIFY_URL`` (an ntfy topic URL) sends one message when
+  the leg ends. The start of the run prints ``notify: on -> <host>`` or
+  ``notify: off (OTR_NOTIFY_URL unset)``. The topic is a secret (anyone who
+  knows an ntfy.sh topic name can read it): use a long random topic or a
+  self-hosted ntfy. A failed ping never changes the exit code.
 """
 from __future__ import annotations
 
@@ -20,6 +38,8 @@ import os
 import pathlib
 import re
 import sys
+import time
+import uuid
 from typing import Any
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -32,10 +52,13 @@ if str(HERE) not in sys.path:
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+import otr_notify  # noqa: E402
 from otr_api import (  # noqa: E402
     COMFYUI_URL,
+    LiveView,
     apply_row_to_workflow,
     fetch_schemas,
+    format_live,
     load_workflow,
     patch_creative,
     patch_widget_by_name,
@@ -524,6 +547,127 @@ def episode_of_prompt(prompt_id: str) -> str | None:
     return names[-1] if names else None
 
 
+def _format_elapsed(seconds: float) -> str:
+    """``3725`` -> ``1h02m``; ``725`` -> ``12m05s``; ``45`` -> ``45s``."""
+    total = max(0, int(seconds))
+    hours, rest = divmod(total, 3600)
+    minutes, secs = divmod(rest, 60)
+    if hours:
+        return f"{hours}h{minutes:02d}m"
+    if minutes:
+        return f"{minutes}m{secs:02d}s"
+    return f"{secs}s"
+
+
+def obs_file_from_history(
+    prompt: dict, history: dict, prompt_id: str
+) -> tuple[str | None, str]:
+    """The obs file the mux node reported publishing, confirmed on disk.
+
+    Returns ``(path, "")`` when the file is there and not empty, else
+    ``(None, why)``. ``OTR_MasterAudioMux`` returns the published path as the
+    ``text`` of its history output (``_canvas_preview`` in
+    nodes/otr_master_audio_mux.py), so this reads the answer the node gave
+    instead of working out where ``otr/obs`` is from a process that is not
+    running inside ComfyUI. Only reads: nothing here touches ``otr/obs/``.
+    """
+    mux_ids = [str(node_id) for node_id, spec in prompt.items()
+               if isinstance(spec, dict)
+               and spec.get("class_type") == "OTR_MasterAudioMux"]
+    if not mux_ids:
+        return None, "this graph has no OTR_MasterAudioMux node, so nothing is published"
+    entry = history.get(prompt_id) if isinstance(history, dict) else None
+    outputs = (entry or {}).get("outputs") or {}
+    for node_id in mux_ids:
+        for text in (outputs.get(node_id) or {}).get("text") or []:
+            reported = str(text)
+            if reported.startswith("not published"):
+                # "not published -- archived at <path>": keep the verdict, drop the path.
+                return None, reported.split(" at ", 1)[0]
+            if not os.path.isfile(reported):
+                return None, "the mux node reported an obs file this machine cannot see"
+            if os.path.getsize(reported) <= 0:
+                return None, "the obs file is zero bytes"
+            return reported, ""
+    return None, "the mux node reported no obs path"
+
+
+def published_obs_file(prompt: dict, prompt_id: str) -> tuple[str | None, str]:
+    """``obs_file_from_history`` for a finished prompt, reading its history."""
+    try:
+        import requests
+        response = requests.get(
+            f"{COMFYUI_URL}/history/{prompt_id}", timeout=20)
+        response.raise_for_status()
+        history = response.json()
+    except Exception as exc:  # noqa: BLE001 -- reported in the ping
+        return None, f"history could not be read ({type(exc).__name__})"
+    return obs_file_from_history(prompt, history, prompt_id)
+
+
+def compose_result_ping(
+    status: str,
+    err: str,
+    episode: str | None,
+    obs_path: str | None,
+    obs_why: str,
+    elapsed_s: float,
+) -> tuple[str, str, str | None]:
+    """``(title, body, priority)`` for the phone. Pure.
+
+    Messages carry the episode id and the obs FILE NAME, no other local path.
+    SUCCESS says "published" only when ``obs_path`` is a confirmed file: a leg
+    whose obs file is missing is the case the operator most needs to hear about
+    ("obs IS the success signal"), so it pings at high priority instead of
+    staying quiet.
+    """
+    took = _format_elapsed(elapsed_s)
+    name = episode or "episode id not read"
+    if status == "SUCCESS":
+        if obs_path:
+            return ("OTR episode published",
+                    f"{name}\n{os.path.basename(obs_path)}\ntook {took}", None)
+        return ("OTR leg finished, nothing in obs",
+                f"{name}\n{obs_why}\ntook {took}", "high")
+    if status == "TIMEOUT":
+        return ("OTR watch timed out",
+                f"stopped watching after {took}; the render may still be "
+                "running", None)
+    lines = [line.strip() for line in (err or "").splitlines() if line.strip()]
+    parts = [lines[0][:300] if lines else "no error text"]
+    hint = next((line for line in lines if line.startswith("-- hint:")), None)
+    if hint:
+        parts.append(hint[:300])
+    parts.append(f"after {took}")
+    return ("OTR leg FAILED", "\n".join(parts), "high")
+
+
+def announce_result(
+    prompt: dict,
+    prompt_id: str,
+    status: str,
+    err: str,
+    episode: str | None,
+    elapsed_s: float,
+) -> None:
+    """The phone ping for a finished leg (PLAN row 1.3). Reports only: whatever
+    happens in here, the leg's result and exit code are unchanged."""
+    if not otr_notify.notify_url():
+        return
+    try:
+        obs_path, obs_why = (None, "")
+        if status == "SUCCESS":
+            obs_path, obs_why = published_obs_file(prompt, prompt_id)
+        title, body, priority = compose_result_ping(
+            status, err, episode, obs_path, obs_why, elapsed_s)
+        sent = otr_notify.notify(title, body, priority=priority)
+        print(f"[canonical-api] notify {'sent' if sent else 'NOT sent'}: {title}",
+              flush=True)
+    except Exception as exc:  # noqa: BLE001 -- reported, never raised
+        print(f"[canonical-api] notify skipped: {type(exc).__name__}: {exc}",
+              flush=True)
+
+
 def main(argv: list[str] | None = None) -> int:
     global COMFYUI_URL
     parser = argparse.ArgumentParser(
@@ -629,32 +773,52 @@ def main(argv: list[str] | None = None) -> int:
         print("[canonical-api] DRY_RUN complete; prompt not submitted", flush=True)
         return 0
 
-    prompt_id = submit_prompt(prompt)
-    print(f"[canonical-api] QUEUED prompt_id={prompt_id}", flush=True)
-    print(
-        f"[canonical-api] t=0s prompt_id={prompt_id} status=queued",
-        flush=True,
-    )
-
-    def heartbeat(elapsed_s: float, status: dict) -> None:
-        phase = str(status.get("status_str") or "pending")
-        # During an outage poll_history hands over the strike count; print it,
-        # or the number exists nowhere a person can read it. `unreachable
-        # (3/12)` is the whole point of counting.
-        strikes = status.get("unreachable_strikes")
-        if strikes:
-            phase = f"{phase} ({strikes}/{status.get('unreachable_limit', '?')})"
+    # Never a hidden switch: say at the start whether the phone ping is on.
+    print(f"[canonical-api] {otr_notify.state_line()}", flush=True)
+    # The live view listens on the websocket of the client that submits, so
+    # the SAME id goes to submit_prompt. It starts first so no frame is missed.
+    client_id = str(uuid.uuid4())
+    live = LiveView(client_id, prompt).start()
+    started = time.monotonic()
+    try:
+        prompt_id = submit_prompt(prompt, client_id=client_id)
+        live.set_prompt_id(prompt_id)
+        print(f"[canonical-api] QUEUED prompt_id={prompt_id}", flush=True)
         print(
-            f"[canonical-api] t={int(elapsed_s)}s prompt_id={prompt_id} "
-            f"status={phase}",
+            f"[canonical-api] t=0s prompt_id={prompt_id} status=queued",
             flush=True,
         )
 
-    status, err = poll_history(
-        prompt_id, timeout_s=args.timeout, poll_s=args.poll_s,
-        on_tick=heartbeat,
-    )
+        def heartbeat(elapsed_s: float, status: dict) -> None:
+            phase = str(status.get("status_str") or "pending")
+            # During an outage poll_history hands over the strike count; print
+            # it, or the number exists nowhere a person can read it.
+            # `unreachable (3/12)` is the whole point of counting.
+            strikes = status.get("unreachable_strikes")
+            if strikes:
+                phase = f"{phase} ({strikes}/{status.get('unreachable_limit', '?')})"
+            # Which node is running and how far along (PLAN row 1.1), appended
+            # AFTER status= so a log reader keyed on `t=<N>s ... status=`
+            # (scripts/otr_render_watchdog.ps1) is unaffected.
+            live_snapshot = status.get("live")
+            live_text = (f' live="{format_live(live_snapshot)}"'
+                         if live_snapshot else "")
+            print(
+                f"[canonical-api] t={int(elapsed_s)}s prompt_id={prompt_id} "
+                f"status={phase}{live_text}",
+                flush=True,
+            )
+
+        status, err = poll_history(
+            prompt_id, timeout_s=args.timeout, poll_s=args.poll_s,
+            on_tick=live.wrap(heartbeat),
+        )
+    finally:
+        live.stop()
+    elapsed_s = time.monotonic() - started
     print(f"[canonical-api] RESULT {status} prompt_id={prompt_id}", flush=True)
+    # Frame counts: the preview measurement (OTR_PREVIEW_METHOD) reads them here.
+    print(f"[canonical-api] LIVE {live.summary()}", flush=True)
     episode = episode_of_prompt(prompt_id)
     if episode:
         # WHICH EPISODE DID THIS LEG MAKE? Until 2026-09-12 this process
@@ -696,7 +860,9 @@ def main(argv: list[str] | None = None) -> int:
     if status != "SUCCESS":
         if err:
             print(f"[canonical-api] ERROR {err}", flush=True)
+        announce_result(prompt, prompt_id, status, err, episode, elapsed_s)
         return 1
+    announce_result(prompt, prompt_id, status, err, episode, elapsed_s)
     return 0
 
 

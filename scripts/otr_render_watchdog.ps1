@@ -32,6 +32,29 @@ function Write-Verdict($state, $msg) {
 }
 Write-Verdict 'RUNNING' 'watchdog armed'
 
+# Phone ping on DEAD (PLAN row 1.3; the same ntfy topic scripts/otr_notify.py
+# uses). Like everything in this script it REPORTS: a failed POST is printed and
+# changes nothing. Only the topic HOST is ever printed, never its path.
+function Get-NotifyState {
+    if (-not $env:OTR_NOTIFY_URL) { return 'notify: off (OTR_NOTIFY_URL unset)' }
+    try { return ('notify: on -> {0}' -f ([System.Uri]$env:OTR_NOTIFY_URL).Authority) }
+    catch { return 'notify: on -> unreadable url' }
+}
+function Send-Ping($title, $body) {
+    if (-not $env:OTR_NOTIFY_URL) { return }
+    try {
+        Invoke-RestMethod -Uri $env:OTR_NOTIFY_URL -Method Post -TimeoutSec 10 `
+            -ContentType 'text/plain; charset=utf-8' `
+            -Headers @{ Title = $title; Priority = 'high' } `
+            -Body ([System.Text.Encoding]::UTF8.GetBytes($body)) | Out-Null
+        Write-Host '[watchdog] notify sent'
+    } catch {
+        $why = $_.Exception.Message.Replace($env:OTR_NOTIFY_URL, '<topic url>')
+        Write-Host ('[watchdog] notify FAILED: {0}' -f $why)
+    }
+}
+Write-Host ('[watchdog] ' + (Get-NotifyState))
+
 function Get-Heartbeat($path) {
     $m = Select-String -Path $path -Pattern '\[(?:soak|canonical-api)\]\s+t=\s*(\d+)s' |
         Select-Object -Last 1
@@ -88,12 +111,14 @@ while ($true) {
         $m = "queue endpoint down ${qFail}x ($QueueUrl)"
         Write-Host ("[watchdog] DEAD {0} :: {1}" -f (Get-Date -Format HH:mm:ss), $m)
         Write-Verdict 'DEAD' $m
+        Send-Ping 'OTR leg dead: queue down' ("leg dead: $m`n" + (Split-Path $LegLog -Leaf))
         exit 2
     }
     if ($stalledFor -ge $StallSeconds) {
         $m = "heartbeat stalled ${stalledFor}s (last t=${lastBeat}s) >= ${StallSeconds}s"
         Write-Host ("[watchdog] DEAD {0} :: {1}" -f (Get-Date -Format HH:mm:ss), $m)
         Write-Verdict 'DEAD' $m
+        Send-Ping 'OTR leg dead: stalled' ("leg dead: $m`n" + (Split-Path $LegLog -Leaf))
         exit 2
     }
 }

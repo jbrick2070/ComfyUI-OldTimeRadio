@@ -482,7 +482,32 @@ def test_set_refuses_direct_engine_widget_patch(tmp_path):
 def test_canonical_runner_emits_poll_heartbeats(tmp_path, monkeypatch):
     dump = tmp_path / "prompt.json"
     monkeypatch.setattr(canonical, "build_api_prompt", lambda _args: ({}, []))
-    monkeypatch.setattr(canonical, "submit_prompt", lambda _prompt: "prompt-live")
+    # submit_prompt takes the live view's client id (the websocket listener
+    # must be on the SAME id that submits); the view itself is stubbed so a
+    # unit test never opens a socket (tests/test_otr_live_view.py covers it).
+    monkeypatch.setattr(canonical, "submit_prompt",
+                        lambda _prompt, client_id=None: "prompt-live")
+
+    class _NoSocketLiveView:
+        def __init__(self, client_id, prompt):
+            pass
+
+        def start(self):
+            return self
+
+        def set_prompt_id(self, prompt_id):
+            pass
+
+        def wrap(self, on_tick):
+            return on_tick
+
+        def stop(self):
+            pass
+
+        def summary(self):
+            return "text_frames=0"
+
+    monkeypatch.setattr(canonical, "LiveView", _NoSocketLiveView)
 
     def _poll(prompt_id, timeout_s, poll_s, on_tick=None):
         assert prompt_id == "prompt-live"

@@ -45,6 +45,12 @@ os.environ.pop("OTR_VOICE_REFERENCE_BANK", None)
 # it inherited, any test that resolves otr_obs_dir() would write into the
 # operator's live watched folder (kibitz runpod-found-fixes r3, 2026-09-04).
 os.environ.pop("OTR_OBS_DIR", None)
+# Likewise a phone-ping topic and a preview probe belong to an operator's shell,
+# never to a test run: inherited, a test that drives the headless runner would
+# ping a real phone, or submit a prompt that asks the server for previews
+# (planning/creatoros-concepts/PLAN.md rows 1.1 and 1.3).
+os.environ.pop("OTR_NOTIFY_URL", None)
+os.environ.pop("OTR_PREVIEW_METHOD", None)
 for _google_key_env in ("OTR_GOOGLE_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"):
     os.environ.pop(_google_key_env, None)
 

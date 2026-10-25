@@ -1,0 +1,35 @@
+{
+  "_about": "Plain-words label for each node class, shown by the headless runner's live view (scripts/otr_api.py LiveView) next to the node id and its progress. tests/test_otr_live_view.py fails when a class listed in node_list.json has no entry here, so a new node cannot run unnamed. A class with neither an exact entry nor a matching pattern is shown by its class name, never by an invented label.",
+  "classes": {
+    "OTR_AnnouncerVoice": "Announcer voice",
+    "OTR_AudioEnhance": "Spatial audio enhance",
+    "OTR_BatchCharacterVoices": "Character voices",
+    "OTR_CaptionBurn": "Burning captions",
+    "OTR_CastLock": "Locking the cast",
+    "OTR_CharacterPhoto": "Character photos",
+    "OTR_ComfyCredential": "Comfy credential",
+    "OTR_CreditsRoll": "Credits roll",
+    "OTR_EpisodeAssembler": "Assembling the episode",
+    "OTR_ImageDirector": "Image policy",
+    "OTR_ImageGenDispatcher": "Generating images",
+    "OTR_LedgerFreezeCascade": "Freezing the ledger",
+    "OTR_LedgerScriptWriter": "Writing the script",
+    "OTR_MasterAudioMux": "Mastering and publishing",
+    "OTR_MetaBriefImagePromptGen": "Writing image prompts",
+    "OTR_SceneSequencer": "Sequencing scenes",
+    "OTR_ShotLock": "Locking the shots",
+    "OTR_SignalLostVideo": "Signal-lost video",
+    "OTR_SilentComposite": "Compositing the video",
+    "OTR_StableAudioTheme": "Composing the theme",
+    "OTR_VideoDirector": "Directing the video",
+    "OTR_VideoRenderBatch": "Rendering the video",
+    "OTR_WorkflowValidator": "Validating the workflow"
+  },
+  "patterns": [
+    {"match": "VAEDecode", "label": "Decoding"},
+    {"match": "VAEEncode", "label": "Encoding"},
+    {"match": "Sampler", "label": "Sampling"},
+    {"match": "Loader|^Load[A-Z]", "label": "Loading"},
+    {"match": "^Save|Preview", "label": "Saving"}
+  ]
+}
