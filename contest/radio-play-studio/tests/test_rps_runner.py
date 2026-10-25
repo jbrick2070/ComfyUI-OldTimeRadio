@@ -783,6 +783,8 @@ def test_the_stream_says_overrun_and_names_the_phase(settings, schemas):
     save_timing(timing_path(settings.out_dir, settings.workflow_path, "1", graph), {node: 10.0})
     good = _good_job()
     good._events = [RealProgress(value=0.0, nodes_done=0, nodes_total=1, current_node=node,
+                                 step=0, steps=1),
+                    RealProgress(value=0.0, nodes_done=0, nodes_total=1, current_node=node,
                                  step=0, steps=1)]
     t = FakeClock()
     t.t = 0
@@ -795,3 +797,5 @@ def test_the_stream_says_overrun_and_names_the_phase(settings, schemas):
             t.t = 60                         # the writer runs past its 10 s from last time
     assert notes[0]["phase"] == "phase.writing"
     assert notes[0]["overrun"] is False
+    # 60 s into a node that took 10 s last time, with no bar to read: the line changes.
+    assert notes[1]["overrun"] is True and notes[1]["phase"] == "phase.writing"
