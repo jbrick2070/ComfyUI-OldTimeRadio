@@ -22,10 +22,15 @@ ignored:
   ``OTR_PREVIEW_METHOD`` (none | auto | latent2rgb | taesd) asks ComfyUI for
   preview frames for this prompt; unset leaves the server's own setting alone,
   and an unknown value is refused before anything is queued.
+  ``--preview-file PATH`` keeps the newest preview frame in PATH (replaced about
+  once a second, written atomically) and, unless OTR_PREVIEW_METHOD is set, asks
+  for latent2rgb frames. It is a diagnostic for a person to open: a failed
+  write is reported on the live snapshot and never fails the leg.
 * FAILURE HINTS. A failure line ends with ``-- hint: ...`` when its text
   matches a known platform failure (scripts/otr_known_failures.py).
 * PHONE PING. ``OTR_NOTIFY_URL`` (an ntfy topic URL) sends one message when
-  the leg ends. The start of the run prints ``notify: on -> <host>`` or
+  the leg ends -- a result, or an exception such as a refused or unreachable
+  submission. The start of the run prints ``notify: on -> <host>`` or
   ``notify: off (OTR_NOTIFY_URL unset)``. The topic is a secret (anyone who
   knows an ntfy.sh topic name can read it): use a long random topic or a
   self-hosted ntfy. A failed ping never changes the exit code.
@@ -633,9 +638,18 @@ def compose_result_ping(
         return ("OTR watch timed out",
                 f"stopped watching after {took}; the render may still be "
                 "running", None)
-    lines = [line.strip() for line in (err or "").splitlines() if line.strip()]
+    # The hint is on its own line in a parsed execution error and at the END of
+    # a line in a refusal, a SERVER-GONE message or a raw fallback: find it
+    # wherever it is, report it once under the headline, and keep it out of the
+    # headline itself.
+    text = err or ""
+    hint = None
+    found = re.search(r"-- hint:[ \t]*([^\r\n]*)", text)
+    if found:
+        hint = "-- hint: " + found.group(1).strip()
+        text = text[:found.start()] + text[found.end():]
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
     parts = [lines[0][:300] if lines else "no error text"]
-    hint = next((line for line in lines if line.startswith("-- hint:")), None)
     if hint:
         parts.append(hint[:300])
     parts.append(f"after {took}")
@@ -666,6 +680,33 @@ def announce_result(
     except Exception as exc:  # noqa: BLE001 -- reported, never raised
         print(f"[canonical-api] notify skipped: {type(exc).__name__}: {exc}",
               flush=True)
+
+
+def preview_plan(preview_file: str | None,
+                 env_method: str | None) -> tuple[str | None, str | None]:
+    """``(method for submit_prompt, start line)`` for ``--preview-file``. Pure.
+
+    ComfyUI sends preview frames only while a preview method is on, so asking
+    for the file also asks for ``latent2rgb`` -- unless OTR_PREVIEW_METHOD is
+    set: the operator's choice stands, and the line says when it means that no
+    file can appear. Without ``--preview-file`` there is nothing to say.
+    """
+    if not preview_file:
+        return None, None
+    stem = os.path.splitext(os.fspath(preview_file))[0]
+    target = f"{stem}.jpg (or {stem}.png)"
+    chosen = (env_method or "").strip().lower()
+    if not chosen:
+        return "latent2rgb", (
+            f"preview file: on -> {target}, the newest frame, replaced as the "
+            "render runs; asking ComfyUI for latent2rgb")
+    if chosen == "none":
+        return None, (
+            f"preview file: on -> {target}, but OTR_PREVIEW_METHOD=none asks "
+            "ComfyUI for no frames, so no file will appear")
+    return None, (
+        f"preview file: on -> {target}, the newest frame, replaced as the "
+        f"render runs; OTR_PREVIEW_METHOD={chosen} decides the frames")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -746,6 +787,15 @@ def main(argv: list[str] | None = None) -> int:
         help="history observation timeout in seconds; 0 waits until terminal",
     )
     parser.add_argument("--poll-s", type=int, default=5)
+    parser.add_argument("--preview-file", default=None, dest="preview_file",
+                        metavar="PATH",
+                        help="keep the newest preview frame of the running render "
+                             "in PATH (.jpg, or .png when ComfyUI sends a PNG), "
+                             "replaced about once a second, so a person can open "
+                             "it and see the render. A diagnostic, not a "
+                             "deliverable: keep it out of otr/episodes and "
+                             "otr/obs. Asks ComfyUI for latent2rgb frames unless "
+                             "OTR_PREVIEW_METHOD is set.")
     args = parser.parse_args(argv)
 
     if args.comfyui_url is not None:
@@ -775,13 +825,22 @@ def main(argv: list[str] | None = None) -> int:
 
     # Never a hidden switch: say at the start whether the phone ping is on.
     print(f"[canonical-api] {otr_notify.state_line()}", flush=True)
+    preview_method, preview_line = preview_plan(
+        args.preview_file, os.environ.get("OTR_PREVIEW_METHOD"))
+    if preview_line:
+        print(f"[canonical-api] {preview_line}", flush=True)
+    # The preview arguments are passed only when --preview-file asked for them,
+    # so a run without the flag builds and submits exactly what it always did.
+    submit_extra = {"preview_method": preview_method} if preview_method else {}
+    live_extra = {"preview_path": args.preview_file} if args.preview_file else {}
     # The live view listens on the websocket of the client that submits, so
     # the SAME id goes to submit_prompt. It starts first so no frame is missed.
     client_id = str(uuid.uuid4())
-    live = LiveView(client_id, prompt).start()
+    live = LiveView(client_id, prompt, **live_extra).start()
     started = time.monotonic()
+    prompt_id = ""
     try:
-        prompt_id = submit_prompt(prompt, client_id=client_id)
+        prompt_id = submit_prompt(prompt, client_id=client_id, **submit_extra)
         live.set_prompt_id(prompt_id)
         print(f"[canonical-api] QUEUED prompt_id={prompt_id}", flush=True)
         print(
@@ -813,6 +872,20 @@ def main(argv: list[str] | None = None) -> int:
             prompt_id, timeout_s=args.timeout, poll_s=args.poll_s,
             on_tick=live.wrap(heartbeat),
         )
+    except Exception as exc:
+        # The leg ended on an EXCEPTION, not on a result: the submission was
+        # refused or unreachable (the commonest unattended failure -- a bad
+        # dropdown value, a server that is not up), or watching crashed. Say so
+        # on the phone, then let the exception go on exactly as before: same
+        # traceback, same exit code. Ctrl-C is a KeyboardInterrupt, not an
+        # Exception, so it sends no ping on purpose: an operator stopping the
+        # watch is not a failure to report.
+        where =("while watching the render" if prompt_id
+                 else "before the prompt was queued")
+        announce_result(prompt, prompt_id, "FAIL",
+                        f"{type(exc).__name__} {where}: {exc}", None,
+                        time.monotonic() - started)
+        raise
     finally:
         live.stop()
     elapsed_s = time.monotonic() - started

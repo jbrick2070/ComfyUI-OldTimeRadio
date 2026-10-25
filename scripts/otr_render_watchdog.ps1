@@ -34,22 +34,79 @@ Write-Verdict 'RUNNING' 'watchdog armed'
 
 # Phone ping on DEAD (PLAN row 1.3; the same ntfy topic scripts/otr_notify.py
 # uses). Like everything in this script it REPORTS: a failed POST is printed and
-# changes nothing. Only the topic HOST is ever printed, never its path.
+# changes nothing. Only the topic HOST is ever printed, never its path or a
+# password. The URL is trimmed once, exactly as otr_notify.py reads it, so a
+# blank value is "off" in both places.
+$NotifyUrl = ("$env:OTR_NOTIFY_URL").Trim()
+# Same rule and wording as scripts/otr_notify.py: an http(s) URL with a host,
+# or the ping is reported loudly as unusable and never attempted.
+$NotifyUnusable = 'OTR_NOTIFY_URL is not an http:// or https:// URL with a host'
+function Get-NotifyUri {
+    $u = $null
+    if (-not [System.Uri]::TryCreate($NotifyUrl, [System.UriKind]::Absolute, [ref]$u)) { return $null }
+    if ($u.Scheme -ne 'http' -and $u.Scheme -ne 'https') { return $null }
+    if (-not $u.Host) { return $null }
+    return $u
+}
 function Get-NotifyState {
-    if (-not $env:OTR_NOTIFY_URL) { return 'notify: off (OTR_NOTIFY_URL unset)' }
-    try { return ('notify: on -> {0}' -f ([System.Uri]$env:OTR_NOTIFY_URL).Authority) }
-    catch { return 'notify: on -> unreadable url' }
+    if (-not $NotifyUrl) { return 'notify: off (OTR_NOTIFY_URL unset)' }
+    $u = Get-NotifyUri
+    if (-not $u) { return "notify: ON BUT UNUSABLE ($NotifyUnusable), no ping will be sent" }
+    return ('notify: on -> {0}' -f $u.Authority)
 }
 function Send-Ping($title, $body) {
-    if (-not $env:OTR_NOTIFY_URL) { return }
+    if (-not $NotifyUrl) { return }
+    $u = Get-NotifyUri
+    if (-not $u) {
+        Write-Host ('[watchdog] notify FAILED: {0}' -f $NotifyUnusable)
+        return
+    }
+    $secrets = @($NotifyUrl)
     try {
-        Invoke-RestMethod -Uri $env:OTR_NOTIFY_URL -Method Post -TimeoutSec 10 `
+        $headers = @{ Title = $title; Priority = 'high' }
+        $target = $NotifyUrl
+        if ($u.AbsolutePath.Length -gt 1) {
+            $secrets += $u.AbsolutePath
+            # The topic alone, too, as otr_notify._parse does: a message may
+            # quote one path segment without its slash.
+            foreach ($seg in $u.AbsolutePath.Split('/')) {
+                if ($seg.Length -gt 1) {
+                    $secrets += $seg
+                    $secrets += [System.Uri]::UnescapeDataString($seg)
+                }
+            }
+        }
+        if ($u.UserInfo) {
+            # user:password@host goes in an HTTP Basic header, as
+            # scripts/otr_notify.py does, and never rides in the URL.
+            $secrets += $u.UserInfo
+            $pair = [System.Uri]::UnescapeDataString($u.UserInfo)
+            $headers['Authorization'] = 'Basic ' + [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($pair))
+            $target = $u.GetComponents([System.UriComponents]'SchemeAndServer, PathAndQuery', [System.UriFormat]::UriEscaped)
+        }
+        # A redirect is never followed: a 301/302/303 would turn the POST into
+        # a bodiless GET that answers 200 -- reported sent, never delivered.
+        # PowerShell 5.1 hands back the 3xx response itself (plus a
+        # non-terminating "maximum redirection" error, ignored here), so the
+        # status is read and a 3xx is made a failure.
+        $r = Invoke-WebRequest -Uri $target -Method Post -TimeoutSec 10 -UseBasicParsing `
+            -MaximumRedirection 0 -ErrorAction SilentlyContinue `
             -ContentType 'text/plain; charset=utf-8' `
-            -Headers @{ Title = $title; Priority = 'high' } `
-            -Body ([System.Text.Encoding]::UTF8.GetBytes($body)) | Out-Null
+            -Headers $headers `
+            -Body ([System.Text.Encoding]::UTF8.GetBytes($body))
+        if (-not $r) { throw 'no answer from the server' }
+        $code = [int]$r.StatusCode
+        if ($code -ge 300) { throw "HTTP ${code}: the server redirected the message" }
         Write-Host '[watchdog] notify sent'
     } catch {
-        $why = $_.Exception.Message.Replace($env:OTR_NOTIFY_URL, '<topic url>')
+        # The message can quote the URL or its path (the topic is a secret).
+        $why = $_.Exception.Message
+        foreach ($secret in ($secrets | Sort-Object Length -Descending)) {
+            $why = $why.Replace($secret, '<hidden>')
+        }
+        if ($why -match 'redirect|\b30[1-8]\b') {
+            $why += ' -- put the final URL (usually https://) in OTR_NOTIFY_URL'
+        }
         Write-Host ('[watchdog] notify FAILED: {0}' -f $why)
     }
 }

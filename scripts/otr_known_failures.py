@@ -2,10 +2,11 @@
 
 WHY THIS EXISTS. `describe_execution_error` already names the node, the
 exception and the traceback tail, and OTR's own refusals already say what to do.
-The failures that do NOT are the platform ones: the GPU ran out of memory, a
-model file ComfyUI does not list, a half-downloaded weights file, a module the
-venv does not have, CUDA unusable, a VAE or LoRA from another model family, the
-server gone. The raw message is accurate and tells a person nothing about which
+The failures that do NOT are the platform ones: the server gone, the GPU ran
+out of memory, the computer ran out of system memory (RAM or the page file), a
+model file ComfyUI does not list, a half-downloaded weights file, a CUDA
+device-side assert, CUDA unusable, a module the venv does not have, a VAE or
+LoRA from another model family. The raw message is accurate and tells a person nothing about which
 script fixes it. (Idea taken from CreatorOS-Studio's error-hint table; see
 planning/creatoros-concepts/PLAN.md row 1.2.)
 
@@ -42,19 +43,24 @@ def _rx(pattern: str) -> "re.Pattern[str]":
 
 #: Order matters: first match wins. A dead server is tried first because its
 #: message can also carry words the later rows look for.
+#:
+#: `server_gone` matches ONLY the harness's own `SERVER-GONE` marker
+#: (`scripts/otr_api.py`: poll_history, and submit_prompt when nothing accepts
+#: the connection). It does not match `ConnectionRefusedError` or "Max retries
+#: exceeded with url": in an execution error those words come from a NODE's own
+#: call to a sidecar or a remote host, and ComfyUI itself answered (it
+#: reported the error), so "the ComfyUI server is not answering" would be false
+#: advice. Where the text cannot say whose connection it was, the call site
+#: that knows (the harness talking to ComfyUI) adds the marker.
 KNOWN_FAILURES: tuple[KnownFailure, ...] = (
     KnownFailure(
         key="server_gone",
-        pattern=_rx(
-            r"SERVER-GONE"
-            r"|ConnectionRefusedError"
-            r"|Max retries exceeded with url"
-            r"|Failed to establish a new connection"
-        ),
+        pattern=_rx(r"SERVER-GONE"),
         hint=(
-            "the ComfyUI server is not answering: read the watchdog verdict "
-            "(scripts/otr_render_watchdog.ps1) and the server log before the leg "
-            "log, then reset the box per CLAUDE.md section 4 before relaunching"
+            "the ComfyUI server is gone or was restarted: read the watchdog "
+            "verdict (scripts/otr_render_watchdog.ps1) and the server log before "
+            "the leg log, then reset the box per CLAUDE.md section 4 before "
+            "relaunching"
         ),
         refs=(),
     ),
@@ -65,7 +71,10 @@ KNOWN_FAILURES: tuple[KnownFailure, ...] = (
             r"|CUDA out of memory"
             r"|CUDA error: out of memory"
             r"|Allocation on device"
-            r"|not enough memory"
+            # DirectML's wording. The bare words "not enough memory" are NOT
+            # here: torch's CPU allocator says them too, and that is system
+            # RAM (the system_memory row below), not the GPU.
+            r"|not enough GPU video memory"
         ),
         hint=(
             "the GPU ran out of memory: close other GPU programs, or run the "
@@ -75,11 +84,25 @@ KNOWN_FAILURES: tuple[KnownFailure, ...] = (
         refs=("07.01", "07.03"),
     ),
     KnownFailure(
+        key="system_memory",
+        pattern=_rx(
+            r"DefaultCPUAllocator: not enough memory"
+            r"|WinError 1455"
+            r"|The paging file is too small for this operation to complete"
+        ),
+        hint=(
+            "the computer ran out of system memory (RAM or the Windows page "
+            "file), not GPU memory: close other programs, or enlarge the "
+            "Windows page file"
+        ),
+        refs=(),
+    ),
+    KnownFailure(
         key="value_not_in_list",
         pattern=_rx(r"value_not_in_list|Value not in list"),
         hint=(
             "ComfyUI does not list that option or model file: run "
-            "scripts/otr_asset_index.py to see which lane needs it, install it "
+            "scripts/otr_asset_index.py --stdout to see which lane needs it, install it "
             "with scripts/otr_fetch_lane_weights.py or scripts/otr_provision.py, "
             "then restart ComfyUI so it re-scans its folders"
         ),
@@ -141,16 +164,21 @@ KNOWN_FAILURES: tuple[KnownFailure, ...] = (
     ),
     KnownFailure(
         key="model_family_mismatch",
+        # torch's own phrase, whole: "size mismatch for <key>: copying a param
+        # with shape ...". The bare words "size mismatch for" also open OTR's
+        # own ReplayBundleError ("manifest size mismatch for 'x': 12 vs 9",
+        # nodes/production_ledger.py), which is a damaged replay bundle and not
+        # a model from another family.
         pattern=_rx(
             r"Error\(s\) in loading state_dict"
-            r"|size mismatch for"
+            r"|size mismatch for \S+: copying a param with shape"
             r"|mat1 and mat2 shapes cannot be multiplied"
             r"|Given groups=\d+, weight of size"
         ),
         hint=(
             "a VAE, LoRA or checkpoint from a different model family than the "
             "graph expects: compare the loader widgets with the files the lane "
-            "needs (scripts/otr_asset_index.py)"
+            "needs (scripts/otr_asset_index.py --stdout)"
         ),
         refs=(),
     ),

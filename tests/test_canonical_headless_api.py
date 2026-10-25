@@ -508,6 +508,7 @@ def test_canonical_runner_emits_poll_heartbeats(tmp_path, monkeypatch):
             return "text_frames=0"
 
     monkeypatch.setattr(canonical, "LiveView", _NoSocketLiveView)
+    monkeypatch.setattr(canonical, "episode_of_prompt", lambda _pid: None)
 
     def _poll(prompt_id, timeout_s, poll_s, on_tick=None):
         assert prompt_id == "prompt-live"
