@@ -749,8 +749,14 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
 # ---------------------------------------------------------------------------
 # Submit + poll
 # ---------------------------------------------------------------------------
-def submit_prompt(api_prompt: dict, client_id: str | None = None) -> str:
+def submit_prompt(api_prompt: dict, client_id: str | None = None,
+                  preview_method: str | None = None) -> str:
     """POST the API prompt to /prompt and return the prompt_id.
+
+    ``preview_method`` (none | auto | latent2rgb | taesd) is the per-prompt
+    ``extra_data.preview_method`` ComfyUI honours. An argument wins over
+    ``OTR_PREVIEW_METHOD``; with neither, nothing is sent and the server's own
+    setting applies, exactly as before.
 
     Sprint H §3.7 hardening (Jeffrey 2026-05-17): ComfyUI returns
     HTTP 200 even when the prompt has validation errors -- it accepts
@@ -772,21 +778,37 @@ def submit_prompt(api_prompt: dict, client_id: str | None = None) -> str:
         # api_key_comfy_org hidden input (execution.py). The SERVER never
         # reads this env var; only the submitter does, right here.
         body_out["extra_data"] = {"api_key_comfy_org": comfy_key}
-    preview_method = os.environ.get("OTR_PREVIEW_METHOD", "").strip().lower()
-    if preview_method:
+    chosen = (preview_method or "").strip().lower()
+    source = "preview_method"
+    if not chosen:
+        chosen = os.environ.get("OTR_PREVIEW_METHOD", "").strip().lower()
+        source = "OTR_PREVIEW_METHOD"
+    if chosen:
         # The live-view preview probe (PLAN row 1.1). A typo is the operator's
         # to hear about now, not a silently ignored setting.
-        if preview_method not in _PREVIEW_METHODS:
+        if chosen not in _PREVIEW_METHODS:
             raise ValueError(
-                f"OTR_PREVIEW_METHOD={preview_method!r} is not one of "
+                f"{source}={chosen!r} is not one of "
                 f"{sorted(_PREVIEW_METHODS)!r}"
             )
-        body_out.setdefault("extra_data", {})["preview_method"] = preview_method
-    resp = requests.post(
-        f"{COMFYUI_URL}/prompt",
-        json=body_out,
-        timeout=30,
-    )
+        body_out.setdefault("extra_data", {})["preview_method"] = chosen
+    try:
+        resp = requests.post(
+            f"{COMFYUI_URL}/prompt",
+            json=body_out,
+            timeout=30,
+        )
+    except requests.ConnectionError as exc:
+        # NOTHING ACCEPTED THE CONNECTION (refused, or the connect never
+        # completed -- ConnectTimeout subclasses this). Here, and only here, the
+        # words "connection refused" are about ComfyUI itself, so the harness
+        # names it with the same marker poll_history uses. The exception TYPE
+        # is unchanged for any caller that catches it.
+        gone = (
+            f"{SERVER_GONE_MARKER}: nothing accepted the connection to "
+            f"{COMFYUI_URL}/prompt, so the prompt was not queued ({exc})"
+        )
+        raise requests.ConnectionError(gone + _hint_suffix(gone)) from exc
     if resp.status_code != 200:
         # The hint is read from the WHOLE body: the 500-character cut below
         # lands before `node_errors`, which is where a bad dropdown value is.
@@ -797,12 +819,14 @@ def submit_prompt(api_prompt: dict, client_id: str | None = None) -> str:
     body = resp.json()
 
     error = body.get("error")
+    node_errors = body.get("node_errors")
     if error:
+        # ComfyUI sends `error` WITH `node_errors` (the dropdown value it does
+        # not list is in the latter), so the hint reads both.
         raise RuntimeError(
             f"submit_prompt: ComfyUI returned error: {error!r}"
-            + _hint_suffix(repr(error))
+            + _hint_suffix(repr((error, node_errors)))
         )
-    node_errors = body.get("node_errors")
     if node_errors:
         # `node_errors` is a non-empty dict only when at least one node
         # failed validation. Surface at POST time so the caller
@@ -908,7 +932,10 @@ def describe_execution_error(messages) -> str:
             return "\n".join(line for line in lines if line)
     except Exception:
         pass
-    return str(messages)[:500] + _hint_suffix(str(messages))
+    # The hint goes on its OWN line, as it does in the parsed form above, so a
+    # reader (and the phone ping) finds it in the same place either way.
+    hint = _hint_suffix(str(messages)).strip()
+    return str(messages)[:500] + ("\n" + hint if hint else "")
 
 
 #: Consecutive REFUSED connections to /history before the poll asks /queue
@@ -1039,15 +1066,15 @@ def poll_history(
                 first_miss = None
             else:
                 gone_for = int(time.time() - (first_miss or start))
-                return (
-                    "FAIL",
+                gone = (
                     f"{SERVER_GONE_MARKER}: the ComfyUI server at {COMFYUI_URL} "
                     f"stopped answering -- {unreachable} consecutive refused "
                     f"connections to /history over {gone_for}s, and /queue is "
                     f"unreachable too. The render is not pending; nothing is "
                     f"listening on that port. Check the process before reading "
-                    f"any log.",
+                    f"any log."
                 )
+                return ("FAIL", gone + _hint_suffix(gone))
 
         if answered and prompt_id not in r:
             empty_ticks += 1
@@ -1065,15 +1092,15 @@ def poll_history(
                         again = {}
                     if isinstance(again, dict) and prompt_id in again:
                         continue
-                    return (
-                        "FAIL",
+                    gone = (
                         f"{SERVER_GONE_MARKER}: the ComfyUI server at "
                         f"{COMFYUI_URL} answers but has no record of prompt "
                         f"{prompt_id}, and nothing is running or queued. The "
                         f"server restarted, or the prompt was cleared, and the "
                         f"render is gone. Check the server log for its boot "
-                        f"time before reading any leg log.",
+                        f"time before reading any leg log."
                     )
+                    return ("FAIL", gone + _hint_suffix(gone))
         else:
             empty_ticks = 0
         time.sleep(poll_s)
@@ -1107,6 +1134,28 @@ _BINARY_PREVIEW_IMAGE_WITH_METADATA = 4
 #: Largest websocket message the listener accepts. A preview frame is small;
 #: this only keeps one oversized frame from closing the socket.
 _WS_MAX_MSG_BYTES = 16 * 1024 * 1024
+
+#: The first bytes of the two image formats a preview frame can carry.
+_JPEG_START = b"\xff\xd8\xff"
+_PNG_START = b"\x89PNG\r\n\x1a\n"
+
+#: A sampler sends a preview per step, many per second. The preview FILE is a
+#: glance for a person, so it is rewritten at most this often (and once more
+#: at the end for the newest frame the pause held back).
+_PREVIEW_WRITE_EVERY_S = 1.0
+
+
+def _image_from_preview_frame(frame: bytes) -> bytes | None:
+    """The JPEG or PNG inside a binary preview frame, or None when none is named.
+
+    The two preview layouts differ (event + image type + image; event +
+    metadata block + image), so the image is found by its magic number rather
+    than by counting header bytes. A UTF-8 metadata block cannot contain 0xFF,
+    so the search cannot land inside one.
+    """
+    starts = [at for at in (frame.find(_JPEG_START, 8), frame.find(_PNG_START, 8))
+              if at != -1]
+    return frame[min(starts):] if starts else None
 
 
 def load_phase_labels(path: str | None = None) -> dict:
@@ -1174,13 +1223,41 @@ class LiveState:
         self.preview_frames = 0
         self.preview_bytes = 0
         self.other_binary_frames = 0
+        #: Preview frames per node id: WHICH node sends previews is the thing
+        #: to know on a lane where they might be silenced.
+        self.preview_by_node: dict[str, int] = {}
+        #: The newest preview image as sent (JPEG or PNG), and a count that
+        #: changes whenever it does.
+        self.last_preview: bytes | None = None
+        self.preview_serial = 0
+        #: The first prompt id a frame named while ours was still unknown (the
+        #: websocket opens before ``submit_prompt`` returns one).
+        self._early_prompt_id: str | None = None
 
     def _is_ours(self, data: dict) -> bool:
         """A frame for another prompt on a shared queue is not ours."""
-        if not self.prompt_id:
-            return True
         frame_prompt = data.get("prompt_id")
+        if not self.prompt_id:
+            # Ours is not known yet, so every frame is taken -- our own first
+            # frames can land before ``set_prompt_id`` -- but the id they name
+            # is kept so ``adopt_prompt_id`` can tell whose they were.
+            if frame_prompt and self._early_prompt_id is None:
+                self._early_prompt_id = str(frame_prompt)
+            return True
         return frame_prompt is None or frame_prompt == self.prompt_id
+
+    def adopt_prompt_id(self, prompt_id: str) -> None:
+        """Ours is now known. State taken from frames that named a DIFFERENT
+        prompt (a broadcast such as another client's ``execution_interrupted``)
+        is dropped; state from frames that named this one is kept."""
+        early = self._early_prompt_id
+        self.prompt_id = prompt_id
+        self._early_prompt_id = None
+        if early is not None and early != prompt_id:
+            self.finished = False
+            self._set_node(None)
+            self.value = None
+            self.max = None
 
     def _set_node(self, node_id: Any) -> None:
         node = None if node_id is None else str(node_id)
@@ -1252,6 +1329,12 @@ class LiveState:
                           _BINARY_PREVIEW_IMAGE_WITH_METADATA):
             self.preview_frames += 1
             self.preview_bytes = len(frame)
+            sender = self.node or "?"
+            self.preview_by_node[sender] = self.preview_by_node.get(sender, 0) + 1
+            image = _image_from_preview_frame(frame)
+            if image is not None:
+                self.last_preview = image
+                self.preview_serial += 1
         else:
             self.other_binary_frames += 1
 
@@ -1308,7 +1391,8 @@ class LiveView:
     """
 
     def __init__(self, client_id: str, api_prompt: dict | None = None,
-                 base_url: str | None = None, labels: dict | None = None):
+                 base_url: str | None = None, labels: dict | None = None,
+                 preview_path: str | None = None):
         self.client_id = client_id
         self._base_url = base_url
         self._lock = threading.Lock()
@@ -1317,6 +1401,13 @@ class LiveView:
         self._connected = False
         self._reason: str | None = None
         self._note: str | None = None
+        #: ``preview_path``: where the newest preview frame is kept (a
+        #: diagnostic for a person, overwritten as the render runs).
+        self._preview_path = os.fspath(preview_path) if preview_path else None
+        self._preview_note: str | None = None
+        self._preview_written = 0          # preview_serial of the frame on disk
+        self._preview_written_at = float("-inf")
+        self._preview_io_lock = threading.Lock()
         if labels is None:
             try:
                 labels = load_phase_labels()
@@ -1347,18 +1438,22 @@ class LiveView:
         if (thread is not None and thread.is_alive()
                 and thread is not threading.current_thread()):
             thread.join(timeout=5)
+        # The newest frame, if the once-a-second pause held it back.
+        self._write_preview(final=True)
 
     def set_prompt_id(self, prompt_id: str) -> None:
-        """Once ``submit_prompt`` has returned, ignore frames for other prompts."""
+        """Once ``submit_prompt`` has returned, ignore frames for other prompts
+        (and forget what an earlier frame for another prompt said)."""
         with self._lock:
-            self._state.prompt_id = prompt_id
+            self._state.adopt_prompt_id(prompt_id)
 
     def snapshot(self) -> dict:
         with self._lock:
             snap = self._state.snapshot()
             snap["connected"] = self._connected
-            if self._note:
-                snap["note"] = self._note
+            note = "; ".join(n for n in (self._note, self._preview_note) if n)
+            if note:
+                snap["note"] = note
             if self._reason and snap["state"] != "finished":
                 snap["state"] = "unavailable"
                 snap["reason"] = self._reason
@@ -1368,10 +1463,13 @@ class LiveView:
         """The frame counts for the end-of-leg line (the preview measurement)."""
         with self._lock:
             state = self._state
+            senders = ",".join("%s:%d" % item
+                               for item in sorted(state.preview_by_node.items()))
             return ("text_frames=%d preview_frames=%d last_preview_bytes=%d "
-                    "other_binary_frames=%d"
+                    "other_binary_frames=%d preview_nodes=%s"
                     % (state.text_frames, state.preview_frames,
-                       state.preview_bytes, state.other_binary_frames))
+                       state.preview_bytes, state.other_binary_frames,
+                       senders or "none"))
 
     def wrap(self, on_tick: Callable[[float, dict], None] | None = None
              ) -> Callable[[float, dict], None]:
@@ -1407,6 +1505,57 @@ class LiveView:
     def _on_binary(self, data: bytes) -> None:
         with self._lock:
             self._state.apply_binary(data)
+        self._write_preview(final=False)
+
+    def _write_preview(self, final: bool) -> None:
+        if not self._preview_path:
+            return
+        # One writer at a time: the listener thread and ``stop`` can both arrive.
+        with self._preview_io_lock:
+            self._write_preview_now(final)
+
+    def _write_preview_now(self, final: bool) -> None:
+        """Keep the newest preview frame in the preview file.
+
+        While frames stream it writes at most once a second; ``final`` (from
+        ``stop``) writes whatever that pause held back. The file is replaced
+        atomically, so a person opening it never sees half an image. A failed
+        write (a viewer holding the file open, a full disk) is reported on the
+        snapshot and the next frame tries again; nothing here can fail the
+        render, and nothing runs when no ``preview_path`` was asked for.
+        """
+        now = time.monotonic()
+        with self._lock:
+            image = self._state.last_preview
+            serial = self._state.preview_serial
+            if image is None or serial == self._preview_written:
+                return
+            if not final and now - self._preview_written_at < _PREVIEW_WRITE_EVERY_S:
+                return
+            self._preview_written_at = now
+        partial = None
+        try:
+            # The extension follows the image: a PNG is never saved as .jpg.
+            stem = os.path.splitext(self._preview_path)[0]
+            target = stem + (".png" if image.startswith(_PNG_START) else ".jpg")
+            os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
+            partial = target + ".part"
+            with open(partial, "wb") as fh:
+                fh.write(image)
+            os.replace(partial, target)
+        except Exception as exc:  # noqa: BLE001 -- reported on the snapshot
+            if partial:
+                try:
+                    os.remove(partial)   # no half-written file left lying about
+                except OSError:
+                    pass
+            with self._lock:
+                self._preview_note = "preview file not written: %s: %s" % (
+                    type(exc).__name__, str(exc)[:100])
+            return
+        with self._lock:
+            self._preview_written = serial
+            self._preview_note = None
 
     def _run(self) -> None:
         try:

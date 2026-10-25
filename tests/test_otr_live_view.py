@@ -152,6 +152,54 @@ def test_frames_for_another_prompt_are_ignored_once_ours_is_known(api, labels):
     assert state.snapshot()["node"] == "1"
 
 
+def test_early_state_from_another_prompt_is_dropped_when_ours_is_known(api, labels):
+    """The socket opens before `submit_prompt` returns an id, so until then
+    every frame is taken. A broadcast about ANOTHER client's prompt (ComfyUI
+    sends `execution_interrupted` to everyone) must not leave this view
+    saying `finished` for a prompt that has not started."""
+    state = _state(api, labels)
+    state.apply_text(_text("executing", node="9", prompt_id="theirs"))
+    state.apply_text(_text("execution_interrupted", prompt_id="theirs"))
+    assert state.snapshot()["state"] == "finished"
+    state.adopt_prompt_id("mine")
+    snap = state.snapshot()
+    assert (snap["state"], snap["node"], snap["value"], snap["max"]) == (
+        "waiting", None, None, None)
+    # ...and from here on theirs is ignored and ours is taken.
+    state.apply_text(_text("executing", node="7", prompt_id="theirs"))
+    assert state.snapshot()["state"] == "waiting"
+    state.apply_text(_text("executing", node="1", prompt_id="mine"))
+    assert state.snapshot()["node"] == "1"
+
+
+def test_early_state_from_our_own_prompt_is_kept_when_its_id_arrives(api, labels):
+    """Our first frames can land before `set_prompt_id` runs; they are ours."""
+    state = _state(api, labels)
+    state.apply_text(_text("execution_start", prompt_id="mine"))
+    state.apply_text(_text("executing", node="7", prompt_id="mine"))
+    state.apply_text(_text("progress", value=3, max=9, node="7", prompt_id="mine"))
+    state.adopt_prompt_id("mine")
+    snap = state.snapshot()
+    assert (snap["state"], snap["node"], snap["value"], snap["max"]) == (
+        "running", "7", 3, 9)
+
+
+def test_early_frames_that_name_no_prompt_are_kept(api, labels):
+    state = _state(api, labels)
+    state.apply_text(_text("executing", node="1"))
+    state.adopt_prompt_id("mine")
+    assert state.snapshot()["node"] == "1"
+
+
+def test_live_view_set_prompt_id_adopts_it(api):
+    view = api.LiveView("c", PROMPT)
+    view._on_text(json.dumps(_text("execution_interrupted", prompt_id="theirs")))
+    assert view.snapshot()["state"] == "finished"
+    view.set_prompt_id("mine")
+    assert view.snapshot()["state"] == "waiting"
+    assert view._state.prompt_id == "mine"
+
+
 def test_a_subgraph_child_is_named_by_its_parent(api, labels):
     state = _state(api, labels)
     state.apply_text(_text("executing", node="7:3"))
@@ -390,3 +438,273 @@ def test_a_mistyped_preview_method_fails_loudly(api, monkeypatch):
     monkeypatch.setenv("OTR_PREVIEW_METHOD", "latent2rbg")
     with pytest.raises(ValueError, match="OTR_PREVIEW_METHOD='latent2rbg'"):
         api.submit_prompt({"1": {"class_type": "X", "inputs": {}}})
+
+
+# --- the preview file (PLAN row 1.1, second half) ---------------------------
+
+JPEG = b"\xff\xd8\xff\xe0\x00\x10JFIF" + bytes(range(32)) + b"\xff\xd9"
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + bytes(range(32))
+
+
+def _preview_frame(image=JPEG, image_type=1):
+    """A type-1 binary frame as ComfyUI sends it: event, image type, image."""
+    return struct.pack(">II", 1, image_type) + image
+
+
+def test_the_image_is_cut_out_of_each_preview_frame_layout(api):
+    # Type 1: event, image type (1 = JPEG, 2 = PNG), then the image.
+    assert api._image_from_preview_frame(_preview_frame(JPEG, 1)) == JPEG
+    assert api._image_from_preview_frame(_preview_frame(PNG, 2)) == PNG
+    # Type 4: event, metadata length, metadata JSON, then the image.
+    meta = json.dumps({"node_id": "9", "image_type": "image/jpeg"}).encode("utf-8")
+    framed = struct.pack(">II", 4, len(meta)) + meta + JPEG
+    assert api._image_from_preview_frame(framed) == JPEG
+    # No image in it, or too short to hold one: nothing to keep.
+    assert api._image_from_preview_frame(_preview_frame(b"jpeg-bytes")) is None
+    assert api._image_from_preview_frame(b"abc") is None
+
+
+def test_the_newest_preview_image_and_its_sending_node_are_kept(api, labels):
+    state = _state(api, labels)
+    state.apply_binary(_preview_frame(JPEG + b"before-any-node"))
+    state.apply_text(_text("executing", node="9"))
+    state.apply_binary(_preview_frame(JPEG + b"first"))
+    serial = state.preview_serial
+    state.apply_binary(_preview_frame(JPEG + b"second"))
+    assert state.last_preview == JPEG + b"second"
+    assert state.preview_serial == serial + 1
+    state.apply_text(_text("executing", node="7"))
+    state.apply_binary(_preview_frame(JPEG))
+    assert state.preview_by_node == {"?": 1, "9": 2, "7": 1}
+    # A preview frame with no image in it is counted and keeps the last image.
+    state.apply_binary(_preview_frame(b"no-image-here"))
+    assert state.preview_frames == 5
+    assert state.last_preview == JPEG
+    assert state.preview_serial == serial + 2
+
+
+def test_summary_names_the_nodes_that_sent_previews(api):
+    view = api.LiveView("c", PROMPT)
+    assert view.summary().endswith("preview_nodes=none")
+    view._on_text(json.dumps(_text("executing", node="9")))
+    view._on_binary(_preview_frame())
+    view._on_binary(_preview_frame())
+    view._on_text(json.dumps(_text("executing", node="7")))
+    view._on_binary(_preview_frame())
+    assert view.summary().endswith("preview_nodes=7:1,9:2")
+
+
+def test_no_preview_path_means_nothing_is_written(api, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    view = api.LiveView("c", PROMPT)
+    view._on_binary(_preview_frame())
+    view.stop()
+    assert list(tmp_path.iterdir()) == []
+    assert "note" not in view.snapshot()
+
+
+def test_the_preview_file_is_the_newest_frame_and_never_half_written(api, tmp_path):
+    target = tmp_path / "shots" / "live.jpg"
+    view = api.LiveView("c", PROMPT, preview_path=str(target))
+    view._on_binary(_preview_frame())
+    assert target.read_bytes() == JPEG
+    # Replaced in place: no scratch file is left beside it.
+    assert [p.name for p in target.parent.iterdir()] == ["live.jpg"]
+
+
+def test_a_png_preview_is_saved_as_png_whatever_name_was_asked_for(api, tmp_path):
+    view = api.LiveView("c", PROMPT, preview_path=str(tmp_path / "live.jpg"))
+    view._on_binary(_preview_frame(PNG, 2))
+    assert (tmp_path / "live.png").read_bytes() == PNG
+    assert not (tmp_path / "live.jpg").exists()
+
+
+def test_the_preview_file_is_written_once_a_second_and_flushed_on_stop(api, tmp_path, monkeypatch):
+    target = tmp_path / "live.jpg"
+    monkeypatch.setattr(api, "_PREVIEW_WRITE_EVERY_S", 3600.0)
+    view = api.LiveView("c", PROMPT, preview_path=str(target))
+    view._on_binary(_preview_frame(JPEG + b"1"))
+    assert target.read_bytes() == JPEG + b"1", "the first frame is written at once"
+    view._on_binary(_preview_frame(JPEG + b"2"))
+    view._on_binary(_preview_frame(JPEG + b"3"))
+    assert target.read_bytes() == JPEG + b"1", "later frames wait out the pause"
+    view.stop()
+    assert target.read_bytes() == JPEG + b"3", "stop() writes the newest frame"
+    view.stop()  # nothing newer: no second write, no error
+    assert target.read_bytes() == JPEG + b"3"
+
+
+def test_with_no_pause_every_frame_is_written(api, tmp_path, monkeypatch):
+    target = tmp_path / "live.jpg"
+    monkeypatch.setattr(api, "_PREVIEW_WRITE_EVERY_S", 0.0)
+    view = api.LiveView("c", PROMPT, preview_path=str(target))
+    for tag in (b"a", b"b", b"c"):
+        view._on_binary(_preview_frame(JPEG + tag))
+        assert target.read_bytes() == JPEG + tag
+
+
+def test_a_failed_preview_write_is_reported_retried_and_never_raised(api, tmp_path, monkeypatch):
+    target = tmp_path / "live.jpg"
+    monkeypatch.setattr(api, "_PREVIEW_WRITE_EVERY_S", 0.0)
+    view = api.LiveView("c", PROMPT, preview_path=str(target))
+    view._note = "labels unreadable: earlier"
+    real_replace = api.os.replace
+
+    def viewer_has_the_file_open(source, destination):
+        raise PermissionError("a viewer has the file open")
+
+    monkeypatch.setattr(api.os, "replace", viewer_has_the_file_open)
+    view._on_binary(_preview_frame())  # must not raise
+    snap = view.snapshot()
+    assert snap["note"] == (
+        "labels unreadable: earlier; preview file not written: "
+        "PermissionError: a viewer has the file open")
+    assert "[labels unreadable: earlier; preview file not written" in api.format_live(snap)
+    assert not target.exists()
+    assert list(tmp_path.iterdir()) == [], "no half-written file is left behind"
+    # The next frame tries again, and the note clears once a write lands.
+    monkeypatch.setattr(api.os, "replace", real_replace)
+    view._on_binary(_preview_frame(JPEG + b"again"))
+    assert target.read_bytes() == JPEG + b"again"
+    assert view.snapshot()["note"] == "labels unreadable: earlier"
+
+
+def test_live_view_writes_the_preview_file_from_a_real_websocket(api, tmp_path):
+    import aiohttp  # noqa: F401 -- a ComfyUI dependency; missing means FAIL, not skip
+    target = tmp_path / "live.jpg"
+    server = FakeComfy([
+        ("text", _text("execution_start", prompt_id="p1")),
+        ("text", _text("executing", node="9", prompt_id="p1")),
+        ("binary", _preview_frame()),
+    ]).start()
+    view = api.LiveView("client-abc", PROMPT,
+                        base_url="http://127.0.0.1:%d" % server.port,
+                        preview_path=str(target))
+    try:
+        view.start()
+        _wait_for(view, lambda s: s["preview_frames"] == 1)
+    finally:
+        view.stop()
+        server.close()
+    assert target.read_bytes() == JPEG
+    assert view.summary().endswith("preview_nodes=9:1")
+
+
+# --- the runner's --preview-file flag ---------------------------------------
+
+def _recording_live(built):
+    """Stands in for LiveView; ``built`` collects the extra arguments main()
+    gave it, so a run without the flag is seen to pass none."""
+    class _Live:
+        def __init__(self, client_id, prompt, **kwargs):
+            built.append(kwargs)
+
+        def start(self):
+            return self
+
+        def set_prompt_id(self, prompt_id):
+            pass
+
+        def wrap(self, on_tick):
+            return on_tick
+
+        def stop(self):
+            pass
+
+        def summary(self):
+            return "text_frames=0"
+    return _Live
+
+
+def _run_runner(canonical, monkeypatch, tmp_path, args):
+    import contextlib
+    import io
+    sent, built = {}, []
+    monkeypatch.setattr(canonical, "build_api_prompt", lambda _args: ({}, []))
+    monkeypatch.setattr(
+        canonical, "submit_prompt",
+        lambda prompt, client_id=None, **extra: sent.update(extra) or "prompt-live")
+    monkeypatch.setattr(canonical, "LiveView", _recording_live(built))
+    monkeypatch.setattr(canonical, "poll_history", lambda *a, **k: ("SUCCESS", ""))
+    monkeypatch.setattr(canonical, "episode_of_prompt", lambda _pid: None)
+    monkeypatch.delenv("OTR_NOTIFY_URL", raising=False)
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        rc = canonical.main([*args, "--dump-prompt", str(tmp_path / "prompt.json")])
+    return rc, buf.getvalue(), sent, built
+
+
+@pytest.fixture(scope="module")
+def canonical():
+    import sys
+    if str(SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS))
+    import otr_canonical_api_run
+    return otr_canonical_api_run
+
+
+def test_preview_plan_says_nothing_without_the_flag(canonical):
+    assert canonical.preview_plan(None, None) == (None, None)
+    assert canonical.preview_plan("", "latent2rgb") == (None, None)
+
+
+def test_preview_plan_asks_for_latent2rgb_unless_the_operator_chose(canonical):
+    method, line = canonical.preview_plan("C:/x/live.jpg", None)
+    assert method == "latent2rgb"
+    assert "preview file: on -> C:/x/live.jpg (or C:/x/live.png)" in line
+    assert canonical.preview_plan("live.jpg", "   ")[0] == "latent2rgb"
+    method, line = canonical.preview_plan("live.jpg", "TAESD")
+    assert method is None and "OTR_PREVIEW_METHOD=taesd decides the frames" in line
+    method, line = canonical.preview_plan("live.jpg", "none")
+    assert method is None and "no file will appear" in line
+
+
+def test_the_flag_reaches_the_live_view_and_the_submit(canonical, monkeypatch, tmp_path):
+    monkeypatch.delenv("OTR_PREVIEW_METHOD", raising=False)
+    shot = str(tmp_path / "live.jpg")
+    rc, out, sent, built = _run_runner(canonical, monkeypatch, tmp_path,
+                                       ["--preview-file", shot])
+    assert rc == 0
+    assert sent == {"preview_method": "latent2rgb"}
+    assert built == [{"preview_path": shot}]
+    assert "[canonical-api] preview file: on ->" in out
+
+
+def test_the_operators_preview_method_stands_when_the_flag_is_given(canonical, monkeypatch, tmp_path):
+    monkeypatch.setenv("OTR_PREVIEW_METHOD", "taesd")
+    shot = str(tmp_path / "live.jpg")
+    rc, out, sent, built = _run_runner(canonical, monkeypatch, tmp_path,
+                                       ["--preview-file", shot])
+    assert rc == 0
+    assert sent == {}, "the env var is read by submit_prompt, not overridden here"
+    assert built == [{"preview_path": shot}]
+    assert "OTR_PREVIEW_METHOD=taesd decides the frames" in out
+
+
+def test_a_run_without_the_flag_submits_and_listens_as_it_always_did(canonical, monkeypatch, tmp_path):
+    monkeypatch.delenv("OTR_PREVIEW_METHOD", raising=False)
+    rc, out, sent, built = _run_runner(canonical, monkeypatch, tmp_path, [])
+    assert rc == 0
+    assert sent == {} and built == [{}]
+    assert "preview file" not in out
+
+
+# --- submit_prompt takes the method as an argument too ----------------------
+
+def test_the_preview_method_argument_wins_over_the_environment(api, monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        api.requests, "post",
+        lambda url, json=None, timeout=None: captured.update(json=json) or _Resp())
+    monkeypatch.delenv("OTR_COMFY_API_KEY", raising=False)
+    monkeypatch.setenv("OTR_PREVIEW_METHOD", "taesd")
+    api.submit_prompt({"1": {"class_type": "X", "inputs": {}}}, preview_method="Latent2RGB")
+    assert captured["json"]["extra_data"]["preview_method"] == "latent2rgb"
+    api.submit_prompt({"1": {"class_type": "X", "inputs": {}}})
+    assert captured["json"]["extra_data"]["preview_method"] == "taesd"
+
+
+def test_a_mistyped_preview_method_argument_fails_loudly(api, monkeypatch):
+    monkeypatch.delenv("OTR_PREVIEW_METHOD", raising=False)
+    with pytest.raises(ValueError, match="preview_method='latent2rbg'"):
+        api.submit_prompt({"1": {"class_type": "X", "inputs": {}}}, preview_method="latent2rbg")

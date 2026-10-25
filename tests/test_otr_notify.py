@@ -8,6 +8,7 @@ on disk, and the topic (a secret) is never printed.
 """
 from __future__ import annotations
 
+import base64
 import contextlib
 import http.server
 import io
@@ -145,6 +146,77 @@ def test_cli_sends_a_test_ping(monkeypatch, capsys):
     assert "[notify] sent" in capsys.readouterr().out
 
 
+def test_a_blank_value_is_off_here_as_in_the_watchdog(monkeypatch, capsys):
+    monkeypatch.setenv(otr_notify.NOTIFY_ENV, "   ")
+    assert otr_notify.state_line() == "notify: off (OTR_NOTIFY_URL unset)"
+    assert otr_notify.notify("t", "b") is False
+    assert capsys.readouterr().out == ""
+
+
+def test_state_line_never_shows_a_password_or_the_topic(monkeypatch):
+    monkeypatch.setenv(
+        otr_notify.NOTIFY_ENV, "https://alice:hunter2@ntfy.example.org:8443/" + TOPIC)
+    line = otr_notify.state_line()
+    assert line == "notify: on -> ntfy.example.org:8443"
+    for secret in ("alice", "hunter2", TOPIC):
+        assert secret not in line
+
+
+@pytest.mark.parametrize("unusable", [
+    "ntfy.example.org/topic",            # no scheme
+    "ftp://ntfy.example.org/topic",      # not http(s)
+    "http://",                           # no host
+    "http://[bad/topic",                 # urlsplit itself raises
+    "http://host:notaport/topic",        # a port that is not a number
+    '"https://ntfy.example.org/topic"',  # quotes that came along with `set X="..."`
+])
+def test_an_unusable_url_is_named_not_raised_and_not_echoed(monkeypatch, capsys, unusable):
+    monkeypatch.setenv(otr_notify.NOTIFY_ENV, unusable)
+    state = otr_notify.state_line()
+    assert state.startswith("notify: ON BUT UNUSABLE")
+    assert "no ping will be sent" in state
+    assert "topic" not in state
+    assert otr_notify.notify("t", "b") is False
+    out = capsys.readouterr().out
+    assert out.strip() == (
+        "[notify] FAILED: OTR_NOTIFY_URL is not an http:// or https:// URL with a host")
+    assert "topic" not in out
+
+
+def test_a_url_with_credentials_is_sent_as_a_basic_header_not_in_the_url(monkeypatch, capsys):
+    with NtfyStub() as stub:
+        host_and_topic = stub.url.split("//", 1)[1]            # 127.0.0.1:PORT/TOPIC
+        # Percent-escapes in the userinfo are decoded before they are encoded.
+        monkeypatch.setenv(otr_notify.NOTIFY_ENV, "http://al%40ice:p%3Ass@" + host_and_topic)
+        assert otr_notify.notify("t", "b") is True
+    (request,) = stub.received
+    assert request["path"] == "/" + TOPIC
+    assert request["headers"]["authorization"] == (
+        "Basic " + base64.b64encode(b"al@ice:p:ss").decode("ascii"))
+    assert capsys.readouterr().out == ""
+
+
+def test_a_failed_ping_never_prints_credentials_or_the_topic(monkeypatch, capsys):
+    monkeypatch.setenv(otr_notify.NOTIFY_ENV, "http://alice:hunter2@127.0.0.1:1/" + TOPIC)
+    assert otr_notify.notify("t", "b") is False
+    out = capsys.readouterr().out
+    assert "[notify] FAILED:" in out
+    for secret in ("alice", "hunter2", TOPIC):
+        assert secret not in out
+
+
+def test_an_error_that_quotes_the_request_path_shows_its_type_alone(monkeypatch, capsys):
+    """`http.client` refuses a space in the request path and QUOTES the path in
+    its message -- and the path is the topic."""
+    with NtfyStub() as stub:
+        monkeypatch.setenv(otr_notify.NOTIFY_ENV, stub.url + " tail")
+        assert otr_notify.notify("t", "b") is False
+    out = capsys.readouterr().out
+    assert "[notify] FAILED: InvalidURL (details withheld" in out
+    assert TOPIC not in out
+    assert stub.received == []
+
+
 # --- the runner's end-of-leg ping -------------------------------------------
 
 def test_compose_success_with_a_confirmed_obs_file():
@@ -180,6 +252,28 @@ def test_compose_failure_carries_the_headline_and_the_hint_not_the_traceback():
     ]
     assert priority == "high"
     assert "someone" not in body
+
+
+def test_compose_failure_finds_a_hint_that_ends_a_line_and_keeps_it_out_of_the_headline():
+    """A refusal, a SERVER-GONE message and the raw fallback end their line with
+    the hint instead of giving it a line of its own."""
+    err = ("SERVER-GONE: the ComfyUI server at http://127.0.0.1:8000 stopped "
+           "answering -- hint: the ComfyUI server is gone or was restarted: "
+           "read the watchdog verdict")
+    title, body, priority = canonical.compose_result_ping("FAIL", err, "ep", None, "", 61)
+    assert body.splitlines() == [
+        "SERVER-GONE: the ComfyUI server at http://127.0.0.1:8000 stopped answering",
+        "-- hint: the ComfyUI server is gone or was restarted: read the watchdog verdict",
+        "after 1m01s",
+    ]
+    assert priority == "high"
+
+
+def test_compose_failure_without_a_hint_or_text_is_still_a_message():
+    _, body, _ = canonical.compose_result_ping("FAIL", "", None, None, "", 5)
+    assert body.splitlines() == ["no error text", "after 5s"]
+    _, body, _ = canonical.compose_result_ping("FAIL", "Boom: it broke", None, None, "", 5)
+    assert body.splitlines() == ["Boom: it broke", "after 5s"]
 
 
 def test_compose_timeout_says_the_render_may_still_be_running():
@@ -350,6 +444,74 @@ def test_the_runner_exit_code_does_not_depend_on_the_ping(monkeypatch, tmp_path)
     assert "notify: off" not in out
 
 
+def test_a_refused_submission_pings_then_raises_unchanged(monkeypatch, tmp_path):
+    """The commonest unattended failure ends before any prompt id exists: a
+    bad dropdown value, a server that is not up. It must reach the phone, and
+    the exception must still be the one the caller would have seen."""
+    refusal = RuntimeError(
+        "POST /prompt -> HTTP 400: {\"error\": {}} -- hint: ComfyUI does not list "
+        "that option or model file")
+
+    def refuse(prompt, client_id=None):
+        raise refusal
+
+    live = []
+
+    class _TrackedLive(_StubLive):
+        def stop(self):
+            live.append("stopped")
+
+    monkeypatch.setattr(canonical, "build_api_prompt", lambda _args: ({}, []))
+    monkeypatch.setattr(canonical, "LiveView", _TrackedLive)
+    monkeypatch.setattr(canonical, "submit_prompt", refuse)
+    monkeypatch.setattr(canonical, "poll_history",
+                        lambda *a, **k: pytest.fail("a refused prompt is never polled"))
+    with NtfyStub() as stub:
+        monkeypatch.setenv(otr_notify.NOTIFY_ENV, stub.url)
+        with pytest.raises(RuntimeError) as caught:
+            _run_main(["--dump-prompt", str(tmp_path / "prompt.json")])
+    assert caught.value is refusal
+    assert live == ["stopped"], "the listener is still stopped"
+    (request,) = stub.received
+    assert request["headers"]["title"] == "OTR leg FAILED"
+    assert request["headers"]["priority"] == "high"
+    lines = request["body"].decode("utf-8").splitlines()
+    assert lines[0].startswith(
+        "RuntimeError before the prompt was queued: POST /prompt -> HTTP 400")
+    assert lines[1] == "-- hint: ComfyUI does not list that option or model file"
+    assert lines[2].startswith("after ")
+
+
+def test_a_crash_while_watching_pings_then_raises_unchanged(monkeypatch, tmp_path):
+    def crash(*args, **kwargs):
+        raise OSError("disk went away")
+
+    monkeypatch.setattr(canonical, "build_api_prompt", lambda _args: ({}, []))
+    monkeypatch.setattr(canonical, "LiveView", _StubLive)
+    monkeypatch.setattr(canonical, "submit_prompt", lambda p, client_id=None: "prompt-live")
+    monkeypatch.setattr(canonical, "poll_history", crash)
+    with NtfyStub() as stub:
+        monkeypatch.setenv(otr_notify.NOTIFY_ENV, stub.url)
+        with pytest.raises(OSError, match="disk went away"):
+            _run_main(["--dump-prompt", str(tmp_path / "prompt.json")])
+    (request,) = stub.received
+    assert request["body"].decode("utf-8").splitlines()[0] == (
+        "OSError while watching the render: disk went away")
+
+
+def test_a_refused_submission_with_notify_off_just_raises(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(canonical, "build_api_prompt", lambda _args: ({}, []))
+    monkeypatch.setattr(canonical, "LiveView", _StubLive)
+
+    def refuse(prompt, client_id=None):
+        raise RuntimeError("refused")
+
+    monkeypatch.setattr(canonical, "submit_prompt", refuse)
+    with pytest.raises(RuntimeError, match="refused"):
+        canonical.main(["--dump-prompt", str(tmp_path / "prompt.json")])
+    assert "notify sent" not in capsys.readouterr().out
+
+
 # --- the watchdog's DEAD ping (a PowerShell harness) -------------------------
 
 def _run_watchdog(tmp_path, notify_url=None, extra=()):
@@ -399,3 +561,35 @@ def test_watchdog_says_the_ping_is_off_when_unset(tmp_path):
     completed = _run_watchdog(tmp_path)
     assert completed.returncode == 2, completed.stdout + completed.stderr
     assert "notify: off (OTR_NOTIFY_URL unset)" in completed.stdout
+
+
+@pytest.mark.skipif(os.name != "nt", reason="watchdog is a PowerShell harness")
+def test_watchdog_reads_a_blank_url_as_off_like_the_runner_does(tmp_path):
+    completed = _run_watchdog(tmp_path, "   ")
+    assert completed.returncode == 2, completed.stdout + completed.stderr
+    assert "notify: off (OTR_NOTIFY_URL unset)" in completed.stdout
+    assert "notify sent" not in completed.stdout and "notify FAILED" not in completed.stdout
+
+
+@pytest.mark.skipif(os.name != "nt", reason="watchdog is a PowerShell harness")
+def test_watchdog_sends_credentials_as_a_basic_header_and_never_prints_them(tmp_path):
+    with NtfyStub() as stub:
+        host_and_topic = stub.url.split("//", 1)[1]
+        completed = _run_watchdog(tmp_path, "http://alice:hunter2@" + host_and_topic)
+    assert completed.returncode == 2, completed.stdout + completed.stderr
+    assert "notify sent" in completed.stdout
+    (request,) = stub.received
+    assert request["path"] == "/" + TOPIC
+    assert request["headers"]["authorization"] == (
+        "Basic " + base64.b64encode(b"alice:hunter2").decode("ascii"))
+    for secret in ("alice", "hunter2", TOPIC):
+        assert secret not in completed.stdout
+
+
+@pytest.mark.skipif(os.name != "nt", reason="watchdog is a PowerShell harness")
+def test_watchdog_failure_line_hides_credentials_and_the_topic(tmp_path):
+    completed = _run_watchdog(tmp_path, "http://alice:hunter2@127.0.0.1:1/" + TOPIC)
+    assert completed.returncode == 2, completed.stdout + completed.stderr
+    assert "notify FAILED" in completed.stdout
+    for secret in ("alice", "hunter2", TOPIC):
+        assert secret not in completed.stdout

@@ -34,22 +34,42 @@ Write-Verdict 'RUNNING' 'watchdog armed'
 
 # Phone ping on DEAD (PLAN row 1.3; the same ntfy topic scripts/otr_notify.py
 # uses). Like everything in this script it REPORTS: a failed POST is printed and
-# changes nothing. Only the topic HOST is ever printed, never its path.
+# changes nothing. Only the topic HOST is ever printed, never its path or a
+# password. The URL is trimmed once, exactly as otr_notify.py reads it, so a
+# blank value is "off" in both places.
+$NotifyUrl = ("$env:OTR_NOTIFY_URL").Trim()
 function Get-NotifyState {
-    if (-not $env:OTR_NOTIFY_URL) { return 'notify: off (OTR_NOTIFY_URL unset)' }
-    try { return ('notify: on -> {0}' -f ([System.Uri]$env:OTR_NOTIFY_URL).Authority) }
+    if (-not $NotifyUrl) { return 'notify: off (OTR_NOTIFY_URL unset)' }
+    try { return ('notify: on -> {0}' -f ([System.Uri]$NotifyUrl).Authority) }
     catch { return 'notify: on -> unreadable url' }
 }
 function Send-Ping($title, $body) {
-    if (-not $env:OTR_NOTIFY_URL) { return }
+    if (-not $NotifyUrl) { return }
+    $secrets = @($NotifyUrl)
     try {
-        Invoke-RestMethod -Uri $env:OTR_NOTIFY_URL -Method Post -TimeoutSec 10 `
+        $headers = @{ Title = $title; Priority = 'high' }
+        $target = $NotifyUrl
+        $u = [System.Uri]$NotifyUrl
+        if ($u.AbsolutePath.Length -gt 1) { $secrets += $u.AbsolutePath }
+        if ($u.UserInfo) {
+            # user:password@host goes in an HTTP Basic header, as
+            # scripts/otr_notify.py does, and never rides in the URL.
+            $secrets += $u.UserInfo
+            $pair = [System.Uri]::UnescapeDataString($u.UserInfo)
+            $headers['Authorization'] = 'Basic ' + [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($pair))
+            $target = $u.GetComponents([System.UriComponents]'SchemeAndServer, PathAndQuery', [System.UriFormat]::UriEscaped)
+        }
+        Invoke-RestMethod -Uri $target -Method Post -TimeoutSec 10 `
             -ContentType 'text/plain; charset=utf-8' `
-            -Headers @{ Title = $title; Priority = 'high' } `
+            -Headers $headers `
             -Body ([System.Text.Encoding]::UTF8.GetBytes($body)) | Out-Null
         Write-Host '[watchdog] notify sent'
     } catch {
-        $why = $_.Exception.Message.Replace($env:OTR_NOTIFY_URL, '<topic url>')
+        # The message can quote the URL or its path (the topic is a secret).
+        $why = $_.Exception.Message
+        foreach ($secret in ($secrets | Sort-Object Length -Descending)) {
+            $why = $why.Replace($secret, '<hidden>')
+        }
         Write-Host ('[watchdog] notify FAILED: {0}' -f $why)
     }
 }

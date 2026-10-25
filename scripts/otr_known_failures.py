@@ -42,19 +42,24 @@ def _rx(pattern: str) -> "re.Pattern[str]":
 
 #: Order matters: first match wins. A dead server is tried first because its
 #: message can also carry words the later rows look for.
+#:
+#: `server_gone` matches ONLY the harness's own `SERVER-GONE` marker
+#: (`scripts/otr_api.py`: poll_history, and submit_prompt when nothing accepts
+#: the connection). It does not match `ConnectionRefusedError` or "Max retries
+#: exceeded with url": in an execution error those words come from a NODE's own
+#: call to a sidecar or a remote host, and ComfyUI itself answered (it
+#: reported the error), so "the ComfyUI server is not answering" would be false
+#: advice. Where the text cannot say whose connection it was, the call site
+#: that knows (the harness talking to ComfyUI) adds the marker.
 KNOWN_FAILURES: tuple[KnownFailure, ...] = (
     KnownFailure(
         key="server_gone",
-        pattern=_rx(
-            r"SERVER-GONE"
-            r"|ConnectionRefusedError"
-            r"|Max retries exceeded with url"
-            r"|Failed to establish a new connection"
-        ),
+        pattern=_rx(r"SERVER-GONE"),
         hint=(
-            "the ComfyUI server is not answering: read the watchdog verdict "
-            "(scripts/otr_render_watchdog.ps1) and the server log before the leg "
-            "log, then reset the box per CLAUDE.md section 4 before relaunching"
+            "the ComfyUI server is gone or was restarted: read the watchdog "
+            "verdict (scripts/otr_render_watchdog.ps1) and the server log before "
+            "the leg log, then reset the box per CLAUDE.md section 4 before "
+            "relaunching"
         ),
         refs=(),
     ),
@@ -141,9 +146,14 @@ KNOWN_FAILURES: tuple[KnownFailure, ...] = (
     ),
     KnownFailure(
         key="model_family_mismatch",
+        # torch's own phrase, whole: "size mismatch for <key>: copying a param
+        # with shape ...". The bare words "size mismatch for" also open OTR's
+        # own ReplayBundleError ("manifest size mismatch for 'x': 12 vs 9",
+        # nodes/production_ledger.py), which is a damaged replay bundle and not
+        # a model from another family.
         pattern=_rx(
             r"Error\(s\) in loading state_dict"
-            r"|size mismatch for"
+            r"|size mismatch for \S+: copying a param with shape"
             r"|mat1 and mat2 shapes cannot be multiplied"
             r"|Given groups=\d+, weight of size"
         ),

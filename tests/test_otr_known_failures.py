@@ -39,8 +39,13 @@ FIXTURES = {
     "server_gone": [
         "SERVER-GONE: the ComfyUI server at http://127.0.0.1:8000 stopped "
         "answering -- 12 consecutive refused connections to /history",
-        "requests.exceptions.ConnectionError: HTTPConnectionPool("
-        "host='127.0.0.1', port=8000): Max retries exceeded with url: /prompt",
+        "SERVER-GONE: the ComfyUI server at http://127.0.0.1:8000 answers but "
+        "has no record of prompt p1, and nothing is running or queued.",
+        # What `submit_prompt` raises when nothing accepts the connection.
+        "requests.exceptions.ConnectionError: SERVER-GONE: nothing accepted "
+        "the connection to http://127.0.0.1:8000/prompt, so the prompt was "
+        "not queued (HTTPConnectionPool(host='127.0.0.1', port=8000): Max "
+        "retries exceeded with url: /prompt)",
     ],
     "out_of_memory": [
         "torch.OutOfMemoryError: Allocation on device",
@@ -99,6 +104,34 @@ def test_first_match_wins_so_a_dead_server_is_not_called_out_of_memory():
     assert kf.match_for(both).key == "server_gone"
 
 
+@pytest.mark.parametrize("text", [
+    "ConnectionRefusedError: [WinError 10061] No connection could be made "
+    "because the target machine actively refused it",
+    "requests.exceptions.ConnectionError: HTTPConnectionPool(host='127.0.0.1', "
+    "port=5000): Max retries exceeded with url: /tts (Caused by "
+    "NewConnectionError('Failed to establish a new connection'))",
+])
+def test_a_node_s_own_refused_connection_is_not_a_dead_comfyui(text):
+    """In an execution error ComfyUI itself ANSWERED (it reported the error), so
+    a refused connection is the node's call to some other service. Telling the
+    operator the ComfyUI server is not answering would send them to the wrong
+    place."""
+    assert kf.match_for(text) is None
+    assert kf.hint_for(text) is None
+
+
+def test_only_torchs_own_size_mismatch_phrase_is_a_model_family_mismatch():
+    torch_text = ("size mismatch for decoder.conv_in.weight: copying a param "
+                  "with shape torch.Size([512, 4, 3, 3]) from checkpoint, the "
+                  "shape in current model is torch.Size([512, 16, 3, 3]).")
+    assert kf.match_for(torch_text).key == "model_family_mismatch"
+    # OTR's own refusal for a damaged replay bundle
+    # (nodes/production_ledger.py) opens with different words that happen to
+    # contain "size mismatch for".
+    ours = "ReplayBundleError: manifest size mismatch for 'audio/line_01.wav': 1200 vs 980"
+    assert kf.match_for(ours) is None
+
+
 def test_out_of_memory_beats_a_module_name_in_the_same_traceback():
     both = ("torch.OutOfMemoryError: Allocation on device\n"
             "  File \"x.py\", line 1\n    # No module named 'x' is not the cause")
@@ -131,9 +164,20 @@ def test_every_tool_a_hint_names_exists():
 # --- refs resolve: never an invented id ------------------------------------
 
 def _bible_path() -> pathlib.Path:
+    """The Bug Bible: ``OTR_BUG_BIBLE_YAML``, else the survival-guide repo found
+    by walking UP from this checkout. A checkout does not always sit at the same
+    depth under ComfyUI (the pack itself, a ``git worktree`` beside it, or one of
+    the agent worktrees inside it), so a fixed number of parents is wrong for
+    some of them."""
     override = os.environ.get("OTR_BUG_BIBLE_YAML", "").strip()
-    return (pathlib.Path(override) if override else
-            REPO.parents[1] / "comfyui-custom-node-survival-guide" / "BUG_BIBLE.yaml")
+    if override:
+        return pathlib.Path(override)
+    for parent in REPO.parents:
+        candidate = parent / "comfyui-custom-node-survival-guide" / "BUG_BIBLE.yaml"
+        if candidate.is_file():
+            return candidate
+    # Not found anywhere: name the usual place so the failure says where to put it.
+    return REPO.parents[1] / "comfyui-custom-node-survival-guide" / "BUG_BIBLE.yaml"
 
 
 def _bible_ids() -> set[str]:
@@ -270,6 +314,96 @@ def test_a_refusal_with_no_known_cause_has_no_hint(api, monkeypatch):
     with pytest.raises(RuntimeError) as caught:
         api.submit_prompt({"1": {"class_type": "X", "inputs": {}}})
     assert str(caught.value) == "POST /prompt -> HTTP 500: internal server error"
+
+
+def test_the_error_and_node_errors_in_one_body_are_both_read_for_the_hint(api, monkeypatch):
+    """ComfyUI sends `error` WITH `node_errors`; the dropdown value it does not
+    list is in the second, and the first alone says nothing the table knows."""
+    body = {"error": {"type": "prompt_outputs_failed_validation",
+                      "message": "Prompt outputs failed validation"},
+            "node_errors": {"3": {"errors": [{"type": "value_not_in_list"}]}}}
+    monkeypatch.setattr(api.requests, "post", lambda *a, **k: _Post(200, body))
+    with pytest.raises(RuntimeError, match=r"returned error.* -- hint: ComfyUI does not list"):
+        api.submit_prompt({"1": {"class_type": "X", "inputs": {}}})
+
+
+def test_an_unrecognised_error_payload_puts_the_hint_on_its_own_line(api):
+    """The fallback form (a payload shape the parser does not know) keeps the
+    hint where the parsed form keeps it, so a reader and the phone ping find it
+    in one place."""
+    got = api.describe_execution_error([["odd_event", "CUDA out of memory"]])
+    lines = got.splitlines()
+    assert lines[0].startswith("[['odd_event'")
+    assert len(lines) == 2
+    assert lines[1].startswith("-- hint: the GPU ran out of memory")
+
+
+def test_a_node_s_refused_connection_in_an_execution_error_gets_no_server_hint(api):
+    got = api.describe_execution_error(_execution_error(
+        "ConnectionRefusedError",
+        "[WinError 10061] No connection could be made because the target "
+        "machine actively refused it"))
+    assert "hint" not in got
+    assert got.splitlines()[0] == "node 9 (OTR_VideoRenderBatch) raised ConnectionRefusedError"
+
+
+def test_a_damaged_replay_bundle_is_not_called_a_model_mismatch(api):
+    got = api.describe_execution_error(_execution_error(
+        "ReplayBundleError",
+        "manifest size mismatch for 'audio/line_01.wav': 1200 vs 980"))
+    assert "hint" not in got
+
+
+# --- the dead-server hint is wired where the server actually dies ----------
+
+class _Reply:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
+def test_a_submission_nothing_accepts_is_named_with_the_marker_and_the_hint(api, monkeypatch):
+    refused = api.requests.ConnectionError("connection refused by the OS")
+
+    def post(*args, **kwargs):
+        raise refused
+
+    monkeypatch.setattr(api.requests, "post", post)
+    with pytest.raises(api.requests.ConnectionError) as caught:
+        api.submit_prompt({"1": {"class_type": "X", "inputs": {}}})
+    text = str(caught.value)
+    assert text.startswith(api.SERVER_GONE_MARKER + ": nothing accepted the connection to ")
+    assert "so the prompt was not queued (connection refused by the OS)" in text
+    assert " -- hint: the ComfyUI server is gone or was restarted" in text
+    # Callers that catch the requests type, and anyone reading the chain, still can.
+    assert caught.value.__cause__ is refused
+
+
+def test_poll_history_names_a_dead_port_with_the_hint(api, monkeypatch):
+    def get(*args, **kwargs):
+        raise api.requests.ConnectionError("refused")
+
+    monkeypatch.setattr(api.requests, "get", get)
+    monkeypatch.setattr(api, "queue_snapshot", lambda: (-1, -1))
+    monkeypatch.setattr(api, "UNREACHABLE_STRIKES", 2)
+    monkeypatch.setattr(api.time, "sleep", lambda _s: None)
+    status, err = api.poll_history("p1", timeout_s=0, poll_s=0)
+    assert status == "FAIL"
+    assert err.startswith(api.SERVER_GONE_MARKER + ": the ComfyUI server at ")
+    assert err.endswith(" -- hint: " + kf.KNOWN_FAILURES[0].hint)
+
+
+def test_poll_history_names_a_vanished_prompt_with_the_hint(api, monkeypatch):
+    monkeypatch.setattr(api.requests, "get", lambda *a, **k: _Reply({}))
+    monkeypatch.setattr(api, "queue_snapshot", lambda: (0, 0))
+    monkeypatch.setattr(api, "VANISHED_CHECK_EVERY", 1)
+    monkeypatch.setattr(api.time, "sleep", lambda _s: None)
+    status, err = api.poll_history("p1", timeout_s=0, poll_s=0)
+    assert status == "FAIL"
+    assert "has no record of prompt p1" in err
+    assert err.endswith(" -- hint: " + kf.KNOWN_FAILURES[0].hint)
 
 
 def test_a_broken_hint_table_is_reported_and_keeps_the_diagnosis(api, monkeypatch):
