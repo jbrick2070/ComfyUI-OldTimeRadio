@@ -188,10 +188,17 @@ def test_estimate_model_size_gb_404_raises_unknown():
 def test_auto_download_gated_no_token_raises_before_snapshot_download(tmp_path, monkeypatch):
     monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1")
     monkeypatch.delenv("HF_TOKEN", raising=False)
-    # Force the Windows registry branch to also miss by stubbing
-    # resolve_hf_token to return None.
+    # The code under test asks resolve_hf_token_runtime. Since PBUG-20260829-10
+    # that also reads huggingface_hub.get_token() (HF_TOKEN AND
+    # HUGGING_FACE_HUB_TOKEN) and the login files, not only the environment and
+    # HKCU that resolve_hf_token covers. Stubbing just resolve_hf_token left the
+    # rest live: on a machine with a User-level HF_TOKEN, the pack's
+    # ensure_hf_token() copies it into os.environ under both names as soon as a
+    # test loads the package, so the full suite saw a token, the gate never
+    # fired, and the test failed there while passing alone (2026-10-24). Stub
+    # the function the code actually calls.
     monkeypatch.setattr(
-        "nodes._otr_hf_auth.resolve_hf_token", lambda: None
+        "nodes._otr_hf_auth.resolve_hf_token_runtime", lambda: None
     )
     snap = MagicMock()
     api = MagicMock()
