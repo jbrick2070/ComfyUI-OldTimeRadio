@@ -1339,6 +1339,38 @@ async function loadOptions(workflow) {
   }
 }
 
+// THE TAB TITLE SHOWS THE RUN (CreatorOS row 3.1). A run is minutes to hours
+// and the person leaves the tab; the title is the one place a hidden page can
+// speak. While a run goes it reads "(42%) Radio Play Studio", from the same
+// value the bar shows; a run that ends while the tab is hidden adds
+// "(1 ready)" until the tab is looked at. "Radio Play Studio" stays as it is
+// in every language, so the tab is still recognisable.
+const BASE_TITLE = document.title;
+let readyCount = 0, titlePct = null;
+function showTitle() {
+  const parts = [];
+  if (readyCount) parts.push(t("title.ready", {n: readyCount}, "(" + readyCount + " ready)"));
+  if (titlePct != null) parts.push("(" + titlePct + "%)");
+  parts.push(BASE_TITLE);
+  document.title = parts.join(" ");
+}
+function titleRunning(pct) { titlePct = pct; showTitle(); }
+function titleEnded(finishedWell) {
+  titlePct = null;
+  if (finishedWell && document.hidden) readyCount += 1;
+  showTitle();
+}
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && readyCount) { readyCount = 0; showTitle(); }
+});
+// The running step in plain words (row 3.2): the server names it by a
+// `phase.*` key, and a step it cannot name shows nothing at all.
+function phaseText(ev) {
+  if (!ev.phase) return "";
+  const name = t(ev.phase);
+  return name ? t("phase.wrap", {phase: name}, " (" + name + ")") : "";
+}
+
 function watch(id) {
   const es = new EventSource("/api/episodes/" + id + "/events");
   let finished = false, high = 0;   // the bar only moves forward
@@ -1348,6 +1380,7 @@ function watch(id) {
     say($("error"), "error.lost");
     $("error").hidden = false;
     say($("status"), "status.disconnected");
+    titleEnded(false);
     running = false; buttons(); refreshBoard();
   };
   es.onmessage = (m) => {
@@ -1355,9 +1388,13 @@ function watch(id) {
     if (ev.type === "progress") {
       high = Math.max(high, Math.round(ev.value * 100));
       $("fill").style.width = high + "%";
+      titleRunning(high);
       // minutes_left comes from this machine's last run of the same workflow
-      const msg = ev.message ? " " + ev.message : "";
-      if (ev.minutes_left != null) say($("status"), "progress.minutes", {pct: high, min: ev.minutes_left, msg});
+      const msg = phaseText(ev) || (ev.message ? " " + ev.message : "");
+      // Past last run's time with no pace to read, the minutes would stand
+      // still and look like a hang: say the step is taking longer (row 3.3).
+      if (ev.overrun) say($("status"), "progress.overrun", {pct: high, msg});
+      else if (ev.minutes_left != null) say($("status"), "progress.minutes", {pct: high, min: ev.minutes_left, msg});
       else if (ev.nodes_total) say($("status"), "progress.stages", {pct: high, done: ev.nodes_done, total: ev.nodes_total, msg});
       else say($("status"), "progress.pct", {pct: high, msg});
     } else if (ev.type === "step") {
@@ -1373,6 +1410,7 @@ function watch(id) {
       es.close();
       $("fill").style.width = "100%";
       say($("status"), "status.finished");
+      titleEnded(true);
       showVideo($("result"), ev.run, ev.file);
       running = false; buttons(); refreshBoard();
     } else if (ev.type === "error") {
@@ -1381,6 +1419,7 @@ function watch(id) {
       plain($("error"), ev.message);
       $("error").hidden = false;
       say($("status"), "status.stopped");
+      titleEnded(false);
       running = false; buttons(); refreshBoard();
     }
   };
@@ -2042,8 +2081,9 @@ function watchStage(id, stageName, pid) {
   refreshBoard(); buttons();
   const es = new EventSource("/api/episodes/" + id + "/events");
   let finished = false, high = 0;   // a stage's bar is its own, and only moves forward
-  const end = () => {
+  const end = (finishedWell) => {
     const shown = stageShown();
+    titleEnded(finishedWell === true);
     finished = true; es.close();
     stageBusy = false; watching = stagePid = null;
     buttons();
@@ -2064,6 +2104,7 @@ function watchStage(id, stageName, pid) {
     if (ev.type === "progress") {
       high = Math.max(high, Math.round(ev.value * 100));
       $("pfill").style.width = high + "%";
+      titleRunning(high);
       if (ev.nodes_total) say($("pstatus"), "progress.stages", {pct: high, done: ev.nodes_done, total: ev.nodes_total, msg: ""});
       else say($("pstatus"), "progress.pct", {pct: high, msg: ""});
     } else if (ev.type === "step") {
@@ -2073,7 +2114,7 @@ function watchStage(id, stageName, pid) {
     } else if (ev.type === "done") {
       $("pfill").style.width = "100%";
       say($("pstatus"), stageText(stageName).done);
-      end();
+      end(true);
     } else if (ev.type === "error") {
       plain($("perror"), ev.message); $("perror").hidden = false;
       say($("pstatus"), "status.stopped");

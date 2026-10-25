@@ -721,3 +721,77 @@ def test_a_stream_that_dies_after_its_opening_status_still_runs_out(settings, sc
     events = list(studio.stream({}))
     assert SnapshotThenDie.opened == runner.LIVE_RETRY_LIMIT + 1
     assert events[-1]["type"] == "done"
+
+
+# --- a step that runs long, and the step in plain words (CreatorOS 3.3, 3.2) --
+
+def test_a_node_past_last_runs_time_with_no_pace_is_an_overrun():
+    t = FakeClock()
+    clock = ProgressClock({"92": 900.0, "85": 100.0}, now=t)
+    clock.observe("92")
+    t.t = 600
+    assert not clock.overrun()
+    t.t = 950                                # past 900 s, and no bar to read
+    assert clock.overrun()
+    # the minutes left stood still on the nodes still to come: the reason for the line
+    assert clock.seconds_left() == pytest.approx(100.0)
+    clock.observe("85")
+    assert not clock.overrun()
+
+
+def test_a_node_whose_own_pace_is_trusted_is_never_an_overrun():
+    t = FakeClock()
+    clock = ProgressClock({"92": 900.0}, now=t)
+    clock.observe("92")
+    clock.bar("92", 500, 1000)               # half way by its own bar
+    t.t = 1200                               # longer than last time, but it says how long is left
+    assert not clock.overrun()
+
+
+def test_a_node_with_no_time_from_last_run_is_never_an_overrun():
+    t = FakeClock()
+    clock = ProgressClock({"92": 900.0}, now=t)
+    clock.observe("7")                       # not in the history: no "last time"
+    t.t = 5000
+    assert not clock.overrun()
+    clock.observe(None)
+    assert not clock.overrun()
+
+
+def test_each_otr_node_has_a_phase_and_a_subgraph_child_takes_its_parents():
+    from radio_play_studio.runner import PHASE_BY_CLASS, phase_for
+    graph = {"9": {"class_type": "OTR_VideoRenderBatch"}, "1": {"class_type": "OTR_LedgerScriptWriter"},
+             "40": {"class_type": "KSampler"}}
+    assert phase_for(graph, "9") == "phase.filming"
+    assert phase_for(graph, "9:3") == "phase.filming"
+    assert phase_for(graph, "1") == "phase.writing"
+    assert phase_for(graph, "40") is None, "a node it cannot name shows nothing"
+    assert phase_for(graph, None) is None and phase_for(None, "9") is None
+    assert phase_for(graph, "999") is None
+    import json
+    nodes = set(json.loads((Path(__file__).resolve().parents[3] / "node_list.json")
+                           .read_text(encoding="utf-8")))
+    assert set(PHASE_BY_CLASS) <= nodes, sorted(set(PHASE_BY_CLASS) - nodes)
+
+
+def test_the_stream_says_overrun_and_names_the_phase(settings, schemas):
+    pytest.importorskip("comfy_sdk")
+    from comfy_sdk.events import Progress as RealProgress
+    graph, _ = Studio(settings, fetch=lambda url: schemas).build_graph({})
+    node, spec = next((k, v) for k, v in graph.items()
+                      if v.get("class_type") == "OTR_LedgerScriptWriter")
+    save_timing(timing_path(settings.out_dir, settings.workflow_path, "1", graph), {node: 10.0})
+    good = _good_job()
+    good._events = [RealProgress(value=0.0, nodes_done=0, nodes_total=1, current_node=node,
+                                 step=0, steps=1)]
+    t = FakeClock()
+    t.t = 0
+    studio = Studio(settings, client_factory=lambda url: FakeClient(good), fetch=lambda url: schemas,
+                    now=t)
+    notes = []
+    for e in studio.stream({}):
+        if e["type"] == "progress":
+            notes.append(e)
+            t.t = 60                         # the writer runs past its 10 s from last time
+    assert notes[0]["phase"] == "phase.writing"
+    assert notes[0]["overrun"] is False

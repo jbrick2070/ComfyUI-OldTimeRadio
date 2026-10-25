@@ -221,3 +221,25 @@ def test_every_choice_a_translated_dropdown_offers_has_its_words(schemas):
     missing = [f"choice.{key}.{_slug(c)}" for key in ("bank", "language", "stills")
                for c in rows[key]["choices"] if f"choice.{key}.{_slug(c)}" not in EN]
     assert missing == []
+
+
+def test_every_phase_the_server_names_is_in_every_language():
+    """The phase keys come from the server (runner.PHASE_BY_CLASS), so the
+    page-key scan above cannot see them."""
+    from radio_play_studio.runner import PHASE_BY_CLASS
+    keys = set(PHASE_BY_CLASS.values()) | {"phase.wrap", "progress.overrun", "title.ready"}
+    for code in CODES:
+        strings = json.loads((I18N_DIR / ("%s.json" % code)).read_text(encoding="utf-8"))
+        missing = sorted(k for k in keys if not strings.get(k))
+        assert missing == [], (code, missing)
+        assert "{phase}" in strings["phase.wrap"] and "{n}" in strings["title.ready"]
+
+
+def test_the_tab_title_and_the_overrun_line_are_wired_where_the_run_ends():
+    page = PAGE.read_text(encoding="utf-8")
+    watch = page[page.index("function watch(id)"):page.index("function showVideo(")]
+    assert "titleRunning(high)" in watch and "titleEnded(true)" in watch
+    assert watch.count("titleEnded(false)") == 2, "an error and a lost connection both clear it"
+    assert 'if (ev.overrun) say($("status"), "progress.overrun"' in watch
+    assert "phaseText(ev)" in watch
+    assert 'addEventListener("visibilitychange"' in page

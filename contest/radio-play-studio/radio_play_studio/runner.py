@@ -150,6 +150,45 @@ def normalize_event(event: Any, graph_size: int = 0) -> dict | None:
     return None
 
 
+#: The running step in plain words (CreatorOS row 3.2): which `phase.*` string
+#: of the page's own i18n files names each OTR node. A class not listed shows
+#: nothing -- never a raw class name. Keep the keys in every i18n file
+#: (tests/test_rps_i18n.py checks they all exist).
+PHASE_BY_CLASS = {
+    "OTR_LedgerScriptWriter": "phase.writing",
+    "OTR_MetaBriefImagePromptGen": "phase.writing",
+    "OTR_CastLock": "phase.casting",
+    "OTR_CharacterPhoto": "phase.casting",
+    "OTR_AnnouncerVoice": "phase.voicing",
+    "OTR_BatchCharacterVoices": "phase.voicing",
+    "OTR_StableAudioTheme": "phase.music",
+    "OTR_ImageDirector": "phase.pictures",
+    "OTR_ImageGenDispatcher": "phase.pictures",
+    "OTR_ShotLock": "phase.planning",
+    "OTR_VideoDirector": "phase.planning",
+    "OTR_SceneSequencer": "phase.planning",
+    "OTR_VideoRenderBatch": "phase.filming",
+    "OTR_SilentComposite": "phase.filming",
+    "OTR_SignalLostVideo": "phase.filming",
+    "OTR_AudioEnhance": "phase.sound",
+    "OTR_EpisodeAssembler": "phase.sound",
+    "OTR_CaptionBurn": "phase.finishing",
+    "OTR_CreditsRoll": "phase.finishing",
+    "OTR_MasterAudioMux": "phase.finishing",
+}
+
+
+def phase_for(graph: dict | None, node_id: Any) -> str | None:
+    """The `phase.*` key for the node now running, or None. A node inside a
+    subgraph reports "<parent>:<child>"; the parent is the one the graph names."""
+    if node_id is None or not isinstance(graph, dict):
+        return None
+    node = str(node_id)
+    spec = graph.get(node) or graph.get(node.split(":", 1)[0])
+    class_type = spec.get("class_type") if isinstance(spec, dict) else None
+    return PHASE_BY_CLASS.get(str(class_type)) if class_type else None
+
+
 def stage_note(event: Any, graph_size: int) -> dict | None:
     """One SDK event as a Scene Producer stage shows it: as
     :func:`normalize_event` has it, with the node each progress frame belongs
@@ -536,7 +575,11 @@ class Studio:
                         if clock.calibrated:
                             note = {"type": "progress", "value": clock.share(),
                                     "message": note.get("message", ""),
-                                    "minutes_left": round(clock.seconds_left() / 60.0)}
+                                    "minutes_left": round(clock.seconds_left() / 60.0),
+                                    "overrun": clock.overrun()}
+                        phase = phase_for(graph, clock.current)
+                        if phase:
+                            note["phase"] = phase
                     if note:
                         yield note
             except Exception as exc:  # noqa: BLE001 - the stream is a view, settle() is the truth
@@ -1031,6 +1074,22 @@ class ProgressClock:
         else:
             node_left = max(0.0, self.history.get(self.current, 0.0) - elapsed)
         return node_left + later
+
+    def overrun(self) -> bool:
+        """True while the running node has gone past last run's time and its own
+        bar cannot say how far it is (CreatorOS row 3.3). Then the minutes left
+        is the time of the nodes still to come and stands still, which reads as
+        a hang; the page says the step is taking longer than last time instead.
+        Never on a node with no time from last run: no "last time" to compare."""
+        if self.current is None:
+            return False
+        expected = self.history.get(self.current, 0.0)
+        if expected <= 0:
+            return False
+        f = self.fraction()
+        if f is not None and f >= self.PACE_MIN_FRACTION and self._elapsed() >= self.PACE_MIN_SECONDS:
+            return False                # its own pace is giving a real figure
+        return self._elapsed() > expected
 
     def timings(self) -> dict:
         """Seconds each named node ran, the running one up to now."""
