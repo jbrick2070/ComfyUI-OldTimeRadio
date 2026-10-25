@@ -380,7 +380,8 @@ def test_the_mux_records_known_good_after_the_obs_copy_and_before_cleanup():
     source = (_REPO / "nodes" / "otr_master_audio_mux.py").read_text(encoding="utf-8")
     publish = source.index("obs_copy = self._publish_to_obs(final)")
     record = source.index("report.append(_record_known_good(_episode_stem(silent_video_path), obs_copy))")
-    assert publish < record
+    gate = source.index('report.append("delivery OK -- required publication verified "')
+    assert publish < gate < record, "after the obs copy and after the delivery gate"
     cleanup_calls = [i for i in range(len(source)) if source.startswith("self._asset_cleanup(", i)]
     assert cleanup_calls and all(record < i for i in cleanup_calls)
 

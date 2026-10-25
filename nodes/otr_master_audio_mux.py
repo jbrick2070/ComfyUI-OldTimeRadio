@@ -2451,12 +2451,6 @@ class OTRMasterAudioMux:
                     "published to OBS anyway -> %s",
                     decision.summary(), obs_copy,
                 )
-            # THE KNOWN-GOOD ENVIRONMENT (CreatorOS row 2.2): an episode just
-            # reached otr/obs, so what this process runs on is this machine's
-            # known-good, for scripts/otr_env_drift.py. Recorded here, not by
-            # a runner afterwards: the asset cleanup below can delete the
-            # episode's ledger, and only this process knows its own env.
-            report.append(_record_known_good(_episode_stem(silent_video_path), obs_copy))
             # N2 (truthful ledger): this terminal node restamps
             # final_video_path over the pre-credits/pre-mux video it is handed.
             report.append(self._stamp_terminal_paths(
@@ -2487,6 +2481,13 @@ class OTRMasterAudioMux:
                         % (obs_copy, _stamped))
                 report.append("delivery OK -- required publication verified "
                               "on disk and on the ledger")
+            # THE KNOWN-GOOD ENVIRONMENT (CreatorOS row 2.2): the episode is in
+            # otr/obs and, where it had to be, the delivery gate above passed,
+            # so what this process runs on is this machine's known-good, for
+            # scripts/otr_env_drift.py. Recorded here, not by a runner
+            # afterwards: the asset cleanup below can delete the episode's
+            # ledger, and only this process knows its own environment.
+            report.append(_record_known_good(_episode_stem(silent_video_path), obs_copy))
             # OH-3 (output-tree contract 2026-06-11): post-publish janitor
             # pass over episodes/_shared/tmp -- fully fail-soft (PD1, never
             # blocks the mux). One of the two sanctioned auto-deletes; the
