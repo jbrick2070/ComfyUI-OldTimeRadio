@@ -19,3 +19,10 @@
 2026-10-27 | Writer | talkie-1930-13b-it | TEST | https://huggingface.co/talkie-lm/talkie-1930-13b-it
 2026-10-27 | Writer | Mr.Chatterbox successor family | WATCH | https://huggingface.co/tventurella/mr_chatterbox_model
 2026-10-27 | Writer | TimeCapsuleLLM 1800-1875 | WATCH | https://huggingface.co/haykgrigorian/TimeCapsuleLLM-London-1800-1875-v2-1.2B
+2026-10-27 | Voice | Maya 2 Native | WATCH | https://huggingface.co/maya-research/maya2-native
+2026-10-27 | Voice | Fish Audio Drama 3 | WATCH | https://huggingface.co/fishaudio/drama-3
+2026-10-27 | Voice | Sony Woosh (SFX) | WATCH | https://github.com/SonyResearch/Woosh
+2026-10-27 | Image | MOSS-Image hi-res LoHa | WATCH | https://huggingface.co/comfyanonymous/MOSS_image_MAX_ULTRA_hires_lora_test
+2026-10-27 | Upscale | Minimax H3 Latent Upscaler | WATCH | https://huggingface.co/Gavining/Minimax_h3_latent_Upscaler
+2026-10-27 | Writer | quill-voice/shakespeare | WATCH | https://huggingface.co/quill-voice/shakespeare
+2026-10-27 | Writer | Ranke-4B / TypewriterLM (news only) | WATCH | https://github.com/entanglr/awesome-vintage-llms
