@@ -5,3 +5,11 @@
 2026-10-26 | Kandinsky 6.0 Video | WATCH | https://comfyui-wiki.com/news/2026-10-06-kandinsky-6-0
 2026-10-26 | Kling 4.0 nodes (CLOUD) | WATCH | https://github.com/Comfy-Org/ComfyUI/commit/de37ca29
 2026-10-26 | Qwen-Image 2.1 DMD2 LoRA | WATCH | https://huggingface.co/Comfy-Org/Qwen-Image-2.1
+2026-10-27 | Voice | KittenTTS 2 | TEST | https://huggingface.co/KittenML/kitten-tts-2
+2026-10-27 | Voice | Gradium Phonon family | WATCH | https://huggingface.co/gradium/phonon-31m-en
+2026-10-27 | Voice | ComfyUI-FishS2-GGUF (Fish S2 Pro) | WATCH | https://github.com/xuanhai0/ComfyUI-FishS2-GGUF
+2026-10-27 | Video | FastH3-QAD-v2 NVFP4 and PTD+RefAsymOPD LoRAs | WATCH | https://huggingface.co/taobao-content-ai/MiniMax-H3-PTD-RefAsymOPD-LoRAs
+2026-10-27 | Video | Kling 4.0 nodes (CLOUD, now in v0.43.0) | WATCH | https://github.com/Comfy-Org/ComfyUI/commit/de37ca29
+2026-10-27 | Video | EdenLive | SKIP | https://huggingface.co/VAST-AI/EdenLive
+2026-10-27 | Image | Kromoss | WATCH | https://huggingface.co/lodestones/Kromoss
+2026-10-27 | Image | Qwen-Image-2.1 Consistency LoRA | SKIP | https://huggingface.co/ausboss/Qwen-Image-2.1-Consistency-LoRA
