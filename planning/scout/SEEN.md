@@ -13,3 +13,9 @@
 2026-10-27 | Video | EdenLive | SKIP | https://huggingface.co/VAST-AI/EdenLive
 2026-10-27 | Image | Kromoss | WATCH | https://huggingface.co/lodestones/Kromoss
 2026-10-27 | Image | Qwen-Image-2.1 Consistency LoRA | SKIP | https://huggingface.co/ausboss/Qwen-Image-2.1-Consistency-LoRA
+2026-10-27 | Upscale | Nvidia VFX Nodes 0.2.1 (RTX VSR, frame gen) | WATCH | https://comfyui-wiki.com/en/news/2026-10-13-nvidia-vfx-nodes
+2026-10-27 | Upscale | FlashVSR+ | WATCH | https://huggingface.co/ruchangyao/FlashVSR_plus
+2026-10-27 | Upscale | LTX-2.5 IC-LoRA Pixel-Spatial-Upscaler | WATCH | https://huggingface.co/Lightricks/LTX-2.5-22b-IC-LoRA-Pixel-Spatial-Upscaler
+2026-10-27 | Writer | talkie-1930-13b-it | TEST | https://huggingface.co/talkie-lm/talkie-1930-13b-it
+2026-10-27 | Writer | Mr.Chatterbox successor family | WATCH | https://huggingface.co/tventurella/mr_chatterbox_model
+2026-10-27 | Writer | TimeCapsuleLLM 1800-1875 | WATCH | https://huggingface.co/haykgrigorian/TimeCapsuleLLM-London-1800-1875-v2-1.2B
