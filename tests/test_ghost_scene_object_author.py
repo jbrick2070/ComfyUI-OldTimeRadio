@@ -57,7 +57,7 @@ def test_a_word_inside_another_word_is_not_grounding():
 
 
 def test_a_plural_in_the_line_grounds_the_singular():
-    assert A.admit(["floorboard"], "You won't hide it beneath the floorboards this time.") == ["floorboard"]
+    assert A.admit(["floorboard"], "Hide it beneath the floorboards this time.") == ["floorboards"]
 
 
 @pytest.mark.parametrize("line", [
@@ -204,8 +204,8 @@ def test_the_head_of_a_multi_word_phrase_is_its_last_word():
 
 
 def test_singular_and_plural_spellings_match_in_both_directions():
-    assert A.admit(["floorboards"], "Pry up the floorboard.") == ["floorboards"]
-    assert A.admit(["floorboard"], "Pry up the floorboards.") == ["floorboard"]
+    assert A.admit(["floorboards"], "Pry up the floorboard.") == ["floorboard"]
+    assert A.admit(["floorboard"], "Pry up the floorboards.") == ["floorboards"]
 
 
 # --------------------------------------------------------------------------- #
@@ -244,9 +244,100 @@ def test_a_cast_title_is_not_a_name_but_a_real_name_still_is():
     ("ferry", "Board the ferries."), ("ferries", "Board the ferry."),
 ])
 def test_the_regular_irregular_plurals_match(phrase, line):
-    assert A.admit([phrase], line) == [phrase]
+    stored = A.admit([phrase], line)
+    assert len(stored) == 1 and stored[0] in line.lower()      # the LINE's own spelling is what is kept
 
 
 def test_a_designation_with_a_digit_is_kept_when_its_head_is_a_word():
     assert A.admit(["bay 4 door"], "Meet me at the bay 4 door.") == ["bay 4 door"]
     assert A.admit(["bay 4"], "Meet me at bay 4.") == []
+
+
+# --------------------------------------------------------------------------- #
+# Found by the Sonnet QA of the pushed commit: each of these got through the first version
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("line", [
+    "I can’t see the lantern.",                 # a curly apostrophe must not hide the negator
+    "She wasn’t holding the lantern.",
+    "You cannot touch the lantern.",
+    "You shouldn't touch the lantern.",
+    "He hadn't lit the lantern.",
+    "There is not a single carved wooden lantern.",  # five words from the negator
+    "There was no sign of the old brass lantern.",
+])
+def test_the_negation_holes_are_closed(line):
+    assert A.admit(["lantern"], line) == []
+
+
+def test_a_curly_apostrophe_does_not_split_a_word_into_junk():
+    assert A.admit(["Carl’s coat"], "Carl’s coat is here.") == ["carl's coat"]
+    assert A.admit(["s"], "Carl’s coat") == []
+    assert A.admit(["t"], "I can’t") == []
+
+
+@pytest.mark.parametrize("phrase", ["Spender's", "Rashida's", "Spender's lamp", "Carl coat", "Kendalls"])
+def test_a_cast_name_is_refused_wherever_it_sits_in_the_phrase(phrase):
+    line = "Spender's lamp, Rashida's coat, Carl coat, the Kendalls and Rashida's boots."
+    names = ["ANNOUNCER", "ADRIAN SPENDER", "RASHIDA PIERCE", "Carl Kendall"]
+    assert A.admit([phrase], line, names=names) == []
+
+
+def test_a_list_is_not_fused_into_one_region():
+    line = "I need a rope, knife, lantern before dawn."
+    assert A.admit(["rope knife lantern"], line) == []
+    assert A.admit(["rope", "knife", "lantern"], line) == ["rope", "knife", "lantern"]
+    assert A.admit(["table lid"], "Put it on the table, lid up.") == []
+    assert A.admit(["key door"], "the key -- door was open") == []
+
+
+@pytest.mark.parametrize("phrase, line", [
+    ("safe", "He saves the day"), ("panes", "pan"), ("does", "do"), ("news", "new"),
+])
+def test_different_words_do_not_collide(phrase, line):
+    assert A.admit([phrase], line) == []
+
+
+@pytest.mark.parametrize("word", ["voices", "lives", "fears", "nights", "men", "women", "truths", "places",
+                                  "moments", "patterns", "girl", "mother", "doctor", "announcer"])
+def test_the_deny_list_is_closed_under_plurals_and_covers_people(word):
+    assert A.admit([word], "The %s were all there, and so were the %s." % (word, word)) == []
+
+
+@pytest.mark.parametrize("word", ["you", "I", "he", "and", "is", "of", "what", "slowly", "own"])
+def test_function_words_are_never_objects(word):
+    assert A.admit([word], "Is that %s there, and of what own kind, slowly, I and he" % word) == []
+
+
+def test_plural_and_singular_of_one_thing_are_one_region():
+    assert A.admit(["stone", "stones"], "the stone and the stones") == ["stone"]
+    assert A.admit(["key", "keys"], "the key and the keys") == ["key"]
+
+
+def test_a_null_for_one_id_does_not_cost_the_others():
+    assert A.parse_response('{"b1": ["stone"], "b2": null, "b3": ["lamp"]}', ["b1", "b2", "b3"]) == {
+        "b1": ["stone"], "b2": [], "b3": ["lamp"]}
+
+
+def test_non_ascii_words_are_kept_whole():
+    assert A.admit(["château"], "The château burns.") == ["château"]
+    assert A.admit(["niño"], "El niño corre.") == ["niño"]
+
+
+def test_a_possessive_head_is_not_an_object():
+    assert A.admit(["captain's"], "Where is the captain's?") == []
+
+
+def test_a_long_episode_is_asked_in_chunks_and_a_failed_chunk_costs_only_its_own_beats():
+    beats = [{"id": "b%d" % i, "line": "Bring the lamp number %d now." % i} for i in range(1, 31)]
+    calls = []
+
+    def gen(messages, temperature=None, max_new_tokens=None):
+        calls.append(max_new_tokens)
+        if len(calls) == 2:
+            raise RuntimeError("out of memory")
+        ids = [t.split(":")[0] for t in messages[0]["content"].splitlines() if t[:1] == "b" and ":" in t]
+        return "{" + ", ".join('"%s": ["lamp"]' % i for i in ids) + "}"
+    out = A.adapt_scene_objects(gen, beats)
+    assert len(calls) == 3                                    # 12 + 12 + 6
+    assert all(n <= A.REPLY_TOKENS_CEILING for n in calls)
+    assert set(out) == {"b%d" % i for i in list(range(1, 13)) + list(range(25, 31))}

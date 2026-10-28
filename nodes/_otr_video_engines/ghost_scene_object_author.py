@@ -7,20 +7,22 @@ The authored per-beat leaf is no better: it is a stock vocabulary (a rope, a blu
 the line. The operator's conclusion (2026-10-28): the prompts must talk about REAL objects, and the system has
 to adapt the dialogue into them. This module does that, for the opt-in lab lanes only.
 
-WHAT IT DOES. One short model call per episode reads each character beat's spoken line and PICKS which of the
-line's own words are physical things or places a camera could film. It cannot invent: every phrase it returns
-must pass :func:`admit`, which keeps a phrase only when
+WHAT IT DOES. A short model call reads each character beat's spoken line and PICKS which of the line's own
+words are physical things or places a camera could film. It cannot invent: every phrase it returns must pass
+:func:`admit`, which keeps a phrase only when
 
 * it is one to four words;
 * it is a CONTIGUOUS run of the spoken line's own words, each a whole word (a plural or singular spelling is
-  fine), so the model can drop words from the line but never add or reorder one: "open the box" cannot become
-  "glowing radioactive box", "brass key" cannot be assembled from "the brass door and the key", and "ring"
-  is never found inside "during";
+  fine), with no comma, colon or dash between them, so the model can drop words from the line but never add,
+  reorder or fuse them: "open the box" cannot become "glowing radioactive box", "brass key" cannot be
+  assembled from "the brass door and the key", "rope, knife, lantern" is three objects and not one, and
+  "ring" is never found inside "during". The phrase that is STORED is the line's own spelling;
 * no bare negator sits in the few words before the run inside its own sentence ("there is no ledger" gives
-  none); its LAST word is its head, which is what the placeholder list and the de-duplication read;
-* its head is not a placeholder or an abstraction (thing, something, truth, time ...);
-* it is not a cast member's name; and
-* its head is not already taken by an earlier phrase.
+  none; "you cannot touch the lantern" gives none);
+* its LAST word (the head) is not a placeholder, an abstraction, a person, a pronoun or any other function
+  word, in either spelling, singular or plural;
+* none of its words is a cast member's name (or a possessive or plural of one); and
+* its head is not already taken by an earlier phrase, in any plural or singular spelling.
 
 At most three survive, which is what the regions layout can hold. Anything that fails is dropped silently and
 the beat falls back to the pool-based resolver, so a bad model answer can only remove a region, never add a
@@ -28,39 +30,64 @@ wrong one.
 
 THE DIALOGUE IS DATA, NOT INSTRUCTIONS. The prompt says so, and grounding in the line is the real guard: a
 line that tries to talk to the model can only ever contribute words it itself contains. The reply parser is
-TOLERANT of a code fence or a sentence around the JSON object (a small model writes both), strict about the
-shape (an object, string lists only, no duplicate keys), ignores ids it was not asked about, and reads a
-missing id as "nothing filmable here". Safety does not rest on the parser; it rests on :func:`admit`.
+TOLERANT of a code fence or a sentence around the JSON object and of a trailing comma (a small model does
+all three), strict about the shape (an object, string lists only, no duplicate keys), ignores ids it was not
+asked about, and reads a missing id or a null as "nothing filmable here". Safety does not rest on the parser;
+it rests on :func:`admit`.
 
 A CAST NAME THAT IS ALSO A NOUN (a character called Rose) is dropped as a name. That is deliberate
 abstention: losing one flower region is cheaper than painting a person as an object.
 
+LONG EPISODES are asked in chunks of at most :data:`MAX_BEATS_PER_CALL` beats, so the reply budget is never
+the limit; one chunk failing loses only its own beats.
+
 WHAT IT DOES NOT DO. It does not rewrite, improve or shorten the dialogue or the story (that topic is closed),
 it does not touch the kernel, and it is not called for any lane that does not declare ``wants_scene_regions``.
 
-Cold-import clean: no torch, no ComfyUI; the regions helpers it reuses import numpy lazily.
+Cold-import clean: no torch, no ComfyUI.
 """
 from __future__ import annotations
 
 import json
 import logging
 import re
+import unicodedata
 
-from .ghost_scene_regions import (
-    SCENE_REGION_MAX_OBJECTS, _NEGATION_WINDOW, _NEGATORS, _SENTENCE_END, _WORD)
+from .ghost_scene_regions import SCENE_REGION_MAX_OBJECTS, _NEGATORS, _SENTENCE_END
 
 _LOG = logging.getLogger("OTR.video.ghost_scene_object_author")
 
-#: Words a phrase may not END in: they say nothing a camera could film.
+#: Words a phrase may not END in: they say nothing a camera could film. Checked in every plural or
+#: singular spelling (``lives`` is refused because ``life`` is).
 _DENY_HEADS = frozenset({
-    "thing", "things", "something", "anything", "everything", "nothing", "stuff", "one", "ones",
-    "it", "this", "that", "these", "those", "there", "here", "way", "ways", "time", "times", "moment",
-    "story", "stories", "truth", "secret", "secrets", "answer", "answers", "question", "questions",
-    "chaos", "idea", "ideas", "reason", "reasons", "fact", "facts", "point", "matter", "life", "world",
-    "day", "night", "man", "woman", "people", "person", "folks", "friend", "friends", "lot", "bit",
-    "kind", "sort", "part", "place", "move", "word", "words", "name", "names", "voice", "silence",
-    "pain", "fear", "hope", "love", "hate", "anger", "sorrow", "joy", "shadow", "shadows",
-    "tide", "mystery", "mysteries", "danger", "damage", "cost", "price", "pattern", "context",
+    # placeholders and abstractions
+    "thing", "something", "anything", "everything", "nothing", "stuff", "one", "way", "time", "moment",
+    "story", "truth", "secret", "answer", "question", "chaos", "idea", "reason", "fact", "point", "matter",
+    "life", "world", "day", "night", "lot", "bit", "kind", "sort", "part", "place", "move", "word", "name",
+    "voice", "silence", "pain", "fear", "hope", "love", "hate", "anger", "sorrow", "joy", "shadow",
+    "mystery", "danger", "damage", "cost", "price", "pattern", "context", "news", "case", "chance", "end",
+    "side", "sense", "mind", "heart", "soul", "spirit", "memory", "dream", "future", "past", "present",
+    # people (the picture already has its cast)
+    "man", "men", "woman", "women", "people", "person", "folk", "folks", "friend", "child", "children",
+    "kid", "baby", "girl", "boy", "mother", "father", "mom", "dad", "brother", "sister", "son", "daughter",
+    "wife", "husband", "doctor", "officer", "captain", "sir", "madam", "lady", "gentleman", "stranger",
+    "soldier", "announcer", "narrator", "host", "everyone", "everybody", "someone", "somebody", "anyone",
+    "anybody", "nobody",
+})
+
+#: Function words: a phrase ending in one names nothing.
+_FUNCTION_WORDS = frozenset({
+    "i", "you", "he", "she", "it", "we", "they", "me", "him", "her", "us", "them", "my", "your", "his",
+    "its", "our", "their", "mine", "yours", "ours", "theirs", "myself", "yourself", "himself", "herself",
+    "itself", "ourselves", "themselves", "this", "that", "these", "those", "there", "here", "who", "whom",
+    "whose", "which", "what", "when", "where", "why", "how", "and", "or", "but", "nor", "so", "yet", "if",
+    "than", "then", "of", "to", "in", "on", "at", "by", "for", "with", "from", "into", "onto", "over",
+    "under", "about", "after", "before", "between", "through", "as", "is", "are", "was", "were", "be",
+    "been", "being", "am", "do", "does", "did", "done", "have", "has", "had", "will", "would", "shall",
+    "should", "can", "could", "may", "might", "must", "not", "no", "yes", "very", "too", "also", "just",
+    "only", "own", "same", "such", "all", "any", "some", "each", "every", "both", "either", "neither",
+    "more", "most", "much", "many", "few", "less", "other", "another", "now", "never", "always", "still",
+    "again", "slowly", "quickly", "back", "away", "out", "up", "down", "off",
 })
 
 #: Words in a cast entry that are a ROLE or a title, not a name: a cast entry "The Radio Announcer" must not
@@ -70,7 +97,26 @@ _GENERIC_NAME_WORDS = frozenset({
     "announcer", "narrator", "host", "radio", "voice", "old", "young", "little", "big",
 })
 
+#: Negators this module honours: the regions resolver's set plus the contractions and adverbs it lacks.
+_NEGATORS_HERE = frozenset(_NEGATORS) | frozenset({
+    "cannot", "hadn't", "hadnt", "shouldn't", "shouldnt", "mustn't", "mustnt", "ain't", "aint", "nowhere",
+    "needn't", "neednt", "mightn't", "mightnt",
+})
+#: How many words before a run a negator may sit and still reach it. Wider than the resolver's, because
+#: abstaining is the safe direction.
+_NEGATION_WINDOW = 6
+
 _TRAILING_COMMA = re.compile(r",\s*([\]}])")
+
+#: A word (letters or digits in any script, with inner apostrophes) or a clause break. A clause break stops a
+#: run from fusing a list; it does not stop a negator from reaching across it.
+_TOKEN = re.compile(r"[^\W_]+(?:'[^\W_]+)*|[,:—–]|--+")
+_BREAKS = (",", ":", "—", "–")
+
+
+def _is_break(token) -> bool:
+    return token in _BREAKS or token.startswith("--")
+
 
 #: Leading words removed from a phrase before it is stored ("the old stone" is kept as "old stone").
 _DETERMINERS = frozenset({"a", "an", "the", "this", "that", "these", "those", "my", "your", "his", "her",
@@ -78,6 +124,9 @@ _DETERMINERS = frozenset({"a", "an", "the", "this", "that", "these", "those", "m
 
 #: The most words one phrase may carry.
 MAX_PHRASE_WORDS = 4
+
+#: The most beats one model call carries. Twelve beats is about 300 reply tokens, well inside the budget.
+MAX_BEATS_PER_CALL = 12
 
 #: Output room per beat: an id, up to three short phrases and the JSON punctuation (about 25 tokens), with
 #: headroom; and a floor/ceiling so a one-beat episode still has room and a long one cannot run away.
@@ -95,7 +144,7 @@ def reply_budget(beat_count) -> int:
 
 
 class SceneObjectAuthorError(ValueError):
-    """The model's reply was not the strict JSON object this module accepts."""
+    """The model's reply was not the JSON object this module accepts."""
 
 
 def build_prompt(beats) -> str:
@@ -124,20 +173,21 @@ def build_prompt(beats) -> str:
 def parse_response(raw, ids) -> dict:
     """``{id: [phrase, ...]}`` for the ids the reply answered; raise on anything but a JSON object.
 
-    Tolerates a code fence and prose around the object (a small model does both) but nothing about the
-    SHAPE: the value for an id must be a list of strings, or the whole reply is rejected.
+    Tolerates a code fence, prose around the object and a trailing comma (a small model does all three).
+    The SHAPE is not negotiable: a value must be a list of strings (or null, read as an empty list), a
+    duplicate key rejects the reply, and an id nobody asked about is ignored.
     """
     text = str(raw or "")
     start, end = text.find("{"), text.rfind("}")
     if start < 0 or end <= start:
         raise SceneObjectAuthorError("no JSON object in the reply")
+
     def _no_duplicate_keys(pairs):
         keys = [k for k, _ in pairs]
         if len(set(keys)) != len(keys):
             raise ValueError("duplicate key")
         return dict(pairs)
     try:
-        # A trailing comma is the one JSON slip a small model makes every day and it changes nothing.
         data = json.loads(_TRAILING_COMMA.sub(r"\1", text[start:end + 1]),
                           object_pairs_hook=_no_duplicate_keys)
     except ValueError as exc:
@@ -149,86 +199,149 @@ def parse_response(raw, ids) -> dict:
     for key, value in data.items():
         if key not in wanted:
             continue
+        if value is None:
+            out[key] = []
+            continue
         if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
             raise SceneObjectAuthorError("the value for %r is not a list of strings" % (key,))
         out[key] = list(value)
     return out
 
 
-def _normalise(phrase) -> str:
-    words = [w for w in _WORD.findall(str(phrase or "").lower())]
+def _fold(text) -> str:
+    """Lower-case, composed, with curly apostrophes made straight so "don’t" is one word."""
+    folded = unicodedata.normalize("NFC", str(text or "")).lower()
+    return folded.replace("’", "'").replace("‘", "'").replace("ʼ", "'")
+
+
+def _words(text) -> list:
+    return [t for t in _TOKEN.findall(_fold(text)) if not _is_break(t)]
+
+
+def _normalise(phrase) -> list:
+    words = _words(phrase)
     while words and words[0] in _DETERMINERS:
         words = words[1:]
-    return " ".join(words)
+    return words
 
 
 def _forms(word) -> set:
-    """The spellings of ``word`` that count as the same word: itself, and its plural or singular."""
-    forms = {word, word + "s", word + "es"}
-    if word.endswith("es") and len(word) > 3:
-        forms.add(word[:-2])
-    if word.endswith("s") and len(word) > 2:
+    """The spellings of ``word`` that count as the same word: itself, and its plural or singular.
+
+    Deliberately narrow: ``safe`` must not match ``saves``, ``panes`` must not match ``pan``, ``does`` must
+    not match ``do``. The f/fe to ves rule needs a stem of five or more letters (knife, shelf), the es rule
+    needs a stem ending in s, x, z, ch or sh (box, bench), and the ies rule needs a consonant before the y.
+    """
+    forms = {word, word + "s"}
+    sibilant = ("s", "x", "z", "ch", "sh")
+    if word.endswith(sibilant):
+        forms.add(word + "es")
+    if len(word) > 3 and word.endswith("s"):
         forms.add(word[:-1])
-    # The regular irregulars: knife/knives, shelf/shelves, story/stories.
-    if word.endswith("ves") and len(word) > 4:
-        forms.update({word[:-3] + "f", word[:-3] + "fe"})
-    if word.endswith("ies") and len(word) > 4:
+    if len(word) > 3 and word.endswith("es") and word[:-2].endswith(sibilant):
+        forms.add(word[:-2])
+    if len(word) > 4 and word.endswith("ies"):
         forms.add(word[:-3] + "y")
-    if word.endswith("fe") and len(word) > 3:
-        forms.add(word[:-2] + "ves")
-    elif word.endswith("f") and len(word) > 2:
-        forms.add(word[:-1] + "ves")
-    if word.endswith("y") and len(word) > 2:
+    if len(word) > 2 and word.endswith("y") and word[-2] not in "aeiou":
         forms.add(word[:-1] + "ies")
+    if len(word) > 4 and word.endswith("ves"):
+        forms.update({word[:-3] + "f", word[:-3] + "fe"})
+    if len(word) > 4 and word.endswith("fe"):
+        forms.add(word[:-2] + "ves")
+    elif len(word) > 4 and word.endswith("f"):
+        forms.add(word[:-1] + "ves")
     return forms
 
 
-def _stance_at_span(line_text, words) -> str:
-    """``"clean"``, ``"negated"`` or ``"absent"``: how the line treats ``words`` as one CONTIGUOUS run.
+def _stem(word) -> str:
+    """The word without a possessive or a plural, for comparing against names."""
+    if word.endswith("'s"):
+        return word[:-2]
+    if word.endswith("s'"):
+        return word[:-2]
+    if len(word) > 3 and word.endswith("s"):
+        return word[:-1]
+    return word
 
-    The run is matched whole word by whole word (a plural or singular spelling counts), so nothing the line
-    does not say in that order can match. ``clean`` needs one match with no bare negator in the few words
-    before it inside its own sentence; a mention under a negator makes the answer ``negated``.
+
+def _match_in_line(line_text, words):
+    """``("clean" | "negated" | "absent", matched_tokens)``: how the line treats ``words`` as one run.
+
+    The run is matched whole word by whole word on CONSECUTIVE words (a clause break between them ends
+    it), so nothing the line does not say in that order can match. ``clean`` needs one match with no
+    negator in the few words before it inside its own sentence; the matched tokens are the LINE's own
+    spelling. A mention under a negator makes the answer ``negated``.
     """
     mentioned = False
-    for sentence in _SENTENCE_END.split(str(line_text or "").lower()):
-        tokens = _WORD.findall(sentence)
+    for sentence in _SENTENCE_END.split(_fold(line_text)):
+        tokens = _TOKEN.findall(sentence)
         for start in range(len(tokens) - len(words) + 1):
-            if not all(tokens[start + k] in _forms(word) for k, word in enumerate(words)):
+            window = tokens[start:start + len(words)]
+            if any(_is_break(t) for t in window):
+                continue
+            if not all(tok in _forms(word) for tok, word in zip(window, words)):
                 continue
             mentioned = True
-            if not any(t in _NEGATORS for t in tokens[max(0, start - _NEGATION_WINDOW):start]):
-                return "clean"
-    return "negated" if mentioned else "absent"
+            before = [t for t in tokens[max(0, start - _NEGATION_WINDOW):start] if not _is_break(t)]
+            if not any(t in _NEGATORS_HERE for t in before):
+                return "clean", window
+    return ("negated" if mentioned else "absent"), []
+
+
+def _is_denied(word, deny) -> bool:
+    return bool(_forms(word) & deny)
 
 
 def admit(phrases, line_text, names=()) -> list:
     """The phrases that pass every rule in the module docstring, in order, at most three."""
-    name_words = set()
+    name_stems = set()
     for name in names or ():
-        name_words.update(w for w in _WORD.findall(str(name or "").lower())
-                          if w not in _GENERIC_NAME_WORDS)
-    kept, heads = [], set()
+        for w in _words(name):
+            if w not in _GENERIC_NAME_WORDS:
+                name_stems.add(_stem(w))
+    deny = _DENY_HEADS | _FUNCTION_WORDS
+    kept, taken = [], set()
     for raw in phrases or ():
-        phrase = _normalise(raw)
-        words = phrase.split()
+        words = _normalise(raw)
         if not words or len(words) > MAX_PHRASE_WORDS:
             continue
+        # A head with no letter ("bay 4" ends in "4") or a possessive head ("captain's") names no object.
         head = words[-1]
-        # A head with no letter ("bay 4" ends in "4") names nothing; digits elsewhere are fine.
-        if head in _DENY_HEADS or head in name_words or not any(ch.isalpha() for ch in head):
+        if not any(ch.isalpha() for ch in head) or head.endswith("'s") or head.endswith("s'"):
             continue
-        # The phrase must be a contiguous run of the line's own words, un-negated: the model may drop
-        # words from the line, never add or reorder one.
-        if _stance_at_span(line_text, words) != "clean":
+        if any(_stem(w) in name_stems for w in words):
             continue
-        if head in heads:
+        stance, matched = _match_in_line(line_text, words)
+        if stance != "clean":
             continue
-        heads.add(head)
-        kept.append(phrase)
+        # The stored phrase is the LINE's own spelling; both spellings must pass the head rules.
+        if _is_denied(head, deny) or _is_denied(matched[-1], deny):
+            continue
+        head_forms = _forms(matched[-1]) | _forms(head)
+        if head_forms & taken:
+            continue
+        taken |= head_forms
+        kept.append(" ".join(matched))
         if len(kept) >= SCENE_REGION_MAX_OBJECTS:
             break
     return kept
+
+
+def _ask(gen, chunk) -> dict:
+    """The parsed answers for one chunk of beats, or ``{}`` after logging why not. Never raises."""
+    ids = [b["id"] for b in chunk]
+    message = build_prompt(chunk)
+    try:
+        raw = gen([{"role": "user", "content": message}],
+                  temperature=REPLY_TEMPERATURE, max_new_tokens=reply_budget(len(chunk)))
+    except Exception as exc:  # noqa: BLE001 -- the GENERATION call only; a failed model never fails a plan
+        _LOG.warning("[OTR.video.ghost_scene_object_author] the model call failed: %s", exc)
+        return {}
+    try:
+        return parse_response(raw, ids)
+    except SceneObjectAuthorError as exc:
+        _LOG.warning("[OTR.video.ghost_scene_object_author] unreadable reply: %s", exc)
+        return {}
 
 
 def adapt_scene_objects(gen, beats, *, names=()) -> dict:
@@ -237,36 +350,26 @@ def adapt_scene_objects(gen, beats, *, names=()) -> dict:
     NEVER RAISES. ``gen`` is the same callable the Ghost author uses
     (``gen(messages, temperature=, max_new_tokens=) -> str``). With no ``gen``, a failed call, an
     unreadable reply or no admitted phrase the result for that beat is simply absent, and the render
-    falls back to the pool-based resolver. A beat with no spoken line is skipped before the call. The log
-    line carries eligible / answered / admitted so a failed extraction reads differently from a line that
-    honestly names nothing.
+    falls back to the pool-based resolver. A beat with no spoken line is skipped before the call. Beats are
+    asked in chunks of :data:`MAX_BEATS_PER_CALL`. The log line carries eligible / answered / admitted so a
+    failed extraction reads differently from a line that honestly names nothing.
     """
     beats = [b for b in beats if " ".join(str(b.get("line") or "").split())]
     if gen is None or not beats:
         return {}
-    ids = [b["id"] for b in beats]
-    message = build_prompt(beats)
-    try:
-        raw = gen([{"role": "user", "content": message}],
-                  temperature=REPLY_TEMPERATURE, max_new_tokens=reply_budget(len(beats)))
-    except Exception as exc:  # noqa: BLE001 -- the GENERATION call only; a failed model never fails a plan
-        _LOG.warning("[OTR.video.ghost_scene_object_author] the model call failed: %s", exc)
-        return {}
-    try:
-        answered = parse_response(raw, ids)
-    except SceneObjectAuthorError as exc:
-        _LOG.warning("[OTR.video.ghost_scene_object_author] unreadable reply: %s", exc)
-        return {}
     lines = {b["id"]: b["line"] for b in beats}
+    answered = {}
+    for first in range(0, len(beats), MAX_BEATS_PER_CALL):
+        answered.update(_ask(gen, beats[first:first + MAX_BEATS_PER_CALL]))
     out = {}
-    for beat_id in ids:
-        admitted = admit(answered.get(beat_id), lines[beat_id], names=names)
+    for beat in beats:
+        admitted = admit(answered.get(beat["id"]), lines[beat["id"]], names=names)
         if admitted:
-            out[beat_id] = admitted
+            out[beat["id"]] = admitted
     _LOG.info("[OTR.video.ghost_scene_object_author] eligible=%d answered=%d admitted=%d",
-              len(ids), sum(1 for v in answered.values() if v), len(out))
+              len(beats), sum(1 for v in answered.values() if v), len(out))
     return out
 
 
 __all__ = ["SceneObjectAuthorError", "build_prompt", "parse_response", "admit", "adapt_scene_objects",
-           "reply_budget", "MAX_PHRASE_WORDS", "REPLY_TEMPERATURE"]
+           "reply_budget", "MAX_PHRASE_WORDS", "MAX_BEATS_PER_CALL", "REPLY_TEMPERATURE"]
