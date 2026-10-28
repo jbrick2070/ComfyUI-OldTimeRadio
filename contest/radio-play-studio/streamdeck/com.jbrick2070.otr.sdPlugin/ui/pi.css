@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: MIT */
+/* The Studio page's own colours (radio_play_studio/static/index.html :root). */
 body {
-  background: #1F1710;
-  color: #FDF6E3;
+  background: #12092F;
+  color: #F4EDFB;
   font-family: "Segoe UI", Arial, sans-serif;
   font-size: 12px;
   margin: 0;
@@ -9,11 +10,13 @@ body {
 }
 h3 {
   font-size: 12px;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #F59E0B;
+  color: #F4EDFB;
+  text-shadow: 1px 1px 0 #7C3AED;
   margin: 12px 0 6px 0;
-  border-bottom: 1px solid #3A2E22;
+  border-bottom: 2px solid #50F898;
   padding-bottom: 4px;
 }
 .row {
@@ -25,26 +28,26 @@ h3 {
 .row label {
   width: 105px;
   flex-shrink: 0;
-  color: #C9B79C;
+  color: #B9ACDC;
 }
 .row select, .row input[type="number"] {
   flex: 1;
-  background: #140F0A;
-  color: #FDF6E3;
-  border: 1px solid #7C6A55;
-  border-radius: 4px;
+  background: #1C1240;
+  color: #F4EDFB;
+  border: 1px solid #7A64B8;
+  border-radius: 6px;
   padding: 4px 6px;
   font-size: 12px;
 }
 .status-banner {
   padding: 6px 8px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-weight: 600;
   margin-bottom: 6px;
 }
-.status-ok { background: #064E3B; border: 1px solid #22C55E; color: #D1FAE5; }
-.status-warn { background: #3A2E22; border: 1px solid #F59E0B; color: #FDF6E3; }
-.status-err { background: #451A03; border: 1px solid #EF4444; color: #FFEDD5; }
-.detail { color: #C9B79C; margin: 0 0 8px 0; display: none; word-break: break-word; }
-.help { color: #7C6A55; margin: 4px 0 10px 0; line-height: 1.4; }
-a { color: #F59E0B; }
+.status-ok { background: #0E3A2A; border: 1px solid #50F898; color: #D6FFE8; }
+.status-warn { background: #24184C; border: 1px solid #B794FF; color: #F4EDFB; }
+.status-err { background: #3A1420; border: 1px solid #FF8A7A; color: #FFE1DC; }
+.detail { color: #B9ACDC; margin: 0 0 8px 0; display: none; word-break: break-word; }
+.help { color: #B9ACDC; margin: 4px 0 10px 0; line-height: 1.4; }
+a { color: #50F898; }

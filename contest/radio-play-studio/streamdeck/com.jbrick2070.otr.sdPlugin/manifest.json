@@ -3,7 +3,7 @@
   "Name": "Radio Play Studio",
   "Version": "0.1.0.0",
   "Author": "Jeffrey A. Brick",
-  "Description": "Make a radio play from a Stream Deck +: dials pick the language, story bank, visual style, acts and machine; a key makes the episode and shows how it is going.",
+  "Description": "Make a radio play from a Stream Deck: choose the language, story bank, visual style, acts and machine on dials or keys, then press one key to make the episode and watch it fill in.",
   "Category": "Radio Play Studio",
   "CategoryIcon": "imgs/plugin/category-icon",
   "Icon": "imgs/plugin/plugin-icon",
@@ -28,10 +28,11 @@
       "Name": "Choice",
       "UUID": "com.jbrick2070.otr.choice",
       "Icon": "imgs/actions/choice/icon",
-      "Tooltip": "Turn through one choice of the play: language, story bank, visual style or acts.",
+      "Tooltip": "One choice of the play: language, story bank, visual style or acts. On a dial, turn to choose; on a key, press for the next and hold for the default.",
       "PropertyInspectorPath": "ui/choice-dial.html",
       "Controllers": [
-        "Encoder"
+        "Encoder",
+        "Keypad"
       ],
       "UserTitleEnabled": false,
       "SupportedInMultiActions": false,
@@ -53,10 +54,11 @@
       "Name": "Machine",
       "UUID": "com.jbrick2070.otr.machine",
       "Icon": "imgs/actions/machine/icon",
-      "Tooltip": "Turn through the machines and how each films; push to switch the Studio to it.",
+      "Tooltip": "The machine and how it films. On a dial, turn to choose and press to switch; on a key, press for the next and hold to switch.",
       "PropertyInspectorPath": "ui/machine-dial.html",
       "Controllers": [
-        "Encoder"
+        "Encoder",
+        "Keypad"
       ],
       "UserTitleEnabled": false,
       "SupportedInMultiActions": false,

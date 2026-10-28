@@ -21,6 +21,12 @@ export interface FakeStudioOptions {
   optionsFailure?: { status: number; error: string };
   /** Answer POST /api/episodes with this instead of starting a run. */
   postFailure?: { status: number; error: string };
+  /** Answer GET /api/episodes with this instead of the listing. */
+  listFailure?: { status: number; error: string };
+  /** Hold the /api/options answer for a workflow this long (ms). */
+  optionsDelayMs?: Record<string, number>;
+  /** Hold the POST /api/episodes answer this long (ms). */
+  postDelayMs?: number;
 }
 
 const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"]);
@@ -73,9 +79,11 @@ export class FakeStudioServer {
     this.opts = { ...this.opts, ...opts };
   }
 
-  public async start(): Promise<number> {
+  /** Listen on `port` (0: any free one); the runs survive a stop and a start,
+   *  as they would not on the real server, so a blip can be tested. */
+  public async start(port = 0): Promise<number> {
     this.server = createServer((req, res) => this.handle(req, res));
-    await new Promise<void>((resolve) => this.server!.listen(0, "127.0.0.1", resolve));
+    await new Promise<void>((resolve) => this.server!.listen(port, "127.0.0.1", resolve));
     return (this.server.address() as AddressInfo).port;
   }
 
@@ -170,8 +178,12 @@ export class FakeStudioServer {
         return;
       }
       const forms = this.opts.forms ?? { "": { fields: SAMPLE_FIELDS, menu: SAMPLE_MENU } };
-      const form = forms[workflow] ?? forms[""];
-      if (!form) {
+      const own = forms[""];
+      const ownMenu = own?.menu as typeof SAMPLE_MENU | undefined;
+      const offered = !workflow || workflow in forms ||
+        Boolean(ownMenu?.machines.some((m) => m.ways.some((w) => w.workflow === workflow)));
+      const form = forms[workflow] ?? own;
+      if (!form || !offered) {
         this.json(res, 400, { error: `${workflow} is not one of the workflows this page offers` });
         return;
       }
@@ -184,10 +196,19 @@ export class FakeStudioServer {
           : menu.current;
         body.menu = { ...menu, current };
       }
-      this.json(res, 200, body);
+      const delay = this.opts.optionsDelayMs?.[workflow] ?? 0;
+      if (delay > 0) {
+        setTimeout(() => this.json(res, 200, body), delay);
+      } else {
+        this.json(res, 200, body);
+      }
       return;
     }
     if (url.pathname === "/api/episodes") {
+      if (this.opts.listFailure) {
+        this.json(res, this.opts.listFailure.status, { error: this.opts.listFailure.error });
+        return;
+      }
       this.json(res, 200, {
         episodes: this.runs
           .slice()
@@ -234,7 +255,12 @@ export class FakeStudioServer {
         return;
       }
       const run = this.addRun({ id: (this.runs.length + 1).toString(16).padStart(12, "0") });
-      this.json(res, 202, { id: run.id });
+      const delay = this.opts.postDelayMs ?? 0;
+      if (delay > 0) {
+        setTimeout(() => this.json(res, 202, { id: run.id }), delay);
+      } else {
+        this.json(res, 202, { id: run.id });
+      }
     });
   }
 

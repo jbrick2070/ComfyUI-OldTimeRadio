@@ -35,8 +35,9 @@ describe("manifest, layout, icons and repository hygiene", () => {
       "com.jbrick2070.otr.machine",
       "com.jbrick2070.otr.make"
     ]);
-    expect(actions[0].Controllers).toEqual(["Encoder"]);
-    expect(actions[1].Controllers).toEqual(["Encoder"]);
+    // Choice and Machine go on a dial or, on a deck without dials, a key.
+    expect(actions[0].Controllers).toEqual(["Encoder", "Keypad"]);
+    expect(actions[1].Controllers).toEqual(["Encoder", "Keypad"]);
     expect(actions[2].Controllers).toEqual(["Keypad"]);
     for (const a of actions) {
       expect(statSync(join(PLUGIN_DIR, String(a.PropertyInspectorPath))).size).toBeGreaterThan(0);

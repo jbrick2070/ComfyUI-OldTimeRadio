@@ -101,13 +101,16 @@ export class StudioClient {
       },
       (res) => {
         if (res.statusCode !== 200) {
-          void readBody(res).then((text) => end(this.refusal(res.statusCode ?? 0, text)));
+          readBody(res).then(
+            (text) => end(this.refusal(res.statusCode ?? 0, text)),
+            (err: Error) => end(new StudioUnreachable(err.message))
+          );
           return;
         }
         res.setEncoding("utf8");
         res.on("data", (chunk: string) => parser.feed(chunk));
         res.on("end", () => end());
-        res.on("error", (err) => end(err));
+        res.on("error", (err) => end(new StudioUnreachable(err.message)));
       }
     );
     req.on("error", (err) => end(new StudioUnreachable(err.message)));
@@ -131,22 +134,26 @@ export class StudioClient {
       const req = httpRequest(
         { host: STUDIO_HOST, port: this.port, method, path, headers, timeout: REQUEST_TIMEOUT_MS },
         (res) => {
-          void readBody(res).then((text) => {
-            const status = res.statusCode ?? 0;
-            if (status < 200 || status >= 300) {
-              reject(this.refusal(status, text));
-              return;
-            }
-            try {
-              resolve((text ? JSON.parse(text) : {}) as T);
-            } catch {
-              reject(new StudioHttpError(status, "the Studio answered with something that is not JSON"));
-            }
-          }, reject);
+          readBody(res).then(
+            (text) => {
+              const status = res.statusCode ?? 0;
+              if (status < 200 || status >= 300) {
+                reject(this.refusal(status, text));
+                return;
+              }
+              try {
+                resolve((text ? JSON.parse(text) : {}) as T);
+              } catch {
+                reject(new StudioHttpError(status, "the Studio answered with something that is not JSON"));
+              }
+            },
+            // The answer was cut off part-way: the same as not answering.
+            (err: Error) => reject(new StudioUnreachable(err.message))
+          );
         }
       );
-      req.on("timeout", () => req.destroy(new Error("the Studio took too long to answer")));
-      req.on("error", (err) => reject(new StudioUnreachable(err.message)));
+      req.on("timeout", () => req.destroy(new StudioUnreachable("the Studio took too long to answer")));
+      req.on("error", (err) => reject(err instanceof StudioUnreachable ? err : new StudioUnreachable(err.message)));
       if (payload) {
         req.write(payload);
       }

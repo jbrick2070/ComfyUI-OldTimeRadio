@@ -3,6 +3,8 @@ import {
   action,
   DialRotateEvent,
   DialUpEvent,
+  KeyDownEvent,
+  KeyUpEvent,
   SingletonAction,
   TouchTapEvent,
   WillAppearEvent,
@@ -11,26 +13,38 @@ import {
 import { CellRateLimiter } from "../gfx/cell-rate-limiter.js";
 import { toSvgDataUri } from "../gfx/svg-renderer.js";
 import { StudioStore } from "../state/studio-store.js";
-import { DialSink } from "./choice-dial.js";
-import { renderMachineDial } from "./faces.js";
+import { HOLD_THRESHOLD_MS } from "../types/settings.js";
+import { ControlSink, dialControlSink, keyControlSink, PressTimer } from "./choice-dial.js";
+import { ControlMode, renderMachine } from "./faces.js";
 
-/** The dial that walks the machine menu: which card, and how it films. The
- *  turn only rests on a row; the push makes it the one that runs. */
+/** The control that walks the machine menu: which card, and how it films.
+ *  A turn (a dial) or a press (a key) only rests on a row; a dial's press or
+ *  a key's hold makes it the one that runs. */
 export class MachineDialController {
   private readonly store: StudioStore;
-  private readonly sink: DialSink;
+  private readonly sink: ControlSink;
+  private readonly mode: ControlMode;
   private readonly limiter: CellRateLimiter<string>;
+  private readonly press: PressTimer;
   private visible = false;
 
   private readonly onChanged = (): void => {
     this.render();
   };
 
-  public constructor(store: StudioStore, sink: DialSink, rateLimitMs = 100) {
+  public constructor(
+    store: StudioStore,
+    sink: ControlSink,
+    rateLimitMs = 100,
+    mode: ControlMode = "dial",
+    holdMs = HOLD_THRESHOLD_MS
+  ) {
     this.store = store;
     this.sink = sink;
+    this.mode = mode;
+    this.press = new PressTimer(holdMs);
     this.limiter = new CellRateLimiter<string>(async (svg) => {
-      await this.sink.setFeedback({ canvas: toSvgDataUri(svg) });
+      await this.sink.draw(toSvgDataUri(svg));
     }, rateLimitMs);
   }
 
@@ -42,6 +56,7 @@ export class MachineDialController {
 
   public disappear(): void {
     this.visible = false;
+    this.press.cancel();
     this.limiter.dispose();
     this.store.off("changed", this.onChanged);
   }
@@ -58,8 +73,20 @@ export class MachineDialController {
     }
   }
 
+  public keyDown(): void {
+    this.press.down(() => {
+      void this.push();
+    });
+  }
+
+  public async keyUp(): Promise<void> {
+    if (this.press.up()) {
+      await this.rotate(1);
+    }
+  }
+
   public svg(): string {
-    return renderMachineDial(this.store);
+    return renderMachine(this.store, this.mode);
   }
 
   private render(): void {
@@ -72,7 +99,7 @@ export class MachineDialController {
 @action({ UUID: "com.jbrick2070.otr.machine" })
 export class MachineDialAction extends SingletonAction {
   private readonly store: StudioStore;
-  private readonly dials = new Map<string, MachineDialController>();
+  private readonly controls = new Map<string, MachineDialController>();
 
   public constructor(store: StudioStore) {
     super();
@@ -80,32 +107,41 @@ export class MachineDialAction extends SingletonAction {
   }
 
   public override onWillAppear(ev: WillAppearEvent): void {
-    if (!ev.action.isDial()) {
+    const target = ev.action;
+    let ctrl: MachineDialController;
+    if (target.isDial()) {
+      ctrl = new MachineDialController(this.store, dialControlSink(target), 100, "dial");
+    } else if (target.isKey()) {
+      ctrl = new MachineDialController(this.store, keyControlSink(target), 100, "key");
+    } else {
       return;
     }
-    const dial = ev.action;
-    const ctrl = new MachineDialController(this.store, {
-      setFeedback: (fb) => dial.setFeedback(fb),
-      showAlert: () => dial.showAlert()
-    });
-    this.dials.set(dial.id, ctrl);
+    this.controls.set(target.id, ctrl);
     ctrl.appear();
   }
 
   public override onWillDisappear(ev: WillDisappearEvent): void {
-    this.dials.get(ev.action.id)?.disappear();
-    this.dials.delete(ev.action.id);
+    this.controls.get(ev.action.id)?.disappear();
+    this.controls.delete(ev.action.id);
   }
 
   public override async onDialRotate(ev: DialRotateEvent): Promise<void> {
-    await this.dials.get(ev.action.id)?.rotate(ev.payload.ticks);
+    await this.controls.get(ev.action.id)?.rotate(ev.payload.ticks);
   }
 
   public override async onDialUp(ev: DialUpEvent): Promise<void> {
-    await this.dials.get(ev.action.id)?.push();
+    await this.controls.get(ev.action.id)?.push();
   }
 
   public override async onTouchTap(ev: TouchTapEvent): Promise<void> {
-    await this.dials.get(ev.action.id)?.push();
+    await this.controls.get(ev.action.id)?.push();
+  }
+
+  public override onKeyDown(ev: KeyDownEvent): void {
+    this.controls.get(ev.action.id)?.keyDown();
+  }
+
+  public override async onKeyUp(ev: KeyUpEvent): Promise<void> {
+    await this.controls.get(ev.action.id)?.keyUp();
   }
 }

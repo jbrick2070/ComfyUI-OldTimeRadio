@@ -48,9 +48,12 @@ describe("turning a dial through a field", () => {
     expect(defaultValue(bank)).toBe("roll");
   });
 
-  it("reads underscores as spaces and a model id by its last piece", () => {
-    expect(displayValue("public_domain")).toBe("public domain");
-    expect(displayValue("google/gemma-4-12b-it")).toBe("gemma-4-12b-it");
+  it("reads underscores as spaces, capitalised, a model id by its last piece, and a roll as Surprise me", () => {
+    expect(displayValue("public_domain")).toBe("Public domain");
+    expect(displayValue("shakespeare_stage_realism")).toBe("Shakespeare stage realism");
+    expect(displayValue("google/gemma-4-12b-it")).toBe("Gemma-4-12b-it");
+    expect(displayValue("roll (any eligible bank)")).toBe("Surprise me");
+    expect(displayValue("roll (any language)")).toBe("Surprise me");
     expect(displayValue(3)).toBe("3");
   });
 });

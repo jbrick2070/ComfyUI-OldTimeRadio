@@ -24,9 +24,13 @@ is a stand-in that enforces the two rules above. On the Studio side,
 Not used on purpose:
 
 * `POST /api/presence`. The page's heartbeat keeps the GPU's models loaded while a tab is
-  open; a deck that never closes would keep them loaded for good. Without it the Studio frees
-  them `GPU_IDLE_S` (150 s) after the deck's run ends and no page is open, which is what a
-  closed page gets. A run that is going is never freed: `should_free_gpu` checks for one.
+  open; a deck that never closes would keep them loaded for good. Without it, once a run ends
+  and no page has spoken in `GPU_IDLE_S` (150 s), the Studio's GPU watcher frees the models at
+  its next tick (every `PRESENCE_S / 2`, 10 s) -- so with no page open, a deck-only episode's
+  models are released about ten seconds after it finishes, and the next episode loads them
+  again. That reload is the price of not pinning the GPU, and it is the right trade for a
+  control surface that is always on. A run that is going is never freed: `should_free_gpu`
+  refuses while `_busy()` sees an unfinished run.
 * `GET /api/keys`. Whether a cloud lane needs a key depends on the stills and writer picks,
   which the deck does not make; the page says so where those are chosen.
 * The Scene Producer routes (`/api/projects/...`). Directing shots is the page's work.

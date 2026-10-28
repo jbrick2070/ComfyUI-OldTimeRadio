@@ -63,7 +63,7 @@ export class MakeKeyController {
     this.holdTimer = setTimeout(() => {
       this.holdTimer = null;
       this.longPressFired = true;
-      void this.sink.openUrl(this.store.studioUrl());
+      this.sink.openUrl(this.store.studioUrl()).catch(() => undefined);
     }, this.holdMs);
   }
 
@@ -73,9 +73,11 @@ export class MakeKeyController {
       this.longPressFired = false;
       return;
     }
+    // The finished episode's address is taken before anything is awaited, so
+    // a run the page starts in between cannot change what opens.
+    const url = this.store.getPhase() === "done" ? this.store.episodeUrl() : "";
     const did = await this.store.press();
-    if (did === "open") {
-      const url = this.store.episodeUrl();
+    if (did === "open" && url) {
       // Played once; the next press makes another.
       this.store.clearRun();
       await this.sink.openUrl(url);

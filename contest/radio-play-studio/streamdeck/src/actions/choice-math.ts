@@ -42,9 +42,6 @@ export function isOffered(field: StudioField, value: unknown): boolean {
 /** The next value `steps` ticks away: through the list for a choice, by one
  *  for a number, held at the ends. */
 export function cycleValue(field: StudioField, current: unknown, steps: number): string | number {
-  if (steps === 0) {
-    return isOffered(field, current) ? (current as string | number) : defaultValue(field);
-  }
   if (field.kind === "choice") {
     const offered = offeredChoices(field);
     if (offered.length === 0) {
@@ -78,10 +75,20 @@ function clampNumber(field: StudioField, n: number): number {
   return out;
 }
 
-/** The words on the touch strip for a value: `public_domain` reads as
- *  "public domain", a model id keeps its last path piece. */
+/** The pack's roll rows ("roll (any eligible bank)", "roll (any style)",
+ *  "roll (any language)": nodes/_otr_rolls.py) pick one at random; the page
+ *  calls that being surprised. */
+export const ROLL_PREFIX = "roll (";
+
+/** The words a face shows for a value: `public_domain` reads as "Public
+ *  domain", a model id keeps its last path piece, a roll row reads "Surprise
+ *  me". */
 export function displayValue(value: unknown): string {
   const text = String(value ?? "");
+  if (text.startsWith(ROLL_PREFIX)) {
+    return "Surprise me";
+  }
   const tail = text.includes("/") ? text.slice(text.lastIndexOf("/") + 1) : text;
-  return tail.replace(/_/g, " ");
+  const words = tail.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }

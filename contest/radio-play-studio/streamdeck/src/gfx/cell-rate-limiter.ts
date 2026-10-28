@@ -12,7 +12,15 @@ export class CellRateLimiter<TPayload> {
   private timer: ReturnType<typeof setTimeout> | null = null;
 
   public constructor(onFlush: (payload: TPayload) => void | Promise<void>, minIntervalMs = 100) {
-    this.onFlush = onFlush;
+    // A face that fails to draw (the Stream Deck gone mid-send) is skipped,
+    // never left as a rejection nobody is waiting on: the next change redraws.
+    this.onFlush = async (payload) => {
+      try {
+        await onFlush(payload);
+      } catch {
+        // dropped on purpose; see above
+      }
+    };
     this.minIntervalMs = Math.max(1, minIntervalMs);
   }
 
