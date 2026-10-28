@@ -176,7 +176,8 @@ negative; count lettering.
 Built and pushed: `animatediff15_v3_haunted_regions_video` and `animatediff15_lightning_regions_video`
 (siblings, cuda only, registered in every roster `apple/VIDEO_LANE_PREFLIGHT.md` lists), the
 `scene_objects` request field, the driver hook, `ghost_scene_regions.py`, and 53 new tests. The strength
-dial is `OTR_SCENE_REGION_STRENGTH` (default 2.0, range 0.1-10, read by the server at run time). Sonnet QA
+dial is `OTR_SCENE_REGION_STRENGTH` (default 4.0 since 2026-10-28, Jeffrey's call; it was 2.0 when this
+section was first written; range 0.1-10, read by the server at run time). Sonnet QA
 of the pushed diff found a real defect in the first push (the encode externals dict held the CLIP handle
 on every Ghost lane) and gaps in object selection; all fixed in cb233177. No shipping workflow, variant or
 default changed.
@@ -377,8 +378,8 @@ legible, seams across context windows, render time, and the operator's eye.
   is wanted.
 - Photon-LCM's origin, or plain SD 1.5 for anything that ships (arm L only).
 - Any registry version bump for new downloads.
-- Added by the build (2026-10-28): the region strength default (2.0 in code; the overnight pairs run at 4.0);
-  whether to richen the region phrase; whether the dialogue's own nouns may ever become regions (today's
+- Added by the build (2026-10-28): the region strength default, settled by Jeffrey as 4.0 (the code default
+  now, as every overnight pair ran); whether to richen the region phrase; whether the dialogue's own nouns may ever become regions (today's
   ruling says no, and it limits how often the arm can help); and whether the regions lanes, or any picture
   arm, should ever replace a shipping default, which is his eye's call on the published pairs in `otr/obs`.
 - Whether to build the picture-reference arm at all, and if so with minted pictures (Klein on the NVIDIA

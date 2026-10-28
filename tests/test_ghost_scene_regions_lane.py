@@ -291,6 +291,18 @@ def test_an_unusable_phrase_template_lands_on_the_default(monkeypatch, bad):
     assert eng._scene_region_phrase("a brass lamp") == "a brass lamp"
 
 
+def test_the_strength_default_is_four_and_the_range_is_unchanged():
+    assert gs.SCENE_REGION_STRENGTH_DEFAULT == 4.0
+    assert (gs.SCENE_REGION_STRENGTH_MIN, gs.SCENE_REGION_STRENGTH_MAX) == (0.1, 10.0)
+    assert gs.SCENE_REGION_STRENGTH_MIN <= gs.SCENE_REGION_STRENGTH_DEFAULT <= gs.SCENE_REGION_STRENGTH_MAX
+
+
+def test_with_no_dial_set_the_lab_lanes_use_four(monkeypatch):
+    monkeypatch.delenv(gs.SCENE_REGION_STRENGTH_ENV, raising=False)
+    for lane in (HAUNTED_R, LIGHTNING_R):
+        assert vreg.get_engine(lane)._scene_region_strength() == 4.0
+
+
 def test_the_identity_moves_with_the_phrase(monkeypatch):
     eng = vreg.get_engine(HAUNTED_R)
     monkeypatch.delenv(gs.SCENE_REGION_PHRASE_ENV, raising=False)

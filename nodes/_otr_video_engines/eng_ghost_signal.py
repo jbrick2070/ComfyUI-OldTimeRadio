@@ -306,10 +306,12 @@ GHOST_REGION_NODE_CANDIDATES = {
 
 #: How hard each object's region pulls against the unchanged global prompt. ComfyUI blends area
 #: conditionings as a weighted average, so a strength of 1.0 gives a region at most half the weight
-#: where it overlaps the global prompt and 2.0 gives it two thirds. A LAB DIAL, never a frozen claim:
-#: an unreadable or out-of-range value lands on the default and says so.
+#: where it overlaps the global prompt, 2.0 gives it two thirds and 4.0 gives it four fifths. The default
+#: is 4.0 (Jeffrey's call, 2026-10-28: every overnight pair ran at 4.0, and on the one bundle measured at
+#: both it was clearly better than 2.0; it was 2.0 until then). A LAB DIAL, never a frozen claim: an
+#: unreadable or out-of-range value lands on the default and says so.
 SCENE_REGION_STRENGTH_ENV = "OTR_SCENE_REGION_STRENGTH"
-SCENE_REGION_STRENGTH_DEFAULT = 2.0
+SCENE_REGION_STRENGTH_DEFAULT = 4.0
 SCENE_REGION_STRENGTH_MIN = 0.1
 SCENE_REGION_STRENGTH_MAX = 10.0
 
