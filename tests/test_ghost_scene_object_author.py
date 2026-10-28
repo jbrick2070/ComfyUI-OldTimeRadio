@@ -359,9 +359,54 @@ def test_an_unreadable_reply_logs_how_it_started(caplog):
 # --------------------------------------------------------------------------- #
 # Found live on pair 10: places and a breath were painted as objects
 # --------------------------------------------------------------------------- #
-def test_a_capitalised_word_in_mid_sentence_is_a_name_or_a_place_not_an_object():
-    line = "Bring word from France and Burgundy to the court."
-    assert A.admit(["France", "Burgundy", "court"], line) == ["court"]
+LEAR = ("The two great princes, France and Burgundy, Great rivals in our youngest daughter's love, "
+        "Long in our court have made their amorous sojourn.")
+
+
+def test_a_known_place_is_kept_though_it_is_capitalised_mid_sentence():
+    assert A.admit(["France", "Burgundy", "court"], LEAR) == ["france", "burgundy", "court"]
+
+
+def test_a_person_the_line_names_is_refused():
+    assert A.admit(["Cordelia"], "What shall Cordelia speak? Love, and be silent.") == []
+    assert A.admit(["Cordelia"], "Tell Cordelia to come.") == []
+    assert A.admit(["Cordelia"], "Cordelia, speak.") == ["cordelia"]       # sentence-initial: just a capital
+    assert A.admit(["Cordelia"], "Now, Cordelia, speak.") == []
+
+
+@pytest.mark.parametrize("line", [
+    "I gave the ring to Cordelia.",           # "to" and "from" name people as often as places
+    "A letter came from Cordelia today.",
+    "Shall Cordelia and Regan decide?",
+])
+def test_to_and_from_are_not_place_cues(line):
+    assert A.admit(["Cordelia", "Regan"], line) == []
+
+
+@pytest.mark.parametrize("line, phrase", [
+    ("She grew up in Thornfield, you know.", "Thornfield"),
+    ("We camped near Dover all night.", "Dover"),
+    ("They met inside Bellweather by the gate.", "Bellweather"),
+    ("The ships left the court of Atlantis at dawn.", "Atlantis"),
+    ("He walked through Avalon alone.", "Avalon"),
+])
+def test_a_word_the_line_puts_in_a_place_is_kept(line, phrase):
+    assert A.admit([phrase], line) == [phrase.lower()]
+
+
+def test_a_multi_word_place_is_kept_whole():
+    assert A.admit(["New York"], "He lives in New York now.") == ["new york"]
+    assert A.admit(["Hong Kong"], "Fly us to Hong Kong tonight.") == ["hong kong"]
+
+
+def test_a_cast_name_is_still_refused_even_in_a_place_context():
+    assert A.admit(["Kent"], "We rode in Kent all week.", names=["KENT"]) == []
+    assert A.admit(["Kent"], "We rode in Kent all week.") == ["kent"]
+
+
+def test_a_name_that_is_also_a_place_word_needs_a_cue():
+    assert A.admit(["Paris"], "I told Paris nothing.") == []
+    assert A.admit(["Paris"], "We met in Paris in spring.") == ["paris"]
 
 
 def test_a_sentence_initial_capital_is_just_a_capital():
