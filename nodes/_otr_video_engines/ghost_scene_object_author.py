@@ -15,8 +15,10 @@ words are physical things or places a camera could film. It cannot invent: every
 * it is a CONTIGUOUS run of the spoken line's own words, and a word capitalized in the middle of a sentence
   is kept only when it is a PLACE: a known country, region or city ("France", "Burgundy"), or a word the
   line puts in a place ("in Thornfield", "near Dover", "the court of Atlantis"). Any other capital is a
-  person's name ("Cordelia"; a cast name is refused before this is asked) and is refused. A sentence-initial
-  capital is just a capital, and a line in capitals carries no such signal; each a whole word (a plural or singular spelling is
+  person's name ("Cordelia", "Lady Macbeth", "Rosalind's arms"; a cast name is refused before this is
+  asked) and is refused, as is a name on the built-in given-name list wherever it sits, and a
+  sentence-initial word that is being ADDRESSED ("Cordelia, ..."). Otherwise a sentence-initial capital is
+  just a capital, and a line in capitals carries no signal except the given-name list; each a whole word (a plural or singular spelling is
   fine), with no comma, colon or dash between them, so the model can drop words from the line but never add,
   reorder or fuse them: "open the box" cannot become "glowing radioactive box", "brass key" cannot be
   assembled from "the brass door and the key", "rope, knife, lantern" is three objects and not one, and
@@ -73,6 +75,7 @@ _DENY_HEADS = frozenset({
     "side", "sense", "mind", "heart", "soul", "spirit", "memory", "dream", "future", "past", "present",
     "breath", "death", "sound", "noise", "echo", "whisper", "feeling", "trouble", "problem", "plan",
     "power", "hurry", "step", "luck", "fate", "doubt", "trust", "peace", "war", "order",
+    "heaven", "hell", "god", "devil",
     # people (the picture already has its cast)
     "man", "men", "woman", "women", "people", "person", "folk", "folks", "friend", "child", "children",
     "kid", "baby", "girl", "boy", "mother", "father", "mom", "dad", "brother", "sister", "son", "daughter",
@@ -125,46 +128,83 @@ def _is_break(token) -> bool:
 
 
 #: Places a capitalized word may name without any cue from the line: countries, regions, cities, waters.
-#: Words that are ALSO common first names (Paris, Georgia, Jordan, Chad, Sydney, Florence, Victoria, Lincoln,
-#: Washington, Charlotte, Madison, Orlando, Kent) are left out on purpose: those need a cue from the line.
+#: Words that are ALSO given names (Paris, Troy, Devon, Georgia, Jordan, Chad, Sydney, Florence, Victoria,
+#: Lincoln, Washington, Charlotte, Madison, Orlando, Kent, Lima, Santiago, Alexandria ...) are left out on
+#: purpose: those need a cue from the line.
 _PLACE_WORDS = frozenset("""
 afghanistan albania algeria andorra angola argentina armenia australia austria azerbaijan bahamas bahrain
 bangladesh barbados belarus belgium belize benin bhutan bolivia bosnia botswana brazil britain brunei
 bulgaria burma burundi cambodia cameroon canada china colombia congo croatia cuba cyprus czechia denmark
 djibouti dominica ecuador egypt eritrea estonia ethiopia fiji finland france gabon gambia germany ghana
 greece grenada guatemala guinea guyana haiti honduras hungary iceland india indonesia iran iraq ireland
-israel italy jamaica japan kazakhstan kenya kosovo kuwait kyrgyzstan laos latvia lebanon lesotho liberia
-libya liechtenstein lithuania luxembourg madagascar malawi malaysia maldives mali malta mauritania mexico
-moldova monaco mongolia montenegro morocco mozambique myanmar namibia nepal netherlands nicaragua niger
-nigeria norway oman pakistan palestine panama paraguay peru philippines poland portugal qatar romania
-russia rwanda samoa senegal serbia singapore slovakia slovenia somalia spain sudan suriname sweden
-switzerland syria taiwan tajikistan tanzania thailand togo tonga tunisia turkey turkmenistan uganda
-ukraine uruguay uzbekistan vanuatu venezuela vietnam yemen zambia zimbabwe
-africa asia europe america americas antarctica arctic oceania scandinavia siberia balkans caribbean
-england scotland wales cornwall yorkshire devon wessex albion normandy brittany burgundy provence
-aquitaine gascony anjou flanders bavaria prussia saxony bohemia castile aragon navarre andalusia
-lombardy tuscany venice sicily sardinia crete rhodes athens sparta troy carthage babylon persia arabia
-judea galilee jerusalem mesopotamia anatolia
-london rome berlin madrid lisbon vienna prague budapest warsaw moscow kyiv istanbul cairo alexandria
-damascus baghdad tehran delhi mumbai calcutta kolkata beijing shanghai tokyo kyoto osaka seoul bangkok
-hanoi manila jakarta melbourne auckland toronto montreal vancouver chicago boston philadelphia seattle
-detroit denver miami atlanta brooklyn manhattan hollywood milan naples geneva zurich amsterdam brussels
-dublin edinburgh glasgow oxford cambridge canterbury winchester bristol liverpool manchester stockholm
-oslo copenhagen helsinki reykjavik havana lima bogota santiago caracas nairobi lagos accra johannesburg
-atlantic pacific mediterranean thames nile danube rhine seine tiber amazon mississippi everest alps
-pyrenees himalayas sahara
-alabama alaska arizona arkansas california colorado connecticut delaware florida hawaii idaho illinois
-indiana iowa kansas kentucky louisiana maine maryland massachusetts michigan minnesota missouri montana
-nebraska nevada ohio oklahoma oregon pennsylvania tennessee texas utah vermont virginia wisconsin wyoming
-new zealand jersey york hong kong san los las angeles francisco vegas orleans
+italy jamaica japan kazakhstan kenya kosovo kuwait kyrgyzstan laos latvia lebanon lesotho liberia libya
+liechtenstein lithuania luxembourg madagascar malawi malaysia maldives malta mauritania mexico moldova
+monaco mongolia montenegro morocco mozambique myanmar namibia nepal netherlands nicaragua niger nigeria
+norway oman pakistan palestine panama paraguay peru philippines poland portugal qatar romania russia
+rwanda samoa senegal serbia singapore slovakia slovenia somalia spain sudan suriname sweden switzerland
+syria taiwan tajikistan tanzania thailand togo tonga tunisia turkey turkmenistan uganda ukraine uruguay
+uzbekistan vanuatu venezuela vietnam yemen zambia zimbabwe africa asia europe america americas antarctica
+arctic oceania scandinavia siberia balkans caribbean england scotland wales cornwall yorkshire wessex
+albion normandy brittany burgundy provence aquitaine gascony anjou flanders bavaria prussia saxony bohemia
+castile aragon navarre andalusia lombardy tuscany venice sicily sardinia crete athens sparta carthage
+babylon persia arabia judea galilee jerusalem mesopotamia anatolia london rome berlin madrid lisbon vienna
+prague budapest warsaw moscow kyiv istanbul cairo damascus baghdad tehran delhi mumbai calcutta kolkata
+beijing shanghai tokyo kyoto osaka seoul bangkok hanoi manila jakarta melbourne auckland toronto montreal
+vancouver chicago boston philadelphia seattle detroit miami atlanta manhattan hollywood naples geneva
+zurich amsterdam brussels dublin edinburgh glasgow oxford cambridge canterbury winchester bristol
+liverpool manchester stockholm oslo copenhagen helsinki reykjavik havana bogota caracas nairobi lagos
+accra johannesburg atlantic pacific mediterranean thames nile danube rhine seine tiber amazon mississippi
+everest alps pyrenees himalayas sahara alabama alaska arizona arkansas california colorado connecticut
+delaware florida hawaii idaho illinois iowa kansas kentucky louisiana maine maryland massachusetts
+michigan minnesota missouri nebraska nevada ohio oklahoma oregon pennsylvania tennessee texas utah vermont
+wisconsin wyoming new zealand york hong kong san los las angeles vegas orleans
 """.split())
 
 #: Words that, directly before a capitalized word, put it in a place ("in Thornfield", "near Dover").
-#: "to" and "from" are NOT here: "give it to Cordelia" and "a letter from Cordelia" name a person.
+#: "to", "from", "at", "into", "toward" and "around" are NOT here: "give it to Cordelia", "a letter from
+#: Cordelia", "look at Cordelia", "bump into Cordelia", "turn toward Cordelia" and "gather around Cordelia"
+#: all name a person.
 _PLACE_CUES = frozenset({
-    "in", "at", "into", "inside", "outside", "near", "across", "through", "throughout", "beyond", "within",
-    "around", "toward", "towards",
+    "in", "near", "inside", "outside", "across", "through", "throughout", "beyond", "within",
 })
+
+#: Title words: a capitalized title followed by a capitalized word names a person ("Lady Macbeth",
+#: "Dr. Watson", "Queen Elizabeth"), whatever word sits in front of it.
+_TITLES = frozenset({
+    "lady", "lord", "king", "queen", "prince", "princess", "duke", "duchess", "earl", "countess", "count",
+    "sir", "dame", "mr", "mrs", "ms", "miss", "dr", "doctor", "captain", "general", "colonel", "sergeant",
+    "lieutenant", "major", "judge", "father", "mother", "brother", "sister", "uncle", "aunt", "madam",
+    "master", "mistress", "saint", "st", "professor", "reverend", "rev", "president", "senator", "emperor",
+    "empress", "prof", "capt", "gen", "col", "sgt", "lt", "hon", "sr", "jr",
+})
+
+#: Given names that are almost always a person. A capitalized word on this list is a person wherever it sits:
+#: "Cordelia is gone", "look at Cordelia", "in Cordelia we trust". Names that are also common words (Rose,
+#: Grace, Mark, Will, Jack, Dawn ...) or places (Troy, Paris, Kent ...) are left off on purpose. The cast
+#: list covers the episode's own characters; this covers the people the dialogue merely mentions.
+_GIVEN_NAMES = frozenset("""
+cordelia regan goneril lear hamlet ophelia gertrude claudius polonius laertes horatio macbeth banquo duncan
+macduff malcolm donalbain rosalind celia touchstone oswald edmund edgar othello iago desdemona cassio
+emilia roderigo portia shylock antonio bassanio jessica nerissa prospero miranda ariel caliban ferdinand
+oberon titania puck lysander demetrius hermia helena theseus hippolyta romeo juliet mercutio tybalt
+benvolio capulet montague brutus cassius caesar antony cleopatra octavius falstaff malvolio viola orsino
+olivia sebastian feste beatrice benedick claudio petruchio katherina bianca lucentio hector achilles
+ulysses ajax priam hecuba cressida troilus pandarus
+james john robert michael william david richard joseph thomas charles christopher daniel matthew anthony
+donald steven paul andrew joshua kenneth kevin brian george edward ronald timothy jason jeffrey ryan jacob
+gary nicholas eric jonathan stephen larry justin scott brandon benjamin samuel gregory alexander patrick
+frank raymond dennis jerry tyler aaron henry douglas peter adam nathan zachary walter kyle harold carl
+arthur gerald roger keith jeremy terry lawrence sean christian albert ethan jesse willie billy bruce bryan
+ralph roy eugene randy vincent russell louis philip bobby johnny bradley martin oscar felix leo hugo
+mary patricia jennifer linda elizabeth barbara susan sarah karen nancy lisa betty margaret sandra ashley
+kimberly emily donna michelle carol amanda dorothy melissa deborah stephanie rebecca sharon laura cynthia
+kathleen amy angela shirley anna brenda pamela emma nicole helen samantha katherine christine debra rachel
+carolyn janet catherine maria diane julie joyce kelly christina lauren joan evelyn judith megan cheryl
+andrea hannah jacqueline martha gloria teresa sara janice marie julia kathryn juliana isabel clara nora
+""".split())
+
+#: Abbreviations whose period is not a sentence end ("Dr. Watson", "Mr. Holmes").
+_ABBREVIATION = re.compile(r"\b(Dr|Mr|Mrs|Ms|St|Sr|Jr|Prof|Capt|Gen|Col|Sgt|Lt|Hon|Rev)\.", re.IGNORECASE)
 
 #: Nouns that make "<noun> of X" a place ("the court of Atlantis", "the kingdom of Spain").
 _PLACE_NOUNS = frozenset({
@@ -334,7 +374,7 @@ def _match_in_line(line_text, words):
     spelling. A mention under a negator makes the answer ``negated``.
     """
     mentioned = False
-    straight = _straight(line_text)
+    straight = _ABBREVIATION.sub(r"\1", _straight(line_text))
     # A line with no lowercase letter is SHOUTED; capitals carry no information there.
     judge_capitals = any(ch.islower() for ch in straight)
     for sentence in _SENTENCE_END.split(straight):
@@ -346,9 +386,8 @@ def _match_in_line(line_text, words):
                 continue
             if not all(tok in _forms(word) for tok, word in zip(window, words)):
                 continue
-            # A capital in the middle of a sentence is a name or a place: a place is kept, a person is not.
-            if judge_capitals and any(cased[i][:1].isupper() and not _capital_is_place(cased, tokens, i)
-                                      for i in range(start, start + len(words)) if i > 0):
+            # A capital is a name or a place: a place is kept, a person is not.
+            if _window_names_a_person(cased, tokens, start, len(words), judge_capitals):
                 continue
             mentioned = True
             before = [t for t in tokens[max(0, start - _NEGATION_WINDOW):start] if not _is_break(t)]
@@ -357,21 +396,65 @@ def _match_in_line(line_text, words):
     return ("negated" if mentioned else "absent"), []
 
 
+def _possessive_stem(token) -> str:
+    return token[:-2] if token.endswith("'s") else token
+
+
 def _capital_is_place(cased, tokens, index) -> bool:
     """True when the capitalized word at ``index`` (mid-sentence) reads as a PLACE rather than a person.
 
-    A known place word, a word the line puts in a place ("in Thornfield"), "<place noun> of X", or the
-    continuation of such a name ("New York") qualifies. Anything else ("What shall Cordelia speak") does not.
+    A known place word (also in the possessive: "France's"), a word the line puts in a place ("in
+    Thornfield", "in the Tower"), "<place noun> of X", or the continuation of such a name ("New York",
+    "San Diego") qualifies. A possessive qualifies ONLY through the place list, because "Rosalind's arms"
+    is a person. Anything else ("What shall Cordelia speak") does not.
     """
-    if tokens[index] in _PLACE_WORDS:
+    word = tokens[index]
+    if _possessive_stem(word) in _PLACE_WORDS:
         return True
+    if word.endswith("'s"):
+        return False
     previous = tokens[index - 1] if index > 0 else ""
     if previous in _PLACE_CUES:
         return True
+    if previous == "the" and index > 1 and tokens[index - 2] in _PLACE_CUES:
+        return True
     if index > 1 and previous == "of" and tokens[index - 2] in _PLACE_NOUNS:
         return True
-    return (index > 1 and cased[index - 1][:1].isupper()
+    return (index > 0 and cased[index - 1][:1].isupper()
             and _capital_is_place(cased, tokens, index - 1))
+
+
+def _window_names_a_person(cased, tokens, start, length, judge_capitals) -> bool:
+    """True when the run ``tokens[start:start + length]`` names a person, so it must not become a region.
+
+    A capitalized given name; a capitalized word right after a capitalized title ("Lady Macbeth"); a title
+    in front of a capitalized word; a sentence-initial capital that is being ADDRESSED ("Cordelia, ..."
+    or "Rosalind!"); and any other mid-sentence capital that is not a place. A sentence-initial capital
+    otherwise is just a capital. In a line with no lowercase letter capitals mean nothing, so only the
+    given-name list can say.
+    """
+    last = start + length - 1
+    for i in range(start, start + length):
+        stem = _possessive_stem(tokens[i])
+        if not judge_capitals:
+            if stem in _GIVEN_NAMES:
+                return True
+            continue
+        if not cased[i][:1].isupper():
+            continue
+        if stem in _GIVEN_NAMES:
+            return True
+        if i > 0 and cased[i - 1][:1].isupper() and tokens[i - 1] in _TITLES:
+            return True
+        if tokens[i] in _TITLES and i + 1 < len(tokens) and cased[i + 1][:1].isupper():
+            return True
+        if i == 0:
+            if i == last and stem not in _PLACE_WORDS and (len(tokens) == 1 or tokens[1] == ","):
+                return True
+            continue
+        if not _capital_is_place(cased, tokens, i):
+            return True
+    return False
 
 
 def _is_denied(word, deny) -> bool:

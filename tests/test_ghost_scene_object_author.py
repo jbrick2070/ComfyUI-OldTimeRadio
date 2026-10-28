@@ -269,7 +269,7 @@ def test_the_negation_holes_are_closed(line):
 
 
 def test_a_curly_apostrophe_does_not_split_a_word_into_junk():
-    assert A.admit(["Carl’s coat"], "Carl’s coat is here.") == ["carl's coat"]
+    assert A.admit(["Tuck’s coat"], "Tuck’s coat is here.") == ["tuck's coat"]
     assert A.admit(["s"], "Carl’s coat") == []
     assert A.admit(["t"], "I can’t") == []
 
@@ -370,8 +370,9 @@ def test_a_known_place_is_kept_though_it_is_capitalized_mid_sentence():
 def test_a_person_the_line_names_is_refused():
     assert A.admit(["Cordelia"], "What shall Cordelia speak? Love, and be silent.") == []
     assert A.admit(["Cordelia"], "Tell Cordelia to come.") == []
-    assert A.admit(["Cordelia"], "Cordelia, speak.") == ["cordelia"]       # sentence-initial: just a capital
+    assert A.admit(["Cordelia"], "Cordelia, speak.") == []                 # addressed
     assert A.admit(["Cordelia"], "Now, Cordelia, speak.") == []
+    assert A.admit(["Stone"], "Stone is cold.") == ["stone"]               # an ordinary sentence-initial capital
 
 
 @pytest.mark.parametrize("line", [
@@ -421,3 +422,62 @@ def test_a_shouted_line_has_no_capital_signal():
 @pytest.mark.parametrize("word", ["breath", "death", "sound", "noise", "echo", "feeling", "plan", "power"])
 def test_more_abstractions_are_never_objects(word):
     assert A.admit([word], "I felt the %s then." % word) == []
+
+
+# --------------------------------------------------------------------------- #
+# Found by the Sonnet QA of the place rule: a person admitted by a place cue, a possessive or a title
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("line, phrase", [
+    ("Why do you stare at Rosalind?", "Rosalind"),
+    ("I ran into Rosalind on the stairs.", "Rosalind"),
+    ("Turn toward Rosalind now.", "Rosalind"),
+    ("Gather around Rosalind.", "Rosalind"),
+    ("He stood near Rosalind all night.", "Rosalind"),
+    ("She slept in Rosalind's arms.", "Rosalind's arms"),
+    ("In Cordelia we trust.", "Cordelia"),
+    ("He stood near Lady Macbeth.", "Lady Macbeth"),
+    ("Look at King Lear now.", "King Lear"),
+    ("Visit the court of Queen Elizabeth.", "Queen Elizabeth"),
+    ("Call Dr. Watson now.", "Watson"),
+    ("Ask Mr. Holmes to come.", "Holmes"),
+    ("Cordelia is gone.", "Cordelia"),
+    ("Rosalind! Wait.", "Rosalind"),
+    ("Wait... Cordelia is gone.", "Cordelia"),
+    ("Regan stays; Cordelia leaves.", "Cordelia"),
+])
+def test_a_person_is_refused_by_cue_possessive_title_or_address(line, phrase):
+    assert A.admit([phrase], line) == []
+
+
+@pytest.mark.parametrize("line, name", [
+    ("WHERE IS CORDELIA?", "Cordelia"), ("TELL CORDELIA TO LEAVE", "Cordelia"), ("BRING ROSALIND HERE", "Rosalind"),
+])
+def test_a_shouted_line_still_refuses_a_given_name(line, name):
+    assert A.admit([name], line) == []
+    assert A.admit(["lamp"], "BRING THE LAMP NOW.") == ["lamp"]
+
+
+def test_a_place_that_is_also_a_given_name_needs_a_cue():
+    assert A.admit(["Troy"], "Tell Troy the news.") == []
+    assert A.admit(["Troy"], "We marched on to Troy.") == []
+    assert A.admit(["Troy"], "The walls in Troy fell.") == ["troy"]
+
+
+def test_a_place_possessive_is_read_through_the_place_list():
+    assert A.admit(["France's coast"], "We sail for France's coast.") == ["france's coast"]
+    assert A.admit(["France's court"], "We sit in France's court.") == ["france's court"]
+    assert A.admit(["Thornfield's shadow"], "She stood in Thornfield's shadow.") == []
+
+
+def test_a_cue_may_reach_across_the_article():
+    assert A.admit(["Tower"], "We meet in the Tower at dusk.") == ["tower"]
+    assert A.admit(["Louvre"], "She works near the Louvre.") == ["louvre"]
+
+
+def test_a_two_word_place_at_the_start_of_a_sentence_is_kept():
+    assert A.admit(["San Diego"], "San Diego is warm.") == ["san diego"]
+
+
+@pytest.mark.parametrize("word", ["heaven", "hell", "god", "devil"])
+def test_the_afterlife_and_its_cast_are_not_objects(word):
+    assert A.admit([word], "She opened the gates of %s." % word) == []
