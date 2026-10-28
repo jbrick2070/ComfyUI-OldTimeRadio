@@ -172,7 +172,8 @@ def test_the_preflight_and_the_durable_row_see_one_object(monkeypatch):
     original = sl._assert_family_inputs_satisfiable_cast_time
 
     def _spy(engine_name, beat, ledger, policy, subject_sigils=None,
-             ghost_prompts=None, ghost_subjects=None, planned_ordinal=None):
+             ghost_prompts=None, ghost_subjects=None, planned_ordinal=None,
+             scene_objects=None):
         if ghost_prompts:
             key = str(beat.get("beat_id") or "")
             if key in ghost_prompts:
@@ -182,7 +183,8 @@ def test_the_preflight_and_the_durable_row_see_one_object(monkeypatch):
         # is an out-of-date double.
         return original(engine_name, beat, ledger, policy, subject_sigils,
                         ghost_prompts, ghost_subjects,
-                        planned_ordinal=planned_ordinal)
+                        planned_ordinal=planned_ordinal,
+                        scene_objects=scene_objects)
 
     monkeypatch.setattr(sl, "_assert_family_inputs_satisfiable_cast_time", _spy)
     _led, shots = _plan()
@@ -692,13 +694,15 @@ def test_the_preflight_and_the_durable_row_see_one_SUBJECT(monkeypatch):
     original = sl._assert_family_inputs_satisfiable_cast_time
 
     def _spy(engine_name, beat, ledger, policy, subject_sigils=None,
-             ghost_prompts=None, ghost_subjects=None, planned_ordinal=None):
+             ghost_prompts=None, ghost_subjects=None, planned_ordinal=None,
+             scene_objects=None):
         key = str(beat.get("beat_id") or "")
         if ghost_subjects and key in ghost_subjects:
             seen[key] = ghost_subjects[key]
         return original(engine_name, beat, ledger, policy, subject_sigils,
                         ghost_prompts, ghost_subjects,
-                        planned_ordinal=planned_ordinal)
+                        planned_ordinal=planned_ordinal,
+                        scene_objects=scene_objects)
 
     monkeypatch.setattr(sl, "_assert_family_inputs_satisfiable_cast_time", _spy)
 

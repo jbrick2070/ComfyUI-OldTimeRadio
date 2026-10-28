@@ -13,6 +13,14 @@ dialogue's noun one clause among several. A region gives it its own text and its
 frame, which is the recipe-part-2 technique (regional text conditioning) in core ComfyUI nodes: no node
 pack, no model, no download.
 
+WHERE THE OBJECTS COME FROM (2026-10-28, operator: "the prompts need to talk about real objects ... it has to
+adapt dialogue"): when ShotLock PLANS an episode on one of these lanes it makes one extra short call on the
+writer it already has loaded, which picks the physical things each character line itself names
+(``ghost_scene_object_author``; every phrase is a contiguous run of the line's own words, so the model can
+only choose, never invent). The picks ride the frozen plan as ``scene_objects`` and replay on any sibling.
+A beat with none, a plan frozen before the field, or a failed call falls back to the episode's key-object
+pool, as the first cut of this lane did.
+
 OPT-IN, DEFAULT OFF. Neither id is a default of any role and neither appears in a shipping profile; the
 three AnimateDiff workflows keep their lanes and an operator picks one of these from the existing video
 dropdown. With no object for a beat the encode graph is the parent's, node for node.

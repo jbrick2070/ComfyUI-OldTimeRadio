@@ -4011,12 +4011,28 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         from .ghost_scene_regions import resolve_scene_objects
         _sr_stored = shot.get("ghost_prompt")
         _sr_mode = str((_sr_stored or {}).get("mode") or "") if isinstance(_sr_stored, dict) else ""
-        _sr = resolve_scene_objects(
-            (ledger or {}).get("meta") or {},
-            ordinal=_planned_ordinal_for_shot(ledger, shot),
-            role=_shot_role, mode=_sr_mode,
-            beat_text=_beat_text_for_shot(ledger, shot),
-            authored_subject=str(shot.get("ghost_subject") or ""))
+        _sr_beat_text = _beat_text_for_shot(ledger, shot)
+        # THE DIALOGUE-ADAPTED OBJECTS FIRST (2026-10-28). ShotLock stamped what the beat's own line
+        # names; they are admitted against the line AGAIN here so an edited ledger cannot add a noun
+        # the line never said. Nothing admitted (no stamp, a frozen older plan, a failed model) falls
+        # back to the key-object pool resolver below, exactly as before.
+        _sr = None
+        _sr_stored_objects = shot.get("scene_objects")
+        if _shot_role == "character_video" and isinstance(_sr_stored_objects, list):
+            from .ghost_scene_object_author import admit as _admit_scene_objects
+            _sr_cast = [str(c.get("name") or "") for c in ((ledger or {}).get("cast") or [])
+                        if isinstance(c, dict)]
+            _sr_admitted = _admit_scene_objects(
+                [o for o in _sr_stored_objects if isinstance(o, str)], _sr_beat_text, names=_sr_cast)
+            if _sr_admitted:
+                _sr = {"objects": tuple(_sr_admitted), "source": "dialogue_adapted"}
+        if _sr is None:
+            _sr = resolve_scene_objects(
+                (ledger or {}).get("meta") or {},
+                ordinal=_planned_ordinal_for_shot(ledger, shot),
+                role=_shot_role, mode=_sr_mode,
+                beat_text=_sr_beat_text,
+                authored_subject=str(shot.get("ghost_subject") or ""))
         req["scene_objects"] = list(_sr["objects"])
         _s_obs = req.setdefault("observability", {})
         _s_obs["scene_objects_source"] = _sr["source"]

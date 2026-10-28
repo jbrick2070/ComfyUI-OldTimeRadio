@@ -174,7 +174,9 @@ class VideoRequest(_Forbid):
     plate_prompt: str = ""
     plate_path: str = ""
     #: THE BEAT'S OWN OBJECTS, ONE REGION EACH (2026-10-27). Declared conditioning, like the plate:
-    #: ``render_driver`` fills it only for an engine declaring ``wants_scene_regions``, from the
+    #: ``render_driver`` fills it only for an engine declaring ``wants_scene_regions``: first from the
+    #: filmable things the beat's own spoken line names (``ghost_scene_object_author``, stamped on the
+    #: shot row at plan time and admitted against the line again at render time), otherwise from the
     #: episode's own key-object pool as the beat's dialogue refers to it
     #: (``ghost_scene_regions.resolve_scene_objects``). CAUSAL through ``sampler_inputs`` on the
     #: render receipt. Empty on every other lane and on every frozen request, so no other lane's
@@ -326,6 +328,15 @@ class ShotRow(_Forbid):
     #: validator, schema version and author version are untouched and no
     #: frozen replay bundle can fail closed over a key it never had.
     ghost_subject: Optional[str] = None
+    #: THE BEAT'S OWN FILMABLE OBJECTS (2026-10-28), adapted from its spoken line by
+    #: ``ghost_scene_object_author`` and read ONLY by an engine declaring ``wants_scene_regions``
+    #: (the opt-in scene-regions lab lanes). Every phrase was admitted against the line at plan
+    #: time and is admitted again at render time, so a hand-edited ledger cannot add a noun the line
+    #: never said. Optional, and ABSENCE is the honest state: a row frozen before this field, a plan
+    #: made for a lane that does not declare the capability, a line naming nothing filmable, or a
+    #: model that failed. All of them fall back to the key-object pool resolver. A sibling of
+    #: `ghost_subject` for the same reason: no closed object's schema or hash moves.
+    scene_objects: Optional[list[str]] = None
     #: CLOUD / BUDGET FLOOR RECEIPT (2026-09-17). Written by
     #: ``render_driver._stamp_cloud_floor_shot`` /
     #: ``_stamp_budget_floor_shot`` when a provider-side beat is floored

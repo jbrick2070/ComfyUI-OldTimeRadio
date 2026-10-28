@@ -1956,7 +1956,8 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger,
                                                policy, subject_sigils=None,
                                                ghost_prompts=None,
                                                ghost_subjects=None,
-                                               planned_ordinal=None):
+                                               planned_ordinal=None,
+                                               scene_objects=None):
     try:
         from ._otr_video_engines.registry import get_engine, is_registered, EngineNotRunnableError
     except ImportError:
@@ -2073,6 +2074,11 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger,
         _cast_subject = (ghost_subjects or {}).get(str(beat.get("beat_id") or ""))
         if _cast_subject:
             shot["ghost_subject"] = str(_cast_subject)
+        # THE SAME DIALOGUE-ADAPTED OBJECTS THE DURABLE ROW WILL CARRY, so a scene-regions lane's
+        # preflight builds the request the render will build rather than the pool fallback.
+        _cast_scene = (scene_objects or {}).get(str(beat.get("beat_id") or ""))
+        if _cast_scene:
+            shot["scene_objects"] = [str(o) for o in _cast_scene]
 
     # ONE NARROW CATCH, AND NOTHING ELSE IS SWALLOWED (2026-07-29, WIRE-W2).
     # A preflight that answers "fine" when it crashed is worse than no
@@ -2766,6 +2772,75 @@ def _ghost_prompt_lane(engine_id) -> bool:
             == _gsp.GHOST_PROMPT_PROFILE)
 
 
+def _ghost_adapt_scene_objects(gen, beat_ids, lines, names) -> dict:
+    """``{beat_id: [object, ...]}`` for ``beat_ids``, through the pure dialogue-object author.
+
+    Opaque ids (``b1`` ...) go to the model, never a line id. Never raises: the author swallows its own
+    model and parse failures, and a beat with no spoken line is skipped before the call.
+    """
+    try:
+        from ._otr_video_engines import ghost_scene_object_author as _author  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_video_engines import ghost_scene_object_author as _author  # type: ignore
+    beats = []
+    for index, beat_id in enumerate(beat_ids, start=1):
+        text = str((lines.get(beat_id) or {}).get("text") or "")
+        if text.strip():
+            beats.append({"id": "b%d" % index, "beat_id": beat_id, "line": text})
+    adapted = _author.adapt_scene_objects(gen, beats, names=names)
+    by_opaque = {b["id"]: b["beat_id"] for b in beats}
+    out = {by_opaque[key]: list(value) for key, value in adapted.items() if key in by_opaque}
+    log.info("[OTR_ShotLock] Ghost scene objects: %d of %d character beat(s) yielded filmable objects",
+             len(out), len(beats))
+    return out
+
+
+def _scene_regions_lane(engine_id) -> bool:
+    """True when ``engine_id`` DECLARES ``wants_scene_regions`` (the opt-in scene-regions lab lanes).
+
+    A capability read, like :func:`_ghost_prompt_lane`; no shipping lane declares it, so for them
+    the dialogue-object step below never runs and plan-time work is unchanged.
+    """
+    eid = str(engine_id or "")
+    if not eid:
+        return False
+    try:
+        from ._otr_video_engines.registry import get_engine, is_registered  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_video_engines.registry import get_engine, is_registered  # type: ignore
+    if not is_registered(eid):
+        return False
+    return bool(getattr(get_engine(eid), "wants_scene_regions", False))
+
+
+def _ghost_prior_scene_objects(ledger) -> dict:
+    """``{beat_id: [object, ...]}`` already on the incoming ledger, for replay.
+
+    Joined the same way as :func:`_ghost_prior_subjects`. A row frozen before the field simply has no
+    key and contributes nothing. The values are carried RAW; the render driver admits them against the
+    line again, so nothing stored here is ever trusted.
+    """
+    out = {}
+    for shot in (((ledger or {}).get("video") or {}).get("shots") or []):
+        if not isinstance(shot, dict):
+            continue
+        objects = shot.get("scene_objects")
+        if not isinstance(objects, list) or not objects \
+                or not all(isinstance(o, str) for o in objects):
+            continue
+        sids = shot.get("source_line_ids")
+        beat_id = ""
+        if isinstance(sids, list) and sids:
+            beat_id = str(sids[0])
+        else:
+            shot_id = str(shot.get("shot_id") or "")
+            if shot_id.startswith("shot_"):
+                beat_id = shot_id[len("shot_"):]
+        if beat_id:
+            out[beat_id] = list(objects)
+    return out
+
+
 def _ghost_cast_names(ledger) -> tuple:
     """Every known cast name, ordered, for removal at the model boundary."""
     names = []
@@ -3093,13 +3168,21 @@ def _ghost_generate_batch(gen, specs, *, style, meta, episode_seed, names,
 
 
 def _author_ghost_prompts(beats, ledger, engine_for, warnings=None,
-                          subjects_out=None):
+                          subjects_out=None, scene_objects_out=None):
     """``{beat_id: ghost_prompt}`` for every Ghost beat in this episode.
 
     HALF B: when ``subjects_out`` is a dict it is filled with
     ``{beat_id: ghost_subject}`` -- replayed from the incoming ledger for a
     hash-matched row, freshly ranked by the model for an authored one, absent
     for a deterministic fallback. The return value is unchanged.
+
+    SCENE OBJECTS (2026-10-28): when ``scene_objects_out`` is a dict AND a
+    character beat's engine declares ``wants_scene_regions``, it is filled with
+    ``{beat_id: [object, ...]}`` -- the filmable things that beat's own spoken
+    line names, picked by the writer already loaded for this call and admitted
+    against the line (``ghost_scene_object_author``). Carried from the incoming
+    ledger when present. Absent on any failure, on a replay whose writer never
+    loaded, and for every lane that does not declare the capability.
 
     Runs ONCE, after the effective route and the durable sigils exist and
     BEFORE the cast-time preflight -- because the preflight builds a request
@@ -3216,6 +3299,24 @@ def _author_ghost_prompts(beats, ledger, engine_for, warnings=None,
     prior_subjects = (_ghost_prior_subjects(ledger)
                       if subjects_out is not None else {})
 
+    # THE BEATS THAT WANT DIALOGUE OBJECTS: character beats whose engine (picked or effective, the
+    # same union as `ghost_beats` above) declares `wants_scene_regions`. Empty for every shipping lane.
+    scene_beats = []
+    if scene_objects_out is not None:
+        prior_scene = _ghost_prior_scene_objects(ledger)
+        for b in ghost_beats:
+            if _gsa.normalize_role(b.get("role")) != "character_video":
+                continue
+            role = str(b.get("role") or "")
+            if not (_scene_regions_lane(engine_for(role))
+                    or _scene_regions_lane(_effective_engine_for_role(role, str(engine_for(role) or "")))):
+                continue
+            beat_id = str(b["beat_id"])
+            if prior_scene.get(beat_id):
+                scene_objects_out[beat_id] = prior_scene[beat_id]
+            else:
+                scene_beats.append(beat_id)
+
     out = {}
     needs = []
     for spec in specs:
@@ -3272,6 +3373,12 @@ def _author_ghost_prompts(beats, ledger, engine_for, warnings=None,
                     out, specs, style=style, meta=meta),
                 reuse_dispositions=reuse_dispositions,
                 subjects_out=batch_subjects)
+            # ONE MORE SHORT CALL, on the writer that is already loaded and BEFORE the unload below.
+            # It never raises and never rejects the batch: a failure leaves the dict empty and the
+            # render falls back to the key-object pool resolver.
+            if scene_beats:
+                scene_objects_out.update(_ghost_adapt_scene_objects(
+                    gen, scene_beats, lines, names))
         finally:
             _ghost_unload_writer(warnings)
         for spec in needs:
@@ -3367,10 +3474,11 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
     # object has to exist before it runs and has to be the IDENTICAL object the
     # durable row will carry.
     ghost_subjects = {}
+    scene_objects = {}
     ghost_prompts = _author_ghost_prompts(
         beats, ledger, engine_for,
         warnings=warnings if isinstance(warnings, list) else None,
-        subjects_out=ghost_subjects)
+        subjects_out=ghost_subjects, scene_objects_out=scene_objects)
 
     # Preflight family compatibility gate (F2):
     if ledger is not None:
@@ -3382,7 +3490,8 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
                 _assert_family_inputs_satisfiable_cast_time(
                     engine_id, b, ledger, policy, subject_sigils,
                     ghost_prompts, ghost_subjects,
-                    planned_ordinal=planned_ordinal)
+                    planned_ordinal=planned_ordinal,
+                    scene_objects=scene_objects)
 
     # Every beat renders per-beat with its own scene still (no
     # still_pool_key stamping).
@@ -3470,6 +3579,12 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
         _row_subject = ghost_subjects.get(str(b.get("beat_id") or ""))
         if _row_subject:
             shots[-1]["ghost_subject"] = str(_row_subject)
+        # The dialogue-adapted objects, beside the subject and under the same absence rule. Only a
+        # lane declaring `wants_scene_regions` ever fills the map, so a shipping lane's row is
+        # byte-identical to what it was before.
+        _row_scene_objects = scene_objects.get(str(b.get("beat_id") or ""))
+        if _row_scene_objects:
+            shots[-1]["scene_objects"] = [str(o) for o in _row_scene_objects]
         _stamp_frame_bounded(shots[-1])
         _stamp_coverage_plan(shots[-1], b["beat_id"],
                              max_render_frames=max_render_frames)
