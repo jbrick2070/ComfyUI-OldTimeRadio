@@ -1,3 +1,36 @@
+## 2026-10-28 -- Elsewhere Broadcasting Service Roku scope (Codex)
+
+The operator asked for a public Roku app that people can find in the Streaming
+Store, install, and browse. Scope is recorded in
+[`planning/elsewhere-broadcasting-service/ROKU_MVP_SCOPE.md`](../planning/elsewhere-broadcasting-service/ROKU_MVP_SCOPE.md)
+and tracked as an open Scope and Decide row in `apple/GO_FORWARD_PLAN.md`.
+
+The working public name is **Elsewhere Broadcasting Service**. The first
+release is a free, browseable catalog of 8-12 original visual audio dramas,
+each 15 minutes or shorter. It is a standard Roku SceneGraph app backed by a
+versioned HTTPS catalog and HLS media on Cloudflare R2 through an EBS-owned
+custom domain. No Roku package, external account, domain, or hosted asset was
+created in this scoping pass.
+
+The decisive production boundary is new and must survive implementation:
+`otr/obs` is an operator-facing completion inbox, not a public catalog. It
+deliberately contains completed renders whose rights receipt did not clear. A
+public release needs a matching eligible receipt, final media QA, and explicit
+curator approval; never scan or upload OBS automatically.
+
+The scope includes Roku certification behavior from the start: HLS and WebVTT,
+global caption settings, Direct to Play, episode and series deep links, local
+bookmarks, timing/loading requirements, low-end device testing, and beta
+before public submission. The source code belongs in a separate EBS delivery
+repository once the outstanding decisions are settled.
+
+Open gates: clear the working brand and domain, identify the owner of the Roku
+developer account, choose the pilot slate, and decide the first store region.
+The scope commit is `7f2390de5`, pushed to `main`; this handoff entry follows
+as a documentation receipt.
+
+---
+
 ## 2026-09-26 -- Foley speech duck implementation (Codex, isolated otr-duck)
 
 Settled operator design wired into `_compile_foley_master` before the real
