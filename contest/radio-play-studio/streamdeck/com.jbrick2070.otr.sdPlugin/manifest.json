@@ -1,0 +1,95 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "Name": "Radio Play Studio",
+  "Version": "0.1.0.0",
+  "Author": "Jeffrey A. Brick",
+  "Description": "Make a radio play from a Stream Deck +: dials pick the language, story bank, visual style, acts and machine; a key makes the episode and shows how it is going.",
+  "Category": "Radio Play Studio",
+  "CategoryIcon": "imgs/plugin/category-icon",
+  "Icon": "imgs/plugin/plugin-icon",
+  "URL": "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/main/contest/radio-play-studio/streamdeck",
+  "UUID": "com.jbrick2070.otr",
+  "CodePath": "bin/plugin.js",
+  "SDKVersion": 3,
+  "Software": {
+    "MinimumVersion": "7.1"
+  },
+  "OS": [
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Nodejs": {
+    "Version": "24"
+  },
+  "Actions": [
+    {
+      "Name": "Choice",
+      "UUID": "com.jbrick2070.otr.choice",
+      "Icon": "imgs/actions/choice/icon",
+      "Tooltip": "Turn through one choice of the play: language, story bank, visual style or acts.",
+      "PropertyInspectorPath": "ui/choice-dial.html",
+      "Controllers": [
+        "Encoder"
+      ],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": false,
+      "Encoder": {
+        "layout": "layouts/cell.json",
+        "TriggerDescription": {
+          "Rotate": "Next or previous choice",
+          "Push": "Back to the default",
+          "Touch": "Left half: previous, right half: next"
+        }
+      },
+      "States": [
+        {
+          "Image": "imgs/actions/choice/key"
+        }
+      ]
+    },
+    {
+      "Name": "Machine",
+      "UUID": "com.jbrick2070.otr.machine",
+      "Icon": "imgs/actions/machine/icon",
+      "Tooltip": "Turn through the machines and how each films; push to switch the Studio to it.",
+      "PropertyInspectorPath": "ui/machine-dial.html",
+      "Controllers": [
+        "Encoder"
+      ],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": false,
+      "Encoder": {
+        "layout": "layouts/cell.json",
+        "TriggerDescription": {
+          "Rotate": "Choose a machine and a way of filming",
+          "Push": "Switch to it",
+          "Touch": "Switch to it"
+        }
+      },
+      "States": [
+        {
+          "Image": "imgs/actions/machine/key"
+        }
+      ]
+    },
+    {
+      "Name": "Make the episode",
+      "UUID": "com.jbrick2070.otr.make",
+      "Icon": "imgs/actions/make/icon",
+      "Tooltip": "Press to make the episode and watch it fill in; press again to play it. Hold to open the Studio page.",
+      "PropertyInspectorPath": "ui/make-key.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": false,
+      "States": [
+        {
+          "Image": "imgs/actions/make/key"
+        }
+      ]
+    }
+  ]
+}

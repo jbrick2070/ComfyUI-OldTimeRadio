@@ -1,0 +1,32 @@
+<!-- SPDX-License-Identifier: MIT -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Radio Play Studio — Machine dial</title>
+  <link rel="stylesheet" href="pi.css" />
+</head>
+<body>
+  <div id="studio-status" class="status-banner status-warn">Waiting for the Studio…</div>
+  <div id="studio-detail" class="detail"></div>
+
+  <h3>This dial</h3>
+  <p class="help">Turn through the machines the Studio knows (8 GB, 16 GB, Mac, AMD, the clouds) and how each one
+    films (foley, video, stills). The turn only rests on a row; push to switch the Studio to it. A row marked
+    <em>?</em> has not been proven on that card. With no menu (the Studio was started on a graph that is not on
+    it), this dial has nothing to switch.</p>
+
+  <h3>Studio</h3>
+  <div class="row">
+    <label for="studio-port">Port</label>
+    <input id="studio-port" type="number" min="1" max="65535" value="8765" />
+  </div>
+  <p class="help">Radio Play Studio answers on 127.0.0.1 only. <a id="open-studio" href="#">Open the Studio page</a>.</p>
+
+  <script src="pi-common.js"></script>
+  <script>
+    // SPDX-License-Identifier: MIT
+    window.piRegisterControls(function () {});
+  </script>
+</body>
+</html>

@@ -259,6 +259,13 @@ A cloud pick needs its key, and the page lists only the keys the current picks n
   `google.secret` or `openrouter.secret` in the pack folder, or `GEMINI_API_KEY` /
   `OPENROUTER_API_KEY` where ComfyUI runs -- and whether a key file is there.
 
+## From a Stream Deck +
+
+[`streamdeck/`](streamdeck/README.md) is a Stream Deck + plugin for this app: dials turn
+through the language, story bank, visual style, acts and machine; one key makes the episode
+and fills in as it goes, then plays it. It talks to the same local server the page does,
+over the same routes, and the server did not change for it (`streamdeck/API-CONTRACT.md`).
+
 ## The page speaks nine languages
 
 English, Español, Português, Italiano, Français, हिन्दी, 日本語, 简体中文 and 繁體中文: the eight languages the

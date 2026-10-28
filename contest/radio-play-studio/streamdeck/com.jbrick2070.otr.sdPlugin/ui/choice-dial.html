@@ -1,0 +1,43 @@
+<!-- SPDX-License-Identifier: MIT -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Radio Play Studio — Choice dial</title>
+  <link rel="stylesheet" href="pi.css" />
+</head>
+<body>
+  <div id="studio-status" class="status-banner status-warn">Waiting for the Studio…</div>
+  <div id="studio-detail" class="detail"></div>
+
+  <h3>This dial</h3>
+  <div class="row">
+    <label for="field-select">Chooses</label>
+    <select id="field-select">
+      <option value="language">Language of the play</option>
+      <option value="bank">Story bank</option>
+      <option value="style">Visual style</option>
+      <option value="acts">Acts</option>
+    </select>
+  </div>
+  <p class="help">Turn to move through the choices the Studio offers for this machine. Push to go back to the
+    form's default. The story bank skips <em>my story</em>: that one needs typed text, so it stays on the page.</p>
+
+  <h3>Studio</h3>
+  <div class="row">
+    <label for="studio-port">Port</label>
+    <input id="studio-port" type="number" min="1" max="65535" value="8765" />
+  </div>
+  <p class="help">Radio Play Studio answers on 127.0.0.1 only. <a id="open-studio" href="#">Open the Studio page</a>.</p>
+
+  <script src="pi-common.js"></script>
+  <script>
+    // SPDX-License-Identifier: MIT
+    window.piRegisterControls(function (settings, save) {
+      var select = document.getElementById("field-select");
+      select.value = settings.field || "bank";
+      select.onchange = function () { save({ field: select.value }); };
+    });
+  </script>
+</body>
+</html>

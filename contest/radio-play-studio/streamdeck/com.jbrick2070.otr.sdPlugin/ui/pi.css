@@ -1,0 +1,50 @@
+/* SPDX-License-Identifier: MIT */
+body {
+  background: #1F1710;
+  color: #FDF6E3;
+  font-family: "Segoe UI", Arial, sans-serif;
+  font-size: 12px;
+  margin: 0;
+  padding: 10px 12px;
+}
+h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #F59E0B;
+  margin: 12px 0 6px 0;
+  border-bottom: 1px solid #3A2E22;
+  padding-bottom: 4px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+.row label {
+  width: 105px;
+  flex-shrink: 0;
+  color: #C9B79C;
+}
+.row select, .row input[type="number"] {
+  flex: 1;
+  background: #140F0A;
+  color: #FDF6E3;
+  border: 1px solid #7C6A55;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+.status-banner {
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.status-ok { background: #064E3B; border: 1px solid #22C55E; color: #D1FAE5; }
+.status-warn { background: #3A2E22; border: 1px solid #F59E0B; color: #FDF6E3; }
+.status-err { background: #451A03; border: 1px solid #EF4444; color: #FFEDD5; }
+.detail { color: #C9B79C; margin: 0 0 8px 0; display: none; word-break: break-word; }
+.help { color: #7C6A55; margin: 4px 0 10px 0; line-height: 1.4; }
+a { color: #F59E0B; }

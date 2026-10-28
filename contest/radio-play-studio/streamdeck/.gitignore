@@ -1,0 +1,7 @@
+node_modules/
+dist/
+release/
+*.streamDeckPlugin
+*.log
+com.jbrick2070.otr.sdPlugin/bin/
+com.jbrick2070.otr.sdPlugin/logs/
