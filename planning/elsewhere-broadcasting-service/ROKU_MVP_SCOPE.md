@@ -1,6 +1,9 @@
 # Elsewhere Broadcasting Service: Roku MVP Scope
 
-**Status:** scoped for a public beta, not yet implemented.
+**Status:** development shell implemented in the private
+[EBS delivery repository](https://github.com/jbrick2070/Elsewhere-Broadcasting-Service).
+Roku installation, real media playback, beta testing, and public certification
+remain open. The first development catalog is empty.
 
 **Working public name:** Elsewhere Broadcasting Service (EBS). "Elsewhere" is
 the short form used in the app. This is a working name until it has passed a
@@ -198,7 +201,8 @@ raising the catalog size.
 
 ## Ownership and launch gates
 
-Before implementation begins, settle these four items:
+The operator authorized the local app build on 2026-10-28. Before public
+distribution and production account/domain setup, settle these four items:
 
 1. **Brand:** clear Elsewhere Broadcasting Service and choose the final public
    name, icon direction, and owned domain.
@@ -210,10 +214,10 @@ Before implementation begins, settle these four items:
 4. **Launch territory:** decide the first Streaming Store region and ensure
    that each pilot episode is cleared for that territory.
 
-The Roku app source should live in a separate EBS delivery repository when
-implementation begins. It has a different release cycle and public runtime
-than the ComfyUI node package. This OTR repository owns the production and
-release-evidence side of the boundary; it does not turn into the Roku package.
+The Roku app source lives in the separate EBS delivery repository. It has a
+different release cycle and public runtime than the ComfyUI node package.
+This OTR repository owns the production and release-evidence side of the
+boundary; it does not turn into the Roku package.
 
 ## Delivery sequence
 

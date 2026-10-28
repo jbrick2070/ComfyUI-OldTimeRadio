@@ -1,3 +1,36 @@
+## 2026-10-28 -- Elsewhere first Roku development build (Codex)
+
+Operator: "can you start the build process"; Roku stick available once it is
+connected. Built in a separate private delivery repository:
+https://github.com/jbrick2070/Elsewhere-Broadcasting-Service
+Local root: `C:\Users\jeffr\Documents\Elsewhere-Broadcasting-Service`.
+
+Initial green commit `25c3ddb`, then reviewed fixes `3a3704e`, both pushed to
+that repository's main. The development artifact is
+`dist/elsewhere-0.1.0-dev.zip`. It has native SceneGraph browse/show/detail,
+HLS Video, English WebVTT metadata, local bookmarks, cold/warm episode and
+series launch handling, async catalog loading/retry, and a curated release
+catalog compiler. The default catalog is empty; no media was uploaded, no
+domain/account purchased, no device installed, and no certification claimed.
+
+Verification: BrighterScript compiler passes; 39 Node tests pass, including
+negative release gates, atomic output behavior, private-field sanitization,
+credential URL refusal, and runtime-only ZIP content. GitHub CI is green on
+both code commits. Independent API/source review caught and closed buffering
+errors overwriting resume progress and an HD layout declaration without HD
+coordinates. Runtime behavior still needs the physical Roku proof.
+
+Review provenance: independent GPT API/tool/runtime review, with findings
+grounded by the driver. External Sonnet and Cursor CLI reviewers could not
+authenticate; Gemini Argon timed out. These attempts do not count as completed
+reviews. The EBS build status records any subsequent external review result.
+This was a scoped first build, not a four-round design campaign.
+
+Remaining work is tracked in the linked EBS README and the open scope row.
+OTR production code, canonical workflow and rendered assets were untouched.
+
+---
+
 ## 2026-10-28 -- Elsewhere Broadcasting Service Roku scope (Codex)
 
 The operator asked for a public Roku app that people can find in the Streaming

@@ -97,8 +97,12 @@ The non-negotiable delivery boundary is that `otr/obs` is never scanned or
 published automatically. It deliberately contains every completed local
 render, including ones with an uncleared rights receipt. A public entry needs
 an exact eligible receipt, final media QA, and an explicit curator approval.
-Open decisions before implementation: brand and domain clearance, the Roku
-developer account owner, initial store regions, and the curated pilot slate.
+Continue from the development package in the private
+[EBS delivery repository](https://github.com/jbrick2070/Elsewhere-Broadcasting-Service).
+Next proof is installation on the operator's Roku stick, followed by selected
+HLS/caption media playback. Open decisions before public distribution: brand
+and domain clearance, the Roku developer account owner, initial store regions,
+and the curated pilot slate.
 
 ### Foley speech duck: live ear proof and registry dependencies
 
