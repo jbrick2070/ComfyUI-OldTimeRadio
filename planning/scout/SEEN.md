@@ -26,3 +26,9 @@
 2026-10-27 | Upscale | Minimax H3 Latent Upscaler | WATCH | https://huggingface.co/Gavining/Minimax_h3_latent_Upscaler
 2026-10-27 | Writer | quill-voice/shakespeare | WATCH | https://huggingface.co/quill-voice/shakespeare
 2026-10-27 | Writer | Ranke-4B / TypewriterLM (news only) | WATCH | https://github.com/entanglr/awesome-vintage-llms
+2026-10-28 | Voice | Audio8-TTS-Realistic-0.6B | WATCH | https://huggingface.co/Edge0/Audio8-TTS-Realistic-0.6b
+2026-10-28 | Video | Bernini-R (Comfy-Org repack, int8_convrot) | WATCH | https://huggingface.co/Comfy-Org/Bernini-R
+2026-10-28 | Video | Open-H3-Regenerate-2K | SKIP | https://huggingface.co/Efficient-Large-Model/Open-H3-Regenerate-2K
+2026-10-28 | Image | Boogu-Image-0.1 Edit (Comfy-Org repack, int8_convrot) | WATCH | https://huggingface.co/Comfy-Org/Boogu-Image
+2026-10-28 | Upscale | Comfy-Org Frame-Interpolation (RIFE/FILM) | WATCH | https://huggingface.co/Comfy-Org/Frame-Interpolation
+2026-10-28 | Writer | Bonsai Shakespeare 9B | SKIP | https://huggingface.co/korokoboom/Bonsai-2-9b-Shakespeare-SFT
