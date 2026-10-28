@@ -82,6 +82,24 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   tests for every commit, probably not needed"; the suite at every push
   stays the guard).
 
+### Elsewhere Broadcasting Service Roku app -- public discovery MVP (2026-10-28)
+
+The operator wants a public Roku app that people can find in the Streaming
+Store, install, and browse. The working public name is **Elsewhere
+Broadcasting Service**; OTR remains the production system behind it, not the
+consumer-facing brand. The scoped MVP is a free, browseable on-demand catalog
+of 8-12 short-form original visual audio dramas, backed by a versioned HTTPS
+catalog and HLS media on a custom-domain object store. The detailed contract,
+delivery boundary, certification work, and launch gates live in
+[`planning/elsewhere-broadcasting-service/ROKU_MVP_SCOPE.md`](../planning/elsewhere-broadcasting-service/ROKU_MVP_SCOPE.md).
+
+The non-negotiable delivery boundary is that `otr/obs` is never scanned or
+published automatically. It deliberately contains every completed local
+render, including ones with an uncleared rights receipt. A public entry needs
+an exact eligible receipt, final media QA, and an explicit curator approval.
+Open decisions before implementation: brand and domain clearance, the Roku
+developer account owner, initial store regions, and the curated pilot slate.
+
 ### Foley speech duck: live ear proof and registry dependencies
 
 The settled detector is implemented in the existing mux: CPU Silero VAD,
