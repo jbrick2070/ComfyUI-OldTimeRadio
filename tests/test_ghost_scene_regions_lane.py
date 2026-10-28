@@ -250,6 +250,23 @@ def test_the_strength_dial_is_read_from_the_environment_and_a_bad_value_falls_ba
         _request(scene_objects=("a brass lamp",)))["scene_regions"]["strength"] == 3.5
 
 
+@pytest.mark.parametrize("engine_id", [HAUNTED, HAUNTED_R])
+def test_the_encode_externals_are_cleared_so_they_cannot_pin_the_clip_handle(monkeypatch, engine_id):
+    seen = []
+    real = wb.run_graph
+
+    def spy(graph, *args, **kwargs):
+        external = kwargs.get("external_results")
+        if external is not None and "clip" in external:
+            seen.append(external)
+        return real(graph, *args, **kwargs)
+
+    monkeypatch.setattr(wb, "run_graph", spy)
+    _render(monkeypatch, engine_id, scene_objects=("a brass lamp",))
+    assert seen, "the encode call was not observed"
+    assert all(not d for d in seen)
+
+
 def test_more_than_three_objects_are_cut_to_three(monkeypatch):
     eng = vreg.get_engine(HAUNTED_R)
     plan = eng._build_render_request(_request(scene_objects=("a", "b", "c", "d", "e")))

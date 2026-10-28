@@ -12,10 +12,19 @@ reference RANKS candidates; it is NOT the source"). This module follows it exact
 ``ghost_subject_candidates(meta)`` and nothing else, the beat text only decides which pool members the
 beat refers to, and a noun the beat negates is never a region.
 
-THE CHOICE OF OBJECTS. The kernel's own object first (so the region reinforces what the global prompt
-already says), then the other pool members the beat cleanly refers to, at most three. A bookend beat has
-no dialogue and gets no regions. A beat whose dialogue names no pool object and whose kernel is not a
-pool object gets none either, which leaves its picture byte-identical to the base lane.
+THE CHOICE OF OBJECTS. Only objects that belong to THIS beat: the pool members the beat's own words
+refer to as whole words and do not negate, plus the object the batched author ranked for the beat from
+its intent. The kernel's positional pick (the odometer tier, chosen by where the beat sits in the episode
+and unrelated to what it says) never gets a region: reinforcing it would make an off-topic picture more
+sure of itself. The kernel's own object leads when it qualifies, so the region reinforces what the global
+prompt already says. At most three. A bookend beat has no dialogue and gets no regions. A beat with no
+qualifying object gets none, which leaves its picture byte-identical to the base lane.
+
+STRICTER THAN THE KERNEL'S OWN MENTION TEST, on purpose. ``_beat_mentions_object`` matches by substring
+and its negation cues omit the bare "no", "not", "without" and "don't" (a gap that predates this
+module), which is tolerable for ONE kernel noun but would turn "during" into a mention of "ring" and
+"there is no ledger" into a region here. A region is a stronger claim than a kernel clause, so this
+module also requires a whole-word mention and checks the few words before it for a bare negator.
 
 MASKS ARE GENERATED, NEVER PAINTED. One object: a soft centred ellipse. Two: left and right halves that
 overlap at the seam. Three: thirds. The recipe this technique comes from drives its regions from a mask
@@ -26,6 +35,7 @@ Cold-import clean: numpy and the author module are resolved inside the functions
 from __future__ import annotations
 
 import hashlib
+import re
 
 #: The most regions a beat gets. Three is the recipe's own count and the most a 512x288 frame can hold
 #: without each region becoming a sliver.
@@ -38,6 +48,54 @@ SCENE_REGION_FEATHER = 0.12
 SCENE_REGION_LAYOUTS = {1: "centre", 2: "halves", 3: "thirds"}
 
 _CHARACTER_ROLE = "character_video"
+
+#: Kernel tiers whose object belongs to this beat. The positional tier (``key_object``) does not.
+_BEAT_OWNED_SOURCES = frozenset({"key_object_in_beat", "authored_subject"})
+
+_WORD = re.compile(r"[a-z0-9']+")
+_SENTENCE_END = re.compile(r"[.!?;]+")
+
+#: Words that, shortly before a mention, make it a mention of something ABSENT.
+_NEGATORS = frozenset({
+    "no", "not", "without", "never", "nobody", "nothing", "neither", "nor", "none", "instead",
+    "rather", "hardly",
+    "isn't", "isnt", "aren't", "arent", "wasn't", "wasnt", "weren't", "werent", "don't", "dont",
+    "doesn't", "doesnt", "didn't", "didnt", "can't", "cant", "won't", "wont", "couldn't",
+    "couldnt", "wouldn't", "wouldnt", "haven't", "havent", "hasn't", "hasnt",
+})
+
+#: How many words before a mention a negator may sit and still reach it.
+_NEGATION_WINDOW = 4
+
+
+def _head_word(obj) -> str:
+    """The object's most specific word: its last long word, as the kernel's own mention test reads it."""
+    words = [w for w in _WORD.findall(str(obj or "").lower()) if w]
+    long_words = [w for w in words if len(w) > 3]
+    return (long_words or words or [""])[-1]
+
+
+def _whole_word_stance(beat_text, obj) -> str:
+    """``"clean"``, ``"negated"`` or ``"absent"``: how the beat treats ``obj`` as a WHOLE WORD.
+
+    ``clean`` needs one whole-word mention with no negator in the few words before it, within its own
+    sentence. ``negated`` means every whole-word mention is negated. ``absent`` means the beat never
+    says the word (a substring such as "ring" inside "during" is not a mention).
+    """
+    head = _head_word(obj)
+    if not head:
+        return "absent"
+    forms = {head, head + "s", head + "es"}
+    mentioned = False
+    for sentence in _SENTENCE_END.split(str(beat_text or "").lower()):
+        tokens = _WORD.findall(sentence)
+        for index, token in enumerate(tokens):
+            if token not in forms:
+                continue
+            mentioned = True
+            if not any(t in _NEGATORS for t in tokens[max(0, index - _NEGATION_WINDOW):index]):
+                return "clean"
+    return "negated" if mentioned else "absent"
 
 
 def resolve_scene_objects(meta, *, ordinal=0, role="", mode="", beat_text="",
@@ -58,7 +116,9 @@ def resolve_scene_objects(meta, *, ordinal=0, role="", mode="", beat_text="",
     if not pool:
         return empty
 
-    referenced = [obj for obj in pool if _gsa._beat_mentions_object(beat_text, obj)]
+    referenced = [obj for obj in pool
+                  if _gsa._beat_mentions_object(beat_text, obj)
+                  and _whole_word_stance(beat_text, obj) == "clean"]
     kernel, kernel_source = _gsa.resolve_crux_kernel(
         meta, ordinal=ordinal, role=role, mode=mode, beat_text=beat_text,
         authored_subject=authored_subject)
@@ -74,12 +134,25 @@ def resolve_scene_objects(meta, *, ordinal=0, role="", mode="", beat_text="",
             break
 
     ordered = []
-    if kernel_object and _gsa._beat_object_stance(beat_text, kernel_object) != "negated":
+    if (kernel_object and kernel_source in _BEAT_OWNED_SOURCES
+            and _gsa._beat_object_stance(beat_text, kernel_object) != "negated"
+            and _whole_word_stance(beat_text, kernel_object) != "negated"
+            and (kernel_source != "key_object_in_beat"
+                 or _whole_word_stance(beat_text, kernel_object) == "clean")):
         ordered.append(kernel_object)
     for obj in referenced:
         if obj not in ordered:
             ordered.append(obj)
-    ordered = ordered[:SCENE_REGION_MAX_OBJECTS]
+    # One region per thing: two pool entries that end in the same word ("ledger", "handwritten
+    # ledger") are one object, and the first stays.
+    unique, heads = [], set()
+    for obj in ordered:
+        head = _head_word(obj)
+        if head in heads:
+            continue
+        heads.add(head)
+        unique.append(obj)
+    ordered = unique[:SCENE_REGION_MAX_OBJECTS]
     if not ordered:
         return empty
     source = kernel_source if ordered[0] == kernel_object else "dialogue"

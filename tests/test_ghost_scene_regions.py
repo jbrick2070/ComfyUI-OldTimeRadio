@@ -74,6 +74,58 @@ def test_the_same_inputs_give_the_same_answer():
     assert a == b
 
 
+@pytest.mark.parametrize("line", [
+    "There is no lantern in this room.",
+    "I don't see a lantern anywhere.",
+    "We have no ledger and never had a lantern.",
+    "Take anything else instead of the lantern.",
+])
+def test_a_bare_negation_the_kernels_own_cues_miss_never_makes_a_region(line):
+    out = _objects(line)
+    assert "a brass lantern" not in out["objects"]
+
+
+def test_the_negation_does_not_reach_across_a_sentence():
+    out = _objects("There is no ledger here. Bring the lantern.")
+    assert out["objects"][0] == "a brass lantern"
+
+
+def test_a_word_inside_another_word_is_not_a_mention():
+    meta = {"key_objects": ["a brass ring"]}
+    out = R.resolve_scene_objects(meta, role="character_video", mode="object",
+                                  beat_text="During the storm she waited by the clamp.")
+    assert out["objects"] == ()
+
+
+def test_a_plural_in_the_dialogue_still_counts():
+    out = _objects("Light the lanterns, all of them.")
+    assert "a brass lantern" in out["objects"]
+
+
+def test_the_positional_kernel_pick_gets_no_region():
+    """The odometer tier is chosen by where the beat sits, not by what it says."""
+    out = _objects("Nothing is happening here at all.")
+    assert out == {"objects": (), "source": "none"}
+
+
+def test_the_authors_ranked_pick_for_the_beat_does_get_a_region():
+    out = _objects("Nothing is happening here at all.", authored_subject="a handwritten ledger")
+    assert out["objects"] == ("a handwritten ledger",)
+    assert out["source"] == "authored_subject"
+
+
+def test_a_pick_the_beat_negates_is_refused_even_when_the_author_ranked_it():
+    out = _objects("There is no ledger on this desk.", authored_subject="a handwritten ledger")
+    assert "a handwritten ledger" not in out["objects"]
+
+
+def test_two_pool_entries_for_the_same_thing_are_one_region():
+    meta = {"key_objects": ["a ledger", "a handwritten ledger"]}
+    out = R.resolve_scene_objects(meta, role="character_video", mode="object",
+                                  beat_text="Bring the ledger here.")
+    assert len(out["objects"]) == 1
+
+
 @pytest.mark.parametrize("count,layout", [(1, "centre"), (2, "halves"), (3, "thirds")])
 def test_the_layout_follows_the_count(count, layout):
     assert R.region_layout_name(count) == layout

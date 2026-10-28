@@ -313,6 +313,9 @@ SCENE_REGION_STRENGTH_DEFAULT = 2.0
 SCENE_REGION_STRENGTH_MIN = 0.1
 SCENE_REGION_STRENGTH_MAX = 10.0
 
+#: Raw env values already warned about, so a bad dial is reported once per value, not once per read.
+_SCENE_REGION_STRENGTH_WARNED = set()
+
 #: Frames per VAE decode CALL on Apple silicon. Zero everywhere else, which
 #: means one call with the whole batch -- exactly what this lane did before.
 #:
@@ -1043,9 +1046,12 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         except (TypeError, ValueError):
             value = float("nan")
         if not (SCENE_REGION_STRENGTH_MIN <= value <= SCENE_REGION_STRENGTH_MAX):
-            _LOG.warning("[OTR.video.ghost_signal] %s=%r is not a number in %.1f..%.1f; using the "
-                         "default %.1f", SCENE_REGION_STRENGTH_ENV, raw, SCENE_REGION_STRENGTH_MIN,
-                         SCENE_REGION_STRENGTH_MAX, SCENE_REGION_STRENGTH_DEFAULT)
+            if str(raw) not in _SCENE_REGION_STRENGTH_WARNED:
+                _SCENE_REGION_STRENGTH_WARNED.add(str(raw))
+                _LOG.warning("[OTR.video.ghost_signal] %s=%r is not a number in %.1f..%.1f; using "
+                             "the default %.1f", SCENE_REGION_STRENGTH_ENV, raw,
+                             SCENE_REGION_STRENGTH_MIN, SCENE_REGION_STRENGTH_MAX,
+                             SCENE_REGION_STRENGTH_DEFAULT)
             return SCENE_REGION_STRENGTH_DEFAULT
         return value
 
@@ -1459,6 +1465,11 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             _LOG.info("[OTR video] %s beat %s: scene regions %s", self.name, plan["shot_id"],
                       self._scene_region_receipt(scene_objects))
         encode_results = _wb.run_graph(encode_graph, external_results=encode_externals)
+        # THE EXTERNALS DICT IS CLEARED AT ONCE. It holds the CLIP handle, and a local that outlives this
+        # call would keep that handle reachable through the whole sample/decode/encode stages -- the
+        # exact reference the lines below exist to drop. (Before 2026-10-27 this dict was an inline
+        # temporary and died with the call.)
+        encode_externals.clear()
         positive_cond = (encode_results[positive_node][0],)
         negative_cond = (encode_results[NODE_NEGATIVE][0],)
 
