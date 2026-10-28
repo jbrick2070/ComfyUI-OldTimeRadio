@@ -27,6 +27,9 @@ export interface FakeStudioOptions {
   optionsDelayMs?: Record<string, number>;
   /** Hold the POST /api/episodes answer this long (ms). */
   postDelayMs?: number;
+  /** Hold the GET /api/episodes answer this long (ms); the listing is taken
+   *  when the request arrives, as the real server's is. */
+  listDelayMs?: number;
 }
 
 const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"]);
@@ -64,6 +67,7 @@ export class FakeStudioServer {
   public readonly runs: FakeRun[] = [];
   public readonly posts: Array<{ host: string; contentType: string; body: unknown }> = [];
   public readonly optionsRequests: string[] = [];
+  public listRequests = 0;
   public readonly eventRequests: Array<{ id: string; lastEventId: string | undefined }> = [];
   public refusedHosts = 0;
   private server: Server | null = null;
@@ -183,8 +187,16 @@ export class FakeStudioServer {
       const offered = !workflow || workflow in forms ||
         Boolean(ownMenu?.machines.some((m) => m.ways.some((w) => w.workflow === workflow)));
       const form = forms[workflow] ?? own;
+      const delay = this.opts.optionsDelayMs?.[workflow] ?? 0;
+      const answer = (status: number, body: unknown): void => {
+        if (delay > 0) {
+          setTimeout(() => this.json(res, status, body), delay);
+        } else {
+          this.json(res, status, body);
+        }
+      };
       if (!form || !offered) {
-        this.json(res, 400, { error: `${workflow} is not one of the workflows this page offers` });
+        answer(400, { error: `${workflow} is not one of the workflows this page offers` });
         return;
       }
       const menu = form.menu as typeof SAMPLE_MENU | undefined;
@@ -196,12 +208,7 @@ export class FakeStudioServer {
           : menu.current;
         body.menu = { ...menu, current };
       }
-      const delay = this.opts.optionsDelayMs?.[workflow] ?? 0;
-      if (delay > 0) {
-        setTimeout(() => this.json(res, 200, body), delay);
-      } else {
-        this.json(res, 200, body);
-      }
+      answer(200, body);
       return;
     }
     if (url.pathname === "/api/episodes") {
@@ -209,12 +216,19 @@ export class FakeStudioServer {
         this.json(res, this.opts.listFailure.status, { error: this.opts.listFailure.error });
         return;
       }
-      this.json(res, 200, {
+      this.listRequests += 1;
+      const listing = {
         episodes: this.runs
           .slice()
           .sort((a, b) => b.started - a.started)
           .map(({ events: _events, ...rest }) => rest)
-      });
+      };
+      const listDelay = this.opts.listDelayMs ?? 0;
+      if (listDelay > 0) {
+        setTimeout(() => this.json(res, 200, listing), listDelay);
+      } else {
+        this.json(res, 200, listing);
+      }
       return;
     }
     const events = /^\/api\/episodes\/([0-9a-f]+)\/events$/.exec(url.pathname);

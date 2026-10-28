@@ -64,7 +64,7 @@ export function choiceFace(store: StudioStore, field: DialField, mode: ControlMo
   if (!form) {
     return phase === "loading"
       ? { title, socket, value: "Tuning in…", tone: "muted", hint: "reading the form" }
-      : { title, socket, value: "Not offered", tone: "muted", hint: store.getFormError() || "this workflow has no such choice" };
+      : { title, socket, value: "Not offered", tone: "muted", hint: store.getFormError() || "not in this workflow" };
   }
   const current = store.getValue(field);
   const value = fieldValueText(field, current);
@@ -95,7 +95,8 @@ export function machineFace(store: StudioStore, mode: ControlMode = "dial"): Dia
   const currentIndex = Math.max(0, store.getMachineIndex());
   const current = entries[currentIndex];
   const wayText = (e: (typeof entries)[number]): string => `${e.way.key}${e.way.proven ? "" : " (unproven)"}`;
-  const nameOf = (e: (typeof entries)[number]): string => MACHINE_NAMES[e.machine] ?? e.machine;
+  // A machine the deck has no name for yet reads as words, and wraps like one.
+  const nameOf = (e: (typeof entries)[number]): string => MACHINE_NAMES[e.machine] ?? displayValue(e.machine);
   const position = (i: number): string => `${i + 1}/${entries.length}`;
   if (store.isLocked()) {
     return {
@@ -109,15 +110,16 @@ export function machineFace(store: StudioStore, mode: ControlMode = "dial"): Dia
     };
   }
   const pending = store.getPendingMachine();
-  if (pending) {
-    const i = entries.indexOf(pending);
+  const pendingIndex = store.getPendingIndex();
+  if (pending && pendingIndex !== null) {
+    const i = pendingIndex;
     // A key is small: the instruction takes the title bar, where it is big.
     return mode === "dial"
       ? { title, socket, value: nameOf(pending), position: position(i), pending: true, hint: `${wayText(pending)}\npress to switch` }
       : { title: "Hold to use", socket, value: nameOf(pending), pending: true, hint: wayText(pending) };
   }
   if (phase === "loading") {
-    return { title, socket, value: nameOf(current), position: position(currentIndex), tone: "muted", hint: "reading the form…" };
+    return { title, socket, value: nameOf(current), position: position(currentIndex), tone: "muted", hint: "tuning in…" };
   }
   return { title, socket, value: nameOf(current), position: position(currentIndex), hint: wayText(current) };
 }

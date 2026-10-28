@@ -97,6 +97,10 @@ export class StudioStore extends EventEmitter {
    *  back under an older number is dropped, so a slow read for one machine
    *  cannot land on top of a quicker read for the next. */
   private formRequest = 0;
+  /** Bumped whenever the run the deck follows is replaced or let go: a
+   *  listing asked for before that describes a world that has moved on (a
+   *  listing taken just before Make does not have the new run in it). */
+  private runGeneration = 0;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private started = false;
@@ -154,6 +158,7 @@ export class StudioStore extends EventEmitter {
   /** The Studio moved to another port: nothing the old one said holds. */
   public endpointChanged(): void {
     this.formRequest += 1;
+    this.runGeneration += 1;
     this.clearReconnect();
     this.closeStream();
     this.run = null;
@@ -244,6 +249,12 @@ export class StudioStore extends EventEmitter {
   public getMachineIndex(): number {
     const workflow = this.currentWorkflow();
     return this.getMachineEntries().findIndex((e) => e.way.workflow === workflow);
+  }
+
+  /** Where the dial is resting, as an index into getMachineEntries(); null
+   *  when it is not resting anywhere. */
+  public getPendingIndex(): number | null {
+    return this.getPendingMachine() ? this.pendingMachine : null;
   }
 
   /** The row the dial is resting on before it is pressed, if any. */
@@ -344,6 +355,7 @@ export class StudioStore extends EventEmitter {
    *  going is kept: there is nothing else to show for it. */
   public clearRun(): void {
     if (this.run?.finished) {
+      this.runGeneration += 1;
       this.run = null;
       this.changed();
     }
@@ -374,6 +386,7 @@ export class StudioStore extends EventEmitter {
     }
     this.submitting = true;
     this.busyReason = "";
+    this.runGeneration += 1;
     this.run = null;
     this.changed();
     const request = this.formRequest;
@@ -444,6 +457,7 @@ export class StudioStore extends EventEmitter {
 
   private async doTick(): Promise<void> {
     const request = this.formRequest;
+    const runGeneration = this.runGeneration;
     let listing: RunListing[];
     try {
       listing = await this.client.episodes();
@@ -459,7 +473,11 @@ export class StudioStore extends EventEmitter {
     }
     const cameBack = !this.reachable;
     this.reachable = true;
-    this.followListing(listing);
+    // A press, an attach or a clear since the listing was asked for: it does
+    // not know about the run the deck now follows, so it decides nothing.
+    if (runGeneration === this.runGeneration && !this.submitting) {
+      this.followListing(listing);
+    }
     this.changed();
     if ((cameBack || this.fields.length === 0 || this.formError) && !this.loading) {
       await this.refresh();
@@ -498,7 +516,7 @@ export class StudioStore extends EventEmitter {
     this.formError = "";
     this.changed();
     try {
-      let body = await this.readForm(this.wantedWorkflow());
+      let body = await this.readForm(this.wantedWorkflow(), request);
       if (request !== this.formRequest) {
         return;
       }
@@ -509,7 +527,7 @@ export class StudioStore extends EventEmitter {
         // graph on an 8 GB card; so does the deck, once, when it has no pick.
         this.picks.workflow = starting;
         this.opts.onPicksChanged(this.getPicks());
-        body = await this.readForm(starting);
+        body = await this.readForm(starting, request);
         if (request !== this.formRequest) {
           return;
         }
@@ -531,17 +549,21 @@ export class StudioStore extends EventEmitter {
   }
 
   /** The form for `workflow`; a saved workflow the Studio no longer offers
-   *  (400) is dropped and the Studio's own form read instead. */
-  private async readForm(workflow: string | undefined): Promise<OptionsResponse> {
+   *  (400) is dropped and the Studio's own form read instead -- but only by
+   *  the newest read, and only if that workflow is still the pick: a refusal
+   *  that a later switch has overtaken must not erase the later pick. */
+  private async readForm(workflow: string | undefined, request: number): Promise<OptionsResponse> {
     try {
       return await this.client.options(workflow);
     } catch (err) {
-      if (workflow && err instanceof StudioHttpError && err.status === 400) {
+      if (!workflow || !(err instanceof StudioHttpError) || err.status !== 400 || request !== this.formRequest) {
+        throw err;
+      }
+      if (this.picks.workflow === workflow) {
         delete this.picks.workflow;
         this.opts.onPicksChanged(this.getPicks());
-        return await this.client.options(undefined);
       }
-      throw err;
+      return await this.client.options(undefined);
     }
   }
 

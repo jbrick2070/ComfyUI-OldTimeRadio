@@ -417,4 +417,50 @@ describe("the deck against a Studio", () => {
     await until(() => store.getPicks().workflow === "otr_16gb_video.json");
     expect(server.optionsRequests.at(-1)).toBe("otr_16gb_video.json");
   });
+
+  // -- the second review's findings (Codex, 1ab69c0c1), each pinned -----------
+
+  it("a listing taken before Make cannot drop the run Make just started", async () => {
+    const { server, store } = await boot({ listDelayMs: 150 });
+    const before = server.listRequests;
+    const look = store.tick();
+    await until(() => server.listRequests > before); // the listing is taken: no run in it yet
+    await store.make();
+    expect(store.getPhase()).toBe("running");
+    const id = store.getRun()!.id;
+    await look; // the stale, empty listing lands now
+    expect(store.getRun()?.id).toBe(id);
+    expect(store.getPhase()).toBe("running");
+    server.emit(id, { type: "done", path: "x", run: "r", file: "f.mp4" });
+    await until(() => store.getPhase() === "done");
+  });
+
+  it("a slow refusal for an old workflow cannot erase the workflow chosen after it", async () => {
+    const { server, store, saved } = await boot({ optionsDelayMs: { "otr_gone.json": 150 } });
+    store.setPicks({ workflow: "otr_gone.json" }); // read A: slow, and it will be a 400
+    await until(() => server.optionsRequests.includes("otr_gone.json"));
+    store.rotateMachine(1); // 16 GB video
+    await store.applyMachine(); // read B: quick
+    expect(store.getPicks().workflow).toBe("otr_16gb_video.json");
+    await new Promise((r) => setTimeout(r, 250)); // A's 400 lands
+    expect(store.getPicks().workflow).toBe("otr_16gb_video.json");
+    expect(saved.at(-1)).toMatchObject({ workflow: "otr_16gb_video.json" });
+    expect(store.getPhase()).toBe("ready");
+  });
+
+  it("the resting machine row's counter is its own place in the list, from 1", async () => {
+    const { store } = await boot();
+    const frames: string[] = [];
+    const dial = new MachineDialController(
+      store,
+      { draw: async (uri) => void frames.push(decodeSvgUri(uri)), showAlert: async () => undefined },
+      1
+    );
+    dial.appear();
+    await dial.rotate(1); // from 16 GB foley (3/4) to 16 GB video
+    expect(store.getPendingIndex()).toBe(3);
+    await until(() => frames.some((f) => f.includes(">4/4<")));
+    expect(frames.some((f) => f.includes(">0/4<"))).toBe(false);
+    dial.disappear();
+  });
 });

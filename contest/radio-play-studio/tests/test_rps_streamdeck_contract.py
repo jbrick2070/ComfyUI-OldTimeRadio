@@ -15,11 +15,13 @@ from urllib.parse import quote
 
 import pytest
 
-from radio_play_studio import runner
+from radio_play_studio import runner, server as server_module
+from radio_play_studio.config import WORKFLOW_NAME, Settings
 from radio_play_studio.form import FIELDS_BY_KEY, MY_STORY_BANK
 from radio_play_studio.runner import Studio
 from radio_play_studio.server import make_server
 
+from test_rps_machines import _device  # noqa: E402 - sibling test module
 from test_rps_runner import FakeClient, _good_job  # noqa: E402 - sibling test module
 
 PLUGIN = pathlib.Path(__file__).resolve().parents[1] / "streamdeck"
@@ -34,15 +36,76 @@ RUNNER_PY = pathlib.Path(runner.__file__).read_text(encoding="utf-8")
 DIAL_FIELDS = re.findall(r'"([a-z_]+)"', re.search(r"DIAL_FIELDS = \[([^\]]+)\]", SETTINGS_TS).group(1))
 
 
+def _serve(studio, monkeypatch):
+    """The real server on a free port, without its GPU watcher: that thread
+    loops for good and would ask the fixture's comfy.invalid to /free (Codex
+    QA, 2026-10-28); what it frees is test_rps_server's business, not this
+    contract's."""
+    monkeypatch.setattr(server_module, "_watch_gpu", lambda runs: None)
+    httpd = make_server(studio, "127.0.0.1", 0)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return httpd
+
+
 @pytest.fixture
-def app(settings, schemas):
+def app(settings, schemas, monkeypatch):
     studio = Studio(settings, client_factory=lambda url: FakeClient(_good_job()), fetch=lambda url: schemas)
-    server = make_server(studio, "127.0.0.1", 0)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    yield server.server_address[1]
-    server.shutdown()
-    server.server_close()
+    httpd = _serve(studio, monkeypatch)
+    yield httpd.server_address[1]
+    httpd.shutdown()
+    httpd.server_close()
+
+
+class _GatedStudio(Studio):
+    """An episode that stays running until the test lets it end."""
+
+    gate: threading.Event
+
+    def stream(self, choices):
+        yield {"type": "submitted"}
+        self.gate.wait(5)
+        yield {"type": "done", "path": "x", "run": "r", "file": "f.mp4"}
+
+
+@pytest.fixture
+def gated_app(settings, schemas, monkeypatch):
+    studio = _GatedStudio(settings, client_factory=lambda url: None, fetch=lambda url: schemas)
+    studio.gate = threading.Event()
+    httpd = _serve(studio, monkeypatch)
+    yield httpd.server_address[1], studio.gate
+    studio.gate.set()
+    httpd.shutdown()
+    httpd.server_close()
+
+
+class _RoutedStudio(Studio):
+    """Remembers which workflow file each run was built from."""
+
+    built: list
+
+    def build_graph_from(self, workflow_path, choices):
+        self.built.append(pathlib.Path(workflow_path).name)
+        return super().build_graph_from(workflow_path, choices)
+
+
+@pytest.fixture
+def menu_app(tmp_path, workflow, schemas, monkeypatch):
+    """A Studio started on a menu workflow, with other ways beside it (the
+    folder test_rps_machines.menu_settings builds)."""
+    folder = tmp_path / "workflows"
+    folder.mkdir()
+    for name in (WORKFLOW_NAME, "otr_16gb_video.json", "otr_16gb_still.json", "otr_8gb_still.json"):
+        (folder / name).write_text(json.dumps(workflow), encoding="utf-8")
+    settings = Settings(comfyui_url="http://comfy.invalid", api_url="http://bridge.invalid",
+                        workflow_path=folder / WORKFLOW_NAME, out_dir=tmp_path / "episodes")
+    stats = _device("cuda", "NVIDIA GeForce RTX 5080 Laptop GPU", 15.9)
+    studio = _RoutedStudio(settings, client_factory=lambda url: FakeClient(_good_job()), fetch=lambda url: schemas,
+                           comfy_json=lambda path: stats)
+    studio.built = []
+    httpd = _serve(studio, monkeypatch)
+    yield httpd.server_address[1], studio
+    httpd.shutdown()
+    httpd.server_close()
 
 
 def _request(port, method, path, body=None, headers=None):
@@ -126,13 +189,45 @@ def test_the_form_has_every_field_the_dials_post(app):
     assert runner.WORKFLOW_CHOICE == "workflow" and "workflow" not in FIELDS_BY_KEY
 
 
-def test_the_deck_post_starts_an_episode_and_a_second_is_refused_busy(app):
-    choices, _ = _deck_choices(app)
-    status, _, body = _post_json(app, "/api/episodes", {"choices": choices})
+def test_the_deck_post_starts_an_episode_and_a_second_is_refused_busy(gated_app):
+    port, gate = gated_app
+    choices, _ = _deck_choices(port)
+    status, _, body = _post_json(port, "/api/episodes", {"choices": choices})
     assert status == 202
     run_id = json.loads(body)["id"]
     assert re.fullmatch(r"[0-9a-f]{12}", run_id)
-    _until_finished(app, run_id)
+    # While it is going: a second press is a 409 with a reason the key can
+    # show, and the listing has the run unfinished, for the deck to follow.
+    status, _, body = _post_json(port, "/api/episodes", {"choices": choices})
+    assert status == 409 and json.loads(body)["error"]
+    _, _, body = _request(port, "GET", "/api/episodes")
+    assert [(r["id"], r["finished"]) for r in json.loads(body)["episodes"]] == [(run_id, False)]
+    gate.set()
+    _until_finished(port, run_id)
+
+
+def test_the_menu_workflow_the_deck_posts_is_the_graph_that_runs(menu_app):
+    port, studio = menu_app
+    status, _, body = _request(port, "GET", "/api/options")
+    menu = json.loads(body)["menu"]
+    ways = [w["workflow"] for m in menu["machines"] for w in m["ways"]]
+    assert "otr_8gb_still.json" in ways and menu["current"]["workflow"] == WORKFLOW_NAME
+    # The deck reads the chosen way's form, then posts the dials plus that way.
+    status, _, body = _request(port, "GET", "/api/options?workflow=otr_8gb_still.json")
+    form = json.loads(body)
+    assert status == 200 and form["menu"]["current"]["workflow"] == "otr_8gb_still.json"
+    fields = {f["key"]: f for f in form["fields"]}
+    choices = {k: fields[k]["default"] for k in DIAL_FIELDS if k in fields}
+    choices["workflow"] = "otr_8gb_still.json"
+    studio.built.clear()
+    status, _, body = _post_json(port, "/api/episodes", {"choices": choices})
+    assert status == 202
+    _until_finished(port, json.loads(body)["id"])
+    assert "otr_8gb_still.json" in studio.built
+    # A workflow off the menu is refused, which is what the deck's 400
+    # fallback reads.
+    status, _, _ = _request(port, "GET", "/api/options?workflow=otr_gone.json")
+    assert status == 400
 
 
 def test_a_post_that_is_not_json_is_refused(app):
