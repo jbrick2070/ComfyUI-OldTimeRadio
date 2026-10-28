@@ -518,10 +518,10 @@ def test_a_sentence_initial_person_is_refused(line, phrase):
     assert A.admit([phrase], line) == []
 
 
-def test_the_first_item_of_a_list_is_not_an_address():
-    assert A.admit(["rope", "knife", "lantern"], "Rope, knife, lantern. Take them all.") == [
-        "rope", "knife", "lantern"]
-    assert A.admit(["Table"], "Table, chairs and a lamp.") == ["table"]
+def test_the_first_item_of_a_list_is_lost_but_the_rest_survive():
+    # a lone sentence-initial word set off by a break is read as an address; losing a region is the safe error
+    assert A.admit(["rope", "knife", "lantern"], "Rope, knife, lantern. Take them all.") == ["knife", "lantern"]
+    assert A.admit(["Table"], "Table, chairs and a lamp.") == []
 
 
 def test_a_two_word_place_after_a_prefix_is_kept():
@@ -544,3 +544,64 @@ def test_the_overweening_rogue_and_the_little_villain_are_people():
     assert A.admit(["overweening rogue"], "Here's an overweening rogue.") == []
     assert A.admit(["little villain"], "Here comes the little villain.") == []
     assert A.admit(["boxtree", "walk"], "Get you all three into the boxtree and down this walk.") == ["boxtree", "walk"]
+
+
+# --------------------------------------------------------------------------- #
+# The fourth QA (of 9aa9f490 and e7df5fe5): a leak the list exemption opened, and the rest
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("line", [
+    "Marek, please, sit down.", "Marek, listen, the door is open.", "Marek, darling, come here.",
+    "Marek, you and I must talk.", "Marek, look, a ghost!", "Marek - look out.", "Marek (quietly) look out.",
+])
+def test_a_name_followed_by_an_aside_is_still_an_address(line):
+    assert A.admit(["Marek"], line) == []
+
+
+@pytest.mark.parametrize("line, phrase", [
+    ("Santa Claus is coming.", "Claus"), ("El Greco painted it.", "Greco"), ("El Cid rode out.", "Cid"),
+    ("I met India Hicks at the door.", "Hicks"), ("She married Brittany Jones last year.", "Jones"),
+    ("Stay in Paris Marek said nothing.", "Marek"), ("Then New Marek spoke.", "Marek"),
+])
+def test_a_name_after_a_place_word_or_a_prefix_is_still_a_person(line, phrase):
+    assert A.admit([phrase], line) == []
+
+
+def test_only_a_place_suffix_continues_a_place():
+    assert A.admit(["Thornfield Hall"], "She stood in Thornfield Hall.") == ["thornfield hall"]
+    assert A.admit(["Buenos Aires"], "Buenos Aires is warm.") == ["buenos aires"]
+    assert A.admit(["New Jersey"], "We drove through New Jersey.") == ["new jersey"]
+
+
+@pytest.mark.parametrize("line, phrase", [
+    ("There is no… ledger here.", "ledger"), ("There is no... ledger here.", "ledger"),
+    ("I can't… find the key.", "key"), ("I told you… Marek knows.", "Marek"),
+])
+def test_an_ellipsis_does_not_cut_a_negation_or_a_capital_loose(line, phrase):
+    assert A.admit([phrase], line) == []
+
+
+def test_an_ellipsis_still_stops_two_words_from_fusing():
+    assert A.admit(["rope knife"], "Rope… knife.") == []
+    assert A.admit(["lantern"], "Light the… lantern now.") == ["lantern"]
+
+
+@pytest.mark.parametrize("word", ["bishop", "baron", "pope", "vicar", "colonel", "general", "earl", "lord",
+                                  "professor", "marshal", "warden", "landlord", "gardener", "prisoner", "pirate"])
+def test_a_lowercase_title_or_role_is_a_person(word):
+    assert A.admit([word], "The %s is here." % word) == []
+
+
+def test_an_accent_does_not_hide_a_name_or_a_place():
+    assert A.admit(["María"], "In María we trust.") == []
+    assert A.admit(["Zoe"], "Zoe knows the way.", names=["Zoë"]) == []
+    assert A.admit(["Zürich"], "We flew to Zürich yesterday.") == ["zürich"]
+
+
+def test_a_plural_geography_name_is_a_place():
+    assert A.admit(["Rockies"], "We ride across the Rockies.") == ["rockies"]
+    assert A.admit(["Hebrides"], "She was born in the Hebrides.") == ["hebrides"]
+
+
+def test_a_capital_i_after_a_sentence_initial_word_is_a_pronoun_not_a_name():
+    assert A.admit(["water"], "Water I need.") == ["water"]
+    assert A.admit(["rope"], "Rope I have, and a knife.") == ["rope"]

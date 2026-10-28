@@ -83,6 +83,8 @@ _DENY_HEADS = frozenset({
     "butler", "maid", "servant", "waiter", "waitress", "clerk", "pilot", "sailor", "farmer", "priest",
     "monk", "nun", "teacher", "student", "detective", "police", "policeman", "thief", "killer", "murderer",
     "victim", "witness", "lawyer", "judge", "crowd", "family", "children",
+    "warden", "landlord", "gardener", "porter", "driver", "passenger", "prisoner", "guest", "neighbor", "boss",
+    "bandit", "pirate", "spy",
     "villain", "rogue", "knave", "fool", "wretch", "scoundrel", "coward", "traitor", "liar", "rascal",
     "fellow", "lad", "lass", "peasant", "beggar", "vagabond", "lover", "rival", "enemy", "master",
     # abstractions a line names about a person
@@ -130,8 +132,8 @@ _TRAILING_COMMA = re.compile(r",\s*([\]}])")
 
 #: A word (letters or digits in any script, with inner apostrophes) or a clause break. A clause break stops a
 #: run from fusing a list; it does not stop a negator from reaching across it.
-_TOKEN = re.compile(r"[^\W_]+(?:'[^\W_]+)*|[,:—–]|--+")
-_BREAKS = (",", ":", "—", "–")
+_TOKEN = re.compile(r"[^\W_]+(?:'[^\W_]+)*|[,:—–()]|--+")
+_BREAKS = (",", ":", "—", "–", "(", ")")
 
 
 def _is_break(token) -> bool:
@@ -168,7 +170,10 @@ accra johannesburg atlantic pacific mediterranean thames nile danube rhine seine
 everest alps pyrenees himalayas sahara alabama alaska arizona arkansas california colorado connecticut
 delaware florida hawaii idaho illinois iowa kansas kentucky louisiana maine maryland massachusetts
 michigan minnesota missouri nebraska nevada ohio oklahoma oregon pennsylvania tennessee texas utah vermont
-wisconsin wyoming new zealand york hong kong san los las angeles vegas orleans
+wisconsin wyoming new zealand york hong kong san los las angeles vegas orleans buenos aires diego jose
+antonio paulo janeiro salvador jersey hampshire haven
+rockies hebrides cotswolds highlands midlands hamptons appalachians andes azores canaries orkneys shetlands
+dolomites catskills ozarks everglades
 """.split())
 
 #: Words that, directly before a capitalized word, put it in a place ("in Thornfield", "near Dover").
@@ -192,10 +197,13 @@ _TITLES = frozenset({
     "chief", "commander", "admiral", "detective", "officer", "agent", "marshal", "knight", "squire",
 })
 
-#: First words of a two-word place ("San Diego", "New York", "Buenos Aires"): the second word is a place too.
-_NAME_PREFIXES = frozenset({
-    "san", "los", "las", "santa", "new", "hong", "buenos", "sao", "rio", "el", "la", "st", "saint", "tel",
-    "abu", "kuala", "costa", "puerto", "port", "mount", "fort",
+#: The last word of a longer place name ("Thornfield Hall", "London Bridge", "Kensington Palace"): such a word
+#: continues a place that was already recognized. Surnames that double as places (Green, Field, Hill, Park,
+#: Wood, Lane) are left out on purpose.
+_PLACE_SUFFIXES = frozenset({
+    "hall", "house", "castle", "bridge", "street", "road", "square", "lake", "river", "bay", "island",
+    "forest", "mountain", "mountains", "abbey", "tower", "palace", "gardens", "cross", "falls", "springs",
+    "heights", "valley", "harbour", "harbor", "beach", "canyon", "creek", "gate", "avenue", "station",
 })
 
 #: Given names that are almost always a person. A capitalized word on this list is a person wherever it sits:
@@ -324,14 +332,25 @@ def parse_response(raw, ids) -> dict:
     return out
 
 
-#: Curly apostrophes become straight (so "don't" is one word); a typographic ellipsis ends a sentence.
-_QUOTE_FOLD = {0x2019: "'", 0x2018: "'", 0x02BC: "'", 0x2026: "."}
+#: Curly apostrophes become straight, so "don't" is one word.
+_QUOTE_FOLD = {0x2019: "'", 0x2018: "'", 0x02BC: "'"}
+
+#: An ellipsis (typographic or "...") and a spaced hyphen are clause breaks INSIDE the sentence: they stop a
+#: run from fusing, and a negator before them still reaches what follows ("There is no... ledger").
+_ELLIPSIS = re.compile("\\.{2,}|\u2026")
+_SPACED_HYPHEN = re.compile(r"\s-\s")
 
 
 def _straight(text) -> str:
-    """Composed, with curly apostrophes made straight so "don’t" is one word. Case is kept."""
-    composed = unicodedata.normalize("NFC", str(text or ""))
-    return composed.translate(_QUOTE_FOLD)
+    """Composed, with curly apostrophes made straight and clause breaks marked. Case is kept."""
+    composed = unicodedata.normalize("NFC", str(text or "")).translate(_QUOTE_FOLD)
+    return _SPACED_HYPHEN.sub(" -- ", _ELLIPSIS.sub(",", composed))
+
+
+def _plain(word) -> str:
+    """``word`` without accents, so "María" and "Zoë" meet "Maria" and "Zoe" in the name and place lists."""
+    decomposed = unicodedata.normalize("NFKD", str(word or ""))
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
 
 
 def _fold(text) -> str:
@@ -434,7 +453,7 @@ def _capital_is_place(cased, tokens, index) -> bool:
     Anything else ("What shall Cordelia speak") does not.
     """
     word = tokens[index]
-    if _possessive_stem(word) in _PLACE_WORDS:
+    if _plain(_possessive_stem(word)) in _PLACE_WORDS:
         return True
     if word.endswith("'s"):
         return False
@@ -446,20 +465,18 @@ def _capital_is_place(cased, tokens, index) -> bool:
         return True
     if index > 1 and previous == "of" and tokens[index - 2] in _PLACE_NOUNS:
         return True
-    if index > 1 and cased[index - 1][:1].isupper() and _capital_is_place(cased, tokens, index - 1):
-        return True
-    # "San Diego is warm": the second word of a two-word place whose first word opens the sentence.
-    return index == 1 and cased[0][:1].isupper() and tokens[0] in _NAME_PREFIXES
+    # "Thornfield Hall": only a place SUFFIX continues a place; any other capital after a place word is a
+    # person ("India Hicks", "Brittany Jones", "Paris Marek").
+    return (index > 0 and word in _PLACE_SUFFIXES and cased[index - 1][:1].isupper()
+            and _capital_is_place(cased, tokens, index - 1))
 
 
 def _is_address(tokens) -> bool:
-    """True when the sentence opens with one word that is being ADDRESSED ("Marek, look out", "Marek!",
-    "Marek -- look out"), and not with the first item of a list ("Rope, knife, lantern ...")."""
-    if len(tokens) == 1:
-        return True
-    if not _is_break(tokens[1]):
-        return False
-    return not (tokens[1] == "," and len(tokens) > 3 and (tokens[3] == "," or tokens[3] == "and"))
+    """True when the sentence opens with one word set off by a break or standing alone ("Marek, look out",
+    "Marek, please, sit down", "Marek!", "Marek -- look out"). Such a word is far more often a name being
+    addressed than the first item of a list ("Rope, knife, lantern ..."), and losing a list's first item
+    costs only a region, so the list is not told apart."""
+    return len(tokens) == 1 or _is_break(tokens[1])
 
 
 def _window_names_a_person(cased, tokens, start, length, judge_capitals) -> bool:
@@ -474,7 +491,7 @@ def _window_names_a_person(cased, tokens, start, length, judge_capitals) -> bool
     """
     last = start + length - 1
     for i in range(start, start + length):
-        stem = _possessive_stem(tokens[i])
+        stem = _plain(_possessive_stem(tokens[i]))
         if not judge_capitals:
             if stem in _GIVEN_NAMES:
                 return True
@@ -494,7 +511,7 @@ def _window_names_a_person(cased, tokens, start, length, judge_capitals) -> bool
             if tokens[0].endswith("'s") and not place:
                 return True
             if (len(tokens) > 1 and cased[1][:1].isupper() and not place
-                    and tokens[0] not in _NAME_PREFIXES):
+                    and tokens[1] != "i" and not tokens[1].startswith("i'")):
                 return True
             continue
         if not _capital_is_place(cased, tokens, i):
@@ -512,8 +529,9 @@ def admit(phrases, line_text, names=()) -> list:
     for name in names or ():
         for w in _words(name):
             if w not in _GENERIC_NAME_WORDS:
-                name_stems.add(_stem(w))
-    deny = _DENY_HEADS | _FUNCTION_WORDS
+                name_stems.add(_plain(_stem(w)))
+    # A lowercase title or role is a person as much as a capitalized one ("the bishop", "the colonel").
+    deny = _DENY_HEADS | _FUNCTION_WORDS | _TITLES
     kept, taken = [], set()
     for raw in phrases or ():
         words = _normalize(raw)
@@ -523,7 +541,7 @@ def admit(phrases, line_text, names=()) -> list:
         head = words[-1]
         if not any(ch.isalpha() for ch in head) or head.endswith("'s") or head.endswith("s'"):
             continue
-        if any(_stem(w) in name_stems for w in words):
+        if any(_plain(_stem(w)) in name_stems for w in words):
             continue
         stance, matched = _match_in_line(line_text, words)
         if stance != "clean":
