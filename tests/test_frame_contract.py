@@ -109,6 +109,10 @@ def test_EVERY_BOUNDED_ENGINE_CAN_SPLIT_AND_UNBOUNDED_ONES_NEED_NOT():
         # beat costs, never how many FRAMES it spans, so max_frames stays 0
         # and the partitioner still has nothing to split on
         "animatediff15_lightning_video",
+        # the SCENE-REGIONS LAB PEERS (2026-10-27) subclass those two lanes and change only the
+        # conditioning, never the timeline: still one timeline per beat, max_frames 0, no split
+        "animatediff15_v3_haunted_regions_video",
+        "animatediff15_lightning_regions_video",
         "mesh_stage", "still_flat", "still_motion", "still_pan", "still_word",
         "viz_camera", "viz_green", "viz_mxc_cpu", "viz_mxc_mandala",
     }, sorted(unbounded)

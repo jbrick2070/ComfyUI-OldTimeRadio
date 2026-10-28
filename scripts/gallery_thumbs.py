@@ -64,6 +64,8 @@ LANES = {
     "cloud_ltx25_audio_in": "LTX AUDIO-IN",
     "animatediff15_v3_haunted_video": "ANIMATEDIFF",
     "animatediff15_lightning_video": "ANIMATEDIFF",
+    "animatediff15_v3_haunted_regions_video": "ANIMATEDIFF",
+    "animatediff15_lightning_regions_video": "ANIMATEDIFF",
     "cloud_vidu_q2_pro_fast_720p": "VIDU VIDEO",
 }
 

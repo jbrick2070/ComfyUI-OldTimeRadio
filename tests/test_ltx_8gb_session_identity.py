@@ -170,6 +170,11 @@ _ENGINES_WITH_A_SESSION = {
     # identity, which already carries the motion module by name and file
     # receipt -- so a Lightning session can never reuse a golden-module handle
     "animatediff15_lightning_video",
+    # the SCENE-REGIONS LAB PEERS (2026-10-27) inherit their parents' session identity: the handles a
+    # session owns (checkpoint, module, adapter, decoder) are unchanged; the regions are per-beat
+    # conditioning, not a model handle
+    "animatediff15_v3_haunted_regions_video",
+    "animatediff15_lightning_regions_video",
     "ltx_8gb",                 # B1b / B2b, 2026-07-27
     "razzle_ltx_8gb",          # 2026-09-17 -- inherits Ltx8gbEngine identity
     # 2026-09-22 -- the LTX 2.5 tier lanes. They inherit

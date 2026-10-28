@@ -699,6 +699,29 @@ CAPABILITIES = {
             "v1-5-pruned-emaonly-fp16.safetensors",
             "animatediff_lightning_8step_comfyui.safetensors",
             "vae-ft-mse-840000-ema-pruned.safetensors"]},
+    # THE SCENE-REGIONS LAB PEERS (2026-10-27): the haunted and lightning lanes with the beat's own
+    # dialogue-named objects each given a region and its own text (core ComfyUI nodes only, no pack, no
+    # new weight). Same artifacts as the parent each subclasses, so the rows repeat the parent's. LAB
+    # IDS: never a default of any role, never in a shipping profile, no cost row, admission
+    # unenforced in the evidence manifest. cuda only: nothing here has run on Apple silicon, and a
+    # device_backends row is a claim about proven execution.
+    "animatediff15_v3_haunted_regions_video": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
+                               "v3_sd15_mm.ckpt",
+                               "v3_sd15_adapter.ckpt"]},
+    "animatediff15_lightning_regions_video": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": [
+            "v1-5-pruned-emaonly-fp16.safetensors",
+            "animatediff_lightning_8step_comfyui.safetensors",
+            "vae-ft-mse-840000-ema-pruned.safetensors"]},
     "minimax_h3_video": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,

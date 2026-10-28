@@ -68,6 +68,7 @@ Anything not listed there is a manual install -- see its row below.
 | `ghost_signal` | 2 weight file(s) | manual download | - |
 | `ghost_signal_lightning` | 4 weight file(s) | manual download | - |
 | `ghost_signal_official` | 4 weight file(s) | manual download | - |
+| `ghost_signal_regions` | 4 weight file(s) | manual download | - |
 | `ghost_signal_stillin_lab` | 2 weight file(s) | manual download | - |
 | `google_omni_video` | nothing on disk | - | - |
 | `humo` | 6 weight file(s) | 14B: `otr_fetch_lane_weights.py humo`; 1.7B: [exact manual download](RUNPOD_INSTALL.md) | - |
@@ -170,6 +171,13 @@ So where a lane appears in the one-command list above, **the fetcher is authorit
 - `v1-5-pruned-emaonly-fp16.safetensors`
 - `v3_sd15_adapter.ckpt`
 - `v3_sd15_mm.ckpt`
+
+**`ghost_signal_regions`** -- `nodes/_otr_video_engines/eng_ghost_signal_regions.py`
+
+- `animatediff_lightning_8step_comfyui.safetensors`
+- `v3_sd15_adapter.ckpt`
+- `v3_sd15_mm.ckpt`
+- `vae-ft-mse-840000-ema-pruned.safetensors`
 
 **`ghost_signal_stillin_lab`** -- `nodes/_otr_video_engines/eng_ghost_signal_stillin_lab.py`
 

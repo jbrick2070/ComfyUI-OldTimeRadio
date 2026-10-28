@@ -287,6 +287,8 @@ _EXTRA_INSTALL = {
     "animatediff15_v3_haunted_video": "ComfyUI-AnimateDiff-Evolved",
     "animatediff15_v3_stillin_lab_video": "ComfyUI-AnimateDiff-Evolved",
     "animatediff15_lightning_video": "ComfyUI-AnimateDiff-Evolved",
+    "animatediff15_v3_haunted_regions_video": "ComfyUI-AnimateDiff-Evolved",
+    "animatediff15_lightning_regions_video": "ComfyUI-AnimateDiff-Evolved",
 }
 
 

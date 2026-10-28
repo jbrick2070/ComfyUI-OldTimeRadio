@@ -1,0 +1,340 @@
+"""The scene-regions lab peers: the graph proven by execution, and the contract that keeps every other lane unchanged.
+
+Executes the haunted-regions engine's ``render_clip`` against recorded fake node classes (the haunted
+file's method: a source grep cannot tell a branch that runs from one that does not) and pins:
+
+* both lab ids are Ghost siblings of their parents (family, roles, prompt profile, frame contract, canvas,
+  artifacts), which is what lets a frozen bundle replay on them;
+* with objects, one text encode, one ``ConditioningSetMask`` bound to a generated mask and one
+  ``ConditioningCombine`` are added per object on top of the UNCHANGED global positive, and the sampler
+  receives the final combined conditioning; with none, the encode graph is the parent's, call for call;
+* a parent lane never reads the field, never resolves a region class and never gains a receipt key;
+* the receipt and the identity tuple move with the objects, the layout and the strength;
+* the driver fills ``scene_objects`` for an opted-in engine only, from the episode's own key-object pool.
+"""
+from __future__ import annotations
+
+import copy
+
+import numpy as np
+import pytest
+import torch
+
+import nodes._otr_video_engines  # noqa: F401 -- populate the registry
+from nodes import otr_shot_lock as sl
+from nodes._otr_video_engines import eng_ghost_signal as gs
+from nodes._otr_video_engines import registry as vreg
+from nodes._otr_video_engines import render_driver as rd
+from nodes._otr_video_engines import wrapper_bridge as wb
+from nodes._otr_video_engines.schemas import VideoRequest
+
+HAUNTED = "animatediff15_v3_haunted_video"
+HAUNTED_R = "animatediff15_v3_haunted_regions_video"
+LIGHTNING = "animatediff15_lightning_video"
+LIGHTNING_R = "animatediff15_lightning_regions_video"
+PAIRS = [(HAUNTED, HAUNTED_R), (LIGHTNING, LIGHTNING_R)]
+
+
+class _Patcher:
+    def __init__(self, tag):
+        self.tag = tag
+        self.detached = False
+
+    def detach(self, unpatch_all=True):
+        self.detached = True
+        return self
+
+
+class _Recorder:
+    def __init__(self, source_request=16):
+        self.calls = []
+        self.source_request = source_request
+        self.base_model = _Patcher("base")
+        self.lora_model = _Patcher("lora")
+        self.ade_model = _Patcher("ade")
+        self.clip = object()
+        self.vae = object()
+
+    def classes(self):
+        rec = self
+
+        def _node(tag, result):
+            class _N:
+                FUNCTION = "go"
+
+                def go(self, **kw):
+                    rec.calls.append((tag, dict(kw)))
+                    return result(kw) if callable(result) else result
+            return _N
+
+        def _sample(kw):
+            n = int(kw["latent_image"]["samples"].shape[0])
+            return ({"samples": torch.zeros((n, 4, 36, 64))},)
+
+        def _decode(kw):
+            n = int(kw["samples"]["samples"].shape[0])
+            frames = np.zeros((n, 288, 512, 3), dtype=np.uint8)
+            for i in range(n):
+                frames[i, 0, 0, 0] = i % 256
+            return (frames,)
+
+        counter = {"text": 0}
+
+        def _text(kw):
+            counter["text"] += 1
+            return ((("cond", kw["text"]),),)
+
+        return {
+            "checkpoint": _node("ckpt", (rec.base_model, rec.clip, rec.vae)),
+            "text_encode": _node("text_encode", _text),
+            "context": _node("context", ("CONTEXT_OPTS",)),
+            "lora": _node("lora", (rec.lora_model,)),
+            "ade": _node("ade", (rec.ade_model,)),
+            "latent": _node("latent", lambda kw: ({"samples": torch.zeros(
+                (int(kw["batch_size"]), 4, 36, 64))},)),
+            "sampler": _node("sampler", _sample),
+            "decode": _node("decode", _decode),
+            "cond_mask": _node("cond_mask", lambda kw: (("masked", kw["conditioning"], kw["strength"]),)),
+            "cond_combine": _node("cond_combine", lambda kw: (("joined", kw["conditioning_1"], kw["conditioning_2"]),)),
+        }
+
+
+def _request(target=32, scene_objects=(), shot_id="shot_b003"):
+    return {
+        "shot_id": shot_id,
+        "request_id": shot_id,
+        "text_prompt": "a brass lamp on a desk, mid-shot or wider",
+        "negative_prompt": "text, watermark, caption, lettering, subtitles",
+        "timing": {"target_frame_count": target},
+        "seed_bundle": {"request_seed": 4242},
+        "scene_objects": list(scene_objects),
+    }
+
+
+def _render(monkeypatch, engine_id, **req_kw):
+    eng = vreg.get_engine(engine_id)
+    rec = _Recorder(source_request=gs.ghost_source_request(32))
+    monkeypatch.setattr(eng, "_classes", rec.classes())
+    monkeypatch.setattr(eng, "_loaded", True)
+    monkeypatch.setattr(eng, "_patchers", [rec.base_model])
+    prepared = {"engine_id": eng.name, "lease": None, "patchers": eng._patchers, "session_ctx": {},
+                "base_model": (rec.base_model,), "clip": (rec.clip,), "vae": (rec.vae,),
+                "recipe": eng._recipe_receipt()}
+    monkeypatch.setattr(wb, "encode_frames_to_silent_mp4",
+                        lambda frames, out_path, fps, **kw: (out_path, int(np.asarray(frames).shape[0])))
+    monkeypatch.setattr(wb, "reclaim_idle_models", lambda reason="": None)
+    monkeypatch.setattr(gs.GhostSignalEngine, "_ckpt_path", lambda self: "ck")
+    monkeypatch.setattr(gs.GhostSignalEngine, "_motion_path", lambda self: "mm")
+    monkeypatch.setattr(gs.GhostSignalEngine, "_lora_path", lambda self: "lo")
+    monkeypatch.setattr(gs.GhostSignalEngine, "_vae_path", lambda self: "vae")
+    raw = eng.render_clip(_request(**req_kw), prepared)
+    return rec, eng, raw
+
+
+# --------------------------------------------------------------------------- #
+# Registration: siblings, and the parents untouched
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("parent_id,lab_id", PAIRS)
+def test_each_lab_id_is_a_ghost_sibling_of_its_parent(parent_id, lab_id):
+    parent, lab = vreg.get_engine(parent_id), vreg.get_engine(lab_id)
+    assert isinstance(lab, type(parent))
+    assert lab.wants_scene_regions is True and parent.wants_scene_regions is False
+    assert lab.recipe_receipt_id != parent.recipe_receipt_id
+    for attr in ("family", "roles", "prompt_profile", "frame_contract", "accepts_still",
+                 "required_inputs", "still_plan", "subject_ownership", "lora_name", "vae_name",
+                 "render_canvas", "hold_factor", "steps", "cfg", "sampler_name", "scheduler",
+                 "motion_module_name"):
+        assert getattr(lab, attr) == getattr(parent, attr), attr
+    assert lab.default_roles == ()
+    assert lab.render_canvas == (512, 288)       # the G2.2 pin for both lab ids
+
+
+@pytest.mark.parametrize("parent_id,lab_id", PAIRS)
+def test_only_the_lab_id_resolves_the_two_core_region_classes(parent_id, lab_id):
+    parent, lab = vreg.get_engine(parent_id), vreg.get_engine(lab_id)
+    assert "cond_mask" not in parent._node_candidates()
+    assert "cond_combine" not in parent._node_candidates()
+    extra = set(lab._node_candidates()) - set(parent._node_candidates())
+    assert extra == {"cond_mask", "cond_combine"}
+    assert lab._node_candidates()["cond_mask"] == ("ConditioningSetMask",)
+    assert lab._node_candidates()["cond_combine"] == ("ConditioningCombine",)
+
+
+@pytest.mark.parametrize("parent_id,lab_id", PAIRS)
+def test_the_lab_ids_load_their_parents_weights_and_nothing_else(parent_id, lab_id):
+    parent, lab = vreg.get_engine(parent_id), vreg.get_engine(lab_id)
+    assert lab._weight_tokens() == parent._weight_tokens()
+
+
+# --------------------------------------------------------------------------- #
+# The graph, proven by execution
+# --------------------------------------------------------------------------- #
+def test_with_no_objects_the_encode_graph_is_the_parents_call_for_call(monkeypatch):
+    rec, _eng, _raw = _render(monkeypatch, HAUNTED_R, scene_objects=())
+    tags = [name for name, _ in rec.calls]
+    assert tags.count("text_encode") == 2
+    assert tags.count("cond_mask") == 0 and tags.count("cond_combine") == 0
+
+
+def test_each_object_adds_a_text_a_mask_and_a_combine_on_top_of_the_global_positive(monkeypatch):
+    rec, eng, _raw = _render(monkeypatch, HAUNTED_R, scene_objects=("a brass lamp", "a battered disc"))
+    tags = [name for name, _ in rec.calls]
+    assert tags.count("text_encode") == 4          # global positive, negative, two objects
+    assert tags.count("cond_mask") == 2 and tags.count("cond_combine") == 2
+    texts = [kw["text"] for name, kw in rec.calls if name == "text_encode"]
+    assert "a brass lamp on a desk, mid-shot or wider" in texts       # the global prompt is UNCHANGED
+    assert "a brass lamp" in texts and "a battered disc" in texts
+    masks = [kw for name, kw in rec.calls if name == "cond_mask"]
+    for kw in masks:
+        assert tuple(kw["mask"].shape) == (288, 512) and kw["mask"].dtype == torch.float32
+        assert kw["set_cond_area"] == "default"
+        assert kw["strength"] == pytest.approx(gs.SCENE_REGION_STRENGTH_DEFAULT)
+    # left and right halves: the first object owns the left, the second the right
+    assert masks[0]["mask"][:, :32].mean() > 0.9 and masks[0]["mask"][:, -32:].mean() < 0.1
+    assert masks[1]["mask"][:, -32:].mean() > 0.9 and masks[1]["mask"][:, :32].mean() < 0.1
+
+
+def test_the_sampler_receives_the_final_combined_conditioning_not_the_global_one(monkeypatch):
+    rec, _eng, _raw = _render(monkeypatch, HAUNTED_R, scene_objects=("a brass lamp", "a battered disc"))
+    sampler = [kw for name, kw in rec.calls if name == "sampler"][0]
+    positive = sampler["positive"]
+    assert positive[0] == "joined"                       # the last combine, two deep
+    assert positive[1][0] == "joined"
+    assert positive[1][1][0][1] == "a brass lamp on a desk, mid-shot or wider"   # the global positive
+    assert positive[2][0] == "masked" and positive[1][2][0] == "masked"
+    assert sampler["negative"][0][0] == "cond"          # the negative is untouched
+    assert sampler["negative"][0][1].startswith("text, watermark")
+
+
+def test_a_parent_lane_ignores_the_field_entirely(monkeypatch):
+    rec, _eng, _raw = _render(monkeypatch, HAUNTED, scene_objects=("a brass lamp", "a battered disc"))
+    tags = [name for name, _ in rec.calls]
+    assert tags.count("text_encode") == 2
+    assert "cond_mask" not in tags and "cond_combine" not in tags
+
+
+@pytest.mark.parametrize("parent_id", [HAUNTED, LIGHTNING])
+def test_a_parent_receipt_gains_no_key_and_its_identity_keeps_its_shape(parent_id):
+    eng = vreg.get_engine(parent_id)
+    req = _request(scene_objects=("a brass lamp",))
+    assert "scene_regions" not in eng.sampler_inputs_for(req)
+    assert "scene_objects" not in eng._build_render_request(req)
+    assert not any(str(part).startswith("regions:") for part in eng.shot_cache_identity(req))
+
+
+@pytest.mark.parametrize("lab_id", [HAUNTED_R, LIGHTNING_R])
+def test_the_lab_receipt_and_identity_move_with_the_objects(lab_id):
+    eng = vreg.get_engine(lab_id)
+    none = eng.sampler_inputs_for(_request(scene_objects=()))
+    one = eng.sampler_inputs_for(_request(scene_objects=("a brass lamp",)))
+    two = eng.sampler_inputs_for(_request(scene_objects=("a brass lamp", "a battered disc")))
+    assert none["scene_regions"]["objects"] == [] and none["scene_regions"]["layout"] == ""
+    assert one["scene_regions"]["layout"] == "centre" and two["scene_regions"]["layout"] == "halves"
+    assert len({one["scene_regions"]["mask_sha8"], two["scene_regions"]["mask_sha8"]}) == 2
+    ids = {eng.shot_cache_identity(_request(scene_objects=o))
+           for o in ((), ("a brass lamp",), ("a brass lamp", "a battered disc"))}
+    assert len(ids) == 3
+
+
+def test_the_strength_dial_is_read_from_the_environment_and_a_bad_value_falls_back(monkeypatch):
+    eng = vreg.get_engine(HAUNTED_R)
+    monkeypatch.delenv(gs.SCENE_REGION_STRENGTH_ENV, raising=False)
+    assert eng._scene_region_strength() == gs.SCENE_REGION_STRENGTH_DEFAULT
+    monkeypatch.setenv(gs.SCENE_REGION_STRENGTH_ENV, "3.5")
+    assert eng._scene_region_strength() == 3.5
+    for bad in ("abc", "0", "99", "-1", "nan"):
+        monkeypatch.setenv(gs.SCENE_REGION_STRENGTH_ENV, bad)
+        assert eng._scene_region_strength() == gs.SCENE_REGION_STRENGTH_DEFAULT, bad
+    monkeypatch.setenv(gs.SCENE_REGION_STRENGTH_ENV, "3.5")
+    assert vreg.get_engine(HAUNTED_R).sampler_inputs_for(
+        _request(scene_objects=("a brass lamp",)))["scene_regions"]["strength"] == 3.5
+
+
+def test_more_than_three_objects_are_cut_to_three(monkeypatch):
+    eng = vreg.get_engine(HAUNTED_R)
+    plan = eng._build_render_request(_request(scene_objects=("a", "b", "c", "d", "e")))
+    assert plan["scene_objects"] == ("a", "b", "c")
+
+
+# --------------------------------------------------------------------------- #
+# The driver fills the field for an opted-in engine only
+# --------------------------------------------------------------------------- #
+def _ledger():
+    return {
+        "meta": {"episode_seed": 1013426535, "visual_style": "archival_documentary",
+                 "freeze_timestamp": "2026-08-22T22:27:56.943819+00:00",
+                 "key_objects": ["a brass lamp", "a battered disc", "a coal truck"],
+                 "story_brief_terms": {"setting": ["the harbour"]}},
+        "cast": [
+            {"char_id": "c01", "name": "ANNOUNCER", "gender": "female"},
+            {"char_id": "c02", "name": "ADRIAN SPENDER", "gender": "male",
+             "appearance": "a broad steady man in a charcoal overcoat"},
+            {"char_id": "c03", "name": "RASHIDA PIERCE", "gender": "female",
+             "appearance": "a tall stooped woman, an olive uniform"},
+        ],
+        "lines": [
+            {"line_id": "music_opening_001", "speaker_role": "music_open", "speaker": "RADIO",
+             "text": "instrumental intro, no dialogue", "dur_s": 5.0, "start_s": 0.0},
+            {"line_id": "b001", "speaker_role": "announcer", "speaker": "ANNOUNCER", "char_id": "c01",
+             "text": "In the bustling heart of the harbour.", "beat_intent": "Open the episode.",
+             "traits": "welcoming", "arc_phase": "scene", "dur_s": 4.0, "start_s": 5.0},
+            {"line_id": "b002", "speaker_role": "character", "speaker": "ADRIAN SPENDER", "char_id": "c02",
+             "text": "Bring the lamp over here, and keep the disc dry.",
+             "beat_intent": "Adrian demands the lamp and the disc.", "traits": "tense",
+             "arc_phase": "scene", "dur_s": 3.0, "start_s": 9.0},
+            {"line_id": "b003", "speaker_role": "character", "speaker": "RASHIDA PIERCE", "char_id": "c03",
+             "text": "It isn't a truck I am afraid of.",
+             "beat_intent": "Rashida refuses.", "traits": "guarded", "arc_phase": "climax",
+             "dur_s": 3.0, "start_s": 12.0},
+            {"line_id": "b005", "speaker_role": "announcer", "speaker": "ANNOUNCER", "char_id": "c01",
+             "text": "And so the harbour keeps its secret.", "beat_intent": "Close the episode.",
+             "traits": "wry", "arc_phase": "resolution", "dur_s": 4.0, "start_s": 18.0},
+            {"line_id": "music_closing_001", "speaker_role": "music_close", "speaker": "RADIO",
+             "text": "closing theme, no dialogue", "dur_s": 5.0, "start_s": 22.0},
+        ],
+    }
+
+
+def _plan(engine_id):
+    pol = {"video_models": {"announcer_visual": engine_id, "music_visual": engine_id,
+                            "character_visual": engine_id},
+           "effective_video_models": {"announcer_visual": engine_id, "music_visual": engine_id,
+                                      "character_video": engine_id}}
+    led = _ledger()
+    beats = sl.extract_beats(led)
+    budget = sl.compute_clip_budget(beats, 25)
+    for beat in beats:
+        budget["per_beat"].setdefault(beat["beat_id"], 50)
+    _groups, shots = sl.build_execution_plan(beats, budget, {}, pol, led, warnings=[])
+    led["video"] = {"shots": shots, "fps": 25}
+    return led, shots
+
+
+def _shot(shots, shot_id):
+    for shot in shots:
+        if shot["shot_id"] == shot_id:
+            return shot
+    raise AssertionError(shot_id)
+
+
+def test_the_driver_fills_scene_objects_for_the_lab_engine_from_the_pool_the_beat_refers_to():
+    led, shots = _plan(HAUNTED_R)
+    req = rd.build_request_from_shot(_shot(shots, "shot_b002"), led, master_audio_path="")
+    assert set(req["scene_objects"]) == {"a brass lamp", "a battered disc"}
+    assert req["observability"]["scene_objects_source"]
+    VideoRequest(**{k: v for k, v in req.items()})          # the declared field validates
+
+
+def test_a_negated_noun_and_a_bookend_get_nothing():
+    led, shots = _plan(HAUNTED_R)
+    negated = rd.build_request_from_shot(_shot(shots, "shot_b003"), led, master_audio_path="")
+    assert "a coal truck" not in negated["scene_objects"]
+    bookend = rd.build_request_from_shot(_shot(shots, "shot_b001"), led, master_audio_path="")
+    assert bookend["scene_objects"] == []
+
+
+def test_the_driver_leaves_every_other_lane_untouched():
+    led, shots = _plan(HAUNTED)
+    req = rd.build_request_from_shot(_shot(shots, "shot_b002"), led, master_audio_path="")
+    assert req.get("scene_objects") in ([], None)
+    assert "scene_objects_source" not in req["observability"]

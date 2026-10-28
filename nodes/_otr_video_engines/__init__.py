@@ -260,6 +260,14 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
+# The SCENE-REGIONS LAB PEERS (2026-10-27) subclass the haunted and lightning lanes, so they import
+# after both and, like every sibling, before the roster audit below. Lab ids: never a default, never in
+# a shipping profile.
+try:  # pragma: no cover - trivial guard
+    from . import eng_ghost_signal_regions as _eng_ghost_signal_regions  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
 
 # ---------------------------------------------------------------------------
 # ROSTER AUDIT -- runs LAST, after every guarded adapter import above.

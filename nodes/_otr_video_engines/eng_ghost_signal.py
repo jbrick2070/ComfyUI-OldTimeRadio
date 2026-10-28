@@ -297,6 +297,22 @@ GHOST_NODE_CANDIDATES = {
     "decode": ("VAEDecode",),
 }
 
+#: THE SCENE-REGIONS ARM (2026-10-27): two CORE ComfyUI classes, no node pack. A lane that declares
+#: ``wants_scene_regions`` resolves these too; every other lane never asks for them.
+GHOST_REGION_NODE_CANDIDATES = {
+    "cond_mask": ("ConditioningSetMask",),
+    "cond_combine": ("ConditioningCombine",),
+}
+
+#: How hard each object's region pulls against the unchanged global prompt. ComfyUI blends area
+#: conditionings as a weighted average, so a strength of 1.0 gives a region at most half the weight
+#: where it overlaps the global prompt and 2.0 gives it two thirds. A LAB DIAL, never a frozen claim:
+#: an unreadable or out-of-range value lands on the default and says so.
+SCENE_REGION_STRENGTH_ENV = "OTR_SCENE_REGION_STRENGTH"
+SCENE_REGION_STRENGTH_DEFAULT = 2.0
+SCENE_REGION_STRENGTH_MIN = 0.1
+SCENE_REGION_STRENGTH_MAX = 10.0
+
 #: Frames per VAE decode CALL on Apple silicon. Zero everywhere else, which
 #: means one call with the whole batch -- exactly what this lane did before.
 #:
@@ -650,6 +666,12 @@ class GhostSignalEngine(_MC.MotionEngineBase):
     #: producing jump cuts AND more total latents.
     adaptive_hold_for_memory = False
 
+    #: THE SCENE-REGIONS SEAM (2026-10-27). False on every existing lane, and that is what keeps them
+    #: byte-identical: with it False the request field is never read, no region node is resolved, no
+    #: receipt key is added and the encode graph is the two nodes it always was. A lab sibling sets it
+    #: True; ``render_driver`` then fills ``scene_objects`` for it (a capability branch, like the plate).
+    wants_scene_regions = False
+
     #: THE CADENCE SEAM. How many delivered frames each generated frame fills.
     #: A peer overrides this alone; the render path reads it through ``self`` so
     #: a declared value cannot be ignored while its receipt claims otherwise.
@@ -742,6 +764,14 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         pin r4 asked for): the render receipt hashes this dict, so two A/A
         nulls agree and a changed cell disagrees by construction."""
         plan = self._build_render_request(request)
+        out = self._sampler_inputs_from_plan(plan)
+        if self.wants_scene_regions:
+            # A KEY ONLY THE LAB LANES CARRY: the objects, the layout, the strength and the mask hash
+            # are causal, so two arms of one frozen beat cannot share a receipt hash.
+            out["scene_regions"] = self._scene_region_receipt(plan.get("scene_objects"))
+        return out
+
+    def _sampler_inputs_from_plan(self, plan):
         return {
             "checkpoint": GHOST_CHECKPOINT_NAME,
             "motion_module": str(self.motion_module_name),
@@ -848,7 +878,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         source batch or output path.
         """
         plan = self._build_render_request(request)
-        return (
+        identity = (
             self.name,
             self._recipe_receipt(),
             str(plan["shot_id"]),
@@ -860,6 +890,12 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             _sha8(plan["text_prompt"]),
             _sha8(plan["negative_prompt"]),
         )
+        if self.wants_scene_regions:
+            region = self._scene_region_receipt(plan.get("scene_objects"))
+            identity += ("regions:%s:%s:%s:%s" % (
+                "|".join(region["objects"]), region["layout"], region["strength"],
+                region["mask_sha8"]),)
+        return identity
 
     # ---- artifact resolution ------------------------------------------- #
     @staticmethod
@@ -955,7 +991,73 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             candidates["lora"] = ("LoraLoaderModelOnly",)
         if self.vae_name:
             candidates["vae_loader"] = ("VAELoader",)
+        if self.wants_scene_regions:
+            candidates.update(GHOST_REGION_NODE_CANDIDATES)
         return candidates
+
+    # ---- scene regions -------------------------------------------------- #
+    def _add_scene_regions(self, graph, externals, classes, objects):
+        """Extend the ENCODE graph with one masked positive per object; return the id of the final
+        combined conditioning node.
+
+        Per object: a text encode of the object's own words, a ``ConditioningSetMask`` binding it to
+        its generated mask, and a ``ConditioningCombine`` joining it to what came before. The masks
+        are external results (tensors the engine owns), never nodes. Core classes only.
+        """
+        import torch
+        from . import ghost_scene_regions as _sr
+        from . import wrapper_bridge as _wb
+
+        masks = _sr.region_masks(len(objects), GHOST_CANVAS_W, GHOST_CANVAS_H)
+        strength = self._scene_region_strength()
+        previous = NODE_POSITIVE
+        for index, (text, mask) in enumerate(zip(objects, masks)):
+            text_id = "region_text_%d" % index
+            mask_id = "region_mask_%d" % index
+            bound_id = "region_cond_%d" % index
+            join_id = "region_join_%d" % index
+            externals[mask_id] = (torch.from_numpy(mask),)
+            graph[text_id] = {
+                "class": classes["text_encode"],
+                "inputs": {"text": str(text), "clip": _wb.Wire("clip", 0)}}
+            graph[bound_id] = {
+                "class": classes["cond_mask"],
+                "inputs": {"conditioning": _wb.Wire(text_id, 0),
+                           "mask": _wb.Wire(mask_id, 0),
+                           "set_cond_area": "default",
+                           "strength": float(strength)}}
+            graph[join_id] = {
+                "class": classes["cond_combine"],
+                "inputs": {"conditioning_1": _wb.Wire(previous, 0),
+                           "conditioning_2": _wb.Wire(bound_id, 0)}}
+            previous = join_id
+        return previous
+
+    def _scene_region_strength(self) -> float:
+        """The regions' strength for this process: the env dial, or the default with a warning."""
+        raw = otr_env.get(SCENE_REGION_STRENGTH_ENV)
+        if raw is None or not str(raw).strip():
+            return SCENE_REGION_STRENGTH_DEFAULT
+        try:
+            value = float(str(raw).strip())
+        except (TypeError, ValueError):
+            value = float("nan")
+        if not (SCENE_REGION_STRENGTH_MIN <= value <= SCENE_REGION_STRENGTH_MAX):
+            _LOG.warning("[OTR.video.ghost_signal] %s=%r is not a number in %.1f..%.1f; using the "
+                         "default %.1f", SCENE_REGION_STRENGTH_ENV, raw, SCENE_REGION_STRENGTH_MIN,
+                         SCENE_REGION_STRENGTH_MAX, SCENE_REGION_STRENGTH_DEFAULT)
+            return SCENE_REGION_STRENGTH_DEFAULT
+        return value
+
+    def _scene_region_receipt(self, objects):
+        """What the regions did for this beat, for the receipt: objects, layout, strength, mask hash."""
+        from . import ghost_scene_regions as _sr
+        objects = [str(o) for o in (objects or ())]
+        if not objects:
+            return {"objects": [], "layout": "", "strength": None, "mask_sha8": ""}
+        masks = _sr.region_masks(len(objects), GHOST_CANVAS_W, GHOST_CANVAS_H)
+        return {"objects": objects, "layout": _sr.region_layout_name(len(objects)),
+                "strength": self._scene_region_strength(), "mask_sha8": _sr.mask_digest(masks)}
 
     # ---- preflight ------------------------------------------------------ #
     def assert_usable(self, host_caps, profile, request_template=None):
@@ -1213,7 +1315,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         # about which cadence ran.
         hold = self._beat_hold(target)
         unique = ghost_unique_source_count(target, hold)
-        return {
+        plan = {
             "shot_id": str(get("shot_id") or get("request_id") or ""),
             "text_prompt": text_prompt,
             "negative_prompt": negative_prompt,
@@ -1224,6 +1326,14 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             "hold": int(hold),
             "fps": int(self.target_fps),
         }
+        if self.wants_scene_regions:
+            # ONLY a lane that opted in reads the field, and only up to the region limit, so no other
+            # lane's plan gains a key.
+            from . import ghost_scene_regions as _sr
+            raw_objects = get("scene_objects") or ()
+            plan["scene_objects"] = tuple(
+                str(o).strip() for o in raw_objects if str(o).strip())[:_sr.SCENE_REGION_MAX_OBJECTS]
+        return plan
 
     def _source_request_for(self, target, hold=None) -> int:
         """Source frames to ask for: the structural floor, then -- only on a
@@ -1338,9 +1448,18 @@ class GhostSignalEngine(_MC.MotionEngineBase):
                 "inputs": {"text": plan["negative_prompt"],
                            "clip": _wb.Wire("clip", 0)}},
         }
-        encode_results = _wb.run_graph(
-            encode_graph, external_results={"clip": owners["clip"]})
-        positive_cond = (encode_results[NODE_POSITIVE][0],)
+        encode_externals = {"clip": owners["clip"]}
+        positive_node = NODE_POSITIVE
+        scene_objects = plan.get("scene_objects") or ()
+        if self.wants_scene_regions and scene_objects:
+            # THE BEAT'S OWN OBJECTS, ONE REGION EACH. The global positive above is kept untouched,
+            # so the style cue and the kernel stay; each object adds a masked positive on top of it.
+            positive_node = self._add_scene_regions(
+                encode_graph, encode_externals, classes, scene_objects)
+            _LOG.info("[OTR video] %s beat %s: scene regions %s", self.name, plan["shot_id"],
+                      self._scene_region_receipt(scene_objects))
+        encode_results = _wb.run_graph(encode_graph, external_results=encode_externals)
+        positive_cond = (encode_results[positive_node][0],)
         negative_cond = (encode_results[NODE_NEGATIVE][0],)
 
         # The CLIP family goes now: both conditionings are extracted, so every

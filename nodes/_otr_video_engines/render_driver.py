@@ -164,6 +164,10 @@ BOOKEND_SCENE_PROMPT_SELF_COMPOSED = frozenset({
     # negative is still COMPOSED and still stamped, so handing this lane a scene
     # prompt would still overwrite its positive.
     "animatediff15_lightning_video",
+    # The SCENE-REGIONS lab peers (2026-10-27) compose through the same authorities as the lanes they
+    # subclass; the regions are added on top of the composed prompt, never instead of it.
+    "animatediff15_v3_haunted_regions_video",
+    "animatediff15_lightning_regions_video",
 })
 
 #: Engines whose motion is not text-driven at all, so a scene prompt would be
@@ -3999,6 +4003,27 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             "SD1 tokens (dropped: %s)",
             _shot_role, shot.get("shot_id"), len(req["plate_prompt"]),
             _plate["clip_tokens"], ", ".join(_plate["dropped"]) or "none")
+    # THE BEAT'S OWN OBJECTS, ONE REGION EACH (2026-10-27). Same shape as the plate above: a
+    # CAPABILITY branch, never an id compare. An engine declaring `wants_scene_regions` gets the
+    # episode's own key objects that THIS beat's dialogue refers to on the declared request field
+    # `scene_objects` (causal through sampler_inputs). Every other lane's request is untouched.
+    if _plate_eng is not None and getattr(_plate_eng, "wants_scene_regions", False):
+        from .ghost_scene_regions import resolve_scene_objects
+        _sr_stored = shot.get("ghost_prompt")
+        _sr_mode = str((_sr_stored or {}).get("mode") or "") if isinstance(_sr_stored, dict) else ""
+        _sr = resolve_scene_objects(
+            (ledger or {}).get("meta") or {},
+            ordinal=_planned_ordinal_for_shot(ledger, shot),
+            role=_shot_role, mode=_sr_mode,
+            beat_text=_beat_text_for_shot(ledger, shot),
+            authored_subject=str(shot.get("ghost_subject") or ""))
+        req["scene_objects"] = list(_sr["objects"])
+        _s_obs = req.setdefault("observability", {})
+        _s_obs["scene_objects_source"] = _sr["source"]
+        _LOG.warning(
+            "[OTR.render_driver] SCENE OBJECTS: %s beat %s -> %s (source: %s)",
+            _shot_role, shot.get("shot_id"),
+            ", ".join(_sr["objects"]) or "none", _sr["source"])
     _prune_strict_text_only_request(req, shot.get("engine_id"))
     return req
 

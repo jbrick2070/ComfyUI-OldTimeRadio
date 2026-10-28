@@ -15,6 +15,14 @@
     "animatediff15_v3_stillin_lab_video": {
       "pack": "ComfyUI-AnimateDiff-Evolved",
       "node_types": ["ADE_AnimateDiffLoaderGen1", "ADE_StandardStaticContextOptions"]
+    },
+    "animatediff15_v3_haunted_regions_video": {
+      "pack": "ComfyUI-AnimateDiff-Evolved",
+      "node_types": ["ADE_AnimateDiffLoaderGen1", "ADE_StandardStaticContextOptions"]
+    },
+    "animatediff15_lightning_regions_video": {
+      "pack": "ComfyUI-AnimateDiff-Evolved",
+      "node_types": ["ADE_AnimateDiffLoaderGen1", "ADE_StandardStaticContextOptions"]
     }
   }
 }

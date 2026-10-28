@@ -173,6 +173,13 @@ class VideoRequest(_Forbid):
     #: and are absent from every other lane's request, byte for byte.
     plate_prompt: str = ""
     plate_path: str = ""
+    #: THE BEAT'S OWN OBJECTS, ONE REGION EACH (2026-10-27). Declared conditioning, like the plate:
+    #: ``render_driver`` fills it only for an engine declaring ``wants_scene_regions``, from the
+    #: episode's own key-object pool as the beat's dialogue refers to it
+    #: (``ghost_scene_regions.resolve_scene_objects``). CAUSAL through ``sampler_inputs`` on the
+    #: render receipt. Empty on every other lane and on every frozen request, so no other lane's
+    #: request or hash changes.
+    scene_objects: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_family_required_inputs(self) -> "VideoRequest":
