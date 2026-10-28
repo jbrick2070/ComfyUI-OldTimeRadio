@@ -316,6 +316,14 @@ SCENE_REGION_STRENGTH_MAX = 10.0
 #: Raw env values already warned about, so a bad dial is reported once per value, not once per read.
 _SCENE_REGION_STRENGTH_WARNED = set()
 
+#: THE REGION PHRASE DIAL (2026-10-28). The text each object's region is encoded from. Default is the
+#: object alone, exactly as pool spells it. A template carrying ``{object}`` wraps it, for example
+#: ``a close photograph of {object}``: a bare "ledger" read to the model as a crowd, so a richer phrase is
+#: the next lever. A lab dial like the strength; an unusable value lands on the default and says so once.
+SCENE_REGION_PHRASE_ENV = "OTR_SCENE_REGION_PHRASE"
+SCENE_REGION_PHRASE_DEFAULT = "{object}"
+_SCENE_REGION_PHRASE_WARNED = set()
+
 #: Frames per VAE decode CALL on Apple silicon. Zero everywhere else, which
 #: means one call with the whole batch -- exactly what this lane did before.
 #:
@@ -895,9 +903,9 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         )
         if self.wants_scene_regions:
             region = self._scene_region_receipt(plan.get("scene_objects"))
-            identity += ("regions:%s:%s:%s:%s" % (
+            identity += ("regions:%s:%s:%s:%s:%s" % (
                 "|".join(region["objects"]), region["layout"], region["strength"],
-                region["mask_sha8"]),)
+                region["mask_sha8"], self._scene_region_phrase_template()),)
         return identity
 
     # ---- artifact resolution ------------------------------------------- #
@@ -1022,7 +1030,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             externals[mask_id] = (torch.from_numpy(mask),)
             graph[text_id] = {
                 "class": classes["text_encode"],
-                "inputs": {"text": str(text), "clip": _wb.Wire("clip", 0)}}
+                "inputs": {"text": self._scene_region_phrase(text), "clip": _wb.Wire("clip", 0)}}
             graph[bound_id] = {
                 "class": classes["cond_mask"],
                 "inputs": {"conditioning": _wb.Wire(text_id, 0),
@@ -1035,6 +1043,25 @@ class GhostSignalEngine(_MC.MotionEngineBase):
                            "conditioning_2": _wb.Wire(bound_id, 0)}}
             previous = join_id
         return previous
+
+    def _scene_region_phrase_template(self) -> str:
+        """The phrase template for this process: the env dial, or ``{object}`` with a one-time warning."""
+        raw = otr_env.get(SCENE_REGION_PHRASE_ENV)
+        if raw is None or not str(raw).strip():
+            return SCENE_REGION_PHRASE_DEFAULT
+        template = " ".join(str(raw).split())
+        if template.count("{object}") != 1 or len(template) > 120:
+            if template not in _SCENE_REGION_PHRASE_WARNED:
+                _SCENE_REGION_PHRASE_WARNED.add(template)
+                _LOG.warning("[OTR.video.ghost_signal] %s=%r must contain {object} exactly once and be at "
+                             "most 120 characters; using the default %r", SCENE_REGION_PHRASE_ENV, raw,
+                             SCENE_REGION_PHRASE_DEFAULT)
+            return SCENE_REGION_PHRASE_DEFAULT
+        return template
+
+    def _scene_region_phrase(self, obj) -> str:
+        """The text one object's region is encoded from."""
+        return self._scene_region_phrase_template().replace("{object}", str(obj))
 
     def _scene_region_strength(self) -> float:
         """The regions' strength for this process: the env dial, or the default with a warning."""
@@ -1063,7 +1090,8 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             return {"objects": [], "layout": "", "strength": None, "mask_sha8": ""}
         masks = _sr.region_masks(len(objects), GHOST_CANVAS_W, GHOST_CANVAS_H)
         return {"objects": objects, "layout": _sr.region_layout_name(len(objects)),
-                "strength": self._scene_region_strength(), "mask_sha8": _sr.mask_digest(masks)}
+                "strength": self._scene_region_strength(), "mask_sha8": _sr.mask_digest(masks),
+                "phrase": self._scene_region_phrase_template()}
 
     # ---- preflight ------------------------------------------------------ #
     def assert_usable(self, host_caps, profile, request_template=None):

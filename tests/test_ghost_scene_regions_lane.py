@@ -267,6 +267,38 @@ def test_the_encode_externals_are_cleared_so_they_cannot_pin_the_clip_handle(mon
     assert all(not d for d in seen)
 
 
+def test_the_phrase_dial_wraps_each_object_and_leaves_the_global_prompt_alone(monkeypatch):
+    monkeypatch.setenv(gs.SCENE_REGION_PHRASE_ENV, "a close photograph of {object}")
+    rec, eng, _raw = _render(monkeypatch, HAUNTED_R, scene_objects=("a brass lamp", "a battered disc"))
+    texts = [kw["text"] for name, kw in rec.calls if name == "text_encode"]
+    assert "a close photograph of a brass lamp" in texts
+    assert "a close photograph of a battered disc" in texts
+    assert "a brass lamp on a desk, mid-shot or wider" in texts          # the global positive is untouched
+    receipt = eng.sampler_inputs_for(_request(scene_objects=("a brass lamp",)))["scene_regions"]
+    assert receipt["phrase"] == "a close photograph of {object}"
+
+
+def test_the_default_phrase_is_the_object_alone(monkeypatch):
+    monkeypatch.delenv(gs.SCENE_REGION_PHRASE_ENV, raising=False)
+    eng = vreg.get_engine(HAUNTED_R)
+    assert eng._scene_region_phrase("a brass lamp") == "a brass lamp"
+
+
+@pytest.mark.parametrize("bad", ["no placeholder here", "{object} and {object}", "x" * 130 + " {object}"])
+def test_an_unusable_phrase_template_lands_on_the_default(monkeypatch, bad):
+    monkeypatch.setenv(gs.SCENE_REGION_PHRASE_ENV, bad)
+    eng = vreg.get_engine(HAUNTED_R)
+    assert eng._scene_region_phrase("a brass lamp") == "a brass lamp"
+
+
+def test_the_identity_moves_with_the_phrase(monkeypatch):
+    eng = vreg.get_engine(HAUNTED_R)
+    monkeypatch.delenv(gs.SCENE_REGION_PHRASE_ENV, raising=False)
+    plain = eng.shot_cache_identity(_request(scene_objects=("a brass lamp",)))
+    monkeypatch.setenv(gs.SCENE_REGION_PHRASE_ENV, "a photograph of {object}")
+    assert eng.shot_cache_identity(_request(scene_objects=("a brass lamp",))) != plain
+
+
 def test_more_than_three_objects_are_cut_to_three(monkeypatch):
     eng = vreg.get_engine(HAUNTED_R)
     plan = eng._build_render_request(_request(scene_objects=("a", "b", "c", "d", "e")))
