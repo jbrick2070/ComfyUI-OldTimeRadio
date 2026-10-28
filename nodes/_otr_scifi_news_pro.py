@@ -3037,8 +3037,16 @@ def _stage_direction_rule(evidence: str) -> str:
 _FRAME_ORDER_MARKERS = (
     "after the last scene",
     "after the announcer outro began",
-    "ANNOUNCER line after the CODA",
 )
+
+#: The OPPOSITE frame fault, and it gets its own note on purpose. Here the
+#: drama is intact and an ANNOUNCER sign-off sits BELOW the CODA, so the fix is
+#: to move that row UP. It used to share `_FRAME_ORDER_MARKERS`, whose note
+#: says "move the ANNOUNCER outro down" -- the wrong direction for this
+#: defect. On 2026-10-28 (PBUG-20261028-01) the 8 GB writer obeyed it on every
+#: rung and the last two drafts came back identical with the sign-off still
+#: last.
+_POST_CODA_ANNOUNCER_MARKER = "ANNOUNCER line after the CODA"
 
 
 def _frame_order_repair_note(defects) -> str:
@@ -3076,6 +3084,32 @@ def _frame_order_repair_note(defects) -> str:
         "The closing order is: last scene, ANNOUNCER outro, CODA, closing "
         "MUSIC, END. If the announcer row was describing something happening "
         "in the scene, give that description to a character instead."
+        "\nReturn no explanation, markdown, or repair commentary."
+    )
+
+
+def _post_coda_announcer_repair_note(defects) -> str:
+    """Tell the model its ANNOUNCER spoke after the CODA, and which way to move it.
+
+    Nothing spoken follows the CODA: the producer appends the factual close
+    right after it, so a sign-off below the CODA has nowhere to go. The row is
+    kept and moved UP into the outro. Self-silencing: absent defect, empty
+    string.
+    """
+    hits = [d for d in defects
+            if d.code is NewsProParseDefect.SKELETON_BREAK
+            and _POST_CODA_ANNOUNCER_MARKER in str(d.detail)]
+    if not hits:
+        return ""
+    where = ", ".join(str(d.line_no) for d in hits if d.line_no is not None)
+    return (
+        "\nFORMAT REPAIR RULE: the CODA is the last spoken row you write. "
+        "An ANNOUNCER row came after the CODA"
+        + (f" (line {where})" if where else "")
+        + ". Keep its words, but move that ANNOUNCER row UP so it sits with "
+        "the ANNOUNCER outro, above the CODA. After the CODA write only the "
+        "closing MUSIC row and then END. The closing order is: last scene, "
+        "ANNOUNCER outro, CODA, closing MUSIC, END."
         "\nReturn no explanation, markdown, or repair commentary."
     )
 
@@ -3582,6 +3616,7 @@ def _run_markup_ladder(
             # carries exactly the rules its own defects call for.
             + _end_delimiter_repair_note(defects)
             + _frame_order_repair_note(defects)
+            + _post_coda_announcer_repair_note(defects)
             + _scene_header_repair_note(defects)
             + "\n" + rendered
         )

@@ -17395,3 +17395,26 @@ not promote it to the Bug Bible on this evidence alone.
   carries acting, and a reseed only fills beats still missing. Pinned in
   tests/test_director_foley.py.
 - status: FIXED in code; live proof is the next 16 GB foley leg.
+
+## PBUG-20261028-01 -- scifi_news_pro died on an ANNOUNCER sign-off below the CODA
+- evidence: 5080, 2026-10-28 06:36, overnight regions study pair 13 leg A
+  (tmp/overnight_20261027/pair_13_a.log; server log lab_run/server_8010.log,
+  prompt 13fba2b9). `otr_8gb_animatediff`, writer Gemma 4 E2B, news bank, one
+  act. `_pass_script` raised NewsProScriptError after four attempts with one
+  defect, "SKELETON_BREAK: ANNOUNCER line after the CODA (line 16)", and
+  salvage refused the same defect. The heartbeats show the drafts ending
+  CODA, closing MUSIC, ANNOUNCER sign-off, END; attempts 3 and 4 identical.
+- cause: two, neither the prose. (1) The repair note pointed the wrong way:
+  this defect sat in `_FRAME_ORDER_MARKERS`, whose note was written for an
+  outro that opened too EARLY and tells the model to "move the ANNOUNCER outro
+  down" -- for a sign-off already below the CODA that is the defect itself, so
+  every rung kept it last. (2) Salvage refused a draft that lost nothing: all
+  the drama was intact, the announcer's last line sat one row too low.
+- fix: the post-CODA case has its own note (`_post_coda_announcer_repair_note`:
+  move that ANNOUNCER row UP, above the CODA; after the CODA only closing MUSIC
+  and END), and the outro-too-early note no longer fires on it. In salvage the
+  parser keeps the line with the announcer outro, ahead of the CODA, and
+  receipts it in speaker_resolutions. The honest path still rejects the shape.
+  Pinned in tests/test_scifi_news_pro_post_coda_announcer.py (the refused
+  draft rebuilt from the heartbeats and line number).
+- status: FIXED in code; live proof is the next news-bank leg on the 8 GB writer.

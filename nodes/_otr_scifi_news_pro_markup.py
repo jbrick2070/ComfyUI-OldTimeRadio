@@ -1007,7 +1007,19 @@ class _Parse:
                 self.outro.append(text)
             elif self.state == _POSTAMBLE:
                 if self.coda is not None:
-                    self.skeleton("ANNOUNCER line after the CODA", no)
+                    if self.salvage:
+                        # A SIGN-OFF BELOW THE CODA IS STILL FRAME TEXT
+                        # (PBUG-20261028-01). The announcer speaks the outro
+                        # and the CODA alike, so the line keeps its voice and
+                        # its words and is spoken with the outro, ahead of the
+                        # CODA -- the one order the ledger can carry, since
+                        # the producer appends the factual close after the
+                        # CODA. Receipted, never hidden.
+                        self.resolutions.append(
+                            f"line {no}: ANNOUNCER line after the CODA kept "
+                            "with the announcer outro, ahead of the CODA")
+                    else:
+                        self.skeleton("ANNOUNCER line after the CODA", no)
                 self.outro.append(text)
             return
         # character line
