@@ -27,8 +27,7 @@ def test_unknown_ids_are_ignored():
     assert A.parse_response('{"b1": ["latch"], "zzz": ["dragon"]}', ["b1"]) == {"b1": ["latch"]}
 
 
-@pytest.mark.parametrize("raw", ["", "no json here", "[1, 2]", '{"b1": "latch"}', '{"b1": [1, 2]}',
-                                 '{"b1": ["a"], "b1": ["b"]}'])
+@pytest.mark.parametrize("raw", ["", "no json here", "[1, 2]", '{"b1": ["a"], "b1": ["b"]}'])
 def test_anything_but_a_object_of_string_lists_is_rejected(raw):
     with pytest.raises(A.SceneObjectAuthorError):
         A.parse_response(raw, ["b1"])
@@ -341,3 +340,17 @@ def test_a_long_episode_is_asked_in_chunks_and_a_failed_chunk_costs_only_its_own
     assert len(calls) == 3                                    # 12 + 12 + 6
     assert all(n <= A.REPLY_TOKENS_CEILING for n in calls)
     assert set(out) == {"b%d" % i for i in list(range(1, 13)) + list(range(25, 31))}
+
+
+def test_an_oddly_shaped_value_costs_only_its_own_beat():
+    raw = '{"b1": ["stone"], "b2": 7, "b3": {"x": 1}, "b4": "latch", "b5": "", "b6": ["lamp", 3, null]}'
+    assert A.parse_response(raw, ["b1", "b2", "b3", "b4", "b5", "b6"]) == {
+        "b1": ["stone"], "b4": ["latch"], "b5": [], "b6": ["lamp"]}
+
+
+def test_an_unreadable_reply_logs_how_it_started(caplog):
+    import logging
+    with caplog.at_level(logging.WARNING):
+        out = A.adapt_scene_objects(lambda *a, **k: "Sorry, I cannot do that", [{"id": "b1", "line": "The lamp."}])
+    assert out == {}
+    assert "Sorry, I cannot do that" in caplog.text

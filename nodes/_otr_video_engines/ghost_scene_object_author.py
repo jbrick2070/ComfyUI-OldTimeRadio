@@ -31,9 +31,9 @@ wrong one.
 THE DIALOGUE IS DATA, NOT INSTRUCTIONS. The prompt says so, and grounding in the line is the real guard: a
 line that tries to talk to the model can only ever contribute words it itself contains. The reply parser is
 TOLERANT of a code fence or a sentence around the JSON object and of a trailing comma (a small model does
-all three), strict about the shape (an object, string lists only, no duplicate keys), ignores ids it was not
-asked about, and reads a missing id or a null as "nothing filmable here". Safety does not rest on the parser;
-it rests on :func:`admit`.
+all three), strict about the whole reply (one object, no duplicate keys), and reads each id on its own: one
+oddly shaped value costs only that beat, an id it was not asked about is ignored, and a missing id or a null
+reads as "nothing filmable here". Safety does not rest on the parser; it rests on :func:`admit`.
 
 A CAST NAME THAT IS ALSO A NOUN (a character called Rose) is dropped as a name. That is deliberate
 abstention: losing one flower region is cheaper than painting a person as an object.
@@ -174,8 +174,10 @@ def parse_response(raw, ids) -> dict:
     """``{id: [phrase, ...]}`` for the ids the reply answered; raise on anything but a JSON object.
 
     Tolerates a code fence, prose around the object and a trailing comma (a small model does all three).
-    The SHAPE is not negotiable: a value must be a list of strings (or null, read as an empty list), a
-    duplicate key rejects the reply, and an id nobody asked about is ignored.
+    The reply must be ONE JSON object with no duplicate key. Each id is read on its own, so one oddly shaped
+    value costs only that beat: a list keeps its string members, a bare string is a one-item list, null or an
+    empty string is an empty list, and anything else (a number, an object) leaves that id unanswered. An id
+    nobody asked about is ignored.
     """
     text = str(raw or "")
     start, end = text.find("{"), text.rfind("}")
@@ -201,10 +203,10 @@ def parse_response(raw, ids) -> dict:
             continue
         if value is None:
             out[key] = []
-            continue
-        if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
-            raise SceneObjectAuthorError("the value for %r is not a list of strings" % (key,))
-        out[key] = list(value)
+        elif isinstance(value, str):
+            out[key] = [value] if value.strip() else []
+        elif isinstance(value, list):
+            out[key] = [v for v in value if isinstance(v, str)]
     return out
 
 
@@ -340,7 +342,8 @@ def _ask(gen, chunk) -> dict:
     try:
         return parse_response(raw, ids)
     except SceneObjectAuthorError as exc:
-        _LOG.warning("[OTR.video.ghost_scene_object_author] unreadable reply: %s", exc)
+        _LOG.warning("[OTR.video.ghost_scene_object_author] unreadable reply: %s (starts: %r)",
+                     exc, " ".join(str(raw or "").split())[:240])
         return {}
 
 
