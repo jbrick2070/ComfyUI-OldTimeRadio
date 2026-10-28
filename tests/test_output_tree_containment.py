@@ -327,11 +327,35 @@ def test_a_remote_voice_reference_is_refused_before_it_is_statted(monkeypatch):
     # (2026-10-18, registry review "arbitrary-file-read": an absolute reference
     # on an arbitrary drive is exactly the read a workflow must not choose).
     assert _resolve_ref_to_disk("models/TTS/refs/indextts2/ix_male_warm.wav")
-    transfer = "U:" + b + "refs" + b + "x.wav"
+    drive = _a_drive_letter_this_box_does_not_use()
+    transfer = drive + b + "refs" + b + "x.wav"
     monkeypatch.setenv("OTR_EXTRA_OUTPUT_ROOTS", "")
     assert _resolve_ref_to_disk(transfer) is None
-    monkeypatch.setenv("OTR_EXTRA_OUTPUT_ROOTS", "U:" + b + "refs")
+    monkeypatch.setenv("OTR_EXTRA_OUTPUT_ROOTS", drive + b + "refs")
     assert _resolve_ref_to_disk(transfer)
+
+
+def _a_drive_letter_this_box_does_not_use():
+    """A drive letter whose paths resolve without touching a real volume.
+
+    The test above used `U:` literally, and on the 5080 `U:` is a REAL mapped
+    share (the 4060 transfer drive). Once that mapping went stale with an
+    expired password, `realpath` raised WinError 1330 for the root, the root
+    was dropped, and the test went red on 2026-10-22 for a reason that had
+    nothing to do with the code. So pick a letter nothing is mapped to,
+    remembered-but-disconnected mappings included."""
+    if os.name != "nt":
+        return "U:"
+    for letter in "QRSTUVWXYJKLMNOP":
+        root = letter + ":" + chr(92)
+        if os.path.exists(root):
+            continue
+        try:
+            os.path.realpath(root + "refs")
+        except OSError:
+            continue
+        return letter + ":"
+    pytest.skip("every candidate drive letter is in use on this machine")
 
 
 def test_the_guard_lives_in_the_one_resolver():
