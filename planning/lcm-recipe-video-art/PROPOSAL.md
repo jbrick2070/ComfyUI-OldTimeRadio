@@ -1,8 +1,10 @@
 # Proposal: getting each beat's own objects onto the AnimateDiff picture
 
 Status: review arc complete (four rounds, Codex and Antigravity on every round, Claude as anchor and
-sole judge). Build authorized by operator relay on 2026-10-27 as opt-in, default off. Written 2026-10-27
-against main at 0aa61970; this replaces the first version of the file, which is in git history.
+sole judge). Build authorized by operator relay on 2026-10-27 as opt-in, default off. ARM R IS BUILT AND
+PUSHED (856ce263, fixes cb233177): two lab engine ids, tests, and a first paired replay, results in
+section 6A. Arms P and L are NOT built. Written 2026-10-27 against main at 0aa61970; this replaces the
+first version of the file, which is in git history.
 
 ## 0. What changed since the first version of this file
 
@@ -136,15 +138,18 @@ leaves the unchanged global prompt in place so a beat with nothing to add render
 
 ## 6. Arm R: regional prompts for the beat's named objects
 
-DATA. The objects the beat's dialogue names, in order of appearance (at most three), and the place.
-Source: the same ledger the kernel resolver reads (`ghost_subject_candidates(meta)` and the beat-text
-check behind tier 1 of `resolve_crux_kernel`; the beat text is joined by `render_driver` on `line_id`).
-If the dialogue names none, the kernel object becomes the single region, so the arm reinforces whatever
-the baseline already intends to draw. Style words never go into a region.
+DATA, as built. The episode's own key objects that belong to THIS beat, at most three: pool members the
+beat's words refer to as whole words and do not negate (a bare "no", "not", "without" or "don't" within
+four words before the mention, inside its sentence, counts as a negation, which the kernel's own cues
+miss), plus the object the batched author ranked for the beat from its intent. The kernel's positional
+(odometer) pick never gets a region, and neither does a bookend. Pool entries ending in the same word
+collapse to one. Source: `ghost_subject_candidates(meta)` and the beat text `render_driver` joins on
+`line_id` (`nodes/_otr_video_engines/ghost_scene_regions.py`). Style words never go into a region. The
+place is not a region: the kernel already carries it in the global prompt.
 
 FIELD. conditioning must be a declared request field, never observability (`schemas.py:158-170`).
-One new optional field pair on the request model (`scene_objects: list[str]`, `scene_place: str`),
-default empty, so frozen bundles and every other lane are unchanged. The driver populates it only for an
+One new optional field on the request model (`scene_objects: list[str]`, no place field), default
+empty, so frozen bundles and every other lane are unchanged. The driver populates it only for an
 engine that declares a capability (`wants_scene_regions`), the way it populates `plate_prompt` for
 `wants_plate_prompt` (`render_driver.py:3977-3988`); it works in a derived replay bundle because the
 driver runs at replay time. Request-model change is shared code and is covered by the other lanes'
@@ -166,6 +171,43 @@ is unmeasured; overlapping regions add weight; hold-2 cadence and the 16-frame f
 cfg 1 (lightning) the negative is inert, so a region phrase cannot be steered away from lettering by the
 negative; count lettering.
 
+### 6A. Built, and what the first paired replays showed (2026-10-27 night)
+
+Built and pushed: `animatediff15_v3_haunted_regions_video` and `animatediff15_lightning_regions_video`
+(siblings, cuda only, registered in every roster `apple/VIDEO_LANE_PREFLIGHT.md` lists), the
+`scene_objects` request field, the driver hook, `ghost_scene_regions.py`, and 53 new tests. The strength
+dial is `OTR_SCENE_REGION_STRENGTH` (default 2.0, range 0.1-10, read by the server at run time). Sonnet QA
+of the pushed diff found a real defect in the first push (the encode externals dict held the CLIP handle
+on every Ghost lane) and gaps in object selection; all fixed in cb233177. No shipping workflow, variant or
+default changed.
+
+Paired replays on the canonical path (a fresh default-lane episode, frozen, replayed on the regions
+sibling: same story, voices, music, seeds and prompts), all published to `otr/obs`. Judged per beat on
+one question: is each object the dialogue names recognisable on screen, default versus regions.
+
+- video_art, haunted lane, three arms of one bundle (default, strength 2, strength 4), key objects hearth,
+  ledger, floorboard. Default arm: none of the named objects on any beat. Regions at strength 2: floorboards
+  and, in the last frame, a fire on stone, on the one beat that names floorboard and hearth. Regions at
+  strength 4: that beat is a clear win (floorboards throughout, a wood-burning stove and flames); the beat
+  that names "ledger" shows a crowd of figures at both strengths and no ledger; the beat that names
+  "floorboards" stays the style's abstract burst at both strengths. About one beat in four at both strengths,
+  stronger at 4. The style's global prompt still dominates when a region cannot win.
+- video_art, lightning lane (cfg 1), strength 2: no win. Key objects were artifact, table, microphone, while
+  the dialogue talks about "that thing", "the stitching", "this covering": none of those words is in the
+  pool, so by the repo's ruling they can never become a region. Only two beats got a region at all ("artifact"),
+  and both arms look alike.
+
+Cost: the regions replay took 17 minutes against about 18 for the default arm's video phase on the 8 GB
+workflow's haunted lane on the 5080 (the lightning replay took 5.6 minutes), so the added time is not
+measurable from wall clock; VRAM was not measured and no weight is added.
+
+What limits it, in order: (1) the pool ruling: only the brief's key objects can ever be regions, and the
+dialogue's own physical nouns are often not in the pool; (2) the region text is the bare pool word, and
+"ledger" alone reads to the model as a crowd; (3) on abstract packs the style words dominate unless the
+dial is high; (4) at cfg 1 the effect is weak. Levers not yet pulled, each a decision: a richer region
+phrase ("a ledger book on a desk"), a pool source that includes the dialogue's own nouns (the ruling forbids
+it today), and a higher default dial.
+
 ## 7. Arm P: beat-matched real photographs at low weight
 
 A small bank of real photographs, public domain or CC0 only (NASA, Library of Congress, Smithsonian
@@ -176,6 +218,17 @@ licence, tags, content hash. Never the recipe author's pictures. Selection: tag 
 beat's dialogue-named objects (same field as arm R); one picture per beat, unmasked; no match, no
 reference (baseline-equal). IPAdapter Plus weight low (sweep 0.3-0.5), `end_at` about 0.6 so the
 photograph steers the first part of the denoise only. Style is not carried by these pictures.
+
+WHERE THE PICTURES COME FROM, updated 2026-10-28 by the operator (relayed): the pictures may be minted per
+beat from the dialogue-named objects instead of, or beside, public-domain photographs, with `flux3_klein`
+on the NVIDIA tiers and `sd15` on the Mac workflow. What the profiles map today, checked in
+`config/workflow_matrix.json`: `otr_8gb_animatediff` maps `flux3_klein`, `otr_16gb_animatediff` maps
+`moss_image`, `otr_mac16_animatediff` maps `sd15`. Klein is to serve the 16 GB reference arm too, scoped to
+the arm only: the 16 GB profile's own still-phase mapping must not change, so the arm would name its picture
+engine itself instead of reading the role mapping. Sizes: `flux3_klein` 10.3 GiB, `moss_image` 12.1 GiB,
+`sd15` 2.0 GiB (`apple/IMAGE_MODELS.md`); per-beat time and added VRAM on the 5080 are not measured, and
+the 8 GB and Mac costs are unmeasured. This arm is not built: the Ghost lanes mint no stills
+(`accepts_still = False`), so a minted picture needs either the image phase or an in-lane image engine call.
 
 COST OF THE ARM. A new node pack (ComfyUI_IPAdapter_plus) and three model files, so the install story
 changes: the one-pack-per-lane frontend schema must be migrated first (`js/lane_node_packs_core.js:58-64`,
@@ -261,6 +314,12 @@ legible, seams across context windows, render time, and the operator's eye.
   is wanted.
 - Photon-LCM's origin, or plain SD 1.5 for anything that ships (arm L only).
 - Any registry version bump for new downloads.
+- Added by the build (2026-10-28): the region strength default (2.0 in code; the overnight pairs run at 4.0);
+  whether to richen the region phrase; whether the dialogue's own nouns may ever become regions (today's
+  ruling says no, and it limits how often the arm can help); and whether the regions lanes, or any picture
+  arm, should ever replace a shipping default, which is his eye's call on the published pairs in `otr/obs`.
+- Whether to build the picture-reference arm at all, and if so with minted pictures (Klein on the NVIDIA
+  tiers, `sd15` on the Mac) or public-domain photographs.
 
 ## 12. What the review arc changed, and what it discarded
 
