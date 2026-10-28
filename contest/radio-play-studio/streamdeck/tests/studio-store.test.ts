@@ -512,13 +512,41 @@ describe("the deck against a Studio", () => {
     expect(store.getPhase()).toBe("running");
   });
 
-  it("a 409 asks afresh what is running and follows the page's episode, not a stale look", async () => {
+  it("a look taken while the press is still being checked cannot drop the run the press starts", async () => {
+    // The real server checks the choices against ComfyUI before it makes the
+    // run, so a listing taken in that window does not have it (Codex QA).
+    const { server, store } = await boot({ postValidateMs: 120, listDelayMs: 300 });
+    const press = store.make();
+    await new Promise((r) => setTimeout(r, 30)); // the POST is being checked; no run yet
+    const before = server.listRequests;
+    const look = store.tick();
+    await until(() => server.listRequests > before); // an empty listing is on its way
+    await press; // the run is made and attached
+    const id = store.getRun()!.id;
+    expect(store.getPhase()).toBe("running");
+    await look; // the empty listing lands after the attach
+    expect(store.getRun()?.id).toBe(id);
+    expect(store.getPhase()).toBe("running");
+    server.emit(id, { type: "done", path: "x", run: "r", file: "f.mp4" });
+    await until(() => store.getPhase() === "done");
+  });
+
+  it("a 409 asks afresh what is running, keeps the key locked until it hears, and follows the page's episode", async () => {
     const { server, store } = await boot({ listDelayMs: 150 });
     const before = server.listRequests;
     const look = store.tick();
     await until(() => server.listRequests > before); // taken before the page's run exists
     const theirs = server.addRun({ id: "cccccccccccc" });
-    await store.make(); // 409: the page's run holds the GPU
+    const asked = server.listRequests;
+    const press = store.make(); // 409: the page's run holds the GPU
+    await until(() => server.listRequests > asked); // the fresh listing is on its way...
+    // ... and until it lands, the key stays locked: no second press, no turning.
+    expect(store.getPhase()).toBe("starting");
+    expect(store.isLocked()).toBe(true);
+    expect(await store.press()).toBe("refused");
+    expect(store.cycle("bank", 1)).toBe(false);
+    await press;
+    expect(server.posts).toHaveLength(1);
     expect(store.getPhase()).toBe("running");
     expect(store.getRun()).toMatchObject({ id: theirs.id, external: true });
     expect(store.getBusyReason()).toBe("");

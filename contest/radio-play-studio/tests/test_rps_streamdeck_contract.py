@@ -78,32 +78,36 @@ def gated_app(settings, schemas, monkeypatch):
     httpd.server_close()
 
 
-class _RoutedStudio(Studio):
-    """Remembers which workflow file each run was built from."""
-
-    built: list
-
-    def build_graph_from(self, workflow_path, choices):
-        self.built.append(pathlib.Path(workflow_path).name)
-        return super().build_graph_from(workflow_path, choices)
+#: The writer's cast size in each menu graph (widgets_values[2], num_characters):
+#: one graph is told apart from the others by what it would submit, so the
+#: routing test can see which file actually ran -- not which one was read.
+CAST_BY_WORKFLOW = {WORKFLOW_NAME: 2, "otr_16gb_video.json": 3, "otr_16gb_still.json": 4, "otr_8gb_still.json": 5}
 
 
 @pytest.fixture
 def menu_app(tmp_path, workflow, schemas, monkeypatch):
     """A Studio started on a menu workflow, with other ways beside it (the
-    folder test_rps_machines.menu_settings builds)."""
+    folder test_rps_machines.menu_settings builds), each graph distinct; and
+    every client the runs used, to read what each one submitted."""
     folder = tmp_path / "workflows"
     folder.mkdir()
-    for name in (WORKFLOW_NAME, "otr_16gb_video.json", "otr_16gb_still.json", "otr_8gb_still.json"):
-        (folder / name).write_text(json.dumps(workflow), encoding="utf-8")
+    for name, cast in CAST_BY_WORKFLOW.items():
+        graph = json.loads(json.dumps(workflow))
+        writer = next(n for n in graph["nodes"] if n["id"] == 7)
+        writer["widgets_values"][2] = cast
+        (folder / name).write_text(json.dumps(graph), encoding="utf-8")
     settings = Settings(comfyui_url="http://comfy.invalid", api_url="http://bridge.invalid",
                         workflow_path=folder / WORKFLOW_NAME, out_dir=tmp_path / "episodes")
     stats = _device("cuda", "NVIDIA GeForce RTX 5080 Laptop GPU", 15.9)
-    studio = _RoutedStudio(settings, client_factory=lambda url: FakeClient(_good_job()), fetch=lambda url: schemas,
-                           comfy_json=lambda path: stats)
-    studio.built = []
+    clients = []
+
+    def client_factory(url):
+        clients.append(FakeClient(_good_job()))
+        return clients[-1]
+
+    studio = Studio(settings, client_factory=client_factory, fetch=lambda url: schemas, comfy_json=lambda path: stats)
     httpd = _serve(studio, monkeypatch)
-    yield httpd.server_address[1], studio
+    yield httpd.server_address[1], clients
     httpd.shutdown()
     httpd.server_close()
 
@@ -207,7 +211,7 @@ def test_the_deck_post_starts_an_episode_and_a_second_is_refused_busy(gated_app)
 
 
 def test_the_menu_workflow_the_deck_posts_is_the_graph_that_runs(menu_app):
-    port, studio = menu_app
+    port, clients = menu_app
     status, _, body = _request(port, "GET", "/api/options")
     menu = json.loads(body)["menu"]
     ways = [w["workflow"] for m in menu["machines"] for w in m["ways"]]
@@ -219,11 +223,20 @@ def test_the_menu_workflow_the_deck_posts_is_the_graph_that_runs(menu_app):
     fields = {f["key"]: f for f in form["fields"]}
     choices = {k: fields[k]["default"] for k in DIAL_FIELDS if k in fields}
     choices["workflow"] = "otr_8gb_still.json"
-    studio.built.clear()
     status, _, body = _post_json(port, "/api/episodes", {"choices": choices})
     assert status == 202
-    _until_finished(port, json.loads(body)["id"])
-    assert "otr_8gb_still.json" in studio.built
+    events = _stream(port, json.loads(body)["id"])
+    assert events[-1][1]["type"] == "done", events[-1]
+    # What reached ComfyUI is the 8 GB graph: its writer's own cast size.
+    submitted = clients[-1].submitted
+    assert submitted["7"]["inputs"]["num_characters"] == CAST_BY_WORKFLOW["otr_8gb_still.json"]
+    # ... and without the routing key the Studio's own graph runs, so the
+    # check above cannot pass by accident.
+    del choices["workflow"]
+    status, _, body = _post_json(port, "/api/episodes", {"choices": choices})
+    assert status == 202
+    assert _stream(port, json.loads(body)["id"])[-1][1]["type"] == "done"
+    assert clients[-1].submitted["7"]["inputs"]["num_characters"] == CAST_BY_WORKFLOW[WORKFLOW_NAME]
     # A workflow off the menu is refused, which is what the deck's 400
     # fallback reads.
     status, _, _ = _request(port, "GET", "/api/options?workflow=otr_gone.json")

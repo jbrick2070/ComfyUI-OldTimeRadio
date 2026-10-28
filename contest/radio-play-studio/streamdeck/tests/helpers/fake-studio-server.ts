@@ -25,8 +25,12 @@ export interface FakeStudioOptions {
   listFailure?: { status: number; error: string };
   /** Hold the /api/options answer for a workflow this long (ms). */
   optionsDelayMs?: Record<string, number>;
-  /** Hold the POST /api/episodes answer this long (ms). */
+  /** Hold the POST /api/episodes answer this long (ms), the run made. */
   postDelayMs?: number;
+  /** Hold a POST this long (ms) BEFORE its run exists, as the real server
+   *  checks the choices against ComfyUI before it starts one: a listing
+   *  taken meanwhile does not have the run. */
+  postValidateMs?: number;
   /** Hold the GET /api/episodes answer this long (ms); the listing is taken
    *  when the request arrives, as the real server's is. */
   listDelayMs?: number;
@@ -264,18 +268,30 @@ export class FakeStudioServer {
         this.json(res, this.opts.postFailure.status, { error: this.opts.postFailure.error });
         return;
       }
-      if (this.runs.some((r) => !r.finished)) {
-        this.json(res, 409, { error: "an episode is already being made; the page shows its progress" });
-        return;
-      }
-      const run = this.addRun({ id: (this.runs.length + 1).toString(16).padStart(12, "0") });
-      const delay = this.opts.postDelayMs ?? 0;
-      if (delay > 0) {
-        setTimeout(() => this.json(res, 202, { id: run.id }), delay);
+      const start = (): void => {
+        if (this.runs.some((r) => !r.finished)) {
+          this.json(res, 409, { error: "an episode is already being made; the page shows its progress" });
+          return;
+        }
+        this.startRun(res);
+      };
+      const validate = this.opts.postValidateMs ?? 0;
+      if (validate > 0) {
+        setTimeout(start, validate);
       } else {
-        this.json(res, 202, { id: run.id });
+        start();
       }
     });
+  }
+
+  private startRun(res: ServerResponse): void {
+    const run = this.addRun({ id: (this.runs.length + 1).toString(16).padStart(12, "0") });
+    const delay = this.opts.postDelayMs ?? 0;
+    if (delay > 0) {
+      setTimeout(() => this.json(res, 202, { id: run.id }), delay);
+    } else {
+      this.json(res, 202, { id: run.id });
+    }
   }
 
   private eventStream(id: string, req: IncomingMessage, res: ServerResponse): void {

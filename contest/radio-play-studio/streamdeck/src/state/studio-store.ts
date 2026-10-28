@@ -169,7 +169,6 @@ export class StudioStore extends EventEmitter {
   /** The Studio moved to another port: nothing the old one said holds. */
   public endpointChanged(): void {
     this.formRequest += 1;
-    this.runGeneration += 1;
     this.submitToken += 1;
     this.tickToken += 1;
     this.ticking = null;
@@ -178,7 +177,7 @@ export class StudioStore extends EventEmitter {
     this.clearPoll();
     this.clearReconnect();
     this.closeStream();
-    this.run = null;
+    this.setRun(null);
     this.fields = [];
     this.menu = null;
     this.pendingMachine = null;
@@ -372,8 +371,7 @@ export class StudioStore extends EventEmitter {
    *  going is kept: there is nothing else to show for it. */
   public clearRun(): void {
     if (this.run?.finished) {
-      this.runGeneration += 1;
-      this.run = null;
+      this.setRun(null);
       this.changed();
     }
   }
@@ -404,8 +402,7 @@ export class StudioStore extends EventEmitter {
     const token = ++this.submitToken;
     this.submitting = true;
     this.busyReason = "";
-    this.runGeneration += 1;
-    this.run = null;
+    this.setRun(null);
     this.changed();
     const current = (): boolean => token === this.submitToken;
     try {
@@ -442,7 +439,7 @@ export class StudioStore extends EventEmitter {
         }
         return;
       }
-      this.run = {
+      this.setRun({
         id: "",
         external: false,
         value: 0,
@@ -451,7 +448,7 @@ export class StudioStore extends EventEmitter {
         finished: true,
         error: message,
         seen: 0
-      };
+      });
     } finally {
       if (current()) {
         this.submitting = false;
@@ -527,7 +524,7 @@ export class StudioStore extends EventEmitter {
       if (!tracked) {
         // The Studio no longer knows it: it restarted.
         this.closeStream();
-        this.run = null;
+        this.setRun(null);
       } else if (!this.stream && this.reconnectTimer === null) {
         // Followed, but nothing is listening (the stream dropped while the
         // Studio was away). Open it again; a run that ended meanwhile replays
@@ -657,10 +654,18 @@ export class StudioStore extends EventEmitter {
     }
   }
 
+  /** The one way the followed run changes: every replacement or release
+   *  moves the run generation on, so a listing asked for before it --
+   *  before a press, during its POST, before an attach -- decides nothing. */
+  private setRun(run: RunState | null): void {
+    this.runGeneration += 1;
+    this.run = run;
+  }
+
   private attach(id: string, external: boolean): void {
     this.closeStream();
     this.clearReconnect();
-    this.run = {
+    this.setRun({
       id,
       external,
       value: 0,
@@ -668,7 +673,7 @@ export class StudioStore extends EventEmitter {
       minutesLeft: null,
       finished: false,
       seen: 0
-    };
+    });
     this.busyReason = "";
     this.changed();
     this.openStream();
@@ -746,7 +751,7 @@ export class StudioStore extends EventEmitter {
     }
     if (error instanceof StudioHttpError && error.status === 404) {
       // The Studio no longer knows this run: it restarted.
-      this.run = null;
+      this.setRun(null);
       this.changed();
       return;
     }
