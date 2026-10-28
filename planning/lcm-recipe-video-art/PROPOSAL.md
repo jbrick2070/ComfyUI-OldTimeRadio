@@ -248,8 +248,20 @@ What the first live pairs showed (video_art and recur_frac, haunted lane, streng
   no object, correctly.
 - Pair 10 (King Lear): "the map" reads as a map, and "France and Burgundy ... in our court" produced a palace,
   a plaza and a wall of national flags, the strongest frames of the night. "Breath" showed nothing in either arm.
-- Four of the six beats that got an object show it on screen, against about one in fifteen for the pool-only
-  arm. That is two pairs and not a measurement; the next pairs and Jeffrey's eye decide.
+- Pair 14 (Twelfth Night, cartoon style): "into the boxtree ... down this walk" is the clearest win of the
+  night. The default arm is the style's paper-cutout collage; the regions arm is a garden with hedges, a
+  lawn path and a large box on the grass. Another beat ("little villain") drew people, and the matcher now
+  refuses person nouns.
+- Pair 12 (a hat) showed the hat in both arms, because "hat" was already one of the story's key objects.
+  Objects the pool already holds cannot show what the adapter adds; the wins are the objects only the line
+  names.
+- Lightning-lane pairs (9 and 11) showed nothing: at cfg 1 the style's color fields win, as in the pool-only
+  lightning pairs. Pair 9 also exposed a parser that threw away a whole episode's picks for one oddly shaped
+  value (fixed).
+- On the haunted lane, five of the ten beats that got an object the pool did not already hold show it on screen
+  (rail, crate, map, the palace and flags, the garden), against about one in fifteen for the pool-only arm. Four
+  of the five misses were a person or an abstraction that the matcher now refuses; the fifth is a plain "box". That is three pairs and not a
+  measurement; Jeffrey's eye decides.
 
 Three defects the live pairs and two reviews found, all fixed and pushed (33fc041d, ef5e0b1b, 5e4a8f71, 24ae6a59,
 588d4da6): a matcher that let invented modifiers, curly-apostrophe negations, cast names, list items and
