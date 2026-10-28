@@ -68,9 +68,8 @@ export class PressTimer {
   public up(): boolean {
     const short = this.timer !== null && !this.held;
     this.cancel();
-    const wasHeld = this.held;
     this.held = false;
-    return short && !wasHeld;
+    return short;
   }
 
   public cancel(): void {

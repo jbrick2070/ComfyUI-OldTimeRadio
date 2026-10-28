@@ -23,8 +23,6 @@ export const PALETTE = {
   ink: "#F4EDFB",
   muted: "#B9ACDC",
   line: "#3B2B70",
-  fieldLine: "#7A64B8",
-  accent: "#7C3AED",
   accentText: "#B794FF",
   lamp: "#50F898",
   bad: "#FF8A7A",
@@ -301,7 +299,8 @@ export function renderNodeSvg(input: DialCellInput, g: NodeGeometry): string {
   }
 
   // The value: one line as large as fits, else two smaller ones.
-  const value = fitText(input.value || "—", {
+  // A blank value still shows that there is one: a dash, never nothing.
+  const value = fitText(input.value.trim() || "—", {
     maxWidth: inner,
     maxSize: g.valueMax,
     minSize: g.valueMin,

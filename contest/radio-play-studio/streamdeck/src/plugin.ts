@@ -58,11 +58,15 @@ streamDeck.actions.registerAction(new MakeKeyAction(store, openUrl));
 // form read and the first press already use them. (getGlobalSettings answers
 // with the settings; it does not raise onDidReceiveGlobalSettings, which in
 // SDK 3 fires only for changes made elsewhere.)
+// A host that never answers costs the saved picks, not the deck: after
+// SETTINGS_WAIT_MS the store starts on the defaults.
+const SETTINGS_WAIT_MS = 3_000;
 void streamDeck
   .connect()
   .then(async () => {
+    const timeout = new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), SETTINGS_WAIT_MS));
     try {
-      settings.load(await streamDeck.settings.getGlobalSettings<StudioGlobalSettings>());
+      settings.load(await Promise.race([streamDeck.settings.getGlobalSettings<StudioGlobalSettings>(), timeout]));
     } catch {
       settings.load(undefined);
     }

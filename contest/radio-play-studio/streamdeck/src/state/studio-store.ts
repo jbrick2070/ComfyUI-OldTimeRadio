@@ -101,6 +101,15 @@ export class StudioStore extends EventEmitter {
    *  listing asked for before that describes a world that has moved on (a
    *  listing taken just before Make does not have the new run in it). */
   private runGeneration = 0;
+  /** The press in flight: an answer for an older one (the port changed
+   *  under it) neither attaches a run nor releases the lock. */
+  private submitToken = 0;
+  /** The look in flight: a port change starts a new one at once instead of
+   *  queueing behind a form read that can take a minute and a half. */
+  private tickToken = 0;
+  /** False until the Studio has answered or failed to, once: the faces say
+   *  "tuning in", not "off air", while the first look is on its way. */
+  private looked = false;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private started = false;
@@ -108,6 +117,8 @@ export class StudioStore extends EventEmitter {
 
   public constructor(client: StudioClient, opts: StoreOptions = {}) {
     super();
+    // Every control on every page listens; a full XL is 32 of them.
+    this.setMaxListeners(0);
     this.client = client;
     this.opts = {
       offPollMs: opts.offPollMs ?? 5_000,
@@ -159,6 +170,12 @@ export class StudioStore extends EventEmitter {
   public endpointChanged(): void {
     this.formRequest += 1;
     this.runGeneration += 1;
+    this.submitToken += 1;
+    this.tickToken += 1;
+    this.ticking = null;
+    this.submitting = false;
+    this.looked = false;
+    this.clearPoll();
     this.clearReconnect();
     this.closeStream();
     this.run = null;
@@ -176,7 +193,7 @@ export class StudioStore extends EventEmitter {
   // -- what the deck shows --------------------------------------------------
   public getPhase(): StudioPhase {
     if (!this.reachable) {
-      return "off";
+      return this.looked ? "off" : "loading";
     }
     if (this.submitting) {
       return "starting";
@@ -202,7 +219,7 @@ export class StudioStore extends EventEmitter {
   /** The dials turn only while nothing is being made. */
   public isLocked(): boolean {
     const phase = this.getPhase();
-    return phase === "running" || phase === "busy" || phase === "off" || phase === "starting";
+    return phase === "running" || phase === "busy" || phase === "off" || phase === "starting" || !this.reachable;
   }
 
   public getRun(): RunState | null {
@@ -384,19 +401,20 @@ export class StudioStore extends EventEmitter {
     if (this.submitting || this.getPhase() !== "ready") {
       return;
     }
+    const token = ++this.submitToken;
     this.submitting = true;
     this.busyReason = "";
     this.runGeneration += 1;
     this.run = null;
     this.changed();
-    const request = this.formRequest;
+    const current = (): boolean => token === this.submitToken;
     try {
       const id = await this.client.startEpisode(this.postableChoices());
-      if (request === this.formRequest) {
+      if (current()) {
         this.attach(id, false);
       }
     } catch (err) {
-      if (request !== this.formRequest) {
+      if (!current()) {
         return;
       }
       if (err instanceof StudioUnreachable) {
@@ -406,14 +424,21 @@ export class StudioStore extends EventEmitter {
       const status = err instanceof StudioHttpError ? err.status : 0;
       const message = (err as Error).message || "the Studio refused it";
       if (status === 409) {
-        // Something is being made. An episode the page started is followed;
-        // anything else (a stage, a project waiting to hear how its last run
-        // ended) is shown as the server put it, and the page sorts it out.
-        this.submitting = false;
-        await this.tick();
-        if (!this.run) {
+        // Something is being made. Ask what, now -- not from a look that was
+        // already on its way before the press -- and keep the key locked until
+        // the answer is in. An episode the page started is followed; anything
+        // else (a stage, a project waiting to hear how its last run ended) is
+        // shown as the server put it, and the page sorts it out.
+        try {
+          const listing = await this.client.episodes();
+          if (current()) {
+            this.followListing(listing);
+          }
+        } catch {
+          // the next look will tell
+        }
+        if (current() && !this.run && !this.busyReason) {
           this.busyReason = message;
-          this.changed();
         }
         return;
       }
@@ -428,8 +453,10 @@ export class StudioStore extends EventEmitter {
         seen: 0
       };
     } finally {
-      this.submitting = false;
-      this.changed();
+      if (current()) {
+        this.submitting = false;
+        this.changed();
+      }
     }
   }
 
@@ -439,17 +466,25 @@ export class StudioStore extends EventEmitter {
    *  Studio has just come back. Never rejects: what goes wrong is state. */
   public tick(): Promise<void> {
     if (!this.ticking) {
+      const token = ++this.tickToken;
+      const request = this.formRequest;
       this.ticking = this.doTick()
         .catch((err: unknown) => {
+          if (request !== this.formRequest) {
+            return; // an answer from before a port change
+          }
           // A listing that fails in a way the client did not class (a 500, a
           // body that is not JSON) is a Studio that is not answering properly.
           this.reachable = false;
+          this.looked = true;
           this.formError = (err as Error)?.message || "the Studio answered with an error";
           this.changed();
         })
         .finally(() => {
-          this.ticking = null;
-          this.schedulePoll();
+          if (token === this.tickToken) {
+            this.ticking = null;
+            this.schedulePoll();
+          }
         });
     }
     return this.ticking;
@@ -473,6 +508,7 @@ export class StudioStore extends EventEmitter {
     }
     const cameBack = !this.reachable;
     this.reachable = true;
+    this.looked = true;
     // A press, an attach or a clear since the listing was asked for: it does
     // not know about the run the deck now follows, so it decides nothing.
     if (runGeneration === this.runGeneration && !this.submitting) {
@@ -729,6 +765,7 @@ export class StudioStore extends EventEmitter {
 
   private lost(): void {
     this.reachable = false;
+    this.looked = true;
     this.clearReconnect();
     this.closeStream();
     this.changed();

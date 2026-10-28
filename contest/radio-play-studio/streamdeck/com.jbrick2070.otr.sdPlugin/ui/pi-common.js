@@ -30,6 +30,7 @@
     loading: ["warn", "Reading the form from the Studio…"],
     form_error: ["err", "The form could not be read."],
     ready: ["ok", "Ready: the Studio answers and the form is in hand."],
+    starting: ["warn", "Sending the press to the Studio…"],
     running: ["ok", "An episode is being made."],
     busy: ["warn", "The GPU is held by something the deck cannot follow."],
     done: ["ok", "The last episode is ready to play."],

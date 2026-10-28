@@ -463,4 +463,93 @@ describe("the deck against a Studio", () => {
     expect(frames.some((f) => f.includes(">0/4<"))).toBe(false);
     dial.disappear();
   });
+
+  // -- the third review's findings (Sonnet, 1ab69c0c1), each pinned ------------
+
+  it("says tuning in, not off air, until the Studio has answered once", async () => {
+    server = new FakeStudioServer({ listDelayMs: 200 });
+    const port = await server.start();
+    store = new StudioStore(new StudioClient(port), { offPollMs: 40, idlePollMs: 40 });
+    store.start();
+    expect(store.getPhase()).toBe("loading");
+    expect(store.isLocked()).toBe(true);
+    await until(() => store!.getPhase() === "ready");
+  });
+
+  it("a port change probes the new Studio at once, not after the old one's slow form read", async () => {
+    const { server, store } = await boot();
+    server.configure({ optionsFailure: { status: 503, error: "ComfyUI is busy" } });
+    await store.refresh(); // a failed read: the next look reads the form again
+    server.configure({ optionsFailure: undefined, optionsDelayMs: { "otr_canonical.json": 1500, "": 1500 } });
+    const before = server.optionsRequests.length;
+    await until(() => server.optionsRequests.length > before); // the slow read is under way
+    const other = new FakeStudioServer();
+    extraServers.push(other);
+    const port = await other.start();
+    const changedAt = Date.now();
+    store.getClient().setPort(port);
+    store.endpointChanged();
+    await until(() => store.getPhase() === "ready" && other.optionsRequests.length > 0);
+    expect(Date.now() - changedAt).toBeLessThan(1000);
+  });
+
+  it("a port change mid-press releases the key at once, and the old answer attaches nothing", async () => {
+    const { store } = await boot({ postDelayMs: 600 });
+    const oldPress = store.make();
+    await until(() => store.getPhase() === "starting");
+    const other = new FakeStudioServer();
+    extraServers.push(other);
+    const port = await other.start();
+    store.getClient().setPort(port);
+    store.endpointChanged();
+    expect(store.getPhase()).not.toBe("starting");
+    await until(() => store.getPhase() === "ready");
+    await oldPress; // the old Studio's 202 lands now
+    expect(store.getRun()).toBeNull();
+    expect(store.getPhase()).toBe("ready");
+    await store.make();
+    expect(other.posts).toHaveLength(1);
+    expect(store.getPhase()).toBe("running");
+  });
+
+  it("a 409 asks afresh what is running and follows the page's episode, not a stale look", async () => {
+    const { server, store } = await boot({ listDelayMs: 150 });
+    const before = server.listRequests;
+    const look = store.tick();
+    await until(() => server.listRequests > before); // taken before the page's run exists
+    const theirs = server.addRun({ id: "cccccccccccc" });
+    await store.make(); // 409: the page's run holds the GPU
+    expect(store.getPhase()).toBe("running");
+    expect(store.getRun()).toMatchObject({ id: theirs.id, external: true });
+    expect(store.getBusyReason()).toBe("");
+    await look;
+    expect(store.getRun()?.id).toBe(theirs.id);
+  });
+
+  it("a machine dial turned while held does not switch on release; a plain press does", async () => {
+    const { server, store } = await boot();
+    const dial = new MachineDialController(store, quietSink(), 1);
+    const reads = server.optionsRequests.length;
+    dial.dialDown();
+    await dial.rotate(1, true);
+    await dial.push();
+    expect(server.optionsRequests.length).toBe(reads);
+    expect(store.getPicks().workflow).toBeUndefined();
+    dial.dialDown();
+    await dial.push();
+    expect(store.getPicks().workflow).toBe("otr_16gb_video.json");
+  });
+
+  it("many controls on one page do not trip the listener limit", async () => {
+    const { store } = await boot();
+    const warnings: string[] = [];
+    const onWarning = (w: Error): void => void warnings.push(w.name);
+    process.on("warning", onWarning);
+    const dials = Array.from({ length: 32 }, () => new ChoiceDialController(store, quietSink(), { field: "bank" }, 1));
+    dials.forEach((d) => d.appear());
+    await new Promise((r) => setTimeout(r, 20));
+    dials.forEach((d) => d.disappear());
+    process.off("warning", onWarning);
+    expect(warnings).not.toContain("MaxListenersExceededWarning");
+  });
 });

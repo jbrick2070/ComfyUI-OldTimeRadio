@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 import {
   action,
+  DialDownEvent,
   DialRotateEvent,
   DialUpEvent,
   KeyDownEvent,
@@ -27,6 +28,9 @@ export class MachineDialController {
   private readonly limiter: CellRateLimiter<string>;
   private readonly press: PressTimer;
   private visible = false;
+  /** The dial was turned while held down: its release is not a press, so it
+   *  does not switch machines (a switch re-reads the form, up to a minute). */
+  private turnedWhileDown = false;
 
   private readonly onChanged = (): void => {
     this.render();
@@ -61,13 +65,27 @@ export class MachineDialController {
     this.store.off("changed", this.onChanged);
   }
 
-  public async rotate(ticks: number): Promise<void> {
-    if (ticks !== 0 && !this.store.rotateMachine(ticks)) {
+  public async rotate(ticks: number, pressed = false): Promise<void> {
+    if (ticks === 0) {
+      return;
+    }
+    if (pressed) {
+      this.turnedWhileDown = true;
+    }
+    if (!this.store.rotateMachine(ticks)) {
       await this.sink.showAlert();
     }
   }
 
+  public dialDown(): void {
+    this.turnedWhileDown = false;
+  }
+
   public async push(): Promise<void> {
+    if (this.turnedWhileDown) {
+      this.turnedWhileDown = false;
+      return;
+    }
     if (!(await this.store.applyMachine())) {
       await this.sink.showAlert();
     }
@@ -126,7 +144,11 @@ export class MachineDialAction extends SingletonAction {
   }
 
   public override async onDialRotate(ev: DialRotateEvent): Promise<void> {
-    await this.controls.get(ev.action.id)?.rotate(ev.payload.ticks);
+    await this.controls.get(ev.action.id)?.rotate(ev.payload.ticks, ev.payload.pressed);
+  }
+
+  public override onDialDown(ev: DialDownEvent): void {
+    this.controls.get(ev.action.id)?.dialDown();
   }
 
   public override async onDialUp(ev: DialUpEvent): Promise<void> {

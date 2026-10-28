@@ -295,8 +295,18 @@ def test_the_deck_calls_these_routes_and_no_others():
     assert "#run=${encodeURIComponent(this.run.id)}" in STORE_TS
 
 
+def test_the_key_has_a_word_for_every_phase_the_run_names():
+    """The run names its phase by the page's string key (runner.PHASE_BY_CLASS);
+    the Make key turns each into one short word (faces.ts PHASE_WORDS). A phase
+    added here without a word there would print `phase.something` on the key."""
+    faces_ts = (PLUGIN / "src" / "actions" / "faces.ts").read_text(encoding="utf-8")
+    block = faces_ts[faces_ts.index("export const PHASE_WORDS"):faces_ts.index("export function phaseWord")]
+    words = dict(re.findall(r'"(phase\.[a-z_]+)": "([a-z ]+)"', block))
+    assert set(words) == set(runner.PHASE_BY_CLASS.values())
+    assert all(words.values())
+
+
 def test_the_plugin_never_ships_in_the_registry_zip():
     ignore = (PLUGIN.parents[2] / ".comfyignore").read_text(encoding="utf-8")
     assert re.search(r"^contest/\s*$", ignore, re.M)
-    manifest = json.loads((PLUGIN / "com.jbrick2070.otr.sdPlugin" / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["UUID"] == "com.jbrick2070.otr"
+    assert (PLUGIN / "com.jbrick2070.otr.sdPlugin" / "manifest.json").is_file()

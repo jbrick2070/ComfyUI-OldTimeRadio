@@ -79,3 +79,18 @@ describe("manifest, layout, icons and repository hygiene", () => {
     }
   });
 });
+
+describe("the property inspector speaks every phase", () => {
+  it("names each StudioPhase in plain words, never the bare key", () => {
+    const store = readFileSync(join(ROOT, "src", "state", "studio-store.ts"), "utf8");
+    const union = store.slice(store.indexOf("export type StudioPhase"), store.indexOf("export interface RunState"));
+    const phases = [...union.matchAll(/\| "([a-z_]+)"/g)].map((m) => m[1]);
+    expect(phases.length).toBeGreaterThanOrEqual(9);
+    const pi = readFileSync(join(PLUGIN_DIR, "ui", "pi-common.js"), "utf8");
+    const words = pi.slice(pi.indexOf("var PHASE_WORDS"), pi.indexOf("function showState"));
+    for (const phase of phases) {
+      const named = words.split(/\r?\n/).some((l) => l.trim().startsWith(`${phase}: [`));
+      expect(named, `pi-common.js has no words for "${phase}"`).toBe(true);
+    }
+  });
+});
