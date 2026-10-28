@@ -532,3 +532,15 @@ def test_a_two_word_place_after_a_prefix_is_kept():
 @pytest.mark.parametrize("word", ["sheriff", "inspector", "king", "nurse", "guard", "butler", "waiter"])
 def test_a_role_noun_is_a_person_not_a_thing(word):
     assert A.admit([word], "The %s took the box." % word) == []
+
+
+@pytest.mark.parametrize("word", ["villain", "rogue", "knave", "fool", "coward", "traitor", "rival", "enemy",
+                                  "complexion", "behavior", "pride", "folly", "riddle", "puzzle", "clue"])
+def test_a_person_noun_or_a_trait_a_line_names_is_not_an_object(word):
+    assert A.admit([word], "Here comes the %s, I say." % word) == []
+
+
+def test_the_overweening_rogue_and_the_little_villain_are_people():
+    assert A.admit(["overweening rogue"], "Here's an overweening rogue.") == []
+    assert A.admit(["little villain"], "Here comes the little villain.") == []
+    assert A.admit(["boxtree", "walk"], "Get you all three into the boxtree and down this walk.") == ["boxtree", "walk"]

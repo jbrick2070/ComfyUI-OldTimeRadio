@@ -83,6 +83,10 @@ _DENY_HEADS = frozenset({
     "butler", "maid", "servant", "waiter", "waitress", "clerk", "pilot", "sailor", "farmer", "priest",
     "monk", "nun", "teacher", "student", "detective", "police", "policeman", "thief", "killer", "murderer",
     "victim", "witness", "lawyer", "judge", "crowd", "family", "children",
+    "villain", "rogue", "knave", "fool", "wretch", "scoundrel", "coward", "traitor", "liar", "rascal",
+    "fellow", "lad", "lass", "peasant", "beggar", "vagabond", "lover", "rival", "enemy", "master",
+    # abstractions a line names about a person
+    "complexion", "behavior", "manner", "temper", "pride", "folly", "honor", "virtue", "riddle", "puzzle", "clue",
     # people (the picture already has its cast)
     "man", "men", "woman", "women", "people", "person", "folk", "folks", "friend", "child", "children",
     "kid", "baby", "girl", "boy", "mother", "father", "mom", "dad", "brother", "sister", "son", "daughter",
