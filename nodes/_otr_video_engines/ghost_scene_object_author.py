@@ -12,7 +12,8 @@ words are physical things or places a camera could film. It cannot invent: every
 :func:`admit`, which keeps a phrase only when
 
 * it is one to four words;
-* it is a CONTIGUOUS run of the spoken line's own words, each a whole word (a plural or singular spelling is
+* it is a CONTIGUOUS run of the spoken line's own words, none of them a capitalised word in the middle of a
+  sentence (a name or a place: "France", "Burgundy"; a line in capitals has no such signal and skips this), each a whole word (a plural or singular spelling is
   fine), with no comma, colon or dash between them, so the model can drop words from the line but never add,
   reorder or fuse them: "open the box" cannot become "glowing radioactive box", "brass key" cannot be
   assembled from "the brass door and the key", "rope, knife, lantern" is three objects and not one, and
@@ -67,6 +68,8 @@ _DENY_HEADS = frozenset({
     "voice", "silence", "pain", "fear", "hope", "love", "hate", "anger", "sorrow", "joy", "shadow",
     "mystery", "danger", "damage", "cost", "price", "pattern", "context", "news", "case", "chance", "end",
     "side", "sense", "mind", "heart", "soul", "spirit", "memory", "dream", "future", "past", "present",
+    "breath", "death", "sound", "noise", "echo", "whisper", "feeling", "trouble", "problem", "plan",
+    "power", "hurry", "step", "luck", "fate", "doubt", "trust", "peace", "war", "order",
     # people (the picture already has its cast)
     "man", "men", "woman", "women", "people", "person", "folk", "folks", "friend", "child", "children",
     "kid", "baby", "girl", "boy", "mother", "father", "mom", "dad", "brother", "sister", "son", "daughter",
@@ -210,10 +213,15 @@ def parse_response(raw, ids) -> dict:
     return out
 
 
+def _straight(text) -> str:
+    """Composed, with curly apostrophes made straight so "don’t" is one word. Case is kept."""
+    composed = unicodedata.normalize("NFC", str(text or ""))
+    return composed.replace("’", "'").replace("‘", "'").replace("ʼ", "'")
+
+
 def _fold(text) -> str:
-    """Lower-case, composed, with curly apostrophes made straight so "don’t" is one word."""
-    folded = unicodedata.normalize("NFC", str(text or "")).lower()
-    return folded.replace("’", "'").replace("‘", "'").replace("ʼ", "'")
+    """:func:`_straight`, lower-cased."""
+    return _straight(text).lower()
 
 
 def _words(text) -> list:
@@ -275,13 +283,20 @@ def _match_in_line(line_text, words):
     spelling. A mention under a negator makes the answer ``negated``.
     """
     mentioned = False
-    for sentence in _SENTENCE_END.split(_fold(line_text)):
-        tokens = _TOKEN.findall(sentence)
+    straight = _straight(line_text)
+    # A line with no lowercase letter is SHOUTED; capitals carry no information there.
+    judge_capitals = any(ch.islower() for ch in straight)
+    for sentence in _SENTENCE_END.split(straight):
+        cased = _TOKEN.findall(sentence)
+        tokens = [t.lower() for t in cased]
         for start in range(len(tokens) - len(words) + 1):
             window = tokens[start:start + len(words)]
             if any(_is_break(t) for t in window):
                 continue
             if not all(tok in _forms(word) for tok, word in zip(window, words)):
+                continue
+            # A capital in the middle of a sentence is a name or a place, not a thing to film.
+            if judge_capitals and any(cased[i][:1].isupper() for i in range(start, start + len(words)) if i > 0):
                 continue
             mentioned = True
             before = [t for t in tokens[max(0, start - _NEGATION_WINDOW):start] if not _is_break(t)]

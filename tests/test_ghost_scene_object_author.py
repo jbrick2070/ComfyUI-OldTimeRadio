@@ -354,3 +354,25 @@ def test_an_unreadable_reply_logs_how_it_started(caplog):
         out = A.adapt_scene_objects(lambda *a, **k: "Sorry, I cannot do that", [{"id": "b1", "line": "The lamp."}])
     assert out == {}
     assert "Sorry, I cannot do that" in caplog.text
+
+
+# --------------------------------------------------------------------------- #
+# Found live on pair 10: places and a breath were painted as objects
+# --------------------------------------------------------------------------- #
+def test_a_capitalised_word_in_mid_sentence_is_a_name_or_a_place_not_an_object():
+    line = "Bring word from France and Burgundy to the court."
+    assert A.admit(["France", "Burgundy", "court"], line) == ["court"]
+
+
+def test_a_sentence_initial_capital_is_just_a_capital():
+    assert A.admit(["stone"], "Stone is cold.") == ["stone"]
+    assert A.admit(["lamp"], "It is dark. Lamp on.") == ["lamp"]
+
+
+def test_a_shouted_line_has_no_capital_signal():
+    assert A.admit(["lamp"], "BRING THE LAMP NOW.") == ["lamp"]
+
+
+@pytest.mark.parametrize("word", ["breath", "death", "sound", "noise", "echo", "feeling", "plan", "power"])
+def test_more_abstractions_are_never_objects(word):
+    assert A.admit([word], "I felt the %s then." % word) == []
