@@ -16,9 +16,11 @@ words are physical things or places a camera could film. It cannot invent: every
   is kept only when it is a PLACE: a known country, region or city ("France", "Burgundy"), or a word the
   line puts in a place ("in Thornfield", "near Dover", "the court of Atlantis"). Any other capital is a
   person's name ("Cordelia", "Lady Macbeth", "Rosalind's arms"; a cast name is refused before this is
-  asked) and is refused, as is a name on the built-in given-name list wherever it sits, and a
-  sentence-initial word that is being ADDRESSED ("Cordelia, ..."). Otherwise a sentence-initial capital is
-  just a capital, and a line in capitals carries no signal except the given-name list; each a whole word (a plural or singular spelling is
+  asked) and is refused, as is a name on the built-in given-name list wherever it sits, a title followed by
+  a name ("Inspector Lestrade"), and a sentence-initial word that is being ADDRESSED ("Cordelia, ...",
+  "Marek -- ...") or is a possessive ("Marek's coat"). Otherwise a sentence-initial capital is just a
+  capital, and a line in capitals carries no signal except the given-name list. A name this module has never
+  heard of, put in a place by "in" or "near", is the one thing it cannot tell from a place; each a whole word (a plural or singular spelling is
   fine), with no comma, colon or dash between them, so the model can drop words from the line but never add,
   reorder or fuse them: "open the box" cannot become "glowing radioactive box", "brass key" cannot be
   assembled from "the brass door and the key", "rope, knife, lantern" is three objects and not one, and
@@ -76,6 +78,11 @@ _DENY_HEADS = frozenset({
     "breath", "death", "sound", "noise", "echo", "whisper", "feeling", "trouble", "problem", "plan",
     "power", "hurry", "step", "luck", "fate", "doubt", "trust", "peace", "war", "order",
     "heaven", "hell", "god", "devil",
+    # role nouns: people, not things (a lowercase "the sheriff" is as much a person as "Sheriff Brody")
+    "sheriff", "inspector", "king", "queen", "prince", "princess", "duke", "duchess", "nurse", "guard",
+    "butler", "maid", "servant", "waiter", "waitress", "clerk", "pilot", "sailor", "farmer", "priest",
+    "monk", "nun", "teacher", "student", "detective", "police", "policeman", "thief", "killer", "murderer",
+    "victim", "witness", "lawyer", "judge", "crowd", "family", "children",
     # people (the picture already has its cast)
     "man", "men", "woman", "women", "people", "person", "folk", "folks", "friend", "child", "children",
     "kid", "baby", "girl", "boy", "mother", "father", "mom", "dad", "brother", "sister", "son", "daughter",
@@ -176,6 +183,15 @@ _TITLES = frozenset({
     "lieutenant", "major", "judge", "father", "mother", "brother", "sister", "uncle", "aunt", "madam",
     "master", "mistress", "saint", "st", "professor", "reverend", "rev", "president", "senator", "emperor",
     "empress", "prof", "capt", "gen", "col", "sgt", "lt", "hon", "sr", "jr",
+    "inspector", "sheriff", "constable", "baron", "baroness", "friar", "nurse", "bishop", "pope", "cardinal",
+    "abbot", "abbess", "monk", "nun", "pastor", "priest", "vicar", "rabbi", "mayor", "governor", "minister",
+    "chief", "commander", "admiral", "detective", "officer", "agent", "marshal", "knight", "squire",
+})
+
+#: First words of a two-word place ("San Diego", "New York", "Buenos Aires"): the second word is a place too.
+_NAME_PREFIXES = frozenset({
+    "san", "los", "las", "santa", "new", "hong", "buenos", "sao", "rio", "el", "la", "st", "saint", "tel",
+    "abu", "kuala", "costa", "puerto", "port", "mount", "fort",
 })
 
 #: Given names that are almost always a person. A capitalized word on this list is a person wherever it sits:
@@ -304,10 +320,14 @@ def parse_response(raw, ids) -> dict:
     return out
 
 
+#: Curly apostrophes become straight (so "don't" is one word); a typographic ellipsis ends a sentence.
+_QUOTE_FOLD = {0x2019: "'", 0x2018: "'", 0x02BC: "'", 0x2026: "."}
+
+
 def _straight(text) -> str:
     """Composed, with curly apostrophes made straight so "don’t" is one word. Case is kept."""
     composed = unicodedata.normalize("NFC", str(text or ""))
-    return composed.replace("’", "'").replace("‘", "'").replace("ʼ", "'")
+    return composed.translate(_QUOTE_FOLD)
 
 
 def _fold(text) -> str:
@@ -406,7 +426,8 @@ def _capital_is_place(cased, tokens, index) -> bool:
     A known place word (also in the possessive: "France's"), a word the line puts in a place ("in
     Thornfield", "in the Tower"), "<place noun> of X", or the continuation of such a name ("New York",
     "San Diego") qualifies. A possessive qualifies ONLY through the place list, because "Rosalind's arms"
-    is a person. Anything else ("What shall Cordelia speak") does not.
+    is a person. A role or a family name after "the" ("near the King", "near the Smiths") is not a place.
+    Anything else ("What shall Cordelia speak") does not.
     """
     word = tokens[index]
     if _possessive_stem(word) in _PLACE_WORDS:
@@ -416,20 +437,34 @@ def _capital_is_place(cased, tokens, index) -> bool:
     previous = tokens[index - 1] if index > 0 else ""
     if previous in _PLACE_CUES:
         return True
-    if previous == "the" and index > 1 and tokens[index - 2] in _PLACE_CUES:
+    if (previous == "the" and index > 1 and tokens[index - 2] in _PLACE_CUES
+            and word not in _TITLES and not word.endswith("s")):
         return True
     if index > 1 and previous == "of" and tokens[index - 2] in _PLACE_NOUNS:
         return True
-    return (index > 0 and cased[index - 1][:1].isupper()
-            and _capital_is_place(cased, tokens, index - 1))
+    if index > 1 and cased[index - 1][:1].isupper() and _capital_is_place(cased, tokens, index - 1):
+        return True
+    # "San Diego is warm": the second word of a two-word place whose first word opens the sentence.
+    return index == 1 and cased[0][:1].isupper() and tokens[0] in _NAME_PREFIXES
+
+
+def _is_address(tokens) -> bool:
+    """True when the sentence opens with one word that is being ADDRESSED ("Marek, look out", "Marek!",
+    "Marek -- look out"), and not with the first item of a list ("Rope, knife, lantern ...")."""
+    if len(tokens) == 1:
+        return True
+    if not _is_break(tokens[1]):
+        return False
+    return not (tokens[1] == "," and len(tokens) > 3 and (tokens[3] == "," or tokens[3] == "and"))
 
 
 def _window_names_a_person(cased, tokens, start, length, judge_capitals) -> bool:
     """True when the run ``tokens[start:start + length]`` names a person, so it must not become a region.
 
     A capitalized given name; a capitalized word right after a capitalized title ("Lady Macbeth"); a title
-    in front of a capitalized word; a sentence-initial capital that is being ADDRESSED ("Cordelia, ..."
-    or "Rosalind!"); and any other mid-sentence capital that is not a place. A sentence-initial capital
+    in front of a capitalized word; a sentence-initial capital that is being ADDRESSED ("Cordelia, ...",
+    "Rosalind!", "Marek -- ...") or is a possessive or the first of two capitalized words ("Marek's coat",
+    "Inspector Lestrade"); and any other mid-sentence capital that is not a place. A sentence-initial capital
     otherwise is just a capital. In a line with no lowercase letter capitals mean nothing, so only the
     given-name list can say.
     """
@@ -449,7 +484,13 @@ def _window_names_a_person(cased, tokens, start, length, judge_capitals) -> bool
         if tokens[i] in _TITLES and i + 1 < len(tokens) and cased[i + 1][:1].isupper():
             return True
         if i == 0:
-            if i == last and stem not in _PLACE_WORDS and (len(tokens) == 1 or tokens[1] == ","):
+            place = stem in _PLACE_WORDS
+            if i == last and not place and _is_address(tokens):
+                return True
+            if tokens[0].endswith("'s") and not place:
+                return True
+            if (len(tokens) > 1 and cased[1][:1].isupper() and not place
+                    and tokens[0] not in _NAME_PREFIXES):
                 return True
             continue
         if not _capital_is_place(cased, tokens, i):

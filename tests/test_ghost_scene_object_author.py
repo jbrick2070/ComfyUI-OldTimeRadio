@@ -269,7 +269,7 @@ def test_the_negation_holes_are_closed(line):
 
 
 def test_a_curly_apostrophe_does_not_split_a_word_into_junk():
-    assert A.admit(["Tuck’s coat"], "Tuck’s coat is here.") == ["tuck's coat"]
+    assert A.admit(["France’s court"], "We sit in France’s court.") == ["france's court"]
     assert A.admit(["s"], "Carl’s coat") == []
     assert A.admit(["t"], "I can’t") == []
 
@@ -481,3 +481,54 @@ def test_a_two_word_place_at_the_start_of_a_sentence_is_kept():
 @pytest.mark.parametrize("word", ["heaven", "hell", "god", "devil"])
 def test_the_afterlife_and_its_cast_are_not_objects(word):
     assert A.admit([word], "She opened the gates of %s." % word) == []
+
+
+# --------------------------------------------------------------------------- #
+# The third QA (of 455cf2e4): a leak the "cue reaches across the" rule opened, and the rest
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("line, phrase", [
+    ("Stay near the King.", "King"),
+    ("Stay near the Queen.", "Queen"),
+    ("Stand near the Duke.", "Duke"),
+    ("Stay near the Inspector.", "Inspector"),
+    ("He hid within the President.", "President"),
+    ("Sit near the Smiths.", "Smiths"),
+])
+def test_a_role_or_a_family_after_the_article_is_not_a_place(line, phrase):
+    assert A.admit([phrase], line) == []
+
+
+@pytest.mark.parametrize("line", [
+    "Marek\u2014look out!", "Marek \u2014 look out!", "Marek\u2013look out!", "Marek: look out!",
+    "\u201cMarek\u2014\u201d she began.", "Marek\u2026 where are you?", "Marek -- look out!",
+])
+def test_a_name_addressed_through_any_break_is_refused(line):
+    assert A.admit(["Marek"], line) == []
+
+
+@pytest.mark.parametrize("line, phrase", [
+    ("Marek's coat is on the chair.", "Marek's coat"),
+    ("Tom's boat is gone.", "Tom's boat"),
+    ("Inspector Lestrade took the box.", "Inspector"),
+    ("Sheriff Brody took the box.", "Sheriff"),
+    ("Marek Kowalski is gone.", "Marek"),
+    ("India Hicks took the box.", "Hicks"),
+])
+def test_a_sentence_initial_person_is_refused(line, phrase):
+    assert A.admit([phrase], line) == []
+
+
+def test_the_first_item_of_a_list_is_not_an_address():
+    assert A.admit(["rope", "knife", "lantern"], "Rope, knife, lantern. Take them all.") == [
+        "rope", "knife", "lantern"]
+    assert A.admit(["Table"], "Table, chairs and a lamp.") == ["table"]
+
+
+def test_a_two_word_place_after_a_prefix_is_kept():
+    assert A.admit(["Buenos Aires"], "Buenos Aires is warm.") == ["buenos aires"]
+    assert A.admit(["San Diego"], "San Diego is warm.") == ["san diego"]
+
+
+@pytest.mark.parametrize("word", ["sheriff", "inspector", "king", "nurse", "guard", "butler", "waiter"])
+def test_a_role_noun_is_a_person_not_a_thing(word):
+    assert A.admit([word], "The %s took the box." % word) == []
