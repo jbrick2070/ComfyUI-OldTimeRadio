@@ -12,7 +12,7 @@ words are physical things or places a camera could film. It cannot invent: every
 :func:`admit`, which keeps a phrase only when
 
 * it is one to four words;
-* it is a CONTIGUOUS run of the spoken line's own words, and a word capitalised in the middle of a sentence
+* it is a CONTIGUOUS run of the spoken line's own words, and a word capitalized in the middle of a sentence
   is kept only when it is a PLACE: a known country, region or city ("France", "Burgundy"), or a word the
   line puts in a place ("in Thornfield", "near Dover", "the court of Atlantis"). Any other capital is a
   person's name ("Cordelia"; a cast name is refused before this is asked) and is refused. A sentence-initial
@@ -103,7 +103,7 @@ _GENERIC_NAME_WORDS = frozenset({
     "announcer", "narrator", "host", "radio", "voice", "old", "young", "little", "big",
 })
 
-#: Negators this module honours: the regions resolver's set plus the contractions and adverbs it lacks.
+#: Negators this module honors: the regions resolver's set plus the contractions and adverbs it lacks.
 _NEGATORS_HERE = frozenset(_NEGATORS) | frozenset({
     "cannot", "hadn't", "hadnt", "shouldn't", "shouldnt", "mustn't", "mustnt", "ain't", "aint", "nowhere",
     "needn't", "neednt", "mightn't", "mightnt",
@@ -124,7 +124,7 @@ def _is_break(token) -> bool:
     return token in _BREAKS or token.startswith("--")
 
 
-#: Places a capitalised word may name without any cue from the line: countries, regions, cities, waters.
+#: Places a capitalized word may name without any cue from the line: countries, regions, cities, waters.
 #: Words that are ALSO common first names (Paris, Georgia, Jordan, Chad, Sydney, Florence, Victoria, Lincoln,
 #: Washington, Charlotte, Madison, Orlando, Kent) are left out on purpose: those need a cue from the line.
 _PLACE_WORDS = frozenset("""
@@ -159,7 +159,7 @@ nebraska nevada ohio oklahoma oregon pennsylvania tennessee texas utah vermont v
 new zealand jersey york hong kong san los las angeles francisco vegas orleans
 """.split())
 
-#: Words that, directly before a capitalised word, put it in a place ("in Thornfield", "near Dover").
+#: Words that, directly before a capitalized word, put it in a place ("in Thornfield", "near Dover").
 #: "to" and "from" are NOT here: "give it to Cordelia" and "a letter from Cordelia" name a person.
 _PLACE_CUES = frozenset({
     "in", "at", "into", "inside", "outside", "near", "across", "through", "throughout", "beyond", "within",
@@ -279,7 +279,7 @@ def _words(text) -> list:
     return [t for t in _TOKEN.findall(_fold(text)) if not _is_break(t)]
 
 
-def _normalise(phrase) -> list:
+def _normalize(phrase) -> list:
     words = _words(phrase)
     while words and words[0] in _DETERMINERS:
         words = words[1:]
@@ -358,7 +358,7 @@ def _match_in_line(line_text, words):
 
 
 def _capital_is_place(cased, tokens, index) -> bool:
-    """True when the capitalised word at ``index`` (mid-sentence) reads as a PLACE rather than a person.
+    """True when the capitalized word at ``index`` (mid-sentence) reads as a PLACE rather than a person.
 
     A known place word, a word the line puts in a place ("in Thornfield"), "<place noun> of X", or the
     continuation of such a name ("New York") qualifies. Anything else ("What shall Cordelia speak") does not.
@@ -388,7 +388,7 @@ def admit(phrases, line_text, names=()) -> list:
     deny = _DENY_HEADS | _FUNCTION_WORDS
     kept, taken = [], set()
     for raw in phrases or ():
-        words = _normalise(raw)
+        words = _normalize(raw)
         if not words or len(words) > MAX_PHRASE_WORDS:
             continue
         # A head with no letter ("bay 4" ends in "4") or a possessive head ("captain's") names no object.

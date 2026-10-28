@@ -363,7 +363,7 @@ LEAR = ("The two great princes, France and Burgundy, Great rivals in our younges
         "Long in our court have made their amorous sojourn.")
 
 
-def test_a_known_place_is_kept_though_it_is_capitalised_mid_sentence():
+def test_a_known_place_is_kept_though_it_is_capitalized_mid_sentence():
     assert A.admit(["France", "Burgundy", "court"], LEAR) == ["france", "burgundy", "court"]
 
 

@@ -26,7 +26,7 @@ module), which is tolerable for ONE kernel noun but would turn "during" into a m
 "there is no ledger" into a region here. A region is a stronger claim than a kernel clause, so this
 module also requires a whole-word mention and checks the few words before it for a bare negator.
 
-MASKS ARE GENERATED, NEVER PAINTED. One object: a soft centred ellipse. Two: left and right halves that
+MASKS ARE GENERATED, NEVER PAINTED. One object: a soft centered ellipse. Two: left and right halves that
 overlap at the seam. Three: thirds. The recipe this technique comes from drives its regions from a mask
 video; a static layout is enough for a first arm, and drifting masks are a later refinement.
 
@@ -45,7 +45,7 @@ SCENE_REGION_MAX_OBJECTS = 3
 SCENE_REGION_FEATHER = 0.12
 
 #: Layout names, by object count. Stamped into the receipt.
-SCENE_REGION_LAYOUTS = {1: "centre", 2: "halves", 3: "thirds"}
+SCENE_REGION_LAYOUTS = {1: "center", 2: "halves", 3: "thirds"}
 
 _CHARACTER_ROLE = "character_video"
 
@@ -192,8 +192,8 @@ def region_masks(count, width, height, feather=SCENE_REGION_FEATHER) -> list:
     ys = (np.arange(height, dtype=np.float32) + 0.5) / float(height)
     grid_x, grid_y = np.meshgrid(xs, ys)
 
-    if layout == "centre":
-        # An ellipse about the middle of the frame, a little below centre where a held object sits.
+    if layout == "center":
+        # An ellipse about the middle of the frame, a little below center where a held object sits.
         cx, cy, rx, ry = 0.5, 0.55, 0.30, 0.40
         dist = np.sqrt(((grid_x - cx) / rx) ** 2 + ((grid_y - cy) / ry) ** 2)
         edge = feather / rx

@@ -8,7 +8,7 @@ first version of the file, which is in git history.
 
 ## 0. What changed since the first version of this file
 
-1. The recipe's reference pictures ARE on this box, and they are not abstract colour fields. The first
+1. The recipe's reference pictures ARE on this box, and they are not abstract color fields. The first
    version said otherwise and was wrong (section 3).
 2. The operator's priority moved. Style is a light touch; what matters is that the objects, the place
    and the dramatic situation the beat's dialogue names are what is on screen. That reorders the
@@ -84,7 +84,7 @@ The converted graphs are `FaderFace\workflows\animatediff_lcm_part1.json` and `_
 local, paid originals and nothing from them is committed. At class level:
 
 - Part 1: an LCM community checkpoint (`photon-LCM`), the AnimateLCM motion module, cfg 1, three
-  IPAdapter Plus applications (one picture each, limited to a colour band of a mask), three sampler
+  IPAdapter Plus applications (one picture each, limited to a color band of a mask), three sampler
   passes at denoise 1.0 / 0.6 / 0.4 with a 4x model upscale between them.
 - Part 2: three ControlNets, background removal and REGIONAL TEXT CONDITIONING: an RGB mask is split
   into three region masks, each paired with its own text phrase, combined into the positive.
@@ -157,7 +157,7 @@ golden pins.
 
 ENGINE. In the encode stage, when the field is non-empty and the lane enables regions: keep the
 unchanged global positive (so the style cue and the kernel stay); add one `CLIPTextEncode` per object;
-build one mask per object in code (one object: a centred soft ellipse; two: left and right halves;
+build one mask per object in code (one object: a centered soft ellipse; two: left and right halves;
 three: thirds; feathered edges; static for now, drifting masks are the recipe's refinement and deferred);
 apply `ConditioningSetMask` (strength dial, default 1.0) and chain `ConditioningCombine`; the negative
 is untouched. Core node classes only. No object, no regions: the graph is byte-identical to the base
@@ -183,7 +183,7 @@ default changed.
 
 Paired replays on the canonical path (a fresh default-lane episode, frozen, replayed on the regions
 sibling: same story, voices, music, seeds and prompts), all published to `otr/obs`. Judged per beat on
-one question: is each object the dialogue names recognisable on screen, default versus regions.
+one question: is each object the dialogue names recognizable on screen, default versus regions.
 
 - video_art, haunted lane, three arms of one bundle (default, strength 2, strength 4), key objects hearth,
   ledger, floorboard. Default arm: none of the named objects on any beat. Regions at strength 2: floorboards
@@ -208,13 +208,64 @@ dial is high; (4) at cfg 1 the effect is weak. Levers not yet pulled, each a dec
 phrase ("a ledger book on a desk"), a pool source that includes the dialogue's own nouns (the ruling forbids
 it today), and a higher default dial.
 
+### 6B. The dialogue names the objects (2026-10-28, Jeffrey's call)
+
+Jeffrey's reading of 6A: "We need the prompts to talk about real objects so that it works. It has to adapt
+dialogue." Taken to mean the picture prompts, never the script. The 2026-09-03 ruling (the dialogue only
+RANKS the brief's key objects, never sources a noun) still governs every shipping lane and the kernel; it is
+relaxed only for the two opt-in lab lanes, and only through a door that keeps its safety property.
+
+Built and pushed in 33fc041d:
+
+- `ghost_scene_object_author.py` (pure). One short call, on the writer ShotLock already has loaded, asks which
+  physical things each character line names. The model only PICKS. A phrase is kept only if it is a
+  CONTIGUOUS run of the line's own words (one to four words, plural or singular), is not under a negator,
+  does not end in a placeholder or abstraction (thing, truth, time, story ...), is not a cast name, is not a
+  second mention of the same head word, and is one of at most three. A line that tells the model to invent
+  something can contribute only words it contains. Output room scales with the number of beats.
+- `otr_shot_lock`: the call happens inside the existing author, before the writer unloads, and only for a
+  character beat whose engine declares `wants_scene_regions`. The picks are stamped on the shot row as
+  `scene_objects` (declared, optional), carried into the cast-time preflight, and ride the frozen plan. A
+  replay spends nothing; a plan frozen before the field has none and falls back to the key-object pool.
+- `render_driver`: prefers the stamped objects, admitting them against the line and the cast a second time.
+
+Reviewed by Codex and Antigravity on the design (one round): both caught that a head-word check let an
+invented modifier through ("iron box" on "the iron gate"), that a fixed 320-token reply would truncate on a
+long episode, and that the preflight built a different request than the render. All fixed before the push.
+Refused: loading the writer on a replay (a replay must cost nothing).
+
+Because the objects are made at plan time, the overnight pairs from number 8 are FLIPPED: the episode is
+planned and rendered on the regions lane, frozen, then replayed on the default lane. Pairs 1-7 used the
+pool only and are not comparable. A consequence worth knowing: a replay never re-plans, so a bundle planned on
+a default lane and replayed on a regions lane still gets the pool objects. Dialogue objects exist only for
+episodes planned on a regions lane, which is how Jeffrey would run it from the dropdown anyway.
+
+What the first live pairs showed (video_art and recur_frac, haunted lane, strength 4):
+
+- Pair 8 (a train-car episode): the lines named a rail, a box and a crate. The rail is a clear win (the default arm
+  is the style's abstract burst; the regions arm shows tracks, a train and a platform), the crate is a clear
+  partial win (a wooden slatted box opens at the center), the box shows nothing. A line with only "this thing" got
+  no object, correctly.
+- Pair 10 (King Lear): "the map" reads as a map, and "France and Burgundy ... in our court" produced a palace,
+  a plaza and a wall of national flags, the strongest frames of the night. "Breath" showed nothing in either arm.
+- Four of the six beats that got an object show it on screen, against about one in fifteen for the pool-only
+  arm. That is two pairs and not a measurement; the next pairs and Jeffrey's eye decide.
+
+Three defects the live pairs and two reviews found, all fixed and pushed (33fc041d, ef5e0b1b, 5e4a8f71, 24ae6a59,
+588d4da6): a matcher that let invented modifiers, curly-apostrophe negations, cast names, list items and
+abstractions through; a parser that threw away a whole episode's picks for one oddly shaped value; and a place
+rule. Jeffrey's ruling on the last: keep a capitalized place such as France or Burgundy, refuse a capitalized
+person such as Cordelia. A mid-sentence capital is kept only when it is a known place, follows a word that puts it
+somewhere (in, at, near, inside, across ...), or follows "court of" and similar. "To" and "from" are not cues,
+because "give it to Cordelia" names a person.
+
 ## 7. Arm P: beat-matched real photographs at low weight
 
 A small bank of real photographs, public domain or CC0 only (NASA, Library of Congress, Smithsonian
 Open Access CC0, Wikimedia Commons marked PD or CC0), resized small, tagged by the concrete objects and
 places radio drama names (radio set, telephone, lamp, door, window, street at night, harbour, train,
 desk, letter, sea, hills ...). A manifest beside the images records for each: source URL, author,
-licence, tags, content hash. Never the recipe author's pictures. Selection: tag match against the
+license, tags, content hash. Never the recipe author's pictures. Selection: tag match against the
 beat's dialogue-named objects (same field as arm R); one picture per beat, unmasked; no match, no
 reference (baseline-equal). IPAdapter Plus weight low (sweep 0.3-0.5), `end_at` about 0.6 so the
 photograph steers the first part of the denoise only. Style is not carried by these pictures.

@@ -126,7 +126,7 @@ def test_two_pool_entries_for_the_same_thing_are_one_region():
     assert len(out["objects"]) == 1
 
 
-@pytest.mark.parametrize("count,layout", [(1, "centre"), (2, "halves"), (3, "thirds")])
+@pytest.mark.parametrize("count,layout", [(1, "center"), (2, "halves"), (3, "thirds")])
 def test_the_layout_follows_the_count(count, layout):
     assert R.region_layout_name(count) == layout
     masks = R.region_masks(count, 512, 288)
@@ -154,14 +154,14 @@ def test_halves_are_left_and_right_and_overlap_only_at_the_seam():
 def test_thirds_each_own_their_own_third():
     masks = R.region_masks(3, 510, 288)
     for index, mask in enumerate(masks):
-        centre = int((index + 0.5) * 510 / 3)
-        assert mask[:, centre].mean() > 0.95
+        center = int((index + 0.5) * 510 / 3)
+        assert mask[:, center].mean() > 0.95
         for other, other_mask in enumerate(masks):
             if other != index:
-                assert other_mask[:, centre].mean() < 0.05
+                assert other_mask[:, center].mean() < 0.05
 
 
-def test_the_centre_mask_is_strongest_in_the_middle_and_gone_at_the_corners():
+def test_the_center_mask_is_strongest_in_the_middle_and_gone_at_the_corners():
     (mask,) = R.region_masks(1, 512, 288)
     assert mask[160, 256] > 0.95
     assert mask[0, 0] < 0.01 and mask[-1, -1] < 0.01

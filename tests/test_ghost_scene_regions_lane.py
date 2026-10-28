@@ -229,7 +229,7 @@ def test_the_lab_receipt_and_identity_move_with_the_objects(lab_id):
     one = eng.sampler_inputs_for(_request(scene_objects=("a brass lamp",)))
     two = eng.sampler_inputs_for(_request(scene_objects=("a brass lamp", "a battered disc")))
     assert none["scene_regions"]["objects"] == [] and none["scene_regions"]["layout"] == ""
-    assert one["scene_regions"]["layout"] == "centre" and two["scene_regions"]["layout"] == "halves"
+    assert one["scene_regions"]["layout"] == "center" and two["scene_regions"]["layout"] == "halves"
     assert len({one["scene_regions"]["mask_sha8"], two["scene_regions"]["mask_sha8"]}) == 2
     ids = {eng.shot_cache_identity(_request(scene_objects=o))
            for o in ((), ("a brass lamp",), ("a brass lamp", "a battered disc"))}
