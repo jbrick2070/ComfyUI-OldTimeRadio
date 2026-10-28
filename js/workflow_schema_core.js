@@ -29,6 +29,9 @@ function refuse(reason, detail) {
  * a pack that is not installed, and that is the loader's business to report, not
  * ours to pre-empt.
  */
+/** The seed companion the frontend saves without a descriptor. */
+const COMPANION = "control_after_generate";
+
 export function liveWidgetNames(nodeType, lookup) {
     const input = lookup?.[nodeType]?.nodeData?.input;
     if (!input) return null;
@@ -50,6 +53,14 @@ export function liveWidgetNames(nodeType, lookup) {
             // `upload` widget, saved right after it (as core's LoadImage).
             if (opts && (opts.image_upload || opts.video_upload || opts.audio_upload)) {
                 names.push("upload");
+            }
+            // A seed declared with `control_after_generate` gets the frontend's
+            // fixed/increment/randomize companion, saved right after it with NO
+            // descriptor of its own: core's KSampler saves seven values for six
+            // declared inputs. Every graph with a KSampler was refused until
+            // this line existed (2026-10-27, loading a community AnimateDiff graph).
+            if (opts && opts.control_after_generate) {
+                names.push(COMPANION);
             }
         }
     }
@@ -202,16 +213,11 @@ function reconcileNode(node, lookup) {
 
     // THE 1:1 MAPPING IS CHECKED, NEVER ASSUMED. Every node in this pack's
     // canonical graph maps widget descriptors to saved values one for one
-    // (measured across all 21). A node carrying a seed-style companion value
-    // would not, and mapping it positionally would corrupt it -- so that refuses
-    // rather than guesses.
-    if (saved.length !== values.length) {
-        return refuse(
-            "value count does not match the saved widget names",
-            `${node.type}: ${saved.length} saved widget name(s) but ` +
-            `${values.length} value(s). This node cannot be reconciled by name.`);
-    }
-
+    // (measured across all 21). The one sanctioned exception is the seed
+    // companion: a seed widget's `control_after_generate` value is saved right
+    // after the seed with no descriptor, so the saved names are EXPANDED with
+    // it wherever this build declares one, and the count is checked against
+    // that. Anything else that does not line up refuses rather than guesses.
     const seen = new Set();
     for (const name of saved) {
         if (seen.has(name)) {
@@ -221,8 +227,25 @@ function reconcileNode(node, lookup) {
         seen.add(name);
     }
 
+    const owners = new Set(live.filter((n, i) => live[i + 1] === COMPANION));
+    const expanded = [];
+    for (const name of saved) {
+        expanded.push(name);
+        if (owners.has(name)) expanded.push(COMPANION);
+    }
+    if (expanded.length !== values.length) {
+        return refuse(
+            "value count does not match the saved widget names",
+            `${node.type}: ${expanded.length} saved widget name(s) but ` +
+            `${values.length} value(s). This node cannot be reconciled by name.`);
+    }
+
     const byName = new Map();
-    saved.forEach((name, i) => byName.set(name, values[i]));
+    const companionOf = new Map();          // seed widget name -> its companion value
+    expanded.forEach((name, i) => {
+        if (name === COMPANION) companionOf.set(expanded[i - 1], values[i]);
+        else byName.set(name, values[i]);
+    });
 
     const liveSet = new Set(live);
     const dropped = saved.filter((n) => !liveSet.has(n));
@@ -249,9 +272,16 @@ function reconcileNode(node, lookup) {
         (slot) => !(slot?.widget?.name && dropped.includes(slot.widget.name)));
     // Rebuilt in the order THIS build declares. A widget we declare that the
     // file does not carry is left out, for the node's own default to fill.
-    node.widgets_values = live
-        .filter((name) => byName.has(name))
-        .map((name) => byName.get(name));
+    const rebuilt = [];
+    live.forEach((name, i) => {
+        if (name === COMPANION) {
+            const owner = live[i - 1];
+            if (companionOf.has(owner)) rebuilt.push(companionOf.get(owner));
+        } else if (byName.has(name)) {
+            rebuilt.push(byName.get(name));
+        }
+    });
+    node.widgets_values = rebuilt;
 
     // KEEP `widgets_values_named` CONSISTENT IF THE FILE CARRIES IT. The
     // frontend writes this map on every save and, when `LiteGraph

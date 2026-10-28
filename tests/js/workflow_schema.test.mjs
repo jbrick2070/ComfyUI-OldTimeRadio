@@ -368,3 +368,35 @@ test("REFUSES duplicate node ids rather than repairing against the wrong node", 
     assert.equal(out.ok, false);
     assert.match(out.reason, /duplicate node id/i);
 });
+
+// --- the seed companion (2026-10-27) ------------------------------------------
+// The frontend saves a `control_after_generate` value right after every widget
+// declared with that option, with no descriptor of its own. Core's KSampler is
+// the everyday case: six declared inputs, seven saved values. Before this the
+// boundary refused every graph that contained one.
+
+test("a KSampler-shaped node with no names and the seed companion passes", () => {
+    declare("Sampler", ["steps"], { seed: ["INT", { control_after_generate: true }] });
+    const graph = { nodes: [{ id: 1, type: "Sampler", widgets_values: [10, 43, "fixed"] }], links: [] };
+    const before = structuredClone(graph);
+    const out = reconcile(graph);
+    assert.equal(out.ok, true, "seven-for-six is the frontend's own shape");
+    assert.deepEqual(graph, before);
+    const short = reconcile({ nodes: [{ id: 1, type: "Sampler", widgets_values: [10, 43] }], links: [] });
+    assert.equal(short.ok, false, "a seed without its companion still refuses");
+});
+
+test("a named seed widget carries its companion through a migration", () => {
+    declare("Sampler2", ["seed"], { steps: ["INT", {}] });
+    registry.Sampler2.nodeData.input.required.seed = ["INT", { control_after_generate: true }];
+    // Saved with a widget this build no longer has, so a migration runs.
+    const node = savedNode(1, "Sampler2", [["old", "x"], ["seed", 43], ["steps", 10]]);
+    node.widgets_values = ["x", 43, "randomize", 10];
+    const out = reconcile({ nodes: [node], links: [] });
+    assert.equal(out.ok, true);
+    assert.equal(out.changed, true);
+    const migrated = out.graph.nodes[0];
+    assert.deepEqual(migrated.widgets_values, [43, "randomize", 10],
+        "rebuilt in live order with the companion right after its seed");
+    assert.deepEqual(migrated.inputs.map((s) => s.widget?.name), ["seed", "steps"]);
+});
