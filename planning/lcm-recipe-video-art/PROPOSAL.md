@@ -159,7 +159,7 @@ ENGINE. In the encode stage, when the field is non-empty and the lane enables re
 unchanged global positive (so the style cue and the kernel stay); add one `CLIPTextEncode` per object;
 build one mask per object in code (one object: a centered soft ellipse; two: left and right halves;
 three: thirds; feathered edges; static for now, drifting masks are the recipe's refinement and deferred);
-apply `ConditioningSetMask` (strength dial, default 1.0) and chain `ConditioningCombine`; the negative
+apply `ConditioningSetMask` (strength dial; the shipped default is 4.0, see 6A and 6B) and chain `ConditioningCombine`; the negative
 is untouched. Core node classes only. No object, no regions: the graph is byte-identical to the base
 lane, which is what keeps the lab ids honest controls.
 
@@ -207,7 +207,8 @@ dialogue's own physical nouns are often not in the pool; (2) the region text is 
 "ledger" alone reads to the model as a crowd; (3) on abstract packs the style words dominate unless the
 dial is high; (4) at cfg 1 the effect is weak. Levers not yet pulled, each a decision: a richer region
 phrase ("a ledger book on a desk"), a pool source that includes the dialogue's own nouns (the ruling forbids
-it today), and a higher default dial.
+it today; since relaxed for the lab lanes, see 6B), and a higher default dial (since pulled: the default is
+now 4.0, Jeffrey's call).
 
 ### 6B. The dialogue names the objects (2026-10-28, Jeffrey's call)
 
@@ -378,9 +379,10 @@ legible, seams across context windows, render time, and the operator's eye.
   is wanted.
 - Photon-LCM's origin, or plain SD 1.5 for anything that ships (arm L only).
 - Any registry version bump for new downloads.
-- Added by the build (2026-10-28): the region strength default, settled by Jeffrey as 4.0 (the code default
-  now, as every overnight pair ran); whether to richen the region phrase; whether the dialogue's own nouns may ever become regions (today's
-  ruling says no, and it limits how often the arm can help); and whether the regions lanes, or any picture
+- Added by the build (2026-10-28): the region strength default, settled by Jeffrey as 4.0 (now the code
+  default; the dialogue-objects pairs from number 8 ran at 4.0); whether to richen the region phrase;
+  whether the dialogue's own nouns may become regions (settled for the lab lanes: they may, see 6B); and
+  whether the regions lanes, or any picture
   arm, should ever replace a shipping default, which is his eye's call on the published pairs in `otr/obs`.
 - Whether to build the picture-reference arm at all, and if so with minted pictures (Klein on the NVIDIA
   tiers, `sd15` on the Mac) or public-domain photographs.
