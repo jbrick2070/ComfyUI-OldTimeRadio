@@ -2796,10 +2796,11 @@ def _ghost_adapt_scene_objects(gen, beat_ids, lines, names) -> dict:
 
 
 def _scene_regions_lane(engine_id) -> bool:
-    """True when ``engine_id`` DECLARES ``wants_scene_regions`` (the opt-in scene-regions lab lanes).
+    """True when ``engine_id`` DECLARES ``wants_scene_regions`` (the haunted lane, since 2026-10-28).
 
-    A capability read, like :func:`_ghost_prompt_lane`; no shipping lane declares it, so for them
-    the dialogue-object step below never runs and plan-time work is unchanged.
+    A capability read, like :func:`_ghost_prompt_lane`; every lane that does not declare it (the
+    Mac's lightning lane and every non-AnimateDiff lane) skips the dialogue-object step below, so its
+    plan-time work is unchanged.
     """
     eid = str(engine_id or "")
     if not eid:

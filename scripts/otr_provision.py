@@ -1200,13 +1200,6 @@ _H3_LANES = {
 }
 _ANIMATEDIFF_ENGINES = {
     "animatediff15_v3_haunted_video",
-    # The still-in LAB PEER (2026-09-02) mints its own plate in-graph and
-    # consumes no dispatcher still, so it stays in the no-still set with its
-    # parent and never gates an 8 GB box on an image bundle.
-    "animatediff15_v3_stillin_lab_video",
-    # The SCENE-REGIONS peer of the haunted lane (2026-10-27) loads exactly the haunted lane's files,
-    # so it routes to the same fetch bundle and, through this set, to the no-still route.
-    "animatediff15_v3_haunted_regions_video",
     "animatediff15_v3_video",
     "animatediff15_v2_video",
     "animatediff15_video",
@@ -1244,9 +1237,6 @@ _NO_STILL_VIDEO_ENGINES = _ANIMATEDIFF_ENGINES | {
     # download for stills the engine declares it does not consume
     # (accepts_still = False). Two different questions, two memberships.
     "animatediff15_lightning_video",
-    # Its scene-regions peer (2026-10-27) is the same case for the same reason: it loads the
-    # lightning lane's files, so it is routed to the lightning bundle below and named here too.
-    "animatediff15_lightning_regions_video",
     "viz_camera",
     "viz_green",
     "viz_mxc_cpu",
@@ -1405,8 +1395,7 @@ def lane_for_engine(engine: str, kind: str, *, low_vram: bool = False):
             return Lane(_LTX25_NATIVE_LANES[engine], False)
         if engine in ("ltx_8gb", "razzle_ltx_8gb"):
             return Lane("ltx_8gb", False)
-        if engine in ("animatediff15_lightning_video",
-                      "animatediff15_lightning_regions_video"):
+        if engine == "animatediff15_lightning_video":
             # BEFORE the _ANIMATEDIFF_ENGINES branch and deliberately NOT in
             # that set: every id in it routes to "haunted", which fetches the
             # v3 module + v3 adapter. This lane loads neither. Adding it to the

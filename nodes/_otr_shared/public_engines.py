@@ -189,6 +189,14 @@ RETIRED_ENGINE_IDS = frozenset({
     # 2026-10-14: retire it; google_omni_video (gemini-omni-1.1-flash) covers
     # text-to-video on the same key.
     "google_veo_video",
+    # The three AnimateDiff LAB ids (operator, 2026-10-28: "ship regions so we
+    # have two animatediff", the haunted lane with regions on CUDA and the
+    # lightning lane on the Mac). Regions now ship inside
+    # animatediff15_v3_haunted_video itself. Each id was registered, so it sat
+    # in every dropdown and a lab bundle may name it: NAMED tombstones.
+    "animatediff15_v3_haunted_regions_video",
+    "animatediff15_lightning_regions_video",
+    "animatediff15_v3_stillin_lab_video",
 })
 
 

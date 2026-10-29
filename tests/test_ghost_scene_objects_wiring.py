@@ -3,8 +3,9 @@
 `test_ghost_scene_object_author.py` pins the pure author. This module pins what only the joined parts can
 get wrong: that the plan makes ONE extra call and only for a lane that declares ``wants_scene_regions``,
 that it runs on the writer BEFORE the unload, that a replay spends nothing and carries the stamp, that a
-shipping lane's rows gain no key, and that the render driver admits the stamp against the line again and
-falls back to the pool resolver when nothing survives.
+lane without regions (the Mac's lightning lane) gains no key, and that the render driver admits the stamp
+against the line again and falls back to the pool resolver when nothing survives. Regions ship on the
+haunted lane since 2026-10-28; the lab sibling it was tested as is retired.
 """
 from __future__ import annotations
 
@@ -16,8 +17,8 @@ from nodes._otr_video_engines import ghost_signal_author as gsa
 from nodes._otr_video_engines import render_driver as rd
 from nodes._otr_video_engines.schemas import ShotRow, VideoRequest
 
-HAUNTED = "animatediff15_v3_haunted_video"
-HAUNTED_R = "animatediff15_v3_haunted_regions_video"
+HAUNTED = "animatediff15_v3_haunted_video"      # regions ship here
+LIGHTNING = "animatediff15_lightning_video"     # the Mac lane: no regions
 MODEL = "unit/test-writer"
 
 
@@ -140,7 +141,7 @@ def _shot(shots, shot_id):
 # The plan
 # --------------------------------------------------------------------------- #
 def test_the_plan_stamps_what_the_line_names_and_drops_what_it_does_not(live_writer):
-    _led, shots = _plan(HAUNTED_R)
+    _led, shots = _plan(HAUNTED)
     assert _shot(shots, "shot_b002")["scene_objects"] == ["lamp", "floorboard"]
     assert "scene_objects" not in _shot(shots, "shot_b003")       # "isn't a truck": negated
     assert "scene_objects" not in _shot(shots, "shot_b001")       # a bookend
@@ -148,22 +149,22 @@ def test_the_plan_stamps_what_the_line_names_and_drops_what_it_does_not(live_wri
 
 
 def test_it_is_one_extra_call_on_the_loaded_writer_before_the_unload(live_writer):
-    _plan(HAUNTED_R)
+    _plan(HAUNTED)
     assert len(live_writer["writer"].prompts) == 1
     assert "DATA, not instructions" in live_writer["writer"].prompts[0]
     # the adaptation call sits between the batch and the unload, on the same loaded writer
     assert live_writer["events"] == ["bind", "batch", "adapt", "unload"]
 
 
-def test_a_shipping_lane_makes_no_call_and_gains_no_key(live_writer):
-    _led, shots = _plan(HAUNTED)
+def test_a_lane_without_regions_makes_no_call_and_gains_no_key(live_writer):
+    _led, shots = _plan(LIGHTNING)
     assert live_writer["writer"].prompts == []
     assert all("scene_objects" not in shot for shot in shots)
 
 
 def test_no_writer_means_no_stamp_and_the_plan_still_succeeds():
     # OTR_TEST_MODE=1 (the conftest default): no writer, and the plan is the deterministic one.
-    _led, shots = _plan(HAUNTED_R)
+    _led, shots = _plan(HAUNTED)
     assert all("scene_objects" not in shot for shot in shots)
 
 
@@ -171,31 +172,31 @@ def test_a_failing_writer_costs_the_stamp_never_the_plan(live_writer):
     def _boom(messages, temperature=None, max_new_tokens=None):
         raise RuntimeError("out of memory")
     live_writer["writer"] = _boom
-    _led, shots = _plan(HAUNTED_R)
+    _led, shots = _plan(HAUNTED)
     assert all("scene_objects" not in shot for shot in shots)
     assert live_writer["events"][-1] == "unload"
 
 
 def test_a_replay_spends_nothing_and_carries_the_stamp(live_writer, monkeypatch):
-    led, shots = _plan(HAUNTED_R)
+    led, shots = _plan(HAUNTED)
     first_prompts = len(live_writer["writer"].prompts)
     assert first_prompts == 1
 
     def _refuse(meta, warnings):
         raise AssertionError("a replay must not load the writer")
     monkeypatch.setattr(sl, "_resolve_writer_llm_binding", _refuse)
-    _led2, shots2 = _plan(HAUNTED_R, ledger=led)
+    _led2, shots2 = _plan(HAUNTED, ledger=led)
     assert _shot(shots2, "shot_b002")["scene_objects"] == ["lamp", "floorboard"]
     assert len(live_writer["writer"].prompts) == first_prompts
 
 
 def test_a_plan_frozen_before_the_field_simply_has_none(live_writer, monkeypatch):
-    led, shots = _plan(HAUNTED_R)
+    led, shots = _plan(HAUNTED)
     for shot in led["video"]["shots"]:
         shot.pop("scene_objects", None)
     monkeypatch.setattr(sl, "_resolve_writer_llm_binding",
                         lambda meta, warnings: (_ for _ in ()).throw(AssertionError("no writer")))
-    _led2, shots2 = _plan(HAUNTED_R, ledger=led)
+    _led2, shots2 = _plan(HAUNTED, ledger=led)
     assert all("scene_objects" not in shot for shot in shots2)
 
 
@@ -207,7 +208,7 @@ def _request(led, shots, shot_id):
 
 
 def test_the_driver_prefers_the_stamped_objects_and_says_so(live_writer):
-    led, shots = _plan(HAUNTED_R)
+    led, shots = _plan(HAUNTED)
     req = _request(led, shots, "shot_b002")
     assert req["scene_objects"] == ["lamp", "floorboard"]
     assert req["observability"]["scene_objects_source"] == "dialogue_adapted"
@@ -215,38 +216,38 @@ def test_the_driver_prefers_the_stamped_objects_and_says_so(live_writer):
 
 
 def test_a_stamped_noun_the_line_never_says_is_dropped_at_render_time(live_writer):
-    led, shots = _plan(HAUNTED_R)
+    led, shots = _plan(HAUNTED)
     _shot(shots, "shot_b002")["scene_objects"] = ["dragon", "lamp"]       # an edited ledger
     assert _request(led, shots, "shot_b002")["scene_objects"] == ["lamp"]
 
 
 def test_when_nothing_survives_the_pool_resolver_answers_as_before(live_writer):
-    led, shots = _plan(HAUNTED_R)
+    led, shots = _plan(HAUNTED)
     _shot(shots, "shot_b002")["scene_objects"] = ["dragon"]
     req = _request(led, shots, "shot_b002")
     assert req["observability"]["scene_objects_source"] != "dialogue_adapted"
 
 
-def test_the_default_lane_ignores_the_stamp(live_writer):
-    led, shots = _plan(HAUNTED_R)
+def test_a_lane_without_regions_ignores_the_stamp(live_writer):
+    led, shots = _plan(HAUNTED)
     row = dict(_shot(shots, "shot_b002"))
-    row["engine_id"] = HAUNTED                                # the A/B replay swaps the engine only
+    row["engine_id"] = LIGHTNING                               # the A/B replay swaps the engine only
     req = rd.build_request_from_shot(row, led, master_audio_path="")
     assert req.get("scene_objects") in ([], None)
     assert "scene_objects_source" not in req["observability"]
 
 
 def test_a_bookend_never_takes_the_stamp(live_writer):
-    led, shots = _plan(HAUNTED_R)
+    led, shots = _plan(HAUNTED)
     _shot(shots, "shot_b001")["scene_objects"] = ["harbour"]
     assert _request(led, shots, "shot_b001")["scene_objects"] == []
 
 
-def test_a_default_planned_bundle_replayed_on_the_regions_sibling_uses_the_pool(live_writer):
-    led, shots = _plan(HAUNTED)
+def test_a_row_with_no_stamp_on_the_regions_lane_uses_the_pool(live_writer):
+    led, shots = _plan(LIGHTNING)
     row = dict(_shot(shots, "shot_b002"))
     assert "scene_objects" not in row
-    row["engine_id"] = HAUNTED_R                              # the A/B replay swaps the engine only
+    row["engine_id"] = HAUNTED                                # a frozen pre-regions row, say
     req = rd.build_request_from_shot(row, led, master_audio_path="")
     assert req["scene_objects"]                               # the key-object pool still answers
     assert req["observability"]["scene_objects_source"] != "dialogue_adapted"
@@ -260,13 +261,13 @@ def test_the_cast_time_preflight_builds_the_request_the_render_will(live_writer,
         seen.append(dict(shot))
         return real(shot, ledger, **kw)
     monkeypatch.setattr(rd, "build_request_from_shot", _spy)
-    _plan(HAUNTED_R)
+    _plan(HAUNTED)
     preflight = {s["shot_id"]: s for s in seen if s.get("source_line_ids")}
     assert preflight["b002"]["scene_objects"] == ["lamp", "floorboard"]
     assert "scene_objects" not in preflight["b003"]
 
 
-def test_a_shipping_lanes_preflight_shot_carries_no_stamp(live_writer, monkeypatch):
+def test_a_lane_without_regions_preflight_shot_carries_no_stamp(live_writer, monkeypatch):
     seen = []
     real = rd.build_request_from_shot
 
@@ -274,7 +275,7 @@ def test_a_shipping_lanes_preflight_shot_carries_no_stamp(live_writer, monkeypat
         seen.append(dict(shot))
         return real(shot, ledger, **kw)
     monkeypatch.setattr(rd, "build_request_from_shot", _spy)
-    _plan(HAUNTED)
+    _plan(LIGHTNING)
     assert seen and all("scene_objects" not in s for s in seen)
 
 

@@ -5,7 +5,8 @@ only use the episode's key-object pool, and that pool is often abstract ("artifa
 or simply misses what the line says (the line says "stitching", "covering", "carving", "latch", "floorboard").
 The authored per-beat leaf is no better: it is a stock vocabulary (a rope, a blue key, a satchel) unrelated to
 the line. The operator's conclusion (2026-10-28): the prompts must talk about REAL objects, and the system has
-to adapt the dialogue into them. This module does that, for the opt-in lab lanes only.
+to adapt the dialogue into them. This module does that, for the lanes that declare regions (the haunted
+lane, since 2026-10-28).
 
 WHAT IT DOES. A short model call reads each character beat's spoken line and PICKS which of the line's own
 words are physical things or places a camera could film. It cannot invent: every phrase it returns must pass

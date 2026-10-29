@@ -243,14 +243,6 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
-# The still-in LAB PEER (campaign item 2, 2026-09-02) subclasses the haunted
-# lane, so it imports after it and, like every sibling, before the roster
-# audit below. A lab id: never a default, never in a shipping profile.
-try:  # pragma: no cover - trivial guard
-    from . import eng_ghost_signal_stillin_lab as _eng_ghost_signal_stillin_lab  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
-
 # The LIGHTNING SPEED PEER (2026-09-08) subclasses the GOLDEN base rather than
 # either v3 lane -- ByteDance's own ComfyUI workflow carries no domain adapter,
 # so composing the v3-paired adapter with a non-v3 distilled module would be an
@@ -260,13 +252,6 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
-# The SCENE-REGIONS LAB PEERS (2026-10-27) subclass the haunted and lightning lanes, so they import
-# after both and, like every sibling, before the roster audit below. Lab ids: never a default, never in
-# a shipping profile.
-try:  # pragma: no cover - trivial guard
-    from . import eng_ghost_signal_regions as _eng_ghost_signal_regions  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
 
 
 # ---------------------------------------------------------------------------

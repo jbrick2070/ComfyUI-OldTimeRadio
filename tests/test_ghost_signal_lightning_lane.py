@@ -324,8 +324,7 @@ def test_the_golden_base_is_untouched():
 def test_the_two_shipping_siblings_are_untouched():
     """The lanes an operator can actually SELECT keep every recipe cell they
     had. Nothing about this lane reaches them."""
-    for name in ("animatediff15_v3_haunted_video",
-                 "animatediff15_v3_stillin_lab_video"):
+    for name in ("animatediff15_v3_haunted_video",):
         peer = vreg.get_engine(name)
         assert peer.motion_module_name == "v3_sd15_mm.ckpt"
         assert (peer.steps, peer.cfg) == (20, 8.0)
@@ -541,8 +540,7 @@ def test_the_siblings_did_not_opt_in_and_are_byte_identical():
     default is False so they are untouched; flipping it for them is an operator
     decision backed by a 5080 comparison, not a driver one."""
     assert gs.GhostSignalEngine.align_source_to_context_window is False
-    for name in ("animatediff15_v3_haunted_video",
-                 "animatediff15_v3_stillin_lab_video"):
+    for name in ("animatediff15_v3_haunted_video",):
         peer = vreg.get_engine(name)
         assert peer.align_source_to_context_window is False
         # The exact number they asked for before the seam existed.
@@ -616,8 +614,7 @@ def test_the_siblings_still_decode_with_the_checkpoints_own_vae():
     bind `ckpt_out[2]` exactly as they always did."""
     assert gs.GhostSignalEngine.vae_name is None
     assert gs.GhostSignalEngine.vae_min_bytes == 0
-    for name in ("animatediff15_v3_haunted_video",
-                 "animatediff15_v3_stillin_lab_video"):
+    for name in ("animatediff15_v3_haunted_video",):
         peer = vreg.get_engine(name)
         assert peer.vae_name is None
         assert peer._vae_path() is None, "a lane with no name is never asked"
@@ -901,8 +898,7 @@ def test_hold_is_resolved_per_beat_and_not_stored_on_the_instance(eng, monkeypat
 def test_the_published_lanes_never_adapt():
     """CLAUDE.md 0B. Their cadence is frozen at whatever made their episodes."""
     assert gs.GhostSignalEngine.adaptive_hold_for_memory is False
-    for name in ("animatediff15_v3_haunted_video",
-                 "animatediff15_v3_stillin_lab_video"):
+    for name in ("animatediff15_v3_haunted_video",):
         peer = vreg.get_engine(name)
         assert peer.adaptive_hold_for_memory is False
         # the fatal beat still resolves to their frozen hold, unchanged
@@ -1050,8 +1046,7 @@ def test_the_published_lanes_cache_key_never_raises(monkeypatch):
     req = {"shot_id": "s1", "text_prompt": "x", "negative_prompt": "y",
            "timing": {"target_frame_count": 320},
            "seed_bundle": {"request_seed": 42}}
-    for name in ("animatediff15_v3_haunted_video",
-                 "animatediff15_v3_stillin_lab_video"):
+    for name in ("animatediff15_v3_haunted_video",):
         assert vreg.get_engine(name).shot_cache_identity(req)
 
 

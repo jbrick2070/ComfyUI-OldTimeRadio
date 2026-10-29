@@ -1,16 +1,18 @@
-"""The scene-regions lab peers: the graph proven by execution, and the contract that keeps every other lane unchanged.
+"""Scene regions on the shipped haunted lane: the graph proven by execution, and the Mac lane left alone.
 
-Executes the haunted-regions engine's ``render_clip`` against recorded fake node classes (the haunted
-file's method: a source grep cannot tell a branch that runs from one that does not) and pins:
+Regions shipped inside ``animatediff15_v3_haunted_video`` on 2026-10-28 (operator: "ship regions so we
+have two animatediff"); the three lab ids are retired. Executes the haunted engine's ``render_clip``
+against recorded fake node classes (a source grep cannot tell a branch that runs from one that does not)
+and pins:
 
-* both lab ids are Ghost siblings of their parents (family, roles, prompt profile, frame contract, canvas,
-  artifacts), which is what lets a frozen bundle replay on them;
+* the haunted lane declares regions and the Mac's lightning lane does not; the lab ids are retired;
 * with objects, one text encode, one ``ConditioningSetMask`` bound to a generated mask and one
   ``ConditioningCombine`` are added per object on top of the UNCHANGED global positive, and the sampler
-  receives the final combined conditioning; with none, the encode graph is the parent's, call for call;
-* a parent lane never reads the field, never resolves a region class and never gains a receipt key;
+  receives the final combined conditioning; with none, the encode graph is the pre-regions one, call
+  for call;
+* the lightning lane never reads the field, never resolves a region class and never gains a receipt key;
 * the receipt and the identity tuple move with the objects, the layout and the strength;
-* the driver fills ``scene_objects`` for an opted-in engine only, from the episode's own key-object pool.
+* the driver fills ``scene_objects`` for the haunted lane only, from the episode's own key-object pool.
 """
 from __future__ import annotations
 
@@ -28,11 +30,10 @@ from nodes._otr_video_engines import render_driver as rd
 from nodes._otr_video_engines import wrapper_bridge as wb
 from nodes._otr_video_engines.schemas import VideoRequest
 
-HAUNTED = "animatediff15_v3_haunted_video"
-HAUNTED_R = "animatediff15_v3_haunted_regions_video"
-LIGHTNING = "animatediff15_lightning_video"
-LIGHTNING_R = "animatediff15_lightning_regions_video"
-PAIRS = [(HAUNTED, HAUNTED_R), (LIGHTNING, LIGHTNING_R)]
+HAUNTED = "animatediff15_v3_haunted_video"      # regions ship here
+LIGHTNING = "animatediff15_lightning_video"     # the Mac lane: no regions
+RETIRED_LAB_IDS = ("animatediff15_v3_haunted_regions_video", "animatediff15_lightning_regions_video",
+                   "animatediff15_v3_stillin_lab_video")
 
 
 class _Patcher:
@@ -132,52 +133,42 @@ def _render(monkeypatch, engine_id, **req_kw):
 
 
 # --------------------------------------------------------------------------- #
-# Registration: siblings, and the parents untouched
+# Registration: regions on the haunted lane, none on lightning, the lab ids retired
 # --------------------------------------------------------------------------- #
-@pytest.mark.parametrize("parent_id,lab_id", PAIRS)
-def test_each_lab_id_is_a_ghost_sibling_of_its_parent(parent_id, lab_id):
-    parent, lab = vreg.get_engine(parent_id), vreg.get_engine(lab_id)
-    assert isinstance(lab, type(parent))
-    assert lab.wants_scene_regions is True and parent.wants_scene_regions is False
-    assert lab.recipe_receipt_id != parent.recipe_receipt_id
-    for attr in ("family", "roles", "prompt_profile", "frame_contract", "accepts_still",
-                 "required_inputs", "still_plan", "subject_ownership", "lora_name", "vae_name",
-                 "render_canvas", "hold_factor", "steps", "cfg", "sampler_name", "scheduler",
-                 "motion_module_name"):
-        assert getattr(lab, attr) == getattr(parent, attr), attr
-    assert lab.default_roles == ()
-    assert lab.render_canvas == (512, 288)       # the G2.2 pin for both lab ids
+def test_the_haunted_lane_wants_regions_and_lightning_does_not():
+    assert vreg.get_engine(HAUNTED).wants_scene_regions is True
+    assert vreg.get_engine(LIGHTNING).wants_scene_regions is False
+    assert vreg.get_engine(HAUNTED).recipe_receipt_id == (
+        "animatediff_sd15_v3_haunted_regions_static16_512x288_v1")
 
 
-@pytest.mark.parametrize("parent_id,lab_id", PAIRS)
-def test_only_the_lab_id_resolves_the_two_core_region_classes(parent_id, lab_id):
-    parent, lab = vreg.get_engine(parent_id), vreg.get_engine(lab_id)
-    assert "cond_mask" not in parent._node_candidates()
-    assert "cond_combine" not in parent._node_candidates()
-    extra = set(lab._node_candidates()) - set(parent._node_candidates())
-    assert extra == {"cond_mask", "cond_combine"}
-    assert lab._node_candidates()["cond_mask"] == ("ConditioningSetMask",)
-    assert lab._node_candidates()["cond_combine"] == ("ConditioningCombine",)
+@pytest.mark.parametrize("lab_id", RETIRED_LAB_IDS)
+def test_the_lab_ids_are_retired_not_registered(lab_id):
+    from nodes._otr_shared.public_engines import RETIRED_ENGINE_IDS
+    assert lab_id in RETIRED_ENGINE_IDS
+    assert not vreg.is_registered(lab_id)
 
 
-@pytest.mark.parametrize("parent_id,lab_id", PAIRS)
-def test_the_lab_ids_load_their_parents_weights_and_nothing_else(parent_id, lab_id):
-    parent, lab = vreg.get_engine(parent_id), vreg.get_engine(lab_id)
-    assert lab._weight_tokens() == parent._weight_tokens()
+def test_only_the_haunted_lane_resolves_the_two_core_region_classes():
+    haunted, lightning = vreg.get_engine(HAUNTED), vreg.get_engine(LIGHTNING)
+    assert haunted._node_candidates()["cond_mask"] == ("ConditioningSetMask",)
+    assert haunted._node_candidates()["cond_combine"] == ("ConditioningCombine",)
+    assert "cond_mask" not in lightning._node_candidates()
+    assert "cond_combine" not in lightning._node_candidates()
 
 
 # --------------------------------------------------------------------------- #
 # The graph, proven by execution
 # --------------------------------------------------------------------------- #
 def test_with_no_objects_the_encode_graph_is_the_parents_call_for_call(monkeypatch):
-    rec, _eng, _raw = _render(monkeypatch, HAUNTED_R, scene_objects=())
+    rec, _eng, _raw = _render(monkeypatch, HAUNTED, scene_objects=())
     tags = [name for name, _ in rec.calls]
     assert tags.count("text_encode") == 2
     assert tags.count("cond_mask") == 0 and tags.count("cond_combine") == 0
 
 
 def test_each_object_adds_a_text_a_mask_and_a_combine_on_top_of_the_global_positive(monkeypatch):
-    rec, eng, _raw = _render(monkeypatch, HAUNTED_R, scene_objects=("a brass lamp", "a battered disc"))
+    rec, eng, _raw = _render(monkeypatch, HAUNTED, scene_objects=("a brass lamp", "a battered disc"))
     tags = [name for name, _ in rec.calls]
     assert tags.count("text_encode") == 4          # global positive, negative, two objects
     assert tags.count("cond_mask") == 2 and tags.count("cond_combine") == 2
@@ -195,7 +186,7 @@ def test_each_object_adds_a_text_a_mask_and_a_combine_on_top_of_the_global_posit
 
 
 def test_the_sampler_receives_the_final_combined_conditioning_not_the_global_one(monkeypatch):
-    rec, _eng, _raw = _render(monkeypatch, HAUNTED_R, scene_objects=("a brass lamp", "a battered disc"))
+    rec, _eng, _raw = _render(monkeypatch, HAUNTED, scene_objects=("a brass lamp", "a battered disc"))
     sampler = [kw for name, kw in rec.calls if name == "sampler"][0]
     positive = sampler["positive"]
     assert positive[0] == "joined"                       # the last combine, two deep
@@ -206,25 +197,16 @@ def test_the_sampler_receives_the_final_combined_conditioning_not_the_global_one
     assert sampler["negative"][0][1].startswith("text, watermark")
 
 
-def test_a_parent_lane_ignores_the_field_entirely(monkeypatch):
-    rec, _eng, _raw = _render(monkeypatch, HAUNTED, scene_objects=("a brass lamp", "a battered disc"))
-    tags = [name for name, _ in rec.calls]
-    assert tags.count("text_encode") == 2
-    assert "cond_mask" not in tags and "cond_combine" not in tags
-
-
-@pytest.mark.parametrize("parent_id", [HAUNTED, LIGHTNING])
-def test_a_parent_receipt_gains_no_key_and_its_identity_keeps_its_shape(parent_id):
-    eng = vreg.get_engine(parent_id)
+def test_the_lightning_lane_receipt_gains_no_key_and_its_identity_keeps_its_shape():
+    eng = vreg.get_engine(LIGHTNING)
     req = _request(scene_objects=("a brass lamp",))
     assert "scene_regions" not in eng.sampler_inputs_for(req)
     assert "scene_objects" not in eng._build_render_request(req)
     assert not any(str(part).startswith("regions:") for part in eng.shot_cache_identity(req))
 
 
-@pytest.mark.parametrize("lab_id", [HAUNTED_R, LIGHTNING_R])
-def test_the_lab_receipt_and_identity_move_with_the_objects(lab_id):
-    eng = vreg.get_engine(lab_id)
+def test_the_haunted_receipt_and_identity_move_with_the_objects():
+    eng = vreg.get_engine(HAUNTED)
     none = eng.sampler_inputs_for(_request(scene_objects=()))
     one = eng.sampler_inputs_for(_request(scene_objects=("a brass lamp",)))
     two = eng.sampler_inputs_for(_request(scene_objects=("a brass lamp", "a battered disc")))
@@ -237,7 +219,7 @@ def test_the_lab_receipt_and_identity_move_with_the_objects(lab_id):
 
 
 def test_the_strength_dial_is_read_from_the_environment_and_a_bad_value_falls_back(monkeypatch):
-    eng = vreg.get_engine(HAUNTED_R)
+    eng = vreg.get_engine(HAUNTED)
     monkeypatch.delenv(gs.SCENE_REGION_STRENGTH_ENV, raising=False)
     assert eng._scene_region_strength() == gs.SCENE_REGION_STRENGTH_DEFAULT
     monkeypatch.setenv(gs.SCENE_REGION_STRENGTH_ENV, "3.5")
@@ -246,12 +228,12 @@ def test_the_strength_dial_is_read_from_the_environment_and_a_bad_value_falls_ba
         monkeypatch.setenv(gs.SCENE_REGION_STRENGTH_ENV, bad)
         assert eng._scene_region_strength() == gs.SCENE_REGION_STRENGTH_DEFAULT, bad
     monkeypatch.setenv(gs.SCENE_REGION_STRENGTH_ENV, "3.5")
-    assert vreg.get_engine(HAUNTED_R).sampler_inputs_for(
+    assert vreg.get_engine(HAUNTED).sampler_inputs_for(
         _request(scene_objects=("a brass lamp",)))["scene_regions"]["strength"] == 3.5
 
 
-@pytest.mark.parametrize("engine_id", [HAUNTED, HAUNTED_R])
-def test_the_encode_externals_are_cleared_so_they_cannot_pin_the_clip_handle(monkeypatch, engine_id):
+@pytest.mark.parametrize("scene_objects", [(), ("a brass lamp",)])
+def test_the_encode_externals_are_cleared_so_they_cannot_pin_the_clip_handle(monkeypatch, scene_objects):
     seen = []
     real = wb.run_graph
 
@@ -262,14 +244,14 @@ def test_the_encode_externals_are_cleared_so_they_cannot_pin_the_clip_handle(mon
         return real(graph, *args, **kwargs)
 
     monkeypatch.setattr(wb, "run_graph", spy)
-    _render(monkeypatch, engine_id, scene_objects=("a brass lamp",))
+    _render(monkeypatch, HAUNTED, scene_objects=scene_objects)
     assert seen, "the encode call was not observed"
     assert all(not d for d in seen)
 
 
 def test_the_phrase_dial_wraps_each_object_and_leaves_the_global_prompt_alone(monkeypatch):
     monkeypatch.setenv(gs.SCENE_REGION_PHRASE_ENV, "a close photograph of {object}")
-    rec, eng, _raw = _render(monkeypatch, HAUNTED_R, scene_objects=("a brass lamp", "a battered disc"))
+    rec, eng, _raw = _render(monkeypatch, HAUNTED, scene_objects=("a brass lamp", "a battered disc"))
     texts = [kw["text"] for name, kw in rec.calls if name == "text_encode"]
     assert "a close photograph of a brass lamp" in texts
     assert "a close photograph of a battered disc" in texts
@@ -280,14 +262,14 @@ def test_the_phrase_dial_wraps_each_object_and_leaves_the_global_prompt_alone(mo
 
 def test_the_default_phrase_is_the_object_alone(monkeypatch):
     monkeypatch.delenv(gs.SCENE_REGION_PHRASE_ENV, raising=False)
-    eng = vreg.get_engine(HAUNTED_R)
+    eng = vreg.get_engine(HAUNTED)
     assert eng._scene_region_phrase("a brass lamp") == "a brass lamp"
 
 
 @pytest.mark.parametrize("bad", ["no placeholder here", "{object} and {object}", "x" * 130 + " {object}"])
 def test_an_unusable_phrase_template_lands_on_the_default(monkeypatch, bad):
     monkeypatch.setenv(gs.SCENE_REGION_PHRASE_ENV, bad)
-    eng = vreg.get_engine(HAUNTED_R)
+    eng = vreg.get_engine(HAUNTED)
     assert eng._scene_region_phrase("a brass lamp") == "a brass lamp"
 
 
@@ -297,14 +279,13 @@ def test_the_strength_default_is_four_and_the_range_is_unchanged():
     assert gs.SCENE_REGION_STRENGTH_MIN <= gs.SCENE_REGION_STRENGTH_DEFAULT <= gs.SCENE_REGION_STRENGTH_MAX
 
 
-def test_with_no_dial_set_the_lab_lanes_use_four(monkeypatch):
+def test_with_no_dial_set_the_haunted_lane_uses_four(monkeypatch):
     monkeypatch.delenv(gs.SCENE_REGION_STRENGTH_ENV, raising=False)
-    for lane in (HAUNTED_R, LIGHTNING_R):
-        assert vreg.get_engine(lane)._scene_region_strength() == 4.0
+    assert vreg.get_engine(HAUNTED)._scene_region_strength() == 4.0
 
 
 def test_the_identity_moves_with_the_phrase(monkeypatch):
-    eng = vreg.get_engine(HAUNTED_R)
+    eng = vreg.get_engine(HAUNTED)
     monkeypatch.delenv(gs.SCENE_REGION_PHRASE_ENV, raising=False)
     plain = eng.shot_cache_identity(_request(scene_objects=("a brass lamp",)))
     monkeypatch.setenv(gs.SCENE_REGION_PHRASE_ENV, "a photograph of {object}")
@@ -312,13 +293,13 @@ def test_the_identity_moves_with_the_phrase(monkeypatch):
 
 
 def test_more_than_three_objects_are_cut_to_three(monkeypatch):
-    eng = vreg.get_engine(HAUNTED_R)
+    eng = vreg.get_engine(HAUNTED)
     plan = eng._build_render_request(_request(scene_objects=("a", "b", "c", "d", "e")))
     assert plan["scene_objects"] == ("a", "b", "c")
 
 
 # --------------------------------------------------------------------------- #
-# The driver fills the field for an opted-in engine only
+# The driver fills the field for the haunted lane only
 # --------------------------------------------------------------------------- #
 def _ledger():
     return {
@@ -378,8 +359,8 @@ def _shot(shots, shot_id):
     raise AssertionError(shot_id)
 
 
-def test_the_driver_fills_scene_objects_for_the_lab_engine_from_the_pool_the_beat_refers_to():
-    led, shots = _plan(HAUNTED_R)
+def test_the_driver_fills_scene_objects_for_the_haunted_lane_from_the_pool_the_beat_refers_to():
+    led, shots = _plan(HAUNTED)
     req = rd.build_request_from_shot(_shot(shots, "shot_b002"), led, master_audio_path="")
     assert set(req["scene_objects"]) == {"a brass lamp", "a battered disc"}
     assert req["observability"]["scene_objects_source"]
@@ -387,15 +368,15 @@ def test_the_driver_fills_scene_objects_for_the_lab_engine_from_the_pool_the_bea
 
 
 def test_a_negated_noun_and_a_bookend_get_nothing():
-    led, shots = _plan(HAUNTED_R)
+    led, shots = _plan(HAUNTED)
     negated = rd.build_request_from_shot(_shot(shots, "shot_b003"), led, master_audio_path="")
     assert "a coal truck" not in negated["scene_objects"]
     bookend = rd.build_request_from_shot(_shot(shots, "shot_b001"), led, master_audio_path="")
     assert bookend["scene_objects"] == []
 
 
-def test_the_driver_leaves_every_other_lane_untouched():
-    led, shots = _plan(HAUNTED)
+def test_the_driver_leaves_the_lightning_lane_untouched():
+    led, shots = _plan(LIGHTNING)
     req = rd.build_request_from_shot(_shot(shots, "shot_b002"), led, master_audio_path="")
     assert req.get("scene_objects") in ([], None)
     assert "scene_objects_source" not in req["observability"]

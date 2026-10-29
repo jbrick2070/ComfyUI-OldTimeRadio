@@ -618,8 +618,7 @@ def test_teardown_releases_the_lease_even_when_unload_raises(monkeypatch):
 # the REAL base prepare/teardown and the REAL lease code against an isolated
 # lock directory -- never the resident server's -- with the graph leaves faked.
 
-GHOST_LANES = ("animatediff15_v3_haunted_video", "animatediff15_lightning_video",
-               "animatediff15_v3_stillin_lab_video")
+GHOST_LANES = ("animatediff15_v3_haunted_video", "animatediff15_lightning_video")
 
 # Bound before any test patches the module: motion_common's ``_GR`` IS this
 # module, so a patch that called ``gpu_residency.acquire`` would call itself.

@@ -285,10 +285,7 @@ _ORDER = ["8 GB NVIDIA", "16 GB NVIDIA", "24 GB NVIDIA", "Apple Silicon (16 GB)"
 #: Re-derive both when an engine changes its graph or its weights repo.
 _EXTRA_INSTALL = {
     "animatediff15_v3_haunted_video": "ComfyUI-AnimateDiff-Evolved",
-    "animatediff15_v3_stillin_lab_video": "ComfyUI-AnimateDiff-Evolved",
     "animatediff15_lightning_video": "ComfyUI-AnimateDiff-Evolved",
-    "animatediff15_v3_haunted_regions_video": "ComfyUI-AnimateDiff-Evolved",
-    "animatediff15_lightning_regions_video": "ComfyUI-AnimateDiff-Evolved",
 }
 
 

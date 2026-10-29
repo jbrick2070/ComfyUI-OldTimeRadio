@@ -19,14 +19,6 @@
       },
       "size_gb": 3.8
     },
-    "animatediff15_v3_stillin_lab_video": {
-      "memory": {
-        "mac16": "oom",
-        "nv16": "fits",
-        "nv8": "fits"
-      },
-      "size_gb": 3.8
-    },
     "bark": {
       "memory": {
         "mac16": "oom",

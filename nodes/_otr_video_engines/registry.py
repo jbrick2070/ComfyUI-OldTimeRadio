@@ -597,8 +597,9 @@ CAPABILITIES = {
     # and preflight fails CLOSED on any one of them; the audio VAE is NOT listed,
     # because listing an asset this lane never loads would make the S5 wizard ask
     # for 0.6 GB nobody needs (it belongs to lane 20).
-    # THE ONE GHOST LANE (operator, 2026-08-23: "delete any animatediff that are
-    # not haunted"). SD1.5 + AnimateDiff-Evolved's official v3 module through the
+    # THE ONE GHOST LANE ON CUDA (operator, 2026-08-23: "delete any animatediff
+    # that are not haunted"; 2026-10-28: it ships with scene regions, and the
+    # lab ids still-in, haunted-regions and lightning-regions are retired). SD1.5 + AnimateDiff-Evolved's official v3 module through the
     # non-looped Standard Static context, plus the removable domain adapter that
     # gives the lane its degraded-transmission look. cuda, no vendor gate, no
     # sidecar, no toolchain. BOTH fp rows are False and that is the point: the
@@ -613,29 +614,6 @@ CAPABILITIES = {
     # campaign, so it is recorded admission-unenforced in the evidence manifest
     # and makes no VRAM-fit claim.
     "animatediff15_v3_haunted_video": {
-        "required_toolchain": None, "requires_sidecar": False,
-        # MPS NOT CLAIMED (2026-09-08). The adapter itself has zero
-        # NVIDIA-specific code -- the same NVIDIA-free adapter pattern as
-        # ltx_8gb, which DID prove out on Apple Silicon (not the same
-        # CAPABILITIES profile; different nodes and weights entirely).
-        # But this lane needs the third-party
-        # ComfyUI-AnimateDiff-Evolved node pack, which is not installed on the
-        # Mac test host, so no render has ever happened on mps (the pack is
-        # present on the CUDA proving machines). A device_backends row is a claim
-        # about proven execution, not about read-the-source plausibility
-        # (apple/ADDING_IMAGE_AND_VIDEO_LANES.md, the 30-second grep test).
-        # Add "mps" here only after a clip lands in otr/obs/.
-        "device_backends": ["cuda"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
-                               "v3_sd15_mm.ckpt",
-                               "v3_sd15_adapter.ckpt"]},
-    # THE STILL-IN LAB PEER (campaign item 2, 2026-09-02): the haunted lane
-    # started from an in-family plate at denoise < 1. Same three artifacts, no
-    # new weight; a LAB id (never a default, never in a shipping profile). No
-    # cost row: admission-unenforced in the evidence manifest, like its parent.
-    "animatediff15_v3_stillin_lab_video": {
         "required_toolchain": None, "requires_sidecar": False,
         # MPS NOT CLAIMED (2026-09-08). The adapter itself has zero
         # NVIDIA-specific code -- the same NVIDIA-free adapter pattern as
@@ -695,29 +673,6 @@ CAPABILITIES = {
         # VAE the checkpoint returns. A/B'd on the M4 with only the decoder
         # changed -- cleaner glass and foliage, less milky haze, judged by the
         # operator -- and it is MIT, more permissive than the other two.
-        "model_requirements": [
-            "v1-5-pruned-emaonly-fp16.safetensors",
-            "animatediff_lightning_8step_comfyui.safetensors",
-            "vae-ft-mse-840000-ema-pruned.safetensors"]},
-    # THE SCENE-REGIONS LAB PEERS (2026-10-27): the haunted and lightning lanes with the beat's own
-    # dialogue-named objects each given a region and its own text (core ComfyUI nodes only, no pack, no
-    # new weight). Same artifacts as the parent each subclasses, so the rows repeat the parent's. LAB
-    # IDS: never a default of any role, never in a shipping profile, no cost row, admission
-    # unenforced in the evidence manifest. cuda only: nothing here has run on Apple silicon, and a
-    # device_backends row is a claim about proven execution.
-    "animatediff15_v3_haunted_regions_video": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
-                               "v3_sd15_mm.ckpt",
-                               "v3_sd15_adapter.ckpt"]},
-    "animatediff15_lightning_regions_video": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": [
             "v1-5-pruned-emaonly-fp16.safetensors",
             "animatediff_lightning_8step_comfyui.safetensors",

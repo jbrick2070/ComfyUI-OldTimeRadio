@@ -42,7 +42,7 @@ RETIRED = sorted(RETIRED_ENGINE_IDS)
 # The contract itself: type, fields, message -- ONE spelling, pinned
 # ---------------------------------------------------------------------------
 
-def test_the_retired_set_is_exactly_the_twenty_four_known_ids():
+def test_the_retired_set_is_exactly_the_twenty_seven_known_ids():
     # Five from the 2026-08-06 SFX-bed rip, five from the 2026-08-23 dormant-3D
     # retirement (lean-mean order 4), five from the 2026-08-23 Ghost narrowing
     # (operator: "delete any animatediff that are not haunted"), one from
@@ -52,6 +52,8 @@ def test_the_retired_set_is_exactly_the_twenty_four_known_ids():
     # published workflows, unlike the obscure `wan_i2v` lane below.
     # Local `razzle_ltx_8gb` stays. And one from 2026-10-14: direct Google Veo,
     # whose preview models Google removes from the Gemini API on 2026-10-22.
+    # And three from 2026-10-28: the AnimateDiff lab ids (operator: "ship
+    # regions so we have two animatediff"); regions ship on the haunted lane.
     # The 14B `wan_i2v` lane (2026-08-26, "rip the large wan we don't need")
     # LEFT this set on the 2026-09-25 clean rip of local Wan: a saved graph
     # naming it now gets the ordinary unregistered-engine refusal, the same
@@ -86,9 +88,12 @@ def test_the_retired_set_is_exactly_the_twenty_four_known_ids():
         "ltx25_native_audio_in_16gb",
         "ltx25_native_audio_in_24gb",
         "google_veo_video",
+        "animatediff15_v3_haunted_regions_video",
+        "animatediff15_lightning_regions_video",
+        "animatediff15_v3_stillin_lab_video",
     })
     assert isinstance(RETIRED_ENGINE_IDS, frozenset)
-    assert len(RETIRED_ENGINE_IDS) == 24, (
+    assert len(RETIRED_ENGINE_IDS) == 27, (
         "the count in this test's name is part of the guard -- rename it in "
         "the same edit that grows the set")
 

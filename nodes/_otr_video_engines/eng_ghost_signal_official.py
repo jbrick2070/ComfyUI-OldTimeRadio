@@ -146,13 +146,25 @@ class GhostSignalV3HauntedEngine(GhostSignalV3Engine):
     ``VideoRequest`` -- that model is ``extra="forbid"`` and its one open dict
     is documented "NEVER conditioning" -- and a schema change is a design item,
     not a mechanical one. Prove the dial does something first.
+
+    SCENE REGIONS SHIP HERE (operator, 2026-10-28: "ship regions so we have two
+    animatediff"). The objects a character beat's own spoken line names each get
+    a region of the frame and their own text, on top of the unchanged global
+    prompt (``wants_scene_regions``; the mechanism is in ``GhostSignalEngine``).
+    It was the lab sibling ``animatediff15_v3_haunted_regions_video`` until then;
+    that id and the other two lab ids are retired, so this lane and the Mac's
+    lightning lane are the only AnimateDiff lanes. A beat whose line names no
+    filmable thing renders exactly as the lane did before regions, node for node.
     """
 
     name = "animatediff15_v3_haunted_video"
 
     lora_name = ADAPTER_V3_NAME
     lora_min_bytes = ADAPTER_V3_MIN_BYTES
-    recipe_receipt_id = "animatediff_sd15_v3_haunted_static16_512x288_v1"
+    # A new id because the recipe changed: regions are part of it now. The
+    # pre-regions id was "animatediff_sd15_v3_haunted_static16_512x288_v1".
+    recipe_receipt_id = "animatediff_sd15_v3_haunted_regions_static16_512x288_v1"
+    wants_scene_regions = True
 
     @property
     def lora_strength(self):

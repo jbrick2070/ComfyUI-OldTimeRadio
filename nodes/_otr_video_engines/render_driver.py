@@ -155,7 +155,6 @@ BOOKEND_SCENE_PROMPT_ENGINES = frozenset({
 BOOKEND_SCENE_PROMPT_SELF_COMPOSED = frozenset({
     "razzle_ltx_8gb",
     "animatediff15_v3_haunted_video",
-    "animatediff15_v3_stillin_lab_video",
     # The LIGHTNING peer (2026-09-08) composes its prompts through the SAME
     # ghost_signal_prompt authorities as its siblings -- distillation changed
     # the sampler cells, not where the words come from -- so it belongs here for
@@ -164,10 +163,6 @@ BOOKEND_SCENE_PROMPT_SELF_COMPOSED = frozenset({
     # negative is still COMPOSED and still stamped, so handing this lane a scene
     # prompt would still overwrite its positive.
     "animatediff15_lightning_video",
-    # The SCENE-REGIONS lab peers (2026-10-27) compose through the same authorities as the lanes they
-    # subclass; the regions are added on top of the composed prompt, never instead of it.
-    "animatediff15_v3_haunted_regions_video",
-    "animatediff15_lightning_regions_video",
 })
 
 #: Engines whose motion is not text-driven at all, so a scene prompt would be

@@ -360,11 +360,8 @@ _LTX25_WEIGHT_ENGINES = frozenset({
 #: not through an image slot (``accepts_still = False``), so each lane is asked
 #: for its own files through ``_weight_tokens()``.
 _ANIMATEDIFF_WEIGHT_ENGINES = frozenset({
-    "animatediff15_lightning_regions_video",
-    "animatediff15_v3_haunted_regions_video",
     "animatediff15_lightning_video",
     "animatediff15_v3_haunted_video",
-    "animatediff15_v3_stillin_lab_video",
 })
 #: Every registered MiniMax H3 lane. Each one is asked for its own rows through
 #: ``_weight_rows()``, the table its assert_usable, byte floors and graph read.

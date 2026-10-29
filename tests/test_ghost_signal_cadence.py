@@ -78,10 +78,11 @@ def test_the_golden_recipe_receipt_is_unchanged():
     Was the mm-p_0.5 receipt while the base lane was the golden one. That lane
     retired 2026-08-23; the receipt pinned here is the surviving lane's, and the
     guard is the same one -- a recipe id is what a render receipt is read
-    against, so it may never drift without someone deciding it should.
+    against, so it may never drift without someone deciding it should. It
+    moved on 2026-10-28, decided: scene regions shipped on this lane.
     """
     assert vreg.get_engine(GOLDEN)._recipe_receipt() == (
-        "animatediff_sd15_v3_haunted_static16_512x288_v1")
+        "animatediff_sd15_v3_haunted_regions_static16_512x288_v1")
 
 
 # --------------------------------------------------------------------------- #

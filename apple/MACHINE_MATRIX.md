@@ -10,7 +10,7 @@ Only receipt-backed rows appear here. **PROVEN** means a full OTR episode publis
 
 | engine | proof | hardware | exact scope | receipt |
 |---|---|---|---|---|
-| `animatediff15_v3_haunted_video` (AnimateDiff haunted video) | **PROVEN** | RTX 4060 Laptop, 8 GB, Ada | full published OTR episodes across five source banks; text-to-video path did not invoke the configured still-image engine | the 4060 drill log (retired 2026-09-24; in git history) steps 7-19 |
+| `animatediff15_v3_haunted_video` (AnimateDiff haunted video) | **PROVEN** | RTX 4060 Laptop, 8 GB, Ada | full published OTR episodes across five source banks; text-to-video path did not invoke the configured still-image engine. PRE-REGIONS: measured before scene regions shipped on this lane (2026-10-28); a regions episode on the 4060 the same day published (28:37, 5.6 GB peak) but its lines named no objects, so the region graph itself is not yet proven on 8 GB | the 4060 drill log (retired 2026-09-24; in git history) steps 7-19 |
 | `humo` (HuMo family) | **PROVEN** | RTX 5080 Laptop, 16 GB, Blackwell | full published OTR episodes | 32 published episodes across humo_14B_169, humo_1.7B_169, humo_1.7B, and humo; episode-ledger delivered_engine evidence |
 | `ltx_8gb` (LTX 0.9.8 2B local video diffusion) | **PROVEN** | Mac mini M4, 16 GB unified, Apple Silicon (MPS) | full published OTR episodes with real local video diffusion on Metal, including one with all three video roles on LTX; the shipped device_backends row said ["cuda"] and was untested policy, corrected to ["cuda","mps"] by this receipt | otr/obs/ 20260908_012201 (vart/lx8g) and 20260908_030426 (sbke/lx8g); apple/MAC_PORTABILITY_GUIDE.md section 7 carries the install steps and the 16 GB cost |
 | `ltx_8gb` (LTX 0.9.8 2B local video diffusion) | **PROVEN** | RTX 4060 Laptop, 8 GB, Ada | full published OTR episode on 8 GB -- eight clips persisted at 512x288, credits passed, zero tracebacks in the whole log | the 4060 drill log (retired 2026-09-24; in git history) -- the_ash_on_the_glass_20260906_170119__anime__ltx_8gb__z_image_turbo__kokoro__original_final.mp4, obs_publish OK, 42,524,256 bytes verified on disk. ADDED 2026-09-12: apple/dropdown_matrix.json had carried ltx_8gb nv8 as proven since the 2026-09-09 harvest while this file had no 8 GB row at all, so the two curated files disagreed. An audit proposed downgrading the verdict; the receipt above is why that would have been wrong, and the gap was here instead. |
@@ -160,7 +160,7 @@ A VRAM number without its conditions is how somebody buys the wrong card.
 
 | engine | conditions | measured |
 |---|---|---|
-| `animatediff15_v3_haunted_video` | 1 act, 8 clips, 24 GB rented card | 2058 s, peak 15,990 MB, published |
+| `animatediff15_v3_haunted_video` | 1 act, 8 clips, 24 GB rented card, before scene regions shipped on this lane (2026-10-28) | 2058 s, peak 15,990 MB, published |
 | `humo` | RTX 5080, 832x480x97 | 13.06 GiB VRAM / 27.53 GiB host RAM; published episode family |
 | `minimax_h3_video` | RTX 5080, legal 124-model / 129-canvas frames | 6,315 MB FL2VA / 6,678 MB REF2VA absolute VRAM; host RAM not captured |
 
