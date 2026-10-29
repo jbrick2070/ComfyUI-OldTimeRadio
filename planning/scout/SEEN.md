@@ -32,3 +32,7 @@
 2026-10-28 | Image | Boogu-Image-0.1 Edit (Comfy-Org repack, int8_convrot) | WATCH | https://huggingface.co/Comfy-Org/Boogu-Image
 2026-10-28 | Upscale | Comfy-Org Frame-Interpolation (RIFE/FILM) | WATCH | https://huggingface.co/Comfy-Org/Frame-Interpolation
 2026-10-28 | Writer | Bonsai Shakespeare 9B | SKIP | https://huggingface.co/korokoboom/Bonsai-2-9b-Shakespeare-SFT
+2026-10-29 | Video | MiniMax Sol-H3-VAE core support (int8_convrot 1.99 GB) | WATCH | https://huggingface.co/Comfy-Org/MiniMax-H3
+2026-10-29 | Upscale | MiniMax-H3 latent upscaler (core support, LBH-123-AI weights) | WATCH | https://huggingface.co/LBH-123-AI/Minimax_h3_latent_Upscaler
+2026-10-29 | Voice | audio.cpp GGUF collection | WATCH | https://huggingface.co/audio-cpp/audio.cpp-gguf
+2026-10-29 | Image | anima-ref-adapter | SKIP | https://huggingface.co/ElectronGirl/anima-ref-adapter
