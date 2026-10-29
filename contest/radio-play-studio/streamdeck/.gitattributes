@@ -1,0 +1,2 @@
+# The packed plugin is a zip: never touch its bytes.
+*.streamDeckPlugin binary

@@ -35,7 +35,27 @@ against its box -- a node's body, or the Make key's clear disc at that line's he
 
 ## Install
 
-Stream Deck 7.1 or newer, Node 24, and Radio Play Studio running on this computer.
+Stream Deck 7.1 or newer on Windows 10 or 11, and Radio Play Studio running on this computer.
+
+1. Get the packed plugin,
+   [`dist/com.jbrick2070.otr.streamDeckPlugin`](dist/com.jbrick2070.otr.streamDeckPlugin): from a
+   clone it is already on disk, or download it straight from GitHub at
+   <https://github.com/jbrick2070/ComfyUI-OldTimeRadio/raw/main/contest/radio-play-studio/streamdeck/dist/com.jbrick2070.otr.streamDeckPlugin>.
+2. Double-click it. The Stream Deck app opens and installs **Radio Play Studio**.
+3. Its three actions are under **Radio Play Studio** in the action list. Drag them onto a page:
+   on a Stream Deck +, a Choice on each of the four dials (set each one's field in its
+   settings: Language, Story bank, Visual style, Acts), with the Make key and a Machine key on
+   the keys above; on a deck with no dials, one Choice key per field, a Machine key and the Make
+   key.
+4. Start the Studio ([its README](../README.md)). Until it answers, the faces read *Off air*.
+
+If the Studio runs on another port, set it in any action's settings; the host is always
+`127.0.0.1`, because the Studio answers no other. The port and the picks are saved and come back
+after a restart. A newer package installs over an older one by double-clicking it the same way.
+
+### Or run it from the source
+
+Node 24, then:
 
 ```bash
 cd contest/radio-play-studio/streamdeck
@@ -44,10 +64,9 @@ npm run build
 npm run link
 ```
 
-`npm run link` registers `com.jbrick2070.otr.sdPlugin` with the Stream Deck app (the Elgato
-CLI's `streamdeck link`). Drag the actions onto a page. If the Studio runs on another port,
-set it in any action's settings; the host is always `127.0.0.1`, because the Studio answers
-no other. The port and the picks are saved and come back after a restart.
+`npm run link` registers this folder, `com.jbrick2070.otr.sdPlugin`, with the Stream Deck app (the
+Elgato CLI's `streamdeck link`), so a rebuild shows after the plugin restarts. Use the package or
+the link, not both: they install the same plugin id.
 
 ## Develop
 
@@ -56,7 +75,14 @@ npm test          # vitest: the faces fit, dial math, the event stream, the stor
 npm run typecheck
 npm run validate  # the Elgato CLI's manifest check
 npm run images    # redraw the default key images from the live renderer
+npm run pack      # build, then write dist/com.jbrick2070.otr.streamDeckPlugin
 ```
+
+The package in `dist/` is the one people install, so it is committed, and `tests/package.test.ts`
+fails when it no longer matches the source: every file in the plugin folder byte for byte, and
+`bin/plugin.js` against a fresh build. After a change, run `npm run pack` and commit the package
+with it. The packer writes `manifest.json` back without its final newline; that is how it is kept.
+Raise `Version` in the manifest for a release, so an installed copy can tell it is older.
 
 `API-CONTRACT.md` lists every route the deck uses and what it expects back.
 `tests/helpers/fake-studio-server.ts` is a stand-in Studio that enforces the server's two

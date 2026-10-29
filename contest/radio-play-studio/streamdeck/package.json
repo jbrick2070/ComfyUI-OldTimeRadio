@@ -20,7 +20,7 @@
     "typecheck": "tsc --noEmit",
     "validate": "streamdeck validate com.jbrick2070.otr.sdPlugin",
     "link": "streamdeck link com.jbrick2070.otr.sdPlugin",
-    "pack": "streamdeck pack com.jbrick2070.otr.sdPlugin --output release --force",
+    "pack": "npm run build && streamdeck pack com.jbrick2070.otr.sdPlugin --output dist --force",
     "images": "esbuild scripts/render-static-images.ts --bundle --platform=node --format=esm --outfile=release/render-static-images.mjs --log-level=warning && node release/render-static-images.mjs"
   },
   "dependencies": {

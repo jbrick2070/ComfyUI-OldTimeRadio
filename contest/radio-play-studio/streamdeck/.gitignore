@@ -1,7 +1,9 @@
 node_modules/
-dist/
 release/
-*.streamDeckPlugin
 *.log
 com.jbrick2070.otr.sdPlugin/bin/
 com.jbrick2070.otr.sdPlugin/logs/
+
+# dist/ holds the packed plugin people install; the repository's own
+# .gitignore ignores every dist/ (a Python rule), so take this one back.
+!dist/
