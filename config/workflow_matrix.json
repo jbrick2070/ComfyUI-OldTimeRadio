@@ -1105,7 +1105,7 @@
       "hardware": "RTX 4060 Laptop, 8 GB, Ada",
       "date": "2026-09-12",
       "episodes": 10,
-      "scope": "full published OTR episodes across five source banks; text-to-video path did not invoke the configured still-image engine. PRE-REGIONS: measured before scene regions shipped on this lane (2026-10-28); a regions episode on the 4060 the same day published (28:37, 5.6 GB peak) but its lines named no objects, so the region graph itself is not yet proven on 8 GB",
+      "scope": "full published OTR episodes across five source banks; text-to-video path did not invoke the configured still-image engine. PRE-REGIONS: measured before scene regions shipped on this lane (2026-10-28). Regions are proven on the same card the same day: see the measurements row for sparkling_scorn_20261028_175202",
       "evidence": "the 4060 drill log (retired 2026-09-24; in git history) steps 7-19"
     },
     {
@@ -1254,6 +1254,11 @@
       "engine": "animatediff15_v3_haunted_video",
       "conditions": "1 act, 8 clips, 24 GB rented card, before scene regions shipped on this lane (2026-10-28)",
       "measured": "2058 s, peak 15,990 MB, published"
+    },
+    {
+      "engine": "animatediff15_v3_haunted_video",
+      "conditions": "WITH scene regions, RTX 4060 Laptop 8 GB, otr_8gb_animatediff as shipped at 5f697cac8, 1 act, shakespeare, anime; regions on 1 of 4 character beats (black, lance, agate; thirds layout, strength 4.0)",
+      "measured": "4818 s for a 125.9 s episode (38 s/s), peak about 5.6 GB whole-GPU, published as sparkling_scorn_20261028_175202. Cost of regions on 8 GB: the regioned shot (325 latent frames) sampled at 94.5 s/step against 37.3 s/step for a 319-frame shot without regions, about 2.5x"
     },
     {
       "engine": "humo",
