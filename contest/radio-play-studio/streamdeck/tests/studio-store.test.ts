@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 import { afterEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { ChoiceDialController, ControlSink } from "../src/actions/choice-dial.js";
 import { MachineDialController } from "../src/actions/machine-dial.js";
 import { MakeKeyController } from "../src/actions/make-key.js";
@@ -540,6 +542,77 @@ describe("the deck against a Studio", () => {
     expect(store.getPhase()).toBe("running");
     server.emit(id, { type: "done", path: "x", run: "r", file: "f.mp4" });
     await until(() => store.getPhase() === "done");
+  });
+
+  it("a look taken before the key lets a finished run go cannot bring it back", async () => {
+    // The listing is taken while the run is still going; the run finishes and
+    // the key lets it go; the listing lands after. Read without the run
+    // generation, it would re-attach the cleared run as the page's (Sonnet QA).
+    const { server, store } = await boot();
+    await store.make();
+    const id = store.getRun()!.id;
+    const releaseListing = server.holdListings();
+    const before = server.listRequests;
+    const look = store.tick();
+    await until(() => server.listRequests > before);
+    expect(server.timeline).toContain(`listing ${before + 1} taken: ${id}`);
+    server.emit(id, { type: "done", path: "x", run: "r", file: "f.mp4" });
+    await until(() => store.getPhase() === "done");
+    store.clearRun(); // the key opened the episode
+    releaseListing();
+    await look;
+    expect(store.getRun()).toBeNull();
+    expect(store.getPhase()).toBe("ready");
+  });
+
+  it("lets a run go when the Studio no longer lists it: it restarted", async () => {
+    const { server, store } = await boot();
+    await store.make();
+    const id = store.getRun()!.id;
+    await until(() => server.eventRequests.some((r) => r.id === id)); // the stream is open
+    expect(store.getPhase()).toBe("running");
+    server.runs.splice(0); // a restarted Studio knows no runs
+    await until(() => store.getRun() === null);
+    // A look found it out, not a stream asking for a run it no longer has.
+    expect(server.timeline).not.toContain(`events ${id}: no such run`);
+    expect(store.getPhase()).toBe("ready");
+  });
+
+  it("lets a run go when its stream, reopened after a clean close, comes back 404: it restarted", async () => {
+    // The listings are held, so it is the stream that finds out, not a look;
+    // a clean end (not a reset, which reads as the Studio gone) reopens it.
+    const { server, store } = await boot();
+    await store.make();
+    const id = store.getRun()!.id;
+    await until(() => server.eventRequests.some((r) => r.id === id)); // the stream is open
+    const releaseListing = server.holdListings();
+    server.runs.splice(0);
+    server.endStreams();
+    await until(() => store.getRun() === null);
+    expect(server.timeline).toContain(`events ${id}: no such run`);
+    expect(store.getPhase()).toBe("ready");
+    releaseListing();
+  });
+
+  it("shows why the Studio refused a press, and a press clears it without making another", async () => {
+    const { server, store } = await boot({ postFailure: { status: 400, error: "bank: not one of the choices" } });
+    await store.make();
+    expect(store.getPhase()).toBe("error");
+    expect(store.getRun()).toMatchObject({ id: "", finished: true, error: "bank: not one of the choices" });
+    expect(store.isLocked()).toBe(false);
+    expect(await store.press()).toBe("cleared");
+    expect(store.getPhase()).toBe("ready");
+    expect(server.posts).toHaveLength(1);
+  });
+
+  it("changes the followed run in one place, which moves the run generation", () => {
+    // A test per load-bearing site pins those; this pins that there is no
+    // other way in, so a new path cannot set the run and skip the generation.
+    const source = readFileSync(join(process.cwd(), "src", "state", "studio-store.ts"), "utf8");
+    const assignments = [...source.matchAll(/this\.run\s*=(?!=)/g)];
+    expect(assignments).toHaveLength(1);
+    const setRun = source.slice(source.indexOf("private setRun("), source.indexOf("private attach("));
+    expect(setRun).toMatch(/this\.runGeneration \+= 1;\s*this\.run = run;/);
   });
 
   it("a 409 asks afresh what is running, keeps the key locked until it hears, and follows the page's episode", async () => {

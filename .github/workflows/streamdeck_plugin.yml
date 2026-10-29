@@ -1,0 +1,47 @@
+name: Stream Deck plugin
+
+# Runs the Stream Deck plugin's own checks on every push that touches it. The
+# packed plugin in contest/radio-play-studio/streamdeck/dist/ is the file people
+# install, and tests/package.test.ts is what says it still matches the source:
+# a source change committed without `npm run pack` fails here instead of
+# shipping a stale package. A guard nobody runs guards nothing (2026-10-28).
+# Windows, because the plugin is Windows-only and that is where it is built.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "contest/radio-play-studio/streamdeck/**"
+      - ".github/workflows/streamdeck_plugin.yml"
+  pull_request:
+    paths:
+      - "contest/radio-play-studio/streamdeck/**"
+      - ".github/workflows/streamdeck_plugin.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: contest/radio-play-studio/streamdeck
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: contest/radio-play-studio/streamdeck/package-lock.json
+      - name: Install from the lockfile
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Tests (faces, store, and the packed plugin against the source)
+        run: npm test
+      - name: Build (the manifest names bin/plugin.js, which a clone has none of)
+        run: npm run build
+      - name: Elgato manifest check
+        run: npm run validate

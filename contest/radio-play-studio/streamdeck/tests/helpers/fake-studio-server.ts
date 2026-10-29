@@ -71,7 +71,7 @@ export class FakeStudioServer {
   /** What happened, in order, so a test can prove the interleaving it sets up
    *  actually took place rather than assume the timers fell that way:
    *  `listing <n> taken: <ids or none>`, `listing <n> answered`,
-   *  `run made: <id>`, `post answered: <id>`. */
+   *  `run made: <id>`, `post answered: <id>`, `events <id>: no such run`. */
   public readonly timeline: string[] = [];
   public readonly eventRequests: Array<{ id: string; lastEventId: string | undefined }> = [];
   public refusedHosts = 0;
@@ -157,6 +157,15 @@ export class FakeStudioServer {
   public cutStreams(): void {
     for (const res of this.openStreams) {
       res.destroy();
+    }
+    this.openStreams.clear();
+  }
+
+  /** End every open event stream cleanly mid-run, as a server does that
+   *  closes a quiet stream: the client sees an ordinary end, not an error. */
+  public endStreams(): void {
+    for (const res of this.openStreams) {
+      res.end();
     }
     this.openStreams.clear();
   }
@@ -303,12 +312,22 @@ export class FakeStudioServer {
         this.json(res, this.opts.postFailure.status, { error: this.opts.postFailure.error });
         return;
       }
-      const start = (): void => {
+      // Busy is refused before the choices are checked and again after, as
+      // server.py's Runs._launch does: a run may start while they are.
+      const busy = (): boolean => {
         if (this.runs.some((r) => !r.finished)) {
           this.json(res, 409, { error: "an episode is already being made; the page shows its progress" });
-          return;
+          return true;
         }
-        this.startRun(res);
+        return false;
+      };
+      if (busy()) {
+        return;
+      }
+      const start = (): void => {
+        if (!busy()) {
+          this.startRun(res);
+        }
       };
       const gate = this.postGate;
       if (gate) {
@@ -337,6 +356,7 @@ export class FakeStudioServer {
   private eventStream(id: string, req: IncomingMessage, res: ServerResponse): void {
     const run = this.runs.find((r) => r.id === id);
     if (!run) {
+      this.timeline.push(`events ${id}: no such run`);
       this.json(res, 404, { error: "no such episode" });
       return;
     }
@@ -347,7 +367,7 @@ export class FakeStudioServer {
     this.openStreams.add(res);
     res.on("close", () => this.openStreams.delete(res));
     const pump = (): void => {
-      if (res.destroyed || !this.server) {
+      if (res.destroyed || res.writableEnded || !this.server) {
         return;
       }
       while (sent < run.events.length) {

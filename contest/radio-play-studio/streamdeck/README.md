@@ -51,7 +51,7 @@ Stream Deck 7.1 or newer on Windows 10 or 11, and Radio Play Studio running on t
 
 If the Studio runs on another port, set it in any action's settings; the host is always
 `127.0.0.1`, because the Studio answers no other. The port and the picks are saved and come back
-after a restart. A newer package installs over an older one by double-clicking it the same way.
+after a restart. To update, install the newer package the same way.
 
 ### Or run it from the source
 
@@ -79,10 +79,12 @@ npm run pack      # build, then write dist/com.jbrick2070.otr.streamDeckPlugin
 ```
 
 The package in `dist/` is the one people install, so it is committed, and `tests/package.test.ts`
-fails when it no longer matches the source: every file in the plugin folder byte for byte, and
-`bin/plugin.js` against a fresh build. After a change, run `npm run pack` and commit the package
-with it. The packer writes `manifest.json` back without its final newline; that is how it is kept.
-Raise `Version` in the manifest for a release, so an installed copy can tell it is older.
+fails when it no longer matches the source: every file the Elgato packer takes from the plugin
+folder, byte for byte, and `bin/` -- `plugin.js` and the `package.json` that makes it an ES module
+wherever it is installed -- against a fresh build. After a change, run `npm run pack` and commit
+the package with it; CI (`.github/workflows/streamdeck_plugin.yml`) runs these tests on every
+push that touches this folder. The packer writes `manifest.json` back without its final newline;
+that is how it is kept. Raise `Version` in the manifest for each release.
 
 `API-CONTRACT.md` lists every route the deck uses and what it expects back.
 `tests/helpers/fake-studio-server.ts` is a stand-in Studio that enforces the server's two

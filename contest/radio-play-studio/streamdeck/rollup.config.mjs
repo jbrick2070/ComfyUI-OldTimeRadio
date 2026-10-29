@@ -38,6 +38,17 @@ export default (flags = {}) => ({
       exportConditions: ["node"],
       preferBuiltins: true
     }),
-    commonjs()
+    commonjs(),
+    {
+      // plugin.js is an ES module wherever it is installed. Node takes a
+      // file's module type from the nearest package.json above it, and the
+      // installed bin/ has none of ours, so a stray `"type": "commonjs"` one
+      // above the Stream Deck's Plugins folder would stop the plugin loading
+      // (Sonnet QA). Elgato's own template emits this same file.
+      name: "emit-module-package-file",
+      generateBundle() {
+        this.emitFile({ fileName: "package.json", source: `{ "type": "module" }`, type: "asset" });
+      }
+    }
   ]
 });

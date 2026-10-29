@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // The packed plugin in dist/ is what gets installed, so it must be this tree:
-// every file in the plugin folder byte for byte, and bin/plugin.js exactly what
-// a build of src/ makes now. A change to the source without `npm run pack`
-// fails here, instead of shipping last week's plugin under today's README.
+// every file in the plugin folder byte for byte, and bin/ exactly what a build
+// of src/ makes now. A change to the source without `npm run pack` fails here,
+// instead of shipping last week's plugin under today's README.
 import { describe, expect, it } from "vitest";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -15,7 +15,7 @@ const ROOT = process.cwd();
 const FOLDER = "com.jbrick2070.otr.sdPlugin";
 const PLUGIN_DIR = join(ROOT, FOLDER);
 const PACKAGE = join(ROOT, "dist", "com.jbrick2070.otr.streamDeckPlugin");
-const BUILT = `${FOLDER}/bin/plugin.js`;
+const BIN = `${FOLDER}/bin/`;
 
 /** What the Elgato CLI leaves out of a package: these defaults (its
  *  `defaultIgnorePatterns`, pinned to the installed CLI below) and each line of
@@ -59,7 +59,9 @@ function cliIgnoreLists(): { readable: string[] | null; shipped: string[] | null
   };
 }
 
-async function buildNow(): Promise<string> {
+/** Each file a release build writes into bin/ -- plugin.js, and the
+ *  package.json that makes it an ES module -- by package name. */
+async function buildNow(): Promise<Map<string, Buffer>> {
   // The config is a function of rollup's flags; none is the release build,
   // whatever ROLLUP_WATCH this shell happens to carry.
   const makeConfig = (await import(pathToFileURL(join(ROOT, "rollup.config.mjs")).href)).default as (
@@ -69,17 +71,25 @@ async function buildNow(): Promise<string> {
   const bundle = await rollup(inputOptions);
   try {
     const { output } = await bundle.generate(outputOptions);
-    return output[0].code;
+    return new Map(
+      output.map((file) => [`${BIN}${file.fileName}`, Buffer.from(file.type === "chunk" ? file.code : file.source)])
+    );
   } finally {
     await bundle.close();
   }
 }
 
 describe("the packed plugin in dist/", () => {
-  const entries = existsSync(PACKAGE)
-    ? readZip(readFileSync(PACKAGE)).filter((e) => !e.name.endsWith("/"))
-    : [];
+  const entries = existsSync(PACKAGE) ? readZip(readFileSync(PACKAGE)) : [];
   const byName = new Map(entries.map((e) => [e.name, e.data]));
+  // One build for every test that needs it. bin/ on disk may be stale or, on a
+  // fresh clone, absent, and the package must carry the build regardless.
+  let build: Promise<Map<string, Buffer>> | null = null;
+  const built = (): Promise<Map<string, Buffer>> => (build ??= buildNow());
+  const folderOnly = async (): Promise<string[]> => {
+    const fromBuild = await built();
+    return packedNames().filter((name) => !fromBuild.has(name));
+  };
 
   it("leaves out what the installed Elgato CLI leaves out", () => {
     // A CLI that changes its defaults fails here, so the list above is re-read
@@ -89,16 +99,16 @@ describe("the packed plugin in dist/", () => {
     expect(shipped, "the CLI's pack command no longer carries this ignore list").toEqual(PACKER_DEFAULT_IGNORES);
   });
 
-  it("exists, and holds the plugin folder and nothing else", () => {
+  it("exists, and holds the plugin folder and the build, each file once, and nothing else", async () => {
     expect(existsSync(PACKAGE), "run `npm run pack`").toBe(true);
-    // bin/plugin.js is the build's: a fresh clone has none on disk, and the
-    // package carries it regardless.
-    const expected = [...new Set([...packedNames(), BUILT])].sort();
-    expect([...byName.keys()].sort()).toEqual(expected);
-  });
+    const expected = [...(await folderOnly()), ...(await built()).keys()].sort();
+    // Every entry as listed, so a duplicate name or a folder entry -- which a
+    // map would fold away -- still fails.
+    expect(entries.map((e) => e.name).sort()).toEqual(expected);
+  }, 120_000);
 
-  it("carries every file of the folder unchanged", () => {
-    for (const name of packedNames().filter((n) => n !== BUILT)) {
+  it("carries every file of the folder unchanged", async () => {
+    for (const name of await folderOnly()) {
       const packed = byName.get(name);
       expect(packed, `${name} is not in the package`).toBeDefined();
       const source = readFileSync(join(ROOT, name));
@@ -112,7 +122,7 @@ describe("the packed plugin in dist/", () => {
         expect(packed!.equals(source), `${name} in the package is stale: run \`npm run pack\``).toBe(true);
       }
     }
-  });
+  }, 120_000);
 
   it("is read by a reader that refuses a local header disagreeing with the directory", () => {
     const tampered = Buffer.from(readFileSync(PACKAGE));
@@ -123,11 +133,16 @@ describe("the packed plugin in dist/", () => {
     expect(() => readZip(tampered)).toThrow(/local header/);
   });
 
-  it("carries the plugin a build of src/ makes now", async () => {
-    const packed = byName.get(BUILT);
-    expect(packed, "bin/plugin.js is not in the package").toBeDefined();
-    const code = await buildNow();
-    expect(code.includes("sourceMappingURL"), "the shipped build points at a source map it does not carry").toBe(false);
-    expect(packed!.toString("utf8") === code, "bin/plugin.js in the package is stale: run `npm run pack`").toBe(true);
+  it("carries what a build of src/ makes now", async () => {
+    const fromBuild = await built();
+    const code = fromBuild.get(`${BIN}plugin.js`);
+    expect(code, "the build wrote no plugin.js").toBeDefined();
+    expect(code!.includes("sourceMappingURL"), "the shipped build points at a source map it does not carry").toBe(false);
+    // plugin.js is an ES module whatever package.json sits above the folder
+    // the Stream Deck installs it in.
+    expect(JSON.parse(fromBuild.get(`${BIN}package.json`)?.toString("utf8") ?? "{}")).toEqual({ type: "module" });
+    for (const [name, data] of fromBuild) {
+      expect(byName.get(name)?.equals(data), `${name} in the package is stale: run \`npm run pack\``).toBe(true);
+    }
   }, 120_000);
 });
