@@ -70,7 +70,14 @@ export function readZip(zip: Buffer): ZipEntry[] {
     if (zip.readUInt32LE(local) !== LOCAL_HEADER) {
       throw new Error(`bad local header for ${name}`);
     }
-    const start = local + 30 + zip.readUInt16LE(local + 26) + zip.readUInt16LE(local + 28);
+    // An installer may read either copy of an entry's name and method, so the
+    // two must agree (Python's zipfile refuses an archive where they do not).
+    const localNameLength = zip.readUInt16LE(local + 26);
+    const localName = zip.subarray(local + 30, local + 30 + localNameLength).toString("utf8");
+    if (localName !== name || zip.readUInt16LE(local + 8) !== method) {
+      throw new Error(`${name}: its local header says ${localName}, method ${zip.readUInt16LE(local + 8)}`);
+    }
+    const start = local + 30 + localNameLength + zip.readUInt16LE(local + 28);
     const packed = zip.subarray(start, start + packedSize);
     let data: Buffer;
     if (method === 0) {

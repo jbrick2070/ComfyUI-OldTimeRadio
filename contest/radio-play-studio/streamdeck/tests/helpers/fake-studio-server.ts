@@ -27,10 +27,6 @@ export interface FakeStudioOptions {
   optionsDelayMs?: Record<string, number>;
   /** Hold the POST /api/episodes answer this long (ms), the run made. */
   postDelayMs?: number;
-  /** Hold a POST this long (ms) BEFORE its run exists, as the real server
-   *  checks the choices against ComfyUI before it starts one: a listing
-   *  taken meanwhile does not have the run. */
-  postValidateMs?: number;
   /** Hold the GET /api/episodes answer this long (ms); the listing is taken
    *  when the request arrives, as the real server's is. */
   listDelayMs?: number;
@@ -72,12 +68,19 @@ export class FakeStudioServer {
   public readonly posts: Array<{ host: string; contentType: string; body: unknown }> = [];
   public readonly optionsRequests: string[] = [];
   public listRequests = 0;
+  /** What happened, in order, so a test can prove the interleaving it sets up
+   *  actually took place rather than assume the timers fell that way:
+   *  `listing <n> taken: <ids or none>`, `listing <n> answered`,
+   *  `run made: <id>`, `post answered: <id>`. */
+  public readonly timeline: string[] = [];
   public readonly eventRequests: Array<{ id: string; lastEventId: string | undefined }> = [];
   public refusedHosts = 0;
   private server: Server | null = null;
   private opts: FakeStudioOptions;
   private waiters: Array<() => void> = [];
   private readonly openStreams = new Set<ServerResponse>();
+  private postGate: Promise<void> | null = null;
+  private listGate: Promise<void> | null = null;
 
   public constructor(opts: FakeStudioOptions = {}) {
     this.opts = opts;
@@ -104,6 +107,29 @@ export class FakeStudioServer {
     this.wake();
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+
+  /** Hold every POST /api/episodes from now on, after its body is read and
+   *  before its run exists, until the returned function is called: the window
+   *  where the real server checks the choices against ComfyUI. */
+  public holdPosts(): () => void {
+    let release!: () => void;
+    this.postGate = new Promise<void>((resolve) => (release = resolve));
+    return () => {
+      this.postGate = null;
+      release();
+    };
+  }
+
+  /** Hold the answer to every GET /api/episodes from now on until the returned
+   *  function is called; each listing is still taken when its request arrives. */
+  public holdListings(): () => void {
+    let release!: () => void;
+    this.listGate = new Promise<void>((resolve) => (release = resolve));
+    return () => {
+      this.listGate = null;
+      release();
+    };
   }
 
   /** A run the page started, listed as unfinished. */
@@ -221,17 +247,26 @@ export class FakeStudioServer {
         return;
       }
       this.listRequests += 1;
+      const n = this.listRequests;
       const listing = {
         episodes: this.runs
           .slice()
           .sort((a, b) => b.started - a.started)
           .map(({ events: _events, ...rest }) => rest)
       };
-      const listDelay = this.opts.listDelayMs ?? 0;
-      if (listDelay > 0) {
-        setTimeout(() => this.json(res, 200, listing), listDelay);
-      } else {
+      this.timeline.push(`listing ${n} taken: ${listing.episodes.map((r) => r.id).join(",") || "none"}`);
+      const answer = (): void => {
+        this.timeline.push(`listing ${n} answered`);
         this.json(res, 200, listing);
+      };
+      const listDelay = this.opts.listDelayMs ?? 0;
+      const gate = this.listGate;
+      if (gate) {
+        void gate.then(answer);
+      } else if (listDelay > 0) {
+        setTimeout(answer, listDelay);
+      } else {
+        answer();
       }
       return;
     }
@@ -275,9 +310,9 @@ export class FakeStudioServer {
         }
         this.startRun(res);
       };
-      const validate = this.opts.postValidateMs ?? 0;
-      if (validate > 0) {
-        setTimeout(start, validate);
+      const gate = this.postGate;
+      if (gate) {
+        void gate.then(start);
       } else {
         start();
       }
@@ -286,11 +321,16 @@ export class FakeStudioServer {
 
   private startRun(res: ServerResponse): void {
     const run = this.addRun({ id: (this.runs.length + 1).toString(16).padStart(12, "0") });
+    this.timeline.push(`run made: ${run.id}`);
+    const answer = (): void => {
+      this.timeline.push(`post answered: ${run.id}`);
+      this.json(res, 202, { id: run.id });
+    };
     const delay = this.opts.postDelayMs ?? 0;
     if (delay > 0) {
-      setTimeout(() => this.json(res, 202, { id: run.id }), delay);
+      setTimeout(answer, delay);
     } else {
-      this.json(res, 202, { id: run.id });
+      answer();
     }
   }
 

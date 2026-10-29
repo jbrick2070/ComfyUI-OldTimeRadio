@@ -514,17 +514,28 @@ describe("the deck against a Studio", () => {
 
   it("a look taken while the press is still being checked cannot drop the run the press starts", async () => {
     // The real server checks the choices against ComfyUI before it makes the
-    // run, so a listing taken in that window does not have it (Codex QA).
-    const { server, store } = await boot({ postValidateMs: 120, listDelayMs: 300 });
+    // run, so a listing taken in that window does not have it (Codex QA). The
+    // order is held by gates the test opens, not by timers: a stalled event
+    // loop let the run be made before the listing and the old code pass.
+    const { server, store } = await boot();
+    const releasePost = server.holdPosts();
     const press = store.make();
-    await new Promise((r) => setTimeout(r, 30)); // the POST is being checked; no run yet
+    await until(() => server.posts.length === 1); // the POST is being checked; no run yet
+    const releaseListing = server.holdListings();
     const before = server.listRequests;
     const look = store.tick();
-    await until(() => server.listRequests > before); // an empty listing is on its way
+    await until(() => server.listRequests > before); // taken with no run in it, and held
+    const n = before + 1;
+    releasePost();
     await press; // the run is made and attached
     const id = store.getRun()!.id;
     expect(store.getPhase()).toBe("running");
+    releaseListing();
     await look; // the empty listing lands after the attach
+    const at = (event: string): number => server.timeline.indexOf(event);
+    expect(at(`listing ${n} taken: none`), server.timeline.join(" | ")).toBeGreaterThanOrEqual(0);
+    expect(at(`listing ${n} taken: none`)).toBeLessThan(at(`run made: ${id}`));
+    expect(at(`listing ${n} answered`)).toBeGreaterThan(at(`post answered: ${id}`));
     expect(store.getRun()?.id).toBe(id);
     expect(store.getPhase()).toBe("running");
     server.emit(id, { type: "done", path: "x", run: "r", file: "f.mp4" });
