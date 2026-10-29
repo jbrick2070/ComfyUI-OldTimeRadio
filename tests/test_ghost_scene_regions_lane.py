@@ -380,3 +380,10 @@ def test_the_driver_leaves_the_lightning_lane_untouched():
     req = rd.build_request_from_shot(_shot(shots, "shot_b002"), led, master_audio_path="")
     assert req.get("scene_objects") in ([], None)
     assert "scene_objects_source" not in req["observability"]
+
+
+def test_the_lightning_lane_renders_no_region_even_when_handed_objects(monkeypatch):
+    rec, _eng, _raw = _render(monkeypatch, LIGHTNING, scene_objects=("a brass lamp", "a battered disc"))
+    tags = [name for name, _ in rec.calls]
+    assert tags.count("text_encode") == 2                # global positive and negative only
+    assert "cond_mask" not in tags and "cond_combine" not in tags

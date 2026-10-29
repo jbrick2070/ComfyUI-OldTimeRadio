@@ -34,8 +34,7 @@ role you care about is on one of them, its image engine sits idle, nothing
 downloads, and changing the pick changes nothing:
 
 `viz_camera`, `viz_green`, `viz_mxc_cpu`, `viz_mxc_mandala`,
-`animatediff15_lightning_video`, `animatediff15_v3_haunted_video`,
-`animatediff15_v3_stillin_lab_video`
+`animatediff15_lightning_video`, `animatediff15_v3_haunted_video`
 
 The `viz_` lanes say so in the dropdown itself -- the canonical's saved
 value reads `viz_mxc_cpu (16:9) (audio-reactive, no scene image)`. The

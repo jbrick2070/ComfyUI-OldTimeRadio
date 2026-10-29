@@ -180,7 +180,7 @@ ComfyUI console, so read it before assuming a break.
 
 - **Every clip already stated how it must be enlarged, and the engine is
   `spandrel_esrgan`.** The AnimateDiff lanes -- `animatediff15_lightning_video`,
-  `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video` --
+  `animatediff15_v3_haunted_video` --
   declare a clean full-frame enlargement (no sharpening, no crop, no pad).
   Real-ESRGAN invents texture, so it is not allowed to overrule that; on an
   episode made entirely of those clips it is not even loaded, and the log line

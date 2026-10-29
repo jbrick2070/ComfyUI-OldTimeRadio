@@ -253,7 +253,6 @@ except Exception:  # noqa: BLE001
     pass
 
 
-
 # ---------------------------------------------------------------------------
 # ROSTER AUDIT -- runs LAST, after every guarded adapter import above.
 # ---------------------------------------------------------------------------

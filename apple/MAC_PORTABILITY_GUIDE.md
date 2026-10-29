@@ -578,7 +578,6 @@ same for both and the outcome is not.
 | --- | --- | --- |
 | `animatediff15_lightning_video` | **PROVEN 2026-09-09** -- a complete 23-beat episode through the real OTR adapter path, published. **EXPERIMENTAL by operator label**: `default_roles` is empty so it can only be chosen per role from the director dropdown, and it carries no qualified cost row | `["mps", "cuda"]` |
 | `animatediff15_v3_haunted_video` | **renders correctly on Metal** (clips faithful to the `recur_frac` style, judged by eye 2026-09-08) and is **unusable here on cost**: 122-134 s/it, and the golden recipe is 20 steps at cfg 8.0 = 40 UNet passes per beat -- about three quarters of an hour for one beat. No clip has reached `otr/obs/` from a Mac. It has **no adaptive-hold guard**, so a long beat can hit the fatal latent count (7.2); the matrix rates it OOM RISK for that reason, not for its 3.8 GB of weights | `["cuda"]` |
-| `animatediff15_v3_stillin_lab_video` | subclasses the haunted lane; same cost, same missing guard | `["cuda"]` |
 
 The proof episode:
 

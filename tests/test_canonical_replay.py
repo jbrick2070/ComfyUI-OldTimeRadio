@@ -186,7 +186,7 @@ def test_a_derived_replay_drops_only_the_video_lane_roll_receipt(tmp_path, monke
     plain = PL.import_replay_bundle(str(bundle)).data["meta"]
     assert {k: plain[k] for k in rolls} == rolls
     fz = importlib.import_module("otr_freeze_replay_bundle")
-    derived_bundle = fz.derive_engine_bundle(bundle, "animatediff15_v3_stillin_lab_video")
+    derived_bundle = fz.derive_engine_bundle(bundle, "animatediff15_lightning_video")
     derived = PL.import_replay_bundle(str(derived_bundle)).data["meta"]
     assert "video_lane_roll" not in derived
     assert derived["still_model_roll"] == rolls["still_model_roll"]
