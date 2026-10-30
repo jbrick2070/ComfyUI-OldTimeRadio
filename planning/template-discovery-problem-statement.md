@@ -38,11 +38,32 @@ and not in the **plain web UI**.
   - The Manager is not reachable in this launch, because ComfyUI was started without
     `--enable-manager`, although `comfyui-manager` 4.2.2 is installed.
 
-## Hypotheses, to test in this order
+## Settled for the web UI: search finds the filename, not the pack name
 
-1. **Search covers built-in templates only.** In frontend 1.57.4, extension templates can be
-   browsed but are not indexed by search. This fits everything above, and would mean the
-   Desktop app behaves the same way.
+Checked in two ways on 2026-10-29: by reading the frontend source, and by searching the live
+web UI here (All selected, filters cleared). Desktop has not been checked.
+
+- **Searching by filename works.**
+  - `otr_canonical` gives "Showing 1 of 679 templates" (otr_canonical).
+  - `otr_` gives "Showing 30 of 679 templates", which is all 30 workflows.
+- **Searching by pack name does not.** `old-time radio` returns only built-in templates
+  (SeedVR2, MiniMax H3, FLUX.2 Klein, ...).
+- **Why, in the source.** The frontend's build manifest matches upstream `ComfyUI_frontend`
+  at `8d7bb487c2740a3a771d65faff19fcfc30147fab`.
+  - An extension workflow's `name`, `title` and `description` are all its filename. The pack
+    name is kept only in `sourceModule` and `searchableText`
+    (`src/platform/workflow/templates/repositories/workflowTemplatesStore.ts` L257-272).
+  - Search indexes `title`, `description`, `tags`, `models` and `name`, and leaves out both
+    fields that hold the pack name (`packages/shared-frontend-utils/src/templateSearch.ts`
+    L22-28).
+- **The App tab's "0 of 13" is a separate filter.** That tab requires `isApp: true`, which
+  extension entries never have (`src/platform/workflow/templates/utils/templateDisplay.ts`
+  L20-30), so its zero proves nothing about search.
+
+## Hypotheses still open
+
+1. **Settled for the web UI.** Extension workflows are found by searching their filename;
+   searching the pack's name does not find them. The Desktop app is not yet checked.
 2. **The Desktop app ships a different frontend, or a different search.** The Desktop app
    bundles its own frontend build. If its version or search code differs, the operator's
    memory is of that build.
@@ -55,21 +76,26 @@ and not in the **plain web UI**.
 
 ## How to settle it
 
-- [ ] In the **Comfy Desktop app** on this laptop, normally launched, open Templates and
-      search "old-time radio". Record the frontend version from Settings → About.
+- [ ] In the **Comfy Desktop app** on this laptop, normally launched, open Templates with
+      All selected and filters cleared. Search `old-time radio`, `otr_canonical` and
+      `otr_8gb_still`, and record the frontend version from Settings → About.
 - [ ] In the **web UI** with a normal launch (no whitelist, `--enable-manager`), run the
-      same search.
-- [ ] Read the template-search code in `ComfyUI_frontend` at 1.57.4 and see which template
-      sets it indexes.
+      same three searches.
+- [x] Read the template-search code in `ComfyUI_frontend` at 1.57.4 (done 2026-10-29; see
+      above).
 - [ ] If search used to index extension templates, find the frontend version that stopped,
       and decide whether to report it to Comfy-Org.
 
 ## What done looks like
 
 A one-line answer to "can a user find Old-Time Radio's templates by searching inside
-ComfyUI?", for both the Desktop app and the web UI, with versions. If the answer is no,
-the README and the stage line should send people to Templates → EXTENSIONS → Old-Time
-Radio. If it is a Comfy-Org regression, the report should go to them.
+ComfyUI?", for both the Desktop app and the web UI, with versions.
+
+- **Web UI 1.57.4:** yes by filename (`otr_`), no by pack name.
+- **Either way,** the README can tell people to search `otr_` or to browse to Templates →
+  EXTENSIONS → Old-Time Radio.
+- **On Comfy-Org's side:** leaving `searchableText` out of the search index looks like a
+  frontend gap worth reporting to them. Ours is to report, not to fix.
 
 Out of scope: discovery without installing the pack. The Templates window only lists
 installed packs. Appearing for uninstalled users would mean getting into Comfy-Org's own
