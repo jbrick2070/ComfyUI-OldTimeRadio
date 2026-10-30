@@ -639,6 +639,46 @@ def test_a_reference_graph_named_directly_keeps_its_reference_stills(settings, s
     assert studio.photo_stills(studio.options()) == ["flux3_klein", "flux3_klein_ref"]
 
 
+def test_a_character_lane_that_takes_no_still_uses_no_photo(settings, schemas):
+    """Codex QA of c41bd4bb8: on the visualiser way the characters are filmed
+    from the sound (viz_camera takes no still), so no still pick paints them
+    from a photo, and the page must say a photo goes unused there."""
+    import json as _json
+    from radio_play_studio.runner import NO_SCENE_IMAGE, Studio
+    required = schemas["OTR_VideoDirector"]["input"]["required"]
+    for spec in required.values():
+        spec[0].append("flux3_klein_ref")
+    viz = "viz_camera (16:9)" + NO_SCENE_IMAGE
+    required["character_video_model"] = [["ltx25_foley_16gb (16:9)", viz]]
+
+    def save(lane):
+        graph = _json.loads(settings.workflow_path.read_text(encoding="utf-8"))
+        for node in graph["nodes"]:
+            if node["type"] == "OTR_VideoDirector":
+                node["widgets_values"] = ["flux3_klein", "flux3_klein_ref", "flux3_klein", lane]
+        settings.workflow_path.write_text(_json.dumps(graph), encoding="utf-8")
+
+    studio = Studio(settings, client_factory=lambda url: None, fetch=lambda url: schemas)
+    save(viz)
+    assert studio.photo_stills(studio.options()) == []
+    # The same graph on a lane that takes its still keeps the picks that use a photo.
+    save("ltx25_foley_16gb (16:9)")
+    assert studio.photo_stills(studio.options()) == ["flux3_klein", "flux3_klein_ref"]
+
+
+def test_the_no_still_marker_is_the_directors_own():
+    """The words the Studio looks for are the ones the director writes after a
+    lane that takes no still; if the director's change, this says so."""
+    import re
+    from pathlib import Path
+    from radio_play_studio.runner import NO_SCENE_IMAGE
+    director = Path(__file__).resolve().parents[3] / "nodes" / "otr_video_director.py"
+    if not director.is_file():
+        pytest.skip("the Studio is outside the pack")
+    found = re.search(r'^_DESCRIPTOR_ABSTRACT = "([^"]*)"', director.read_text(encoding="utf-8"), re.M)
+    assert found and found.group(1) == NO_SCENE_IMAGE
+
+
 def test_a_lost_stream_is_opened_again_while_comfyui_holds_the_job(settings, schemas):
     """2026-10-23: the bar sat at 78 % for three hours while ComfyUI filmed shot
     after shot, because nothing listened after the SDK gave up on the stream."""

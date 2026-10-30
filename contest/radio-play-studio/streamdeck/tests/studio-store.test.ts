@@ -227,6 +227,40 @@ describe("the deck against a Studio", () => {
     ]);
   });
 
+  // -- the Codex review of c41bd4bb8, each finding pinned -----------------------
+
+  it("a resting row keeps its name when the menu is read again, and stops resting when it is gone", async () => {
+    const { server, store } = await boot();
+    expect(store.rotateMenu("engine", 1)).toBe(true); // 16 GB video, the second row
+    // The menu comes back with a way ahead of it: the row moves, the rest stays on it.
+    const ways16 = SAMPLE_MENU.machines[1].ways;
+    const wider = {
+      ...SAMPLE_MENU,
+      machines: [
+        SAMPLE_MENU.machines[0],
+        { key: "nvidia16", ways: [ways16[0], { key: "animatediff", workflow: "otr_16gb_animatediff.json", proven: true }, ways16[1]] }
+      ]
+    };
+    server.configure({ forms: { "": { fields: SAMPLE_FIELDS, menu: wider } } });
+    await store.refresh();
+    expect(store.getPendingEntry("engine")!.way.workflow).toBe("otr_16gb_video.json");
+    expect(store.getPendingIndex("engine")).toBe(2);
+    // And back without it: nothing rests, so a press switches nothing.
+    const narrower = { ...SAMPLE_MENU, machines: [SAMPLE_MENU.machines[0], { key: "nvidia16", ways: [ways16[0]] }] };
+    server.configure({ forms: { "": { fields: SAMPLE_FIELDS, menu: narrower } } });
+    await store.refresh();
+    expect(store.getPendingEntry("engine")).toBeNull();
+    expect(await store.applyMenu("engine")).toBe(false);
+    expect(store.getPicks().workflow).toBeUndefined();
+  });
+
+  it("a press with nothing resting leaves the other control resting", async () => {
+    const { store } = await boot();
+    store.rotateMenu("engine", 1); // 16 GB video, resting
+    expect(await store.applyMenu("machine")).toBe(false); // the machine control rests nowhere
+    expect(store.getPendingEntry("engine")!.way.workflow).toBe("otr_16gb_video.json");
+  });
+
   it("with no menu, neither menu control has anything to turn and no workflow is posted", async () => {
     const { server, store } = await boot({ forms: { "": { fields: SAMPLE_FIELDS } } });
     expect(store.rotateMenu("machine", 1)).toBe(false);

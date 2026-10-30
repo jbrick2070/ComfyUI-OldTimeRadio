@@ -74,7 +74,8 @@ MACHINES: tuple = (
     ("amd", (("stills", "otr_amd_still.json"),)),
     # No GPU at all: the cloud graphs. Comfy Cloud bills Comfy credits through the
     # key the page holds; Google bills a Google key ComfyUI reads itself.
-    ("comfy_cloud", (("foley", "otr_cloud_deluxe_3act.json"), ("video", "otr_cloud_low.json"))),
+    ("comfy_cloud", (("foley", "otr_cloud_deluxe_3act.json"), ("video", "otr_cloud_low.json"),
+                     ("audio_in", "otr_cloud_deluxe_audio_in_3act.json"))),
     ("google_cloud", (("stills", "otr_google_still.json"),)),
 )
 def _machine_choices() -> dict:
@@ -111,6 +112,7 @@ UNPROVEN: dict = {
                           "fixed, not yet published since",
     "otr_google_still.json": "no published episode yet",
     "otr_16gb_mime.json": "not run in the 5080 round of 2026-10-23; no published episode yet",
+    "otr_cloud_deluxe_audio_in_3act.json": "no published episode yet",
 }
 
 

@@ -34,6 +34,11 @@ USES = (("video", "OTR_VideoDirector", "character_video_model"),
         ("voices", "OTR_CastLock", "char_voice_engine"),
         ("music", "OTR_StableAudioTheme", "engine"),
         ("writer", WRITER, "creative_writing_model"))
+#: The characters' video lane, and the words the director puts after a lane
+#: that takes no still (otr_video_director._DESCRIPTOR_ABSTRACT): its pictures
+#: come from the sound, so nothing a still engine paints, photo or not, reaches it.
+VIDEO_INPUT = "character_video_model"
+NO_SCENE_IMAGE = " (audio-reactive, no scene image)"
 #: The choice that names which menu workflow a run uses: routing, not a field.
 WORKFLOW_CHOICE = "workflow"
 #: A still engine that paints a character from that character's picture is named
@@ -476,7 +481,8 @@ class Studio:
         when one ships), by the rule build_graph_from applies: a pick keeps the
         graph's `<pick>_ref` character stills, and a `_ref` engine picked by name
         is a reference engine itself. Empty when that graph paints no character
-        still from a picture, which makes every photo unused."""
+        still from a picture, or films its characters on a lane that takes no
+        still (the visualiser), which makes every photo unused."""
         stills = next((f for f in fields if f.get("key") == "stills"), None)
         if stills is None:
             return []
@@ -487,6 +493,8 @@ class Studio:
             schemas = self._fetch(self.settings.comfyui_url)
         graph = workflow_to_api_prompt(workflow, schemas)
         director = graph.get(locate_nodes(workflow).get(DIRECTOR, ""), {}).get("inputs", {})
+        if NO_SCENE_IMAGE in str(director.get(VIDEO_INPUT) or ""):
+            return []  # the visualiser's characters take no still (Codex QA of c41bd4bb8)
         saved = str(director.get(STILLS_INPUT) or "")
         out = [c for c in choices if c.endswith(REFERENCE_SUFFIX)]
         if saved.endswith(REFERENCE_SUFFIX) and saved[:-len(REFERENCE_SUFFIX)] in choices:

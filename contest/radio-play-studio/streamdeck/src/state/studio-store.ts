@@ -59,6 +59,11 @@ export interface MachineEntry {
  *  want"). */
 export type MenuPart = "machine" | "engine";
 
+/** What names a menu control's row: its machine, or its engine's workflow. */
+function rowName(part: MenuPart, e: MachineEntry): string {
+  return part === "machine" ? e.machine : e.way.workflow;
+}
+
 /** The menu's machine keys (config.MACHINES) as the dial names them. */
 export const MACHINE_NAMES: Record<string, string> = {
   nvidia8: "8 GB card",
@@ -91,8 +96,11 @@ export class StudioStore extends EventEmitter {
   private fields: StudioField[] = [];
   private menu: StudioMenu | null = null;
   private picks: Choices = {};
-  /** Where each menu control is resting, as an index into its own rows. */
-  private pending: Record<MenuPart, number | null> = { machine: null, engine: null };
+  /** Where each menu control is resting, by name: the machine, or the
+   *  engine's workflow. Never by place, so a menu read again (a reconnect,
+   *  another port, a pick made elsewhere) cannot move it onto another row; a
+   *  row that is gone stops it resting (Codex QA of c41bd4bb8). */
+  private pending: Record<MenuPart, string | null> = { machine: null, engine: null };
   private run: RunState | null = null;
   private stream: EventStreamHandle | null = null;
   private reachable = false;
@@ -289,12 +297,17 @@ export class StudioStore extends EventEmitter {
   /** Where a menu control is resting, as an index into its rows; null when
    *  it is not resting anywhere. */
   public getPendingIndex(part: MenuPart): number | null {
-    return this.getPendingEntry(part) ? this.pending[part] : null;
+    const name = this.pending[part];
+    if (name === null) {
+      return null;
+    }
+    const at = this.getMenuEntries(part).findIndex((e) => rowName(part, e) === name);
+    return at >= 0 ? at : null;
   }
 
   /** The row a menu control is resting on before it is pressed, if any. */
   public getPendingEntry(part: MenuPart): MachineEntry | null {
-    const at = this.pending[part];
+    const at = this.getPendingIndex(part);
     return at === null ? null : this.getMenuEntries(part)[at] ?? null;
   }
 
@@ -341,19 +354,20 @@ export class StudioStore extends EventEmitter {
     if (entries.length === 0 || this.isLocked()) {
       return false;
     }
-    const from = this.pending[part] ?? Math.max(0, this.getMenuIndex(part));
+    const from = this.getPendingIndex(part) ?? Math.max(0, this.getMenuIndex(part));
     const n = entries.length;
-    this.pending[part] = (((from + steps) % n) + n) % n;
+    this.pending[part] = rowName(part, entries[(((from + steps) % n) + n) % n]);
     this.changed();
     return true;
   }
 
   /** Make a control's resting row the one that runs: the form is read again
-   *  for it, and picks it does not offer fall back to its defaults. Both
-   *  controls stop resting: a switch changes the rows the video control has. */
+   *  for it, and picks it does not offer fall back to its defaults. A switch
+   *  stops both controls resting, since it changes the rows the video control
+   *  has; a press that switches nothing leaves the other control as it was. */
   public async applyMenu(part: MenuPart): Promise<boolean> {
     const pending = this.getPendingEntry(part);
-    this.pending = { machine: null, engine: null };
+    this.pending[part] = null;
     if (!pending || this.isLocked()) {
       this.changed();
       return false;
@@ -362,6 +376,7 @@ export class StudioStore extends EventEmitter {
       this.changed();
       return true;
     }
+    this.pending = { machine: null, engine: null };
     this.picks.workflow = pending.way.workflow;
     this.picksChanged();
     await this.refresh();

@@ -270,10 +270,13 @@ def test_every_video_engine_a_machine_ships_is_on_its_menu():
     from radio_play_studio.config import _checkout_workflow
     folder = _checkout_workflow().parent
     on_menu = {name for _, ways in MACHINES for _, name in ways}
-    for prefix in ("otr_8gb_", "otr_16gb_", "otr_mac16_"):
+    # A twin, the closed-SDK sibling of the open foley default, and the cloud
+    # low graph at one and five acts (the page sets the acts itself).
+    not_engines = {"otr_16gb_foley.json", "otr_cloud_low_1act.json", "otr_cloud_low_5act.json"}
+    for prefix in ("otr_8gb_", "otr_16gb_", "otr_mac16_", "otr_cloud_", "otr_google_", "otr_amd_"):
         for path in folder.glob(prefix + "*.json"):
-            if path.stem.endswith("_flux3_ref") or path.name == "otr_16gb_foley.json":
-                continue  # a twin, and the closed-SDK sibling of the open foley default
+            if path.stem.endswith("_flux3_ref") or path.name in not_engines:
+                continue
             assert path.name in on_menu, path.name
 
 
