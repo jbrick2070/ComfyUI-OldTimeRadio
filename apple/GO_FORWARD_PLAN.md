@@ -285,17 +285,19 @@ different proof.
 
 ### The registry -- his clicks and his word
 
-* **2.3.43 is the latest published version** (`d6cb10e74`, 2026-10-28), and
-  it is what `/nodes/comfyui-old-time-radio/install` serves even though it is
-  **Flagged**. Its 716-file zip matches git at `d6cb10e74` byte for byte, with
-  no `contest/` (MRKT, read 2026-10-29).
-* **2.3.44 is owed: the AnimateDiff rip is not in the registry.** `2d7d00f8b`
-  and `5f697cac8` (2026-10-28, after 2.3.43) changed 11 shipped files: three
-  lab engine ids retired, and scene regions moved onto
-  `animatediff15_v3_haunted_video`. Owner: the 5080, `pyproject.toml`. Before
-  the bump: a full suite on that HEAD, diffed against a baseline. MRKT held
-  the release on 2026-10-29 because the 4060 was the live build-night demo
-  machine that evening, so the suite could not run there.
+* **2.3.44 is the latest published version** (`e43e278e7`, cut from the 4060
+  on 2026-10-29 at the operator's word, "Release tonight"): the AnimateDiff
+  rip reaches the registry. It landed **Pending**, and
+  `/nodes/comfyui-old-time-radio/install` serves it already, with the same 31
+  dependencies as 2.3.43. Its 714-file zip matches git at `e43e278e7` byte for
+  byte, with no `contest/`; against 2.3.43's 716 it drops the two retired lab
+  engine files and changes nothing else but the rip, its docs and the version
+  stamps. Expect it to go Flagged like 2.3.21-2.3.43 (below). The release
+  gate, kept for the next one: on this box the full suite had the same 23
+  failures on 2.3.43 and on HEAD, plus
+  `test_cache_persist_failure_does_not_mask_render_exception`, which depends
+  on test order (its render assertion passes; only its caplog capture comes
+  back empty, and it fails alone on 2.3.43 too).
 * **Delete `v2.0-alpha`.** Unblocked: 2.1.1 is Active, the registry icon points
   at `/main/`, and the last live pin -- the RunPod bootstrap `curl` in
   RUNPOD_INSTALL -- moved to `/main/` on 2026-09-25. One click, his.

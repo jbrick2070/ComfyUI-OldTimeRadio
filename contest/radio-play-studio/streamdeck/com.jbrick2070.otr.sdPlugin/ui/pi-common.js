@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 /* global WebSocket, window, document */
-// Shared by the three property inspectors: the Stream Deck socket, the
+// Shared by the four property inspectors: the Stream Deck socket, the
 // Studio status banner, the port field, and the "Open the Studio" link.
 
 (function () {

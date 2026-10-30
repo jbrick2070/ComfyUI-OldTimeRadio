@@ -482,13 +482,16 @@ const KEY_FOR_WRITER = {"openrouter:slot-a": "openrouter", "google_api:slot-a": 
 let keyStatus = null;
 // One act on our test machines (planning/regression/ROUNDS.md, 2026-10-23), in
 // seconds, with the card it was measured on: a guide, never a promise; the
-// foley figure is the closed-SDK sibling's.
+// foley figure is the closed-SDK sibling's. The 8 GB mime, audio-in and
+// visualiser figures are the 2026-10-20/21 round's: on 10-23 the first two drew
+// long Sci-Fi News episodes (112 s and 150 s, not about 75), and the visualiser
+// is the first leg after a boot in both rounds, so it carries the cold start.
 const RTX5080 = "RTX 5080 Laptop, 16 GB", RTX4060 = "RTX 4060 Laptop, 8 GB";
 const ONE_ACT_SECONDS = {"otr_16gb_still.json": [1543, RTX5080], "otr_16gb_video.json": [8849, RTX5080],
                          "otr_16gb_foley_open.json": [12090, RTX5080], "otr_8gb_still.json": [617, RTX4060],
                          "otr_8gb_video.json": [618, RTX4060], "otr_8gb_ltx25_foley.json": [3374, RTX4060],
-                         "otr_8gb_animatediff.json": [1891, RTX4060], "otr_8gb_ltx25_mime.json": [5538, RTX4060],
-                         "otr_8gb_ltx25_audio_in.json": [10054, RTX4060], "otr_8gb_low.json": [969, RTX4060],
+                         "otr_8gb_animatediff.json": [1891, RTX4060], "otr_8gb_ltx25_mime.json": [3031, RTX4060],
+                         "otr_8gb_ltx25_audio_in.json": [3504, RTX4060], "otr_8gb_low.json": [514, RTX4060],
                          "otr_16gb_low.json": [353, RTX5080]};
 let running = false;   // an episode is being made: Make stays off
 

@@ -87,7 +87,6 @@ export const ENGINE_NAMES: Record<string, string> = {
   ltx25_foley_24gb: "LTX 2.5 foley",
   ltx25_high_video: "LTX 2.5",
   ltx098_low_video: "LTX 0.9.8",
-  ltx_8gb: "LTX 2",
   ltx25_mime_8gb: "LTX 2.5 mime",
   ltx25_mime_16gb: "LTX 2.5 mime",
   ltx25_audio_in_8gb: "LTX 2.5 audio-in",

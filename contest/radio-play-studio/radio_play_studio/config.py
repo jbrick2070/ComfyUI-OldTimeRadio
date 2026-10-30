@@ -52,9 +52,9 @@ def reference_twin(workflow_path: Path) -> Path:
 #: 2026-10-29: "all video engine models should be available", AnimateDiff named):
 #: AnimateDiff, the mime and audio-in LTX lanes, and the visualiser that loads no
 #: video weights. The 8 GB four published in both 4060 rounds (ROUNDS.md); the
-#: 16 GB AnimateDiff and visualiser in apple/MACHINES.md and the 5080 round; the
-#: Mac's AnimateDiff Lightning and visualiser in the Mac 16 GB column.
-WAYS: tuple = ("foley", "video", "stills", "animatediff", "mime", "audio_in", "visualiser")
+#: 16 GB visualiser in the 5080 round there, and the 16 GB AnimateDiff in the
+#: 16 GB+ column of apple/MACHINES.md (that round did not run it); the Mac's
+#: AnimateDiff Lightning and visualiser in the Mac 16 GB column.
 MACHINES: tuple = (
     ("nvidia8", (("foley", "otr_8gb_ltx25_foley.json"), ("video", "otr_8gb_video.json"),
                  ("stills", "otr_8gb_still.json"), ("animatediff", "otr_8gb_animatediff.json"),
@@ -78,6 +78,12 @@ MACHINES: tuple = (
                      ("audio_in", "otr_cloud_deluxe_audio_in_3act.json"))),
     ("google_cloud", (("stills", "otr_google_still.json"),)),
 )
+#: Every way a machine can film, in the page's order. Each needs its words in
+#: every page language (way.<key>, way.<key>_sub) and in the deck (faces.ts
+#: WAY_WORDS); tests hold both, and MACHINES, to this list.
+WAYS: tuple = ("foley", "video", "stills", "animatediff", "mime", "audio_in", "visualiser")
+
+
 def _machine_choices() -> dict:
     """The generated cells (machine_choices.json beside this file), or nothing:
     without them every machine keeps every choice."""

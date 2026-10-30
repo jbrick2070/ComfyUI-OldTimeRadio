@@ -200,3 +200,23 @@ def test_a_lane_label_keeps_only_its_id_however_many_suffixes_it_carries():
     left the visualiser named "viz_camera (16:9)"."""
     body = CODE[CODE.index("function modelName"):]
     assert 'String(value).split(" (")[0]' in body[:body.index("\n}")]
+
+
+@pytest.mark.parametrize("code", CODES)
+def test_every_way_has_its_name_and_its_line_in_every_language(code):
+    """A way card is named "way." + key and "way." + key + "_sub", which the
+    literal key scan in test_rps_i18n cannot see (config.WAYS is the list)."""
+    from radio_play_studio.config import WAYS
+    strings = json.loads((I18N_DIR / f"{code}.json").read_text(encoding="utf-8"))
+    for way in WAYS:
+        assert strings.get(f"way.{way}") and strings.get(f"way.{way}_sub"), (code, way)
+
+
+def test_the_deck_has_a_word_for_every_way_and_only_those():
+    """The Video control falls back to the way's word (faces.ts WAY_WORDS) for an
+    engine it has no name for; config.WAYS is the list both read."""
+    from radio_play_studio.config import WAYS
+    deck = (PAGE.parents[2] / "streamdeck" / "src" / "actions" / "faces.ts").read_text(encoding="utf-8")
+    block = deck[deck.index("export const WAY_WORDS"):]
+    words = set(re.findall(r"^\s*(\w+):", block[:block.index("};")], re.M))
+    assert words == set(WAYS)

@@ -256,7 +256,7 @@ def test_every_unproven_name_is_on_the_menu_and_says_why():
         assert menu_lookup(name) is not None and why.strip()
 
 
-def test_no_menu_machine_offers_foley_or_mime_where_it_is_not_proven():
+def test_no_foley_or_mime_on_a_mac_or_amd_and_mime_only_on_nvidia():
     offered = {machine: {way for way, _ in ways} for machine, ways in MACHINES}
     assert offered["mac16"] == {"video", "stills", "animatediff", "visualiser"} and offered["amd"] == {"stills"}
     mime = {machine for machine, ways in MACHINES for _, name in ways if "mime" in name}
