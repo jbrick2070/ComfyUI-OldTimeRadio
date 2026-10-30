@@ -1374,6 +1374,13 @@ NO_LANE_REASON = {
     "mesh_stage": "manual_doc",
 }
 
+#: The pip line a ``pip_manual`` engine needs, as the docs print it. Pinned to
+#: the engine's own ``REQUIREMENT`` by tests/test_upscale_rtx_vsr.py so the
+#: refusal and apple/MACHINES.md cannot name two different ranges.
+PIP_MANUAL_REQUIREMENTS = {
+    "rtx_vsr": "nvidia-vfx>=0.2,<0.3",
+}
+
 
 def lane_for_engine(engine: str, kind: str, *, low_vram: bool = False):
     """Route ONE engine id to its provisioning lane. The single router.

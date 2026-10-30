@@ -69,44 +69,133 @@ RULES = [
     ("$import_func_direct", re.compile(r"__import__\s*\("), "__import__("),
 ]
 
-_PIP_SHELL_RE = re.compile(r"\bpip\s+install\b")
-_SPAWN_CALLEES = {"run", "Popen", "call", "check_call", "check_output", "system", "popen"}
+#: ``pip install`` as shell text: a pip token, any options, then ``install``.
+_PIP_SHELL_RE = re.compile(r"\bpip\d*(?:\.\d+)*(?:\.exe)?\s+(?:-[^\s]+\s+)*install\b")
+#: ``pip``, ``pip3``, ``pip3.12``, ``pip.exe`` as one argv token.
+_PIP_TOKEN_RE = re.compile(r"^pip\d*(?:\.\d+)*(?:\.exe)?$", re.IGNORECASE)
+#: Callees that run what they are handed, by name, whatever module owns them.
+_SPAWN_CALLEES = {"run", "Popen", "call", "check_call", "check_output", "system",
+                  "popen", "spawn", "exec"}
+#: Callees handed a list literal without ever running it. A list that grows
+#: through ``extend``/``append``/``insert`` is followed into the NAME instead.
+_INERT_CALLEES = {"print", "extend", "append", "insert", "join", "format", "debug",
+                  "info", "warning", "error", "exception", "log", "len", "sorted",
+                  "set", "list", "tuple", "repr", "str"}
+
+
+def _argv_spells_pip_install(words) -> bool:
+    """True when the FIRST pip token is followed, options allowed between, by
+    ``install``. ``["pip", "uninstall", "x"]`` is not an install;
+    ``["pip", "--no-cache-dir", "install", "x"]`` is."""
+    for i, word in enumerate(words):
+        if not _PIP_TOKEN_RE.match(word):
+            continue
+        for later in words[i + 1:]:
+            if later.startswith("-"):
+                continue
+            return later == "install"
+        return False
+    return False
+
+
+def _literal_words(node, names) -> list:
+    """The string constants an argv expression carries, in order: a list or
+    tuple literal (a starred element is followed), a ``+`` of such, or a NAME
+    assigned or grown from them anywhere in the same file."""
+    import ast
+    if isinstance(node, (ast.List, ast.Tuple)):
+        out = []
+        for elt in node.elts:
+            if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                out.append(elt.value)
+            elif isinstance(elt, ast.Starred):
+                out.extend(_literal_words(elt.value, names))
+        return out
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        return _literal_words(node.left, names) + _literal_words(node.right, names)
+    if isinstance(node, ast.Name):
+        return list(names.get(node.id, ()))
+    return []
+
+
+def _collect_argv_names(tree) -> dict:
+    """NAME -> the string constants its list carries. Scope-blind on purpose
+    (one map per file): ``cmd = [...]``, ``cmd += [...]``, ``cmd.extend([...])``
+    and ``cmd.append("x")`` all feed the name, so a spawn handed ``cmd`` is
+    judged on what ``cmd`` was built from. A reader that must guess guesses
+    toward reporting."""
+    import ast
+    names: dict = {}
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)):
+            words = _literal_words(node.value, names)
+            if words:
+                names[node.targets[0].id] = words
+        elif (isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name)
+                and isinstance(node.op, ast.Add)):
+            names[node.target.id] = (list(names.get(node.target.id, ()))
+                                     + _literal_words(node.value, names))
+        elif (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.attr in ("extend", "append", "insert")):
+            added = []
+            for arg in node.args:
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    added.append(arg.value)
+                else:
+                    added.extend(_literal_words(arg, names))
+            if added:
+                target = node.func.value.id
+                names[target] = list(names.get(target, ())) + added
+    return names
 
 
 def _pip_install_spawns(rel: str, raw: str) -> list:
     """The registry's pylint-scanner rule ``subprocess-pip-install``, modelled.
 
-    An AST check, not a lexical one: it fires on a call whose arguments spell a
-    pip install -- an argv list carrying ``"pip"`` and then ``"install"`` as
-    separate elements, or a spawn-named callee (run, Popen, call, check_call,
-    check_output, system, popen) handed a string containing ``pip install``.
-    Any callee counts for the argv shape, because this pack spawns through its
-    own boundary (``otr_proc.run``) and the reviewer read through it. An error
-    message that merely quotes a pip line is neither shape and does not fire.
+    An AST check, not a lexical one. Two shapes fire:
+
+    * ARGV: a call -- any callee except the inert ones above, because this pack
+      spawns through its own boundary (``otr_proc.run``) and the reviewer read
+      through it -- handed, positionally or by keyword, a list whose first pip
+      token is followed by ``install`` (options allowed between). The list may
+      be a literal, a ``+`` of literals, a starred splice, or a NAME the file
+      assigned or grew from literals (``cmd = [...]``, ``cmd.extend([...])``).
+    * SHELL TEXT: a spawn-named callee (run, Popen, call, check_call,
+      check_output, system, popen, spawn, exec) with ``pip ... install`` in any
+      string constant anywhere in its arguments -- a plain string, an f-string,
+      ``"pip install " + pkg``, or ``shlex.split("pip install x")``.
+
+    An error message that merely quotes a pip line is neither shape. What is
+    still over-reported, on purpose: a helper that builds a hint from a pip
+    argv (``fmt(["pip", "install", x])``) fires, because the reader cannot tell
+    a hint builder from a spawn wrapper -- a hit here is a line to look at.
+    Measured 2026-10-30 against the shapes two reviewers (Sonnet, Codex)
+    listed as misses; `tests/test_registry_scan_oracle_rules.py` pins them.
     """
     import ast
     try:
         tree = ast.parse(raw)
     except SyntaxError:
         return []
+    names = _collect_argv_names(tree)
     raw_lines = raw.splitlines()
     out = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
-        hit = False
-        for arg in node.args:
-            if isinstance(arg, (ast.List, ast.Tuple)):
-                words = [e.value for e in arg.elts
-                         if isinstance(e, ast.Constant) and isinstance(e.value, str)]
-                if "pip" in words and "install" in words[words.index("pip"):]:
-                    hit = True
-            elif isinstance(arg, ast.Constant) and isinstance(arg.value, str) \
-                    and _PIP_SHELL_RE.search(arg.value):
-                fn = node.func
-                callee = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
-                if callee in _SPAWN_CALLEES:
-                    hit = True
+        fn = node.func
+        callee = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+        if callee in _INERT_CALLEES:
+            continue
+        values = list(node.args) + [kw.value for kw in node.keywords]
+        hit = any(_argv_spells_pip_install(_literal_words(v, names)) for v in values)
+        if not hit and callee in _SPAWN_CALLEES:
+            hit = any(
+                isinstance(sub, ast.Constant) and isinstance(sub.value, str)
+                and _PIP_SHELL_RE.search(sub.value)
+                for v in values for sub in ast.walk(v))
         if hit:
             out.append({
                 "file": rel, "line": node.lineno, "rule": "$subprocess_pip_install",

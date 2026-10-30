@@ -150,14 +150,21 @@ If you change a dropdown yourself, these are the only picks that need anything b
 
 ## Where do the manual weights come from?
 
-Only the picks below still need a hand download.
+Only the picks below still need a hand step.
+
+### A package you install with pip
+
+Not a weight file: the engine's runtime ships inside a pip package, and the pack never installs packages at run time (the Comfy Registry forbids it). Run the line once with ComfyUI's own Python, never a system pip. A box without the package keeps rendering: the composite says so in its report and uses `off`.
+
+| If you select | Run once, with ComfyUI's own Python |
+|---|---|
+| `rtx_vsr` | `python -m pip install "nvidia-vfx>=0.2,<0.3"` |
 
 ### No manifest ships for these
 
 This pack cannot fetch them, and no table here can tell you the filename, because the engine chooses it. Select one anyway and it refuses by name before anything else runs, naming what it is missing and where it expects it. It never quietly substitutes another.
 
 * `mesh_stage`
-* `rtx_vsr`
 
 ## What the words mean
 

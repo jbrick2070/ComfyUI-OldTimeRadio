@@ -40,7 +40,8 @@ published standards forbid exactly that ("runtime package installation through
 subprocess calls is not permitted"), its reviewer flagged 2.3.34 and 2.3.35
 ``policy-v0.7: code-install`` for it, and no version after 2.3.20 reached
 Active while it shipped (PBUG-20261030-01). So the user runs the one pip line
-into ComfyUI's own Python, once (``INSTALL_HINT``, which every refusal names),
+into ComfyUI's own Python, once (``INSTALL_HINT``, which the missing-package
+refusal names),
 and ``load`` imports what is there; installing NVIDIA's runtime is the user's
 own acceptance of NVIDIA's licence. A box without the package refuses like any
 other unusable case -- naming the hardware reason first where there is one, so
@@ -81,10 +82,13 @@ _LOG = logging.getLogger("OTR.upscale.rtx_vsr")
 #: itself.
 REQUIREMENT = "nvidia-vfx>=0.2,<0.3"
 
-#: Every refusal names it. The PACK never runs it -- the user does, once, with
-#: ComfyUI's own Python (module docstring: the registry forbids a run-time pip).
-INSTALL_HINT = ('install it with ComfyUI\'s own Python first: pip install "%s" '
-                "(NVIDIA RTX card required)" % REQUIREMENT)
+#: The missing-package refusal names it (``_refuse``'s ``hint``), and only on a
+#: box that could run the SDK. The PACK never runs it -- the user does, once,
+#: with ComfyUI's own interpreter (a system pip installs where ComfyUI never
+#: looks); the module docstring says why the registry forbids a run-time pip.
+INSTALL_HINT = ("install it first with ComfyUI's own interpreter, never a system "
+                'pip: python -m pip install "%s" (NVIDIA RTX card required)'
+                % REQUIREMENT)
 
 #: The SDK's floor: RTX Video Super Resolution runs on Turing (sm_75) or newer.
 #: A Pascal/Maxwell GTX card would be told to install a wheel it cannot use.
@@ -227,9 +231,15 @@ class RtxVsr:
                 ("sizing", "to_canvas"))
 
     # -----------------------------------------------------------------
-    def _refuse(self, reason, message):
-        return EngineUnusable(self.name, "upscale_stage", reason,
-                              f"{message}; {INSTALL_HINT}", kind="upscale")
+    def _refuse(self, reason, message, hint=False):
+        """The composite's refusal. ``hint`` appends the pip line, and only the
+        missing-package refusal on a box that could run the SDK sets it: a CPU,
+        AMD, Mac or GTX box, a bad quality level, a failed probe, or a package
+        that is present but will not load each get their own reason and
+        nothing else, so nobody is sent to install a wheel that would not
+        help (Sonnet and Codex reviews of 68d0a1417)."""
+        text = f"{message}; {INSTALL_HINT}" if hint else message
+        return EngineUnusable(self.name, "upscale_stage", reason, text, kind="upscale")
 
     def load(self, device) -> None:
         """Bind to an NVIDIA GPU and prove the SDK runs there. Raises
@@ -253,9 +263,19 @@ class RtxVsr:
                                "NVIDIA-only")
         # THE SDK, AFTER THE DEVICE HAS PROVED NVIDIA, so a CPU, Mac or AMD box
         # is refused for its hardware, never for a package it has no use for.
+        blocker = _hardware_blocker(torch, dev)
         try:
-            nvvfx = _import_nvvfx(blocker=_hardware_blocker(torch, dev))
-        except Exception as exc:  # noqa: BLE001 -- ImportError, a DLL load error
+            nvvfx = _import_nvvfx(blocker=blocker)
+        except ModuleNotFoundError as exc:
+            # The pip line helps exactly here: the package is absent and this
+            # box could use it. A hardware blocker means it would not help; a
+            # module OTHER than nvvfx missing is the SDK's own breakage.
+            absent = getattr(exc, "name", None) in (None, "nvvfx")
+            raise self._refuse(EngineUsabilityReason.MISSING_MODEL,
+                               f"the nvidia-vfx package is not usable here "
+                               f"({type(exc).__name__}: {exc})",
+                               hint=absent and not blocker)
+        except Exception as exc:  # noqa: BLE001 -- an ImportError, a DLL load error
             raise self._refuse(EngineUsabilityReason.MISSING_MODEL,
                                f"the nvidia-vfx package is not usable here "
                                f"({type(exc).__name__}: {exc})")

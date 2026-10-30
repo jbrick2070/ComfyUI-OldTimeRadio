@@ -111,14 +111,16 @@ on 2026-10-16: AnimateDiff episodes upscaled clip by clip.
 
 **You install its package, once.** Its models ship inside NVIDIA's own
 package, `nvidia-vfx`, so there is no checkpoint to fetch -- and the pack does
-not fetch the package either. Until 2.3.44 the engine ran `pip install` itself
+not fetch the package either. Through 2.3.44 the engine ran `pip install` itself
 the first time an NVIDIA workflow picked it; the Comfy Registry's standards
 forbid a node pack installing packages at run time, and the registry flagged
 the pack for it, so the install is yours. Run this once with ComfyUI's own
-Python (the `python.exe` inside its venv or `python_embeded` folder):
+Python (the `python.exe` inside its venv or `python_embeded` folder), never
+with a bare `pip` from your PATH, which is usually a different Python and puts
+the package where ComfyUI never looks:
 
 ```
-pip install "nvidia-vfx>=0.2,<0.3"
+python -m pip install "nvidia-vfx>=0.2,<0.3"
 ```
 
 If ComfyUI's Python has no pip (some ComfyUI Desktop installs use uv), the

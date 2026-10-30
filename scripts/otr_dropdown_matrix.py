@@ -1074,9 +1074,16 @@ def render_apple(rows: list) -> str:
     # ------------------------------------------------------------- 3. weights
     L.append("## Where do the manual weights come from?\n\n")
     fetcher = _load("scripts/otr_fetch_lane_weights.py", "_odm_fetcher")
-    lane_to_engines, unsourced = {}, []
+    lane_to_engines, unsourced, pip_rows = {}, [], []
     for row in rows:
         if "manual" not in str(row["friction"]).lower():
+            continue
+        # A pip package is not a weight file: the pack never installs it (the
+        # registry forbids a run-time pip, PBUG-20261030-01), so its row says
+        # which line to run, not which file to download.
+        if provision.NO_LANE_REASON.get(row["engine"]) == "pip_manual":
+            pip_rows.append((row["public"],
+                             provision.PIP_MANUAL_REQUIREMENTS.get(row["engine"], "")))
             continue
         lane = str(row["lane"]) if row["lane"] else ""
         specs = manual_artifacts(lane, provision, fetcher) if lane else []
@@ -1095,8 +1102,8 @@ def render_apple(rows: list) -> str:
                  "here is the whole group. A heading with no total means that "
                  "group's manifest predates byte receipts -- the machine grid still has "
                  "the figure.\n\n")
-    elif unsourced:
-        L.append("Only the picks below still need a hand download.\n\n")
+    elif unsourced or pip_rows:
+        L.append("Only the picks below still need a hand step.\n\n")
     else:
         L.append("None: no row in the grid above reads manual.\n\n")
 
@@ -1127,6 +1134,19 @@ def render_apple(rows: list) -> str:
                          folder,
                          "%.2f GiB" % (size / 2 ** 30) if size else "--",
                          "yes" if spec.get("gated") else "no"))
+        L.append("\n")
+
+    if pip_rows:
+        L.append("### A package you install with pip\n\n")
+        L.append("Not a weight file: the engine's runtime ships inside a pip "
+                 "package, and the pack never installs packages at run time "
+                 "(the Comfy Registry forbids it). Run the line once with "
+                 "ComfyUI's own Python, never a system pip. A box without the "
+                 "package keeps rendering: the composite says so in its report "
+                 "and uses `off`.\n\n")
+        L.append("| If you select | Run once, with ComfyUI's own Python |\n|---|---|\n")
+        for public, requirement in sorted(pip_rows):
+            L.append("| `%s` | `python -m pip install \"%s\"` |\n" % (public, requirement))
         L.append("\n")
 
     if unsourced:

@@ -141,16 +141,18 @@ def test_fingerprint_does_not_import_torch_or_nvvfx():
 def test_a_non_cuda_device_refuses(monkeypatch):
     _fake_nvvfx(monkeypatch)
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-    with pytest.raises(EngineUnusable, match="NVIDIA CUDA device"):
+    with pytest.raises(EngineUnusable, match="NVIDIA CUDA device") as exc:
         V.RtxVsr().load(torch.device("cpu"))
+    assert "pip install" not in str(exc.value)     # its hardware, not a package
 
 
 def test_a_rocm_torch_refuses(monkeypatch):
     _fake_nvvfx(monkeypatch)
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(torch.version, "hip", "6.2", raising=False)
-    with pytest.raises(EngineUnusable, match="ROCm"):
+    with pytest.raises(EngineUnusable, match="ROCm") as exc:
         V.RtxVsr().load(torch.device("cuda:0"))
+    assert "pip install" not in str(exc.value)
 
 
 @pytest.mark.parametrize("quality,match", [("BOGUS", "not one of"),
@@ -160,8 +162,9 @@ def test_a_bad_quality_level_refuses(monkeypatch, quality, match):
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(torch.version, "hip", None, raising=False)
     monkeypatch.setenv("OTR_RTX_VSR_QUALITY", quality)
-    with pytest.raises(EngineUnusable, match=match):
+    with pytest.raises(EngineUnusable, match=match) as exc:
         V.RtxVsr().load(torch.device("cuda:0"))
+    assert "pip install" not in str(exc.value)     # the SDK is there; its level is wrong
 
 
 def test_upscale_is_exact_x2_with_sides_rounded_for_the_sdk_and_resized():
@@ -389,7 +392,9 @@ def test_a_non_degrading_engine_failing_mid_composite_still_raises(tmp_path,
 
 def _sdk_absent(monkeypatch):
     """No nvvfx; a capable RTX host unless a test says otherwise; and a spawn
-    boundary that FAILS THE TEST if the engine tries to run anything at all."""
+    boundary that FAILS THE TEST if the engine tries to run anything at all.
+    Python itself is left real: the suite runs on 3.12+, which the SDK floor
+    accepts, and a bare tuple in sys.version_info breaks `.major` readers."""
     from nodes._otr_shared import proc as otr_proc
 
     def never(*argv, **kw):
@@ -403,7 +408,6 @@ def _sdk_absent(monkeypatch):
                         lambda d=None: "NVIDIA GeForce RTX 4060 Laptop GPU")
     monkeypatch.setattr(platform, "machine", lambda: "AMD64")
     monkeypatch.setattr(sys, "platform", "win32")
-    monkeypatch.setattr(sys, "version_info", (3, 13, 0, "final", 0))
 
 
 def test_without_the_package_load_refuses_with_the_pip_line(monkeypatch):
@@ -421,16 +425,18 @@ def test_without_the_package_load_refuses_with_the_pip_line(monkeypatch):
 def test_a_cpu_box_is_refused_for_its_hardware_not_the_package(monkeypatch):
     _sdk_absent(monkeypatch)
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-    with pytest.raises(EngineUnusable, match="NVIDIA CUDA device"):
+    with pytest.raises(EngineUnusable, match="NVIDIA CUDA device") as exc:
         V.RtxVsr().load(torch.device("cpu"))
+    assert "pip install" not in str(exc.value)     # its hardware, not a package
 
 
 def test_an_amd_box_is_refused_for_its_hardware_not_the_package(monkeypatch):
     _sdk_absent(monkeypatch)
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(torch.version, "hip", "6.2", raising=False)
-    with pytest.raises(EngineUnusable, match="ROCm"):
+    with pytest.raises(EngineUnusable, match="ROCm") as exc:
         V.RtxVsr().load(torch.device("cuda:0"))
+    assert "pip install" not in str(exc.value)
 
 
 def test_a_pre_turing_card_without_the_sdk_hears_the_real_reason(monkeypatch):
@@ -438,8 +444,9 @@ def test_a_pre_turing_card_without_the_sdk_hears_the_real_reason(monkeypatch):
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(torch.version, "hip", None, raising=False)
     monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d=None: (6, 1))
-    with pytest.raises(EngineUnusable, match="Turing"):
+    with pytest.raises(EngineUnusable, match="Turing") as exc:
         V.RtxVsr().load(torch.device("cuda:0"))
+    assert "pip install" not in str(exc.value)     # it could not use the wheel
 
 
 def test_an_arm_or_mac_host_without_the_sdk_hears_the_real_reason(monkeypatch):
@@ -448,8 +455,9 @@ def test_an_arm_or_mac_host_without_the_sdk_hears_the_real_reason(monkeypatch):
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(torch.version, "hip", None, raising=False)
     monkeypatch.setattr(platform, "machine", lambda: "aarch64")
-    with pytest.raises(EngineUnusable, match="x86-64"):
+    with pytest.raises(EngineUnusable, match="x86-64") as exc:
         V.RtxVsr().load(torch.device("cuda:0"))
+    assert "pip install" not in str(exc.value)     # it could not use the wheel
 
 
 def test_a_gtx_card_without_the_sdk_hears_the_real_reason(monkeypatch):
@@ -459,8 +467,9 @@ def test_a_gtx_card_without_the_sdk_hears_the_real_reason(monkeypatch):
     monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d=None: (7, 5))
     monkeypatch.setattr(torch.cuda, "get_device_name",
                         lambda d=None: "NVIDIA GeForce GTX 1660 SUPER")
-    with pytest.raises(EngineUnusable, match="GTX"):
+    with pytest.raises(EngineUnusable, match="GTX") as exc:
         V.RtxVsr().load(torch.device("cuda:0"))
+    assert "pip install" not in str(exc.value)     # it could not use the wheel
 
 
 def test_a_present_but_broken_sdk_raises_its_own_error(monkeypatch):
@@ -476,6 +485,38 @@ def test_a_present_but_broken_sdk_raises_its_own_error(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", broken)
     with pytest.raises(ImportError, match="DLL load failed"):
         V._import_nvvfx()
+
+
+def test_a_present_but_broken_sdk_is_refused_without_the_pip_line(monkeypatch):
+    """Through load(): the DLL error is the reason, and the pip line would be
+    wrong for a package that is already there (Codex review of 68d0a1417)."""
+    import builtins
+    _sdk_absent(monkeypatch)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.version, "hip", None, raising=False)
+    real_import = builtins.__import__
+
+    def broken(name, *a, **kw):
+        if name == "nvvfx":
+            raise ImportError("DLL load failed while importing nvvfx")
+        return real_import(name, *a, **kw)
+    monkeypatch.setattr(builtins, "__import__", broken)
+    with pytest.raises(EngineUnusable) as exc:
+        V.RtxVsr().load(torch.device("cuda:0"))
+    assert "DLL load failed" in str(exc.value)
+    assert "pip install" not in str(exc.value)
+
+
+def test_the_provisioner_names_the_same_pip_line_as_the_engine():
+    """apple/MACHINES.md prints the provisioner's line and the refusal prints
+    the engine's: one requirement, two readers, or they drift apart."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "otr_provision_pin", REPO_ROOT / "scripts" / "otr_provision.py")
+    prov = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(prov)
+    assert prov.NO_LANE_REASON["rtx_vsr"] == "pip_manual"
+    assert prov.PIP_MANUAL_REQUIREMENTS["rtx_vsr"] == V.REQUIREMENT
 
 
 # --- AnimateDiff / Ghost rows (operator, 2026-10-15) ----------------------- #
