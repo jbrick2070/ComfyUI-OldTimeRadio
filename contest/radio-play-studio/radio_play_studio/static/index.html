@@ -486,7 +486,10 @@ let keyStatus = null;
 const RTX5080 = "RTX 5080 Laptop, 16 GB", RTX4060 = "RTX 4060 Laptop, 8 GB";
 const ONE_ACT_SECONDS = {"otr_16gb_still.json": [1543, RTX5080], "otr_16gb_video.json": [8849, RTX5080],
                          "otr_16gb_foley_open.json": [12090, RTX5080], "otr_8gb_still.json": [617, RTX4060],
-                         "otr_8gb_video.json": [618, RTX4060], "otr_8gb_ltx25_foley.json": [3374, RTX4060]};
+                         "otr_8gb_video.json": [618, RTX4060], "otr_8gb_ltx25_foley.json": [3374, RTX4060],
+                         "otr_8gb_animatediff.json": [1891, RTX4060], "otr_8gb_ltx25_mime.json": [5538, RTX4060],
+                         "otr_8gb_ltx25_audio_in.json": [10054, RTX4060], "otr_8gb_low.json": [969, RTX4060],
+                         "otr_16gb_low.json": [353, RTX5080]};
 let running = false;   // an episode is being made: Make stays off
 
 // -- Translations -------------------------------------------------------------
@@ -796,7 +799,9 @@ const MODEL_NAMES = {
   ltx25_foley_24gb: "LTX 2.5 with foley", ltx25_high_video: "LTX 2.5", ltx_8gb: "LTX 2 (8 GB)",
   ltx098_low_video: "LTX 0.9.8", still_motion: "still with motion", still_flat: "still",
   viz_camera: "audio visualiser", animatediff15_v3_haunted_video: "AnimateDiff",
-  animatediff15_lightning_video: "AnimateDiff Lightning", cloud_ltx25_foley_plus: "LTX 2.5 foley (cloud)",
+  animatediff15_lightning_video: "AnimateDiff Lightning", ltx25_mime_8gb: "LTX 2.5 mime",
+  ltx25_mime_16gb: "LTX 2.5 mime", ltx25_audio_in_8gb: "LTX 2.5 audio-in",
+  cloud_ltx25_foley_plus: "LTX 2.5 foley (cloud)",
   cloud_vidu_q2_pro_fast_720p: "Vidu Q2 (cloud)", cloud_ltx25_audio_in: "LTX 2.5 audio-in (cloud)",
   kokoro: "Kokoro", cloud_elevenlabs: "ElevenLabs (cloud)", google_tts: "Google voices (cloud)",
   stable_audio_3: "Stable Audio 3", sonilo: "Sonilo (cloud)", google_lyria: "Lyria (cloud)",

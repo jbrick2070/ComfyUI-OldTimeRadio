@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 import streamDeck from "@elgato/streamdeck";
 import { ChoiceDialAction } from "./actions/choice-dial.js";
-import { MachineDialAction } from "./actions/machine-dial.js";
+import { MachineDialAction, VideoDialAction } from "./actions/machine-dial.js";
 import { MakeKeyAction } from "./actions/make-key.js";
 import { SettingsSync } from "./state/settings-sync.js";
 import { StudioStore } from "./state/studio-store.js";
@@ -52,6 +52,7 @@ streamDeck.ui.onSendToPlugin<{ event?: string; port?: string | number }>((ev) =>
 
 streamDeck.actions.registerAction(new ChoiceDialAction(store));
 streamDeck.actions.registerAction(new MachineDialAction(store));
+streamDeck.actions.registerAction(new VideoDialAction(store));
 streamDeck.actions.registerAction(new MakeKeyAction(store, openUrl));
 
 // The saved port and picks are read before the store starts, so its first

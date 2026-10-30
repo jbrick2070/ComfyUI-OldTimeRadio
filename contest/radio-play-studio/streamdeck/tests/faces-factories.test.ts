@@ -8,9 +8,9 @@
 // invisible to a test that fed the renderer its own strings.)
 import { describe, expect, it } from "vitest";
 import { offeredChoices } from "../src/actions/choice-math.js";
-import { PHASE_WORDS, renderChoice, renderMachine, renderMakeKey } from "../src/actions/faces.js";
+import { ENGINE_NAMES, PHASE_WORDS, renderChoice, renderMakeKey, renderMenu } from "../src/actions/faces.js";
 import { CELL, NODE_KEY } from "../src/gfx/svg-renderer.js";
-import { MachineEntry, RunState, STAGE_BUSY, StudioPhase, StudioStore } from "../src/state/studio-store.js";
+import { MachineEntry, MenuPart, RunState, STAGE_BUSY, StudioPhase, StudioStore } from "../src/state/studio-store.js";
 import { StudioField } from "../src/types/contract.js";
 import { DIAL_FIELDS } from "../src/types/settings.js";
 import { BANKS, checkKey, checkNode, LANGUAGES, LONG_ERROR, STYLES, TextEl } from "./helpers/face-measure.js";
@@ -31,7 +31,8 @@ interface StubState {
  *  are fresh objects on every call, as the real store's are. */
 function stubStore(st: StubState): StudioStore {
   const locked = ["running", "busy", "off", "starting"].includes(st.phase);
-  const entries = (): MachineEntry[] => (st.entries ?? []).map((e) => ({ machine: e.machine, way: { ...e.way } }));
+  // Both menu controls get the same rows here: a face only reads its own.
+  const entries = (_part?: MenuPart): MachineEntry[] => (st.entries ?? []).map((e) => ({ machine: e.machine, way: { ...e.way } }));
   const run = st.run
     ? ({ id: "0123456789ab", external: false, value: 0, phase: "", minutesLeft: null, finished: false, seen: 0, ...st.run } as RunState)
     : null;
@@ -43,10 +44,10 @@ function stubStore(st: StubState): StudioStore {
     isLocked: () => locked,
     getFormError: () => st.formError ?? "",
     getBusyReason: () => st.busy ?? "",
-    getMachineEntries: entries,
-    getMachineIndex: () => st.current ?? 0,
+    getMenuEntries: entries,
+    getMenuIndex: () => st.current ?? 0,
     getPendingIndex: () => (st.pending ?? null),
-    getPendingMachine: () => (st.pending === null || st.pending === undefined ? null : entries()[st.pending]),
+    getPendingEntry: () => (st.pending === null || st.pending === undefined ? null : entries()[st.pending]),
     getRun: () => run
   } as unknown as StudioStore;
 }
@@ -60,17 +61,29 @@ const REAL_FIELDS: Record<string, StudioField> = {
   style: choiceField("style", STYLES),
   acts: choiceField("acts", ["1", "2", "3", "4", "5", "6", "7"])
 };
-/** config.MACHINES, the unproven rows as config.UNPROVEN names them, and a
- *  machine the deck has no name for yet. */
+/** config.MACHINES with the lane each graph saves, the unproven rows as
+ *  config.UNPROVEN names them, a lane the deck has no name for yet, a way read
+ *  without node definitions, and a machine the deck has no name for yet. */
 const REAL_ENTRIES: MachineEntry[] = (
   [
-    ["nvidia8", "foley", true], ["nvidia8", "video", true], ["nvidia8", "stills", true],
-    ["nvidia16", "foley", true], ["nvidia16", "video", true], ["nvidia16", "stills", true],
-    ["mac16", "video", true], ["mac16", "stills", true], ["amd", "stills", true],
-    ["comfy_cloud", "foley", false], ["comfy_cloud", "video", false], ["google_cloud", "stills", true],
-    ["a_machine_added_later", "stills", false]
-  ] as Array<[string, string, boolean]>
-).map(([machine, way, proven]) => ({ machine, way: { key: way, workflow: `${machine}_${way}.json`, proven } }));
+    ["nvidia8", "foley", true, "ltx25_foley_8gb"], ["nvidia8", "video", true, "ltx098_low_video"],
+    ["nvidia8", "stills", true, "still_motion"], ["nvidia8", "animatediff", true, "animatediff15_v3_haunted_video"],
+    ["nvidia8", "mime", true, "ltx25_mime_8gb"], ["nvidia8", "audio_in", true, "ltx25_audio_in_8gb"],
+    ["nvidia8", "visualiser", true, "viz_camera"],
+    ["nvidia16", "foley", true, "ltx25_foley_16gb (16:9)"], ["nvidia16", "video", true, "ltx25_high_video"],
+    ["nvidia16", "stills", true, "still_motion"], ["nvidia16", "animatediff", true, "animatediff15_v3_haunted_video"],
+    ["nvidia16", "mime", false, "ltx25_mime_16gb"], ["nvidia16", "visualiser", true, "viz_camera"],
+    ["mac16", "video", true, "ltx098_low_video"], ["mac16", "stills", true, "still_motion"],
+    ["mac16", "animatediff", true, "animatediff15_lightning_video"], ["mac16", "visualiser", true, "viz_camera"],
+    ["amd", "stills", true, "still_motion"],
+    ["comfy_cloud", "foley", false, "cloud_ltx25_foley_plus"], ["comfy_cloud", "video", false, "cloud_vidu_q2_pro_fast_720p"],
+    ["google_cloud", "stills", false, "a_lane_added_later"],
+    ["a_machine_added_later", "audio_in", false, ""]
+  ] as Array<[string, string, boolean, string]>
+).map(([machine, way, proven, video]) => ({
+  machine,
+  way: { key: way, workflow: `${machine}_${way}.json`, proven, ...(video ? { uses: { video } } : {}) }
+}));
 const ALL_PHASES: StudioPhase[] = ["off", "loading", "form_error", "ready", "starting", "running", "busy", "done", "error"];
 /** The only words a face ends with an ellipsis on purpose. */
 const MEANT_ELLIPSIS = new Set(["Tuning in…", "reading the form…", "tuning in…", "on the way…"]);
@@ -107,8 +120,8 @@ describe("every face the factories draw fits, and only a server's long text is e
     expect(faces).toBeGreaterThan(500);
   });
 
-  it("machine controls: every row chosen or resting, every phase and mode, and a counter from 1", () => {
-    for (const mode of ["dial", "key"] as const) {
+  it("machine and video controls: every row chosen or resting, every phase and mode, and a counter from 1", () => {
+    for (const [part, mode] of [["machine", "dial"], ["machine", "key"], ["engine", "dial"], ["engine", "key"]] as const) {
       const g = mode === "dial" ? CELL : NODE_KEY;
       for (const phase of ALL_PHASES) {
         for (let i = 0; i < REAL_ENTRIES.length; i += 1) {
@@ -120,8 +133,8 @@ describe("every face the factories draw fits, and only a server's long text is e
               pending,
               run: phase === "running" ? { value: 0.7 } : null
             };
-            const label = `${mode} machine row ${i} resting ${pending} ${phase}`;
-            const els = checkNode(renderMachine(stubStore(st), mode), g, label);
+            const label = `${part} ${mode} row ${i} resting ${pending} ${phase}`;
+            const els = checkNode(renderMenu(stubStore(st), part, mode), g, label);
             expect(cutWords(els), label).toEqual([]);
             for (const t of els.filter((e) => /^\d+\/\d+$/.test(e.text))) {
               const [at, of] = t.text.split("/").map(Number);
@@ -137,10 +150,28 @@ describe("every face the factories draw fits, and only a server's long text is e
         }
       }
       for (const phase of ALL_PHASES) {
-        const label = `${mode} no menu ${phase}`;
-        expect(cutWords(checkNode(renderMachine(stubStore({ phase }), mode), g, label)), label).toEqual([]);
+        const label = `${part} ${mode} no menu ${phase}`;
+        expect(cutWords(checkNode(renderMenu(stubStore({ phase }), part, mode), g, label)), label).toEqual([]);
       }
     }
+  });
+
+  it("the video control names each engine, the machine control the engine it would film with", () => {
+    const at = (workflow: string): number => REAL_ENTRIES.findIndex((e) => e.way.workflow === workflow);
+    const words = (svg: string): string => [...svg.matchAll(/>([^<]+)</g)].map((m) => m[1]).join(" ");
+    const face = (part: MenuPart, current: number): string =>
+      words(renderMenu(stubStore({ phase: "ready", entries: REAL_ENTRIES, current }), part, "dial"));
+    expect(face("engine", at("nvidia8_animatediff.json"))).toContain("AnimateDiff");
+    expect(face("engine", at("mac16_animatediff.json"))).toContain("AnimateDiff Lightning");
+    expect(face("engine", at("nvidia16_foley.json"))).toContain(ENGINE_NAMES.ltx25_foley_16gb);
+    expect(face("engine", at("nvidia16_mime.json"))).toContain("not yet proven");
+    // A lane the deck has no name for yet reads as its way; a way read without
+    // node definitions too.
+    expect(face("engine", at("google_cloud_stills.json"))).toContain("stills");
+    expect(face("engine", at("a_machine_added_later_audio_in.json"))).toContain("audio-in");
+    expect(face("machine", at("nvidia8_visualiser.json"))).toContain("8 GB card");
+    expect(face("machine", at("nvidia8_visualiser.json"))).toContain("Visualiser");
+    expect(face("machine", at("nvidia16_mime.json"))).toContain("not yet proven");
   });
 
   it("the Make key: every phase word, minutes to three digits, known and long reasons", () => {

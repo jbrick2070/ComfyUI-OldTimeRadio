@@ -1,7 +1,7 @@
 # Radio Play Studio for Stream Deck
 
 Make a radio play without touching the page. Dials (or keys) pick the language, the story
-bank, the visual style, the number of acts and the machine; one key makes the episode and
+bank, the visual style, the number of acts, the machine and its video engine; one key makes the episode and
 fills in as it goes. It drives [Radio Play Studio](../README.md) on this computer, over the
 same local HTTP the page uses; the Studio did not change for it.
 
@@ -18,11 +18,12 @@ fills with the lamp's green.
 | Control | On a Stream Deck + dial | On a key (any Stream Deck) | Face |
 |---|---|---|---|
 | **Choice** (one per field; pick the field in its settings) | turn: next or previous choice · press: back to the default | press: next choice · hold: back to the default | a node: the field's name, where the pick sits in its list (`3/11`), the pick, a green bar while an episode is made |
-| **Machine** | turn: rest on a machine and how it films · press: switch to it | press: rest on the next one · hold: switch to it | the card, how it films (`unproven` where it has not been proven); the resting row is outlined white |
+| **Machine** | turn: rest on a machine · press: switch to it | press: rest on the next one · hold: switch to it | the card, and the video engine it would film with: the one you are on when that card has it, else its first (`not yet proven` where it has no published episode); the resting row is outlined white |
+| **Video** | turn: rest on a video engine · press: switch to it | press: rest on the next one · hold: switch to it | the engine (LTX 2.5 foley, LTX 0.9.8, Stills, AnimateDiff, LTX 2.5 mime, LTX 2.5 audio-in, Visualiser: whichever the card ships), and the card it runs on (`not yet proven` where it has no published episode) |
 | **Make** | — | press: make the episode; when done, play it; after a failure, clear it · hold: open the Studio page on the run | `MAKE` over the waveform; then a ring that fills, the percent, the phase and minutes left; a check when done; the reason when it failed |
 
 So a deck with no dials (Stream Deck MK.2, XL, Mini, Neo) can run the whole thing from keys:
-put one Choice key per field, a Machine key and the Make key on a page.
+put one Choice key per field, a Machine key, a Video key and the Make key on a page.
 
 The story bank skips *my story*: that bank needs typed text, which stays on the page. A roll
 row shows as *Surprise me*. While the page is making an episode the Make key follows that one;
@@ -42,11 +43,11 @@ Stream Deck 7.1 or newer on Windows 10 or 11, and Radio Play Studio running on t
    clone it is already on disk, or download it straight from GitHub at
    <https://github.com/jbrick2070/ComfyUI-OldTimeRadio/raw/main/contest/radio-play-studio/streamdeck/dist/com.jbrick2070.otr.streamDeckPlugin>.
 2. Double-click it. The Stream Deck app opens and installs **Radio Play Studio**.
-3. Its three actions are under **Radio Play Studio** in the action list. Drag them onto a page:
+3. Its four actions are under **Radio Play Studio** in the action list. Drag them onto a page:
    on a Stream Deck +, a Choice on each of the four dials (set each one's field in its
-   settings: Language, Story bank, Visual style, Acts), with the Make key and a Machine key on
-   the keys above; on a deck with no dials, one Choice key per field, a Machine key and the Make
-   key.
+   settings: Language, Story bank, Visual style, Acts), with the Make key, a Machine key and a
+   Video key on the keys above (Machine and Video work on a dial too); on a deck with no dials,
+   one Choice key per field, a Machine key, a Video key and the Make key.
 4. Start the Studio ([its README](../README.md)). Until it answers, the faces read *Off air*.
 
 For the keys around them -- the Studio page, LogBlaster, the ComfyUI graph, your clips --

@@ -23,6 +23,8 @@ export interface MenuWay {
   key: string;
   workflow: string;
   proven: boolean;
+  /** What its graph runs, as it saved it (runner.USES): `video` is the lane. */
+  uses?: Record<string, string>;
 }
 
 export interface MenuMachine {

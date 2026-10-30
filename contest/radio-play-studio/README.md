@@ -103,9 +103,12 @@ The page starts by asking two things, and fills in the rest of the form from the
 
 - **Your machine:** NVIDIA 8 GB, NVIDIA 16 GB or more, a 16 GB Mac, AMD (ROCm), or no GPU at all
   through Comfy Cloud or Google Cloud. It starts on the card your ComfyUI reports.
-- **How it's filmed:** **TTS + Foley video** (voices, moving pictures and their own sound effects),
-  **TTS w/ video** (voices and moving pictures) or **TTS w/ stills** (voices and still pictures with
-  slow motion), whichever that machine has proven: no foley or mime on a Mac, stills only on AMD.
+- **How it's filmed:** every video engine that machine ships: **TTS + Foley video** (voices, moving
+  pictures and their own sound effects), **TTS w/ video** (voices and moving pictures), **TTS w/
+  stills** (voices and still pictures with slow motion), **TTS w/ AnimateDiff**, **Mime video**
+  (the video's own sound carries the scenes), **Audio-in video** (pictures made from the voices and
+  music) and **TTS w/ visualiser** (no video model at all). No foley or mime on a Mac, stills only on
+  AMD; a way with no published episode yet is marked *not yet proven*.
   Each card names what that workflow runs (video, stills, voices, music, writer), read from the
   workflow itself, and how long the acts you set took on our test machine. The cloud ways are
   offered but marked "not yet proven" until an episode from them is published (`UNPROVEN` in

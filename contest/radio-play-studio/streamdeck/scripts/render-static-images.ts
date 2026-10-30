@@ -19,8 +19,14 @@ const files: Record<string, string> = {
   "machine/key.svg": renderNodeKeySvg({
     title: "Machine",
     value: "16 GB card",
-    hint: "foley",
+    hint: "LTX 2.5 foley",
     socket: SOCKET_COLORS.machine
+  }),
+  "video/key.svg": renderNodeKeySvg({
+    title: "Video",
+    value: "AnimateDiff",
+    hint: "8 GB card",
+    socket: SOCKET_COLORS.video
   })
 };
 for (const [rel, svg] of Object.entries(files)) {

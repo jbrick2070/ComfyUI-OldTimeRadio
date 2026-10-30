@@ -48,17 +48,29 @@ def reference_twin(workflow_path: Path) -> Path:
 #: reference twin's fk3r episodes); Mac -- its engines proven in the Mac 16 GB
 #: column of apple/MACHINES.md; AMD -- the R9700 receipt in
 #: config/workflow_matrix.json.
+#: After the three come the rest of each machine's video engines (operator,
+#: 2026-10-29: "all video engine models should be available", AnimateDiff named):
+#: AnimateDiff, the mime and audio-in LTX lanes, and the visualiser that loads no
+#: video weights. The 8 GB four published in both 4060 rounds (ROUNDS.md); the
+#: 16 GB AnimateDiff and visualiser in apple/MACHINES.md and the 5080 round; the
+#: Mac's AnimateDiff Lightning and visualiser in the Mac 16 GB column.
+WAYS: tuple = ("foley", "video", "stills", "animatediff", "mime", "audio_in", "visualiser")
 MACHINES: tuple = (
     ("nvidia8", (("foley", "otr_8gb_ltx25_foley.json"), ("video", "otr_8gb_video.json"),
-                 ("stills", "otr_8gb_still.json"))),
+                 ("stills", "otr_8gb_still.json"), ("animatediff", "otr_8gb_animatediff.json"),
+                 ("mime", "otr_8gb_ltx25_mime.json"), ("audio_in", "otr_8gb_ltx25_audio_in.json"),
+                 ("visualiser", "otr_8gb_low.json"))),
     # 16 GB and up: the 24 GB cards that have rendered episodes (rented RTX PRO
     # 4000, A4500) ran these same graphs; otr_24gb_foley is a draft with no
-    # receipt, so it is not offered.
+    # receipt, so it is not offered. No 16 GB audio-in graph ships.
     ("nvidia16", (("foley", WORKFLOW_NAME), ("video", "otr_16gb_video.json"),
-                  ("stills", "otr_16gb_still.json"))),
-    # No foley or mime on a Mac: LTX 0.9.8 video and stills with motion are the
-    # engines proven there (apple/MACHINES.md, Mac 16 GB column).
-    ("mac16", (("video", "otr_mac16_video.json"), ("stills", "otr_mac16_still.json"))),
+                  ("stills", "otr_16gb_still.json"), ("animatediff", "otr_16gb_animatediff.json"),
+                  ("mime", "otr_16gb_mime.json"), ("visualiser", "otr_16gb_low.json"))),
+    # No foley or mime on a Mac: LTX 0.9.8 video, stills with motion, AnimateDiff
+    # Lightning and the visualiser are the engines proven there (apple/MACHINES.md,
+    # Mac 16 GB column).
+    ("mac16", (("video", "otr_mac16_video.json"), ("stills", "otr_mac16_still.json"),
+               ("animatediff", "otr_mac16_animatediff.json"), ("visualiser", "otr_mac16_low.json"))),
     ("amd", (("stills", "otr_amd_still.json"),)),
     # No GPU at all: the cloud graphs. Comfy Cloud bills Comfy credits through the
     # key the page holds; Google bills a Google key ComfyUI reads itself.
@@ -98,6 +110,7 @@ UNPROVEN: dict = {
     "otr_cloud_low.json": "two live runs died at assembly (PBUG-20260915-01, -03); "
                           "fixed, not yet published since",
     "otr_google_still.json": "no published episode yet",
+    "otr_16gb_mime.json": "not run in the 5080 round of 2026-10-23; no published episode yet",
 }
 
 

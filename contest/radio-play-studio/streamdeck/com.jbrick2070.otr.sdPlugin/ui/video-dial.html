@@ -1,0 +1,33 @@
+<!-- SPDX-License-Identifier: MIT -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Radio Play Studio — Video dial</title>
+  <link rel="stylesheet" href="pi.css" />
+</head>
+<body>
+  <div id="studio-status" class="status-banner status-warn">Waiting for the Studio…</div>
+  <div id="studio-detail" class="detail"></div>
+
+  <h3>This control</h3>
+  <p class="help">Steps through every video engine the chosen machine films with: LTX 2.5 with foley, plain LTX
+    video, stills, AnimateDiff, LTX 2.5 mime and audio-in, and the visualiser that needs no video model, as far as
+    that machine has them. A turn of the dial, or a press of the key, only rests on an engine (outlined white);
+    press the dial, or hold the key, to switch the Studio to it. An engine marked <em>not yet proven</em> has no
+    published episode on that machine yet. The <em>Machine</em> control chooses the machine.</p>
+
+  <h3>Studio</h3>
+  <div class="row">
+    <label for="studio-port">Port</label>
+    <input id="studio-port" type="number" min="1" max="65535" value="8765" />
+  </div>
+  <p class="help">Radio Play Studio answers on 127.0.0.1 only. <a id="open-studio" href="#">Open the Studio page</a>.</p>
+
+  <script src="pi-common.js"></script>
+  <script>
+    // SPDX-License-Identifier: MIT
+    window.piRegisterControls(function () {});
+  </script>
+</body>
+</html>

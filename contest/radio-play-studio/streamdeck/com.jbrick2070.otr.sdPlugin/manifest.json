@@ -3,7 +3,7 @@
   "Name": "Radio Play Studio",
   "Version": "0.1.0.0",
   "Author": "Jeffrey A. Brick",
-  "Description": "Make a radio play from a Stream Deck: choose the language, story bank, visual style, acts and machine on dials or keys, then press one key to make the episode and watch it fill in.",
+  "Description": "Make a radio play from a Stream Deck: choose the language, story bank, visual style, acts, machine and video engine on dials or keys, then press one key to make the episode and watch it fill in.",
   "Category": "Radio Play Studio",
   "CategoryIcon": "imgs/plugin/category-icon",
   "Icon": "imgs/plugin/plugin-icon",
@@ -54,7 +54,7 @@
       "Name": "Machine",
       "UUID": "com.jbrick2070.otr.machine",
       "Icon": "imgs/actions/machine/icon",
-      "Tooltip": "The machine and how it films. On a dial, turn to choose and press to switch; on a key, press for the next and hold to switch.",
+      "Tooltip": "The machine the episode is made for. On a dial, turn to choose and press to switch; on a key, press for the next and hold to switch.",
       "PropertyInspectorPath": "ui/machine-dial.html",
       "Controllers": [
         "Encoder",
@@ -65,7 +65,7 @@
       "Encoder": {
         "layout": "layouts/cell.json",
         "TriggerDescription": {
-          "Rotate": "Choose a machine and a way of filming",
+          "Rotate": "Choose a machine",
           "Push": "Switch to it",
           "Touch": "Switch to it"
         }
@@ -73,6 +73,32 @@
       "States": [
         {
           "Image": "imgs/actions/machine/key"
+        }
+      ]
+    },
+    {
+      "Name": "Video",
+      "UUID": "com.jbrick2070.otr.video",
+      "Icon": "imgs/actions/video/icon",
+      "Tooltip": "The video engine the machine films with: LTX, AnimateDiff, stills, the visualiser and the rest that machine has. On a dial, turn to choose and press to switch; on a key, press for the next and hold to switch.",
+      "PropertyInspectorPath": "ui/video-dial.html",
+      "Controllers": [
+        "Encoder",
+        "Keypad"
+      ],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": false,
+      "Encoder": {
+        "layout": "layouts/cell.json",
+        "TriggerDescription": {
+          "Rotate": "Choose a video engine",
+          "Push": "Switch to it",
+          "Touch": "Switch to it"
+        }
+      },
+      "States": [
+        {
+          "Image": "imgs/actions/video/key"
         }
       ]
     },

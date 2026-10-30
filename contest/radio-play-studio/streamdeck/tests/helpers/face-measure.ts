@@ -4,6 +4,7 @@
 // font), checked against its box -- a node's body, or the Make key's clear
 // disc at that line's height -- and against the rows around it.
 import { expect } from "vitest";
+import { ENGINE_NAMES, WAY_WORDS } from "../../src/actions/faces.js";
 import { ASCENT, DESCENT, KEY, keyHalfChord, NodeGeometry, PALETTE } from "../../src/gfx/svg-renderer.js";
 import { textWidth, Weight } from "../../src/gfx/text-fit.js";
 
@@ -100,7 +101,8 @@ export const STYLES = [
 ];
 export const BANKS = ["roll (any eligible bank)", "media_archive", "original", "scifi_news_pro", "public_domain", "shakespeare"];
 export const LANGUAGES = ["roll (any language)", "Off", "English", "Portuguese", "Mandarin", "Japanese", "Spanish"];
-export const WAYS = ["foley", "video", "stills"];
+/** Every name a menu control gives a way: each engine, and each way's word. */
+export const WAYS = [...new Set([...Object.values(ENGINE_NAMES), ...Object.values(WAY_WORDS)])];
 /** A server reason longer than any face: the one text a face may cut. */
 export const LONG_ERROR =
   "project 2026-10-28-wanderer is waiting to hear how its last run ended; open it and look again, or forget that run";

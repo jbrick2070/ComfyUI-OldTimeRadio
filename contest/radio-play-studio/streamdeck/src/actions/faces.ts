@@ -9,7 +9,8 @@ import {
   renderNodeKeySvg,
   SOCKET_COLORS
 } from "../gfx/svg-renderer.js";
-import { MACHINE_NAMES, StudioStore } from "../state/studio-store.js";
+import { MACHINE_NAMES, MachineEntry, MenuPart, StudioStore } from "../state/studio-store.js";
+import { MenuWay } from "../types/contract.js";
 import { DIAL_FIELD_TITLES, DialField } from "../types/settings.js";
 
 /** A choice or machine control is a dial on a Stream Deck + and a key on a
@@ -78,50 +79,97 @@ export function choiceFace(store: StudioStore, field: DialField, mode: ControlMo
   return { title, socket, value, position, hint };
 }
 
-/** The machine control's node: the card in large letters, how it films under. */
-export function machineFace(store: StudioStore, mode: ControlMode = "dial"): DialCellInput {
-  const title = "Machine";
-  const socket = SOCKET_COLORS.machine;
+/** The video engine each lane a menu graph saves is, named for a person;
+ *  the page's MODEL_NAMES, short enough for a key. */
+export const ENGINE_NAMES: Record<string, string> = {
+  ltx25_foley_8gb: "LTX 2.5 foley",
+  ltx25_foley_16gb: "LTX 2.5 foley",
+  ltx25_foley_24gb: "LTX 2.5 foley",
+  ltx25_high_video: "LTX 2.5",
+  ltx098_low_video: "LTX 0.9.8",
+  ltx_8gb: "LTX 2",
+  ltx25_mime_8gb: "LTX 2.5 mime",
+  ltx25_mime_16gb: "LTX 2.5 mime",
+  ltx25_audio_in_8gb: "LTX 2.5 audio-in",
+  animatediff15_v3_haunted_video: "AnimateDiff",
+  animatediff15_lightning_video: "AnimateDiff Lightning",
+  still_motion: "Stills",
+  still_flat: "Flat stills",
+  viz_camera: "Visualiser",
+  cloud_ltx25_foley_plus: "LTX 2.5 foley",
+  cloud_vidu_q2_pro_fast_720p: "Vidu Q2",
+  cloud_ltx25_audio_in: "LTX 2.5 audio-in"
+};
+
+/** The menu's ways (config.WAYS) in a word, for a graph whose engine is not
+ *  named above or was not read. */
+export const WAY_WORDS: Record<string, string> = {
+  foley: "foley",
+  video: "video",
+  stills: "stills",
+  animatediff: "AnimateDiff",
+  mime: "mime",
+  audio_in: "audio-in",
+  visualiser: "visualiser"
+};
+
+/** What a way films with: the engine its graph saves, else the way itself. */
+export function engineName(way: MenuWay): string {
+  // A lane can carry its frame after it: "ltx25_foley_16gb (16:9)".
+  const lane = String(way.uses?.video ?? "").replace(/ \([^)]*\)$/, "");
+  return ENGINE_NAMES[lane] ?? WAY_WORDS[way.key] ?? displayValue(way.key);
+}
+
+/** A menu control's node. The machine control: the card in large letters,
+ *  what it would film with under. The video control: the engine in large
+ *  letters, the card it runs on under. */
+export function menuFace(store: StudioStore, part: MenuPart, mode: ControlMode = "dial"): DialCellInput {
+  const title = part === "machine" ? "Machine" : "Video";
+  const socket = part === "machine" ? SOCKET_COLORS.machine : SOCKET_COLORS.video;
   const phase = store.getPhase();
   if (phase === "off") {
     return { title, socket, value: "Off air", tone: "muted", hint: OFF_HINT(store) };
   }
-  const entries = store.getMachineEntries();
+  const entries = store.getMenuEntries(part);
   if (entries.length === 0) {
     return phase === "loading"
       ? { title, socket, value: "Tuning in…", tone: "muted", hint: "reading the form" }
       : { title, socket, value: "Its own graph", tone: "muted", hint: "no machine menu" };
   }
-  const currentIndex = Math.max(0, store.getMachineIndex());
+  const currentIndex = Math.max(0, store.getMenuIndex(part));
   const current = entries[currentIndex];
-  const wayText = (e: (typeof entries)[number]): string => `${e.way.key}${e.way.proven ? "" : " (unproven)"}`;
   // A machine the deck has no name for yet reads as words, and wraps like one.
-  const nameOf = (e: (typeof entries)[number]): string => MACHINE_NAMES[e.machine] ?? displayValue(e.machine);
+  const machineName = (e: MachineEntry): string => MACHINE_NAMES[e.machine] ?? displayValue(e.machine);
+  const main = (e: MachineEntry): string => (part === "machine" ? machineName(e) : engineName(e.way));
+  // An engine's name and "(unproven)" do not fit one line of a key together;
+  // a row with no published episode says so in place of the other half.
+  const sub = (e: MachineEntry): string =>
+    !e.way.proven ? "not yet proven" : part === "machine" ? engineName(e.way) : machineName(e);
   const position = (i: number): string => `${i + 1}/${entries.length}`;
   if (store.isLocked()) {
     return {
       title,
       socket,
-      value: nameOf(current),
+      value: main(current),
       position: position(currentIndex),
       tone: "muted",
-      hint: wayText(current),
+      hint: sub(current),
       progress: runProgress(store)
     };
   }
-  const pending = store.getPendingMachine();
-  const pendingIndex = store.getPendingIndex();
+  const pending = store.getPendingEntry(part);
+  const pendingIndex = store.getPendingIndex(part);
   if (pending && pendingIndex !== null) {
     const i = pendingIndex;
     // A key is small: the instruction takes the title bar, where it is big.
     return mode === "dial"
-      ? { title, socket, value: nameOf(pending), position: position(i), pending: true, hint: `${wayText(pending)}\npress to switch` }
-      : { title: "Hold to use", socket, value: nameOf(pending), pending: true, hint: wayText(pending) };
+      ? { title, socket, value: main(pending), position: position(i), pending: true, hint: `${sub(pending)}\npress to switch` }
+      : { title: "Hold to use", socket, value: main(pending), pending: true, hint: sub(pending) };
   }
   if (phase === "loading") {
-    return { title, socket, value: nameOf(current), position: position(currentIndex), tone: "muted", hint: "tuning in…" };
+    return { title, socket, value: main(current), position: position(currentIndex), tone: "muted", hint: "tuning in…" };
   }
-  return { title, socket, value: nameOf(current), position: position(currentIndex), hint: wayText(current) };
+  return { title, socket, value: main(current), position: position(currentIndex), hint: sub(current) };
 }
 
 /** The Make key's face. */
@@ -159,8 +207,8 @@ export function renderChoice(store: StudioStore, field: DialField, mode: Control
   return mode === "dial" ? renderDialCellSvg(face) : renderNodeKeySvg(face);
 }
 
-export function renderMachine(store: StudioStore, mode: ControlMode): string {
-  const face = machineFace(store, mode);
+export function renderMenu(store: StudioStore, part: MenuPart, mode: ControlMode): string {
+  const face = menuFace(store, part, mode);
   return mode === "dial" ? renderDialCellSvg(face) : renderNodeKeySvg(face);
 }
 

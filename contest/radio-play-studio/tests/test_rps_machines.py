@@ -14,7 +14,7 @@ import pytest
 from test_rps_runner import FakeClient, _good_job
 from test_rps_server import _request
 
-from radio_play_studio.config import (MACHINES, WORKFLOW_NAME, Settings, detect_machine,
+from radio_play_studio.config import (MACHINES, WAYS, WORKFLOW_NAME, Settings, detect_machine,
                                       menu_lookup)
 from radio_play_studio.graph import GraphError
 from radio_play_studio.runner import Studio
@@ -46,7 +46,7 @@ def test_every_menu_entry_is_a_workflow_the_pack_ships():
     for machine, ways in MACHINES:
         assert ways, machine
         for way, name in ways:
-            assert way in ("foley", "video", "stills"), (machine, way)
+            assert way in WAYS, (machine, way)
             assert (folder / name).is_file(), name
             assert menu_lookup(name) == (machine, way)
     # The contest default is the 16 GB machine's first way.
@@ -258,8 +258,23 @@ def test_every_unproven_name_is_on_the_menu_and_says_why():
 
 def test_no_menu_machine_offers_foley_or_mime_where_it_is_not_proven():
     offered = {machine: {way for way, _ in ways} for machine, ways in MACHINES}
-    assert offered["mac16"] == {"video", "stills"} and offered["amd"] == {"stills"}
-    assert not any("mime" in name for _, ways in MACHINES for _, name in ways)
+    assert offered["mac16"] == {"video", "stills", "animatediff", "visualiser"} and offered["amd"] == {"stills"}
+    mime = {machine for machine, ways in MACHINES for _, name in ways if "mime" in name}
+    assert mime == {"nvidia8", "nvidia16"}
+
+
+def test_every_video_engine_a_machine_ships_is_on_its_menu():
+    """Operator, 2026-10-29: "all video engine models should be available".
+    Every shipped graph for a menu machine is one of its ways, except a draft
+    with no receipt and the reference twins the page reaches through a pick."""
+    from radio_play_studio.config import _checkout_workflow
+    folder = _checkout_workflow().parent
+    on_menu = {name for _, ways in MACHINES for _, name in ways}
+    for prefix in ("otr_8gb_", "otr_16gb_", "otr_mac16_"):
+        for path in folder.glob(prefix + "*.json"):
+            if path.stem.endswith("_flux3_ref") or path.name == "otr_16gb_foley.json":
+                continue  # a twin, and the closed-SDK sibling of the open foley default
+            assert path.name in on_menu, path.name
 
 
 def test_each_machine_offers_only_the_choices_its_column_allows():

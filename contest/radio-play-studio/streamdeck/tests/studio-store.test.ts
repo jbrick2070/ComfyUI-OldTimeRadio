@@ -173,7 +173,7 @@ describe("the deck against a Studio", () => {
     const { server, store, saved } = await boot({
       forms: {
         "": { fields: SAMPLE_FIELDS, menu: SAMPLE_MENU },
-        "otr_8gb_still.json": {
+        "otr_8gb_ltx25_foley.json": {
           fields: SAMPLE_FIELDS.map((f) => (f.key === "style" ? { ...f, choices: ["noir"] } : f)),
           menu: SAMPLE_MENU
         }
@@ -181,21 +181,56 @@ describe("the deck against a Studio", () => {
     });
     store.cycle("style", 1); // technicolor
     const dial = new MachineDialController(store, quietSink(), 1);
-    expect(store.getMachineIndex()).toBe(2); // 16 GB foley, the server's own
+    expect(store.getMenuIndex("machine")).toBe(1); // the 16 GB card, the server's own
     await dial.rotate(-1);
-    expect(store.getPendingMachine()!.way.workflow).toBe("otr_8gb_still.json");
+    // The 8 GB card, on the way the deck is on: foley.
+    expect(store.getPendingEntry("machine")!.way.workflow).toBe("otr_8gb_ltx25_foley.json");
     await dial.push();
-    expect(store.getPicks().workflow).toBe("otr_8gb_still.json");
-    expect(server.optionsRequests.at(-1)).toBe("otr_8gb_still.json");
+    expect(store.getPicks().workflow).toBe("otr_8gb_ltx25_foley.json");
+    expect(server.optionsRequests.at(-1)).toBe("otr_8gb_ltx25_foley.json");
     expect(store.getValue("style")).toBe("noir");
-    expect(saved.at(-1)).toEqual({ workflow: "otr_8gb_still.json" });
+    expect(saved.at(-1)).toEqual({ workflow: "otr_8gb_ltx25_foley.json" });
     await store.make();
-    expect((server.posts[0].body as { choices: Choices }).choices.workflow).toBe("otr_8gb_still.json");
+    expect((server.posts[0].body as { choices: Choices }).choices.workflow).toBe("otr_8gb_ltx25_foley.json");
   });
 
-  it("with no menu, the machine dial has nothing to turn and no workflow is posted", async () => {
+  it("the machine control has one row per machine; the video control the current machine's engines", async () => {
+    const { store } = await boot();
+    expect(store.getMenuEntries("machine").map((e) => e.way.workflow)).toEqual([
+      "otr_8gb_ltx25_foley.json", // foley, as the deck is on now
+      "otr_canonical.json"
+    ]);
+    expect(store.getMenuEntries("engine").map((e) => e.way.workflow)).toEqual(["otr_canonical.json", "otr_16gb_video.json"]);
+    const video = new MachineDialController(store, quietSink(), 1, "dial", 60, "engine");
+    await video.rotate(1);
+    await video.push();
+    expect(store.getPicks().workflow).toBe("otr_16gb_video.json");
+    // On video, a machine with no video way switches to its first.
+    expect(store.getMenuEntries("machine").map((e) => e.way.workflow)).toEqual([
+      "otr_8gb_ltx25_foley.json",
+      "otr_16gb_video.json"
+    ]);
+    expect(store.getMenuIndex("machine")).toBe(1);
+    expect(store.getMenuIndex("engine")).toBe(1);
+  });
+
+  it("a switch on either control stops the other resting, so it cannot run a row from the old machine", async () => {
+    const { store } = await boot();
+    expect(store.rotateMenu("engine", 1)).toBe(true); // 16 GB video, resting
+    expect(store.rotateMenu("machine", 1)).toBe(true); // the 8 GB card, resting
+    expect(await store.applyMenu("machine")).toBe(true);
+    expect(store.getPicks().workflow).toBe("otr_8gb_ltx25_foley.json");
+    expect(store.getPendingEntry("engine")).toBeNull();
+    expect(store.getMenuEntries("engine").map((e) => e.way.workflow)).toEqual([
+      "otr_8gb_ltx25_foley.json",
+      "otr_8gb_still.json"
+    ]);
+  });
+
+  it("with no menu, neither menu control has anything to turn and no workflow is posted", async () => {
     const { server, store } = await boot({ forms: { "": { fields: SAMPLE_FIELDS } } });
-    expect(store.rotateMachine(1)).toBe(false);
+    expect(store.rotateMenu("machine", 1)).toBe(false);
+    expect(store.rotateMenu("engine", 1)).toBe(false);
     await store.make();
     expect((server.posts[0].body as { choices: Choices }).choices.workflow).toBeUndefined();
   });
@@ -290,23 +325,24 @@ describe("the deck against a Studio", () => {
     expect(written.at(-1)).toEqual({ port, picksJson: JSON.stringify({ style: "woodcut", bank: "shakespeare" }) });
   });
 
-  it("drops a slow form answer that a later machine switch has overtaken", async () => {
+  it("drops a slow form answer that a later switch has overtaken", async () => {
     const { server, store } = await boot({
       forms: {
         "": { fields: SAMPLE_FIELDS, menu: SAMPLE_MENU },
-        "otr_8gb_still.json": { fields: SAMPLE_FIELDS.map((f) => (f.key === "style" ? { ...f, choices: ["old"] } : f)), menu: SAMPLE_MENU },
-        "otr_16gb_video.json": { fields: SAMPLE_FIELDS.map((f) => (f.key === "style" ? { ...f, choices: ["new"] } : f)), menu: SAMPLE_MENU }
+        "otr_16gb_video.json": { fields: SAMPLE_FIELDS.map((f) => (f.key === "style" ? { ...f, choices: ["old"] } : f)), menu: SAMPLE_MENU },
+        "otr_8gb_ltx25_foley.json": { fields: SAMPLE_FIELDS.map((f) => (f.key === "style" ? { ...f, choices: ["new"] } : f)), menu: SAMPLE_MENU }
       },
-      optionsDelayMs: { "otr_8gb_still.json": 150 }
+      optionsDelayMs: { "otr_16gb_video.json": 150 }
     });
-    store.rotateMachine(-1); // 8 GB stills, slow
-    const slow = store.applyMachine();
-    await until(() => server.optionsRequests.includes("otr_8gb_still.json"));
-    store.rotateMachine(2); // 16 GB video, quick
-    const quick = store.applyMachine();
+    store.rotateMenu("engine", 1); // 16 GB video, slow
+    const slow = store.applyMenu("engine");
+    await until(() => server.optionsRequests.includes("otr_16gb_video.json"));
+    // The 8 GB card has no video way: it switches to its first, 8 GB foley, quick.
+    store.rotateMenu("machine", -1);
+    const quick = store.applyMenu("machine");
     await Promise.all([slow, quick]);
     await new Promise((r) => setTimeout(r, 200));
-    expect(store.getPicks().workflow).toBe("otr_16gb_video.json");
+    expect(store.getPicks().workflow).toBe("otr_8gb_ltx25_foley.json");
     expect(store.getValue("style")).toBe("new");
   });
 
@@ -412,7 +448,20 @@ describe("the deck against a Studio", () => {
     const key = new MachineDialController(store, quietSink(), 1, "key", 60);
     key.keyDown();
     await key.keyUp();
-    expect(store.getPendingMachine()!.way.workflow).toBe("otr_16gb_video.json");
+    expect(store.getPendingEntry("machine")!.way.workflow).toBe("otr_8gb_ltx25_foley.json");
+    key.keyDown();
+    await new Promise((r) => setTimeout(r, 100));
+    await key.keyUp();
+    await until(() => store.getPicks().workflow === "otr_8gb_ltx25_foley.json");
+    expect(server.optionsRequests.at(-1)).toBe("otr_8gb_ltx25_foley.json");
+  });
+
+  it("on a key, the video engine steps on a press and switches on a hold", async () => {
+    const { server, store } = await boot();
+    const key = new MachineDialController(store, quietSink(), 1, "key", 60, "engine");
+    key.keyDown();
+    await key.keyUp();
+    expect(store.getPendingEntry("engine")!.way.workflow).toBe("otr_16gb_video.json");
     key.keyDown();
     await new Promise((r) => setTimeout(r, 100));
     await key.keyUp();
@@ -441,8 +490,8 @@ describe("the deck against a Studio", () => {
     const { server, store, saved } = await boot({ optionsDelayMs: { "otr_gone.json": 150 } });
     store.setPicks({ workflow: "otr_gone.json" }); // read A: slow, and it will be a 400
     await until(() => server.optionsRequests.includes("otr_gone.json"));
-    store.rotateMachine(1); // 16 GB video
-    await store.applyMachine(); // read B: quick
+    store.rotateMenu("engine", 1); // 16 GB video
+    await store.applyMenu("engine"); // read B: quick
     expect(store.getPicks().workflow).toBe("otr_16gb_video.json");
     await new Promise((r) => setTimeout(r, 250)); // A's 400 lands
     expect(store.getPicks().workflow).toBe("otr_16gb_video.json");
@@ -459,10 +508,10 @@ describe("the deck against a Studio", () => {
       1
     );
     dial.appear();
-    await dial.rotate(1); // from 16 GB foley (3/4) to 16 GB video
-    expect(store.getPendingIndex()).toBe(3);
-    await until(() => frames.some((f) => f.includes(">4/4<")));
-    expect(frames.some((f) => f.includes(">0/4<"))).toBe(false);
+    await dial.rotate(1); // from the 16 GB card (2/2) round to the 8 GB card, the first row
+    expect(store.getPendingIndex("machine")).toBe(0);
+    await until(() => frames.some((f) => f.includes(">1/2<")));
+    expect(frames.some((f) => f.includes(">0/2<"))).toBe(false);
     dial.disappear();
   });
 
@@ -649,7 +698,7 @@ describe("the deck against a Studio", () => {
     expect(store.getPicks().workflow).toBeUndefined();
     dial.dialDown();
     await dial.push();
-    expect(store.getPicks().workflow).toBe("otr_16gb_video.json");
+    expect(store.getPicks().workflow).toBe("otr_8gb_ltx25_foley.json");
   });
 
   it("many controls on one page do not trip the listener limit", async () => {

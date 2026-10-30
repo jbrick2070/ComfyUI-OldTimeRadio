@@ -13,18 +13,20 @@ import {
 } from "@elgato/streamdeck";
 import { CellRateLimiter } from "../gfx/cell-rate-limiter.js";
 import { toSvgDataUri } from "../gfx/svg-renderer.js";
-import { StudioStore } from "../state/studio-store.js";
+import { MenuPart, StudioStore } from "../state/studio-store.js";
 import { HOLD_THRESHOLD_MS } from "../types/settings.js";
 import { ControlSink, dialControlSink, keyControlSink, PressTimer } from "./choice-dial.js";
-import { ControlMode, renderMachine } from "./faces.js";
+import { ControlMode, renderMenu } from "./faces.js";
 
-/** The control that walks the machine menu: which card, and how it films.
- *  A turn (a dial) or a press (a key) only rests on a row; a dial's press or
- *  a key's hold makes it the one that runs. */
+/** A control that walks one half of the machine menu: which card (the
+ *  machine control), or which video engine that card films with (the video
+ *  control). A turn (a dial) or a press (a key) only rests on a row; a dial's
+ *  press or a key's hold makes it the one that runs. */
 export class MachineDialController {
   private readonly store: StudioStore;
   private readonly sink: ControlSink;
   private readonly mode: ControlMode;
+  private readonly part: MenuPart;
   private readonly limiter: CellRateLimiter<string>;
   private readonly press: PressTimer;
   private visible = false;
@@ -41,11 +43,13 @@ export class MachineDialController {
     sink: ControlSink,
     rateLimitMs = 100,
     mode: ControlMode = "dial",
-    holdMs = HOLD_THRESHOLD_MS
+    holdMs = HOLD_THRESHOLD_MS,
+    part: MenuPart = "machine"
   ) {
     this.store = store;
     this.sink = sink;
     this.mode = mode;
+    this.part = part;
     this.press = new PressTimer(holdMs);
     this.limiter = new CellRateLimiter<string>(async (svg) => {
       await this.sink.draw(toSvgDataUri(svg));
@@ -72,7 +76,7 @@ export class MachineDialController {
     if (pressed) {
       this.turnedWhileDown = true;
     }
-    if (!this.store.rotateMachine(ticks)) {
+    if (!this.store.rotateMenu(this.part, ticks)) {
       await this.sink.showAlert();
     }
   }
@@ -86,7 +90,7 @@ export class MachineDialController {
       this.turnedWhileDown = false;
       return;
     }
-    if (!(await this.store.applyMachine())) {
+    if (!(await this.store.applyMenu(this.part))) {
       await this.sink.showAlert();
     }
   }
@@ -104,7 +108,7 @@ export class MachineDialController {
   }
 
   public svg(): string {
-    return renderMachine(this.store, this.mode);
+    return renderMenu(this.store, this.part, this.mode);
   }
 
   private render(): void {
@@ -114,23 +118,25 @@ export class MachineDialController {
   }
 }
 
-@action({ UUID: "com.jbrick2070.otr.machine" })
-export class MachineDialAction extends SingletonAction {
+/** The Stream Deck side of a menu control, on a dial or a key. */
+class MenuControlAction extends SingletonAction {
   private readonly store: StudioStore;
+  private readonly part: MenuPart;
   private readonly controls = new Map<string, MachineDialController>();
 
-  public constructor(store: StudioStore) {
+  public constructor(store: StudioStore, part: MenuPart) {
     super();
     this.store = store;
+    this.part = part;
   }
 
   public override onWillAppear(ev: WillAppearEvent): void {
     const target = ev.action;
     let ctrl: MachineDialController;
     if (target.isDial()) {
-      ctrl = new MachineDialController(this.store, dialControlSink(target), 100, "dial");
+      ctrl = new MachineDialController(this.store, dialControlSink(target), 100, "dial", HOLD_THRESHOLD_MS, this.part);
     } else if (target.isKey()) {
-      ctrl = new MachineDialController(this.store, keyControlSink(target), 100, "key");
+      ctrl = new MachineDialController(this.store, keyControlSink(target), 100, "key", HOLD_THRESHOLD_MS, this.part);
     } else {
       return;
     }
@@ -165,5 +171,19 @@ export class MachineDialAction extends SingletonAction {
 
   public override async onKeyUp(ev: KeyUpEvent): Promise<void> {
     await this.controls.get(ev.action.id)?.keyUp();
+  }
+}
+
+@action({ UUID: "com.jbrick2070.otr.machine" })
+export class MachineDialAction extends MenuControlAction {
+  public constructor(store: StudioStore) {
+    super(store, "machine");
+  }
+}
+
+@action({ UUID: "com.jbrick2070.otr.video" })
+export class VideoDialAction extends MenuControlAction {
+  public constructor(store: StudioStore) {
+    super(store, "engine");
   }
 }

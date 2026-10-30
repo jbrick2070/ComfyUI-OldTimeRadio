@@ -47,11 +47,17 @@ export interface RunState {
   seen: number;
 }
 
-/** One row of the machine dial: a machine and one way it films. */
+/** One row of the machine or video control: a machine and one way it films. */
 export interface MachineEntry {
   machine: string;
   way: MenuWay;
 }
+
+/** Which question a menu control answers, as the page's two rows do: the
+ *  machine, or the video engine that machine films with (operator,
+ *  2026-10-29: "it should be a separate option to choose any video model you
+ *  want"). */
+export type MenuPart = "machine" | "engine";
 
 /** The menu's machine keys (config.MACHINES) as the dial names them. */
 export const MACHINE_NAMES: Record<string, string> = {
@@ -85,7 +91,8 @@ export class StudioStore extends EventEmitter {
   private fields: StudioField[] = [];
   private menu: StudioMenu | null = null;
   private picks: Choices = {};
-  private pendingMachine: number | null = null;
+  /** Where each menu control is resting, as an index into its own rows. */
+  private pending: Record<MenuPart, number | null> = { machine: null, engine: null };
   private run: RunState | null = null;
   private stream: EventStreamHandle | null = null;
   private reachable = false;
@@ -180,7 +187,7 @@ export class StudioStore extends EventEmitter {
     this.setRun(null);
     this.fields = [];
     this.menu = null;
-    this.pendingMachine = null;
+    this.pending = { machine: null, engine: null };
     this.reachable = false;
     this.loading = false;
     this.formError = "";
@@ -247,36 +254,48 @@ export class StudioStore extends EventEmitter {
     return pick !== undefined && isOffered(field, pick) ? pick : defaultValue(field);
   }
 
-  /** The machine dial's rows, in menu order; empty without a menu. */
-  public getMachineEntries(): MachineEntry[] {
-    if (!this.menu) {
+  /** A menu control's rows, in menu order; empty without a menu. The machine
+   *  control has one row per machine, on the way switching to it would run:
+   *  the way of the same name when that machine has one, else its first, as
+   *  the page does. The video control has the current machine's ways. */
+  public getMenuEntries(part: MenuPart): MachineEntry[] {
+    const menu = this.menu;
+    const at = this.currentEntry();
+    if (!menu || !at) {
       return [];
     }
+    if (part === "engine") {
+      const machine = menu.machines.find((m) => m.key === at.machine);
+      return machine ? machine.ways.map((way) => ({ machine: machine.key, way })) : [];
+    }
     const out: MachineEntry[] = [];
-    for (const machine of this.menu.machines) {
-      for (const way of machine.ways) {
+    for (const machine of menu.machines) {
+      const way = machine.key === at.machine
+        ? at.way
+        : machine.ways.find((w) => w.key === at.way.key) ?? machine.ways[0];
+      if (way) {
         out.push({ machine: machine.key, way });
       }
     }
     return out;
   }
 
-  /** The row the next POST would run on. */
-  public getMachineIndex(): number {
+  /** The row of a menu control the next POST would run on. */
+  public getMenuIndex(part: MenuPart): number {
     const workflow = this.currentWorkflow();
-    return this.getMachineEntries().findIndex((e) => e.way.workflow === workflow);
+    return this.getMenuEntries(part).findIndex((e) => e.way.workflow === workflow);
   }
 
-  /** Where the dial is resting, as an index into getMachineEntries(); null
-   *  when it is not resting anywhere. */
-  public getPendingIndex(): number | null {
-    return this.getPendingMachine() ? this.pendingMachine : null;
+  /** Where a menu control is resting, as an index into its rows; null when
+   *  it is not resting anywhere. */
+  public getPendingIndex(part: MenuPart): number | null {
+    return this.getPendingEntry(part) ? this.pending[part] : null;
   }
 
-  /** The row the dial is resting on before it is pressed, if any. */
-  public getPendingMachine(): MachineEntry | null {
-    const entries = this.getMachineEntries();
-    return this.pendingMachine === null ? null : entries[this.pendingMachine] ?? null;
+  /** The row a menu control is resting on before it is pressed, if any. */
+  public getPendingEntry(part: MenuPart): MachineEntry | null {
+    const at = this.pending[part];
+    return at === null ? null : this.getMenuEntries(part)[at] ?? null;
   }
 
   public studioUrl(): string {
@@ -317,23 +336,24 @@ export class StudioStore extends EventEmitter {
     return true;
   }
 
-  public rotateMachine(steps: number): boolean {
-    const entries = this.getMachineEntries();
+  public rotateMenu(part: MenuPart, steps: number): boolean {
+    const entries = this.getMenuEntries(part);
     if (entries.length === 0 || this.isLocked()) {
       return false;
     }
-    const from = this.pendingMachine ?? Math.max(0, this.getMachineIndex());
+    const from = this.pending[part] ?? Math.max(0, this.getMenuIndex(part));
     const n = entries.length;
-    this.pendingMachine = (((from + steps) % n) + n) % n;
+    this.pending[part] = (((from + steps) % n) + n) % n;
     this.changed();
     return true;
   }
 
-  /** Make the resting row the one that runs: the form is read again for it,
-   *  and picks it does not offer fall back to its defaults. */
-  public async applyMachine(): Promise<boolean> {
-    const pending = this.getPendingMachine();
-    this.pendingMachine = null;
+  /** Make a control's resting row the one that runs: the form is read again
+   *  for it, and picks it does not offer fall back to its defaults. Both
+   *  controls stop resting: a switch changes the rows the video control has. */
+  public async applyMenu(part: MenuPart): Promise<boolean> {
+    const pending = this.getPendingEntry(part);
+    this.pending = { machine: null, engine: null };
     if (!pending || this.isLocked()) {
       this.changed();
       return false;
@@ -624,9 +644,29 @@ export class StudioStore extends EventEmitter {
     return way ? way.workflow : null;
   }
 
+  /** Every way on the menu, machine by machine. */
+  private allEntries(): MachineEntry[] {
+    if (!this.menu) {
+      return [];
+    }
+    const out: MachineEntry[] = [];
+    for (const machine of this.menu.machines) {
+      for (const way of machine.ways) {
+        out.push({ machine: machine.key, way });
+      }
+    }
+    return out;
+  }
+
+  /** The menu row the next POST would run on, if the menu has it. */
+  private currentEntry(): MachineEntry | null {
+    const workflow = this.currentWorkflow();
+    return this.allEntries().find((e) => e.way.workflow === workflow) ?? null;
+  }
+
   private currentWorkflow(): string {
     const pick = this.wantedWorkflow();
-    if (pick && this.getMachineEntries().some((e) => e.way.workflow === pick)) {
+    if (pick && this.allEntries().some((e) => e.way.workflow === pick)) {
       return pick;
     }
     return this.menu?.current.workflow ?? "";
@@ -637,7 +677,7 @@ export class StudioStore extends EventEmitter {
     let dropped = false;
     for (const key of Object.keys(this.picks)) {
       if (key === "workflow") {
-        if (!this.menu || !this.getMachineEntries().some((e) => e.way.workflow === this.picks.workflow)) {
+        if (!this.menu || !this.allEntries().some((e) => e.way.workflow === this.picks.workflow)) {
           delete this.picks.workflow;
           dropped = true;
         }

@@ -27,10 +27,12 @@ const VALUES: Array<[string, string]> = [
   ...STYLES.map((v): [string, string] => ["Visual style", displayValue(v)]),
   ...ACTS.map((v): [string, string] => ["Acts", v]),
   ...Object.values(MACHINE_NAMES).map((v): [string, string] => ["Machine", v]),
+  ...WAYS.map((v): [string, string] => ["Video", v]),
   ["Language", "Off air"],
   ["Story bank", "Tuning in…"],
   ["Visual style", "Not offered"],
-  ["Machine", "Its own graph"]
+  ["Machine", "Its own graph"],
+  ["Video", "Its own graph"]
 ];
 
 type Hint = { hint: string; pending?: boolean; tone?: DialCellInput["tone"]; progress?: number; title?: string };
@@ -39,7 +41,9 @@ const COMMON_HINTS: Hint[] = [
   { hint: "nothing on port 65535", tone: "muted" },
   { hint: "reading the form…", tone: "muted" },
   { hint: "no machine menu", tone: "muted" },
-  ...WAYS.map((w) => ({ hint: `${w} (unproven)` })),
+  { hint: "not yet proven" },
+  ...Object.values(MACHINE_NAMES).map((m) => ({ hint: m })),
+  ...WAYS.map((w) => ({ hint: w })),
   { hint: LONG_ERROR, tone: "muted" }
 ];
 /** What faces.ts writes on a strip cell, and on a key. */
@@ -47,12 +51,16 @@ const HINTS: Record<"strip cell" | "node key", Hint[]> = {
   "strip cell": [
     ...COMMON_HINTS,
     { hint: "press to reset" },
-    ...WAYS.map((w) => ({ hint: `${w} (unproven)\npress to switch`, pending: true }))
+    ...WAYS.map((w) => ({ hint: `${w}\npress to switch`, pending: true })),
+    ...Object.values(MACHINE_NAMES).map((m) => ({ hint: `${m}\npress to switch`, pending: true })),
+    { hint: "not yet proven\npress to switch", pending: true }
   ],
   "node key": [
     ...COMMON_HINTS,
     { hint: "press: next\nhold: reset" },
-    ...WAYS.map((w) => ({ hint: `${w} (unproven)`, pending: true, title: "Hold to use" }))
+    ...WAYS.map((w) => ({ hint: w, pending: true, title: "Hold to use" })),
+    ...Object.values(MACHINE_NAMES).map((m) => ({ hint: m, pending: true, title: "Hold to use" })),
+    { hint: "not yet proven", pending: true, title: "Hold to use" }
   ]
 };
 

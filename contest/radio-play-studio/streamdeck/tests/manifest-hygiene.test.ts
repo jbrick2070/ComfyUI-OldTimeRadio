@@ -23,7 +23,7 @@ function walkFiles(dir: string): string[] {
 }
 
 describe("manifest, layout, icons and repository hygiene", () => {
-  it("declares SDK 3, Node 24, Stream Deck 7.1 and the three actions with their files", () => {
+  it("declares SDK 3, Node 24, Stream Deck 7.1 and the four actions with their files", () => {
     const manifest = JSON.parse(readFileSync(join(PLUGIN_DIR, "manifest.json"), "utf8")) as Record<string, unknown>;
     expect(manifest.UUID).toBe("com.jbrick2070.otr");
     expect(manifest.SDKVersion).toBe(3);
@@ -33,12 +33,14 @@ describe("manifest, layout, icons and repository hygiene", () => {
     expect(actions.map((a) => a.UUID)).toEqual([
       "com.jbrick2070.otr.choice",
       "com.jbrick2070.otr.machine",
+      "com.jbrick2070.otr.video",
       "com.jbrick2070.otr.make"
     ]);
-    // Choice and Machine go on a dial or, on a deck without dials, a key.
+    // Choice, Machine and Video go on a dial or, on a deck without dials, a key.
     expect(actions[0].Controllers).toEqual(["Encoder", "Keypad"]);
     expect(actions[1].Controllers).toEqual(["Encoder", "Keypad"]);
-    expect(actions[2].Controllers).toEqual(["Keypad"]);
+    expect(actions[2].Controllers).toEqual(["Encoder", "Keypad"]);
+    expect(actions[3].Controllers).toEqual(["Keypad"]);
     for (const a of actions) {
       expect(statSync(join(PLUGIN_DIR, String(a.PropertyInspectorPath))).size).toBeGreaterThan(0);
       expect(statSync(join(PLUGIN_DIR, `${String(a.Icon)}.svg`)).size).toBeGreaterThan(0);

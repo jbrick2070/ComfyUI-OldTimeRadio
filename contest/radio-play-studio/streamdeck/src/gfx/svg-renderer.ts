@@ -38,7 +38,8 @@ export const SOCKET_COLORS = {
   bank: "#FFA931",
   style: "#64B5F6",
   acts: "#FF9CF9",
-  machine: "#B39DDB"
+  machine: "#B39DDB",
+  video: "#81C784"
 } as const;
 
 export type Tone = "normal" | "muted" | "alert" | "good";
