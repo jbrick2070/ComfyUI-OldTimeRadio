@@ -316,11 +316,114 @@ different proof.
   not permitted"). 2.3.36-2.3.43 sit at `policy-v0.7: reflag-pending-review`,
   the queue state every flagged pack gets before its verdict (kjnodes 1.5.3
   and rgthree-comfy got the same words this month), and every one of them
-  still shipped that install. PBUG-20261030-01 removes it: the user
-  pip-installs the SDK, every refusal names the line, the composite still
-  degrades to `off`. The next release carries the fix. A clean automated scan
-  auto-Actives (22 packs did in October); a flagged one waits for the
-  reviewer, whose last pass over OTR stopped at 2.3.35.
+  still shipped that install. PBUG-20261030-01 removes it: `load` imports
+  the SDK and otherwise refuses by name, the composite still degrades to
+  `off`, and since `8667ab55c` the SDK is a declared dependency (below). A
+  clean automated scan auto-Actives (22 packs did in October); a flagged one
+  waits for the reviewer, whose last pass over OTR stopped at 2.3.35.
+* **2.3.45 is the registry-hardening release -- what it carries, and the
+  backup plan if it is flagged again (2026-10-30).** Nine commits on `main`
+  since 2.3.44, `68d0a1417..8667ab55c`: the run-time pip is gone
+  (`68d0a1417`, `9112ef498`), then "Registry sinks" A-G. Two panels were
+  asked what else the policy reviewer would flag -- Codex Astra (eleven
+  file-access claims) and Gemini Argon (twelve, run by the operator) -- and a
+  Sonnet fan-out reproduced every claim against the real files with executed
+  probes before any code moved. The panel proposed; the probes disposed.
+  Scan replica 0 findings on HEAD; scoped suite green on every push; the
+  Linux install check (`linux_install_check.yml`, runs 41143993912 and
+  41143997369) installed the new requirements on Python 3.13 and 3.12: the
+  nvidia-vfx stub built NVIDIA's 443 MB `cp312-abi3` manylinux wheel on both,
+  `en_core_web_sm` 3.8.0 landed on 3.12 and was skipped by its marker on 3.13.
+
+  Astra's eleven, each closed by a commit with a test that reproduces the
+  escape (`50ccbbd0a` A, `36ca25d68` B, `502aeeda6` C; `164d205d0` D folds
+  the Codex review of C):
+
+  | # | class the reviewer would write | verdict | where it is closed |
+  |---|---|---|---|
+  | 1 | arbitrary-file-read, information-disclosure: a ledger `char_id` stat'ed and hashed as a file | CONFIRMED | A: `_otr_producer_clips._as_file` hashes only inside the read roots |
+  | 2 | path-traversal, arbitrary-file-write: `content_hash` became a filename tail | CONFIRMED (textual, no link needed) | A: `render_driver._still_spine_materialize_row` hex-only digest, destination confined |
+  | 3 | code-install: `tokenizer*` fetched a `.py` from a ledger-named repo | CONFIRMED as download only, execution refuted | A: `_otr_model_catalog.IGNORE_PATTERNS` excludes code and binaries |
+  | 4 | arbitrary-file-write through a junction at the episode stills dir | CONFIRMED (planted link) | C: `portrait_ledger.episode_stills_dir`, dispatcher copy and manifest confined |
+  | 5 | arbitrary-file-write: derived sidecars (caption .ass, credits frames and concat, composite .qa.json) | CONFIRMED (planted link) | C: each sidecar confined where it is built |
+  | 6 | arbitrary-file-read: bundle children (`manifest.json`, `cards.json`) opened after only the parent was proven | CONFIRMED (planted link) | B: children confined with `roots=[bundle]`; cards must be listed |
+  | 7 | arbitrary-file-read: case-folded membership, raw spelling opened | CONFIRMED (harmless on NTFS) | B: exact membership, manifest canonicalized, ledger confined |
+  | 8 | information-disclosure: the freezer copied through links and junctions | CONFIRMED (planted link) | B: every source proven inside the episode before the copy |
+  | 9 | producer clip bundles via a planted junction | REFUTED on its spelling (regex-pinned, root realpath-checked) | C: hardened anyway, one call per site |
+  | 10 | arbitrary-file-read: listed frames opened and handed to ffmpeg unchecked | CONFIRMED (planted link) | C: `directory_clip.list_directory_frames` refuses a link child |
+  | 11 | arbitrary-file-read: fingerprint hooks stat the raw spelling after proving another | CONFIRMED (IS_CHANGED only) | C: `_quiet_file_sha256` and the composite hook use the proven spelling |
+
+  Argon's twelve (`636b18227` E, `438e98081` F, `8667ab55c` G):
+
+  | rank | class | verdict | where it is closed |
+  |---|---|---|---|
+  | 1 | code-install: misaki's English G2P pip-installs spaCy's model mid-render when absent | CONFIRMED | F: the Kokoro backend refuses by name before KPipeline; G: `en_core_web_sm` declared by its release wheel under kokoro's marker |
+  | 2 | code-install / arbitrary-file-write / ssrf: `validate_model_id` Path 3 admits any `org/name` repo; `tokenizer*` admitted `.py` | CONFIRMED as download only | F: `IGNORE_PATTERNS` excludes code, binaries and the pack's own receipt; the catalog restriction itself is a product decision, OPEN (below) |
+  | 3 | any-code-execute: `prestartup_script.py` loads the pack's own HF-home helper with `exec_module` | reads the pack's own file; optics only | OPEN, product decision (below) |
+  | 4 | ffmpeg concat injection: a newline in a filename is a second `file` directive | CONFIRMED with real ffmpeg | F: `_otr_paths._refuse_by_text` refuses every control character; `directory_clip` refuses a listed name carrying one |
+  | 5 | credentialed path injection: a ledger `provider_voice_id` interpolated into the Comfy proxy's URL path | CONFIRMED | F: `eng_cloud_elevenlabs` accepts `[A-Za-z0-9_-]{1,64}` and nothing else |
+  | 6 | path-traversal / arbitrary-file-stat: receipt keys stat'ed unconfined; the receipt itself fetched from a repository | CONFIRMED | F: `_otr_llm_folder._receipt` requires every key inside its folder; the receipt name is never fetched |
+  | 7 | unsolicited boot download: Kokoro voice and ONNX fetches unpinned; `ffmpeg-downloader` declared and never invoked | CONFIRMED | G: ffmpeg-downloader dropped with the resolver step that preferred it (imageio-ffmpeg encodes, PyAV probes, as Comfy-Org's own nodes do); boot-time pinning OPEN (below) |
+  | 8 | information-disclosure: `GET /otr/latest_ledger` scrubbed only whole-string paths | CONFIRMED | F: `_otr_scrub_paths` scrubs a path token wherever it sits, keys included, and withholds past depth 24 |
+  | 9 | credential leak on redirect: the Google key followed a cross-origin redirect | CONFIRMED | E: `_KeyStaysOnOrigin` strips it; `_absolute_url` pins the origin |
+  | 10 | insecure temp file: chatterbox sidecar via `tempfile.mktemp` | CONFIRMED | F: the pack's mkstemp allocator under the in-tree scratch folder |
+  | 11 | arbitrary-file-read / unguarded fetch: omni-video `_image_part` read an unconfined path; the cloud download was unbounded and any scheme | CONFIRMED | E: `confine_to_read_roots`; https-only, 2 GiB ceiling, partial file unlinked |
+  | 12 | scanner-evasion optics: shipped comments said a spelling "clears" a scanner literal | CONFIRMED (comments) | F: eighteen comments state the invariant the spelling serves |
+
+  **Three dependency decisions, his (2026-10-30):** `nvidia-vfx>=0.2,<0.3`
+  is DECLARED the way Comfy-Org's own ComfyUI_Nvidia_VFX_Nodes declares it,
+  under a marker for the wheels pypi.nvidia.com publishes (win_amd64, linux
+  x86_64; the PyPI entry is a wheel-stub that fails the whole install
+  elsewhere) -- an AMD or Intel x86-64 box downloads 540 MB it cannot use and
+  the engine refuses by hardware, a cost he took over a run-time install;
+  `en_core_web_sm` declared by its GitHub release wheel (best practice over a
+  gated or automatic download, the Kokoro-ONNX reasoning); `ffmpeg-downloader`
+  dropped. Each is also an A/B lever if the next verdict flags.
+
+  **Left OPEN as product decisions, not taken on the diff:** (a) Path 3 of
+  `validate_model_id` still admits any `org/name` repository when
+  auto-download is on -- restricting the writer to the curated catalog is a
+  feature cut, his call; (b) the boot-time Kokoro voice and ONNX fetches are
+  unpinned (hash-pinning is a `_otr_kokoro_voice_prefetch.py` change plus a
+  manifest); (c) prestartup's `exec_module` of the pack's own helper could be
+  a plain import. None of the three is a registry standards violation on the
+  published text; each is on the A/B list below in the order the panel
+  ranked them.
+
+  **If 2.3.45 is flagged: the backup plan, one lever per version.** Codex
+  (gpt-5.6-sol, file-grounded, 2026-10-30) ranked the levers and agreed with
+  the driver's own order; it also grepped the 714-file shipped set for
+  anything A-G does not name and found no further lever (the three
+  non-literal imports read checked-in tables; the two writes outside the
+  output tree are the HF-cache probe and the fixed Comfy models folder).
+  Rule zero: `reflag-pending-review` is the queue, not a verdict -- it alone
+  justifies no change. Wait for a signed `policy-vN: <class>`, read its text,
+  then pull ONE lever and publish the next patch version:
+  1. **Revert the `nvidia-vfx` declaration** to the documented manual pip line
+     (the refusal hint and the `pip_dependency` lane already carry the line;
+     the lane word goes back to manual) -- when the flag names `nvidia-vfx`,
+     `pypi.nvidia.com`, a wheel-stub or a third-party index, or says
+     `code-install` with no file:line at a Python call. A structured
+     `subprocess-pip-install` finding that points at a Python call means fix
+     that call instead, not this. Cost: RTX VSR becomes a one-line manual
+     setup on NVIDIA; AMD and Intel lose nothing.
+  2. **Revert the `en_core_web_sm` URL line** to the refusal plus the
+     documented `python -m spacy download en_core_web_sm` -- when the flag
+     says direct-url dependency, external wheel, supply-chain, or names
+     `en_core_web_sm` or GitHub; or when lever 1 was pulled and the same
+     signed class persists. Cost: English Kokoro on Python below 3.13 needs
+     one manual line on a fresh install.
+  3. **Path 3 of `validate_model_id` goes curated-only** while auto-download
+     is on -- when the flag says arbitrary-download, user-controlled model
+     fetch, remote model download, or cites `snapshot_download`. Cost: a
+     custom remote writer repository is downloaded by hand first; curated
+     rows and already-local models are untouched.
+  Not levers on their own: boot-time fetch pinning, prestartup's
+  `exec_module`, the ledger route, the spawn boundary. None violates the
+  published text and none matches an observed verdict class; take one only
+  when the flag text names it. Every lever is a code decision he has already
+  weighed once; pulling one needs his word, since it removes a convenience
+  the current version promises.
 * **Comfy Desktop's registry Install is intermittent** (PBUG-20260925-01: a
   green "installed" toast and nothing on disk, twice; then fine). Not ours to
   fix; worth telling Comfy-Org, with the 4060's timeline. His Discord.
