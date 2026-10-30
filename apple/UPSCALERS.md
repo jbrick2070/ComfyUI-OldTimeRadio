@@ -19,7 +19,7 @@ it to **off**. See the end of this page for why each.
 |---|---|---|
 | **`off`** -- ships this way | Leaves the composite's own resize in charge | Nothing |
 | **`spandrel_esrgan`** | Runs Real-ESRGAN x2plus over each eligible clip, one frame at a time, then fits the result to the canvas | Nothing: its one 64 MB file downloads itself the first time the engine loads |
-| **`rtx_vsr`** | NVIDIA RTX Video Super Resolution: the same upscaler an RTX card applies to browser video, x2, then fitted to the canvas | An NVIDIA RTX card, and one pip line you run first for its ~540 MB NVIDIA package (below) |
+| **`rtx_vsr`** | NVIDIA RTX Video Super Resolution: the same upscaler an RTX card applies to browser video, x2, then fitted to the canvas | An NVIDIA RTX card; its ~540 MB NVIDIA package comes with the pack's requirements on Windows and Linux x86-64 (below) |
 
 **Those are the ones that ship.** The dropdown is built from the pack's live upscale
 registry, so a new engine would appear by itself the day one ships. Today the list
@@ -109,15 +109,19 @@ edges -- so it is the canonical graph's default, while every NVIDIA workflow
 selects `rtx_vsr` (since 2026-10-15). First published with it on the RTX 4060
 on 2026-10-16: AnimateDiff episodes upscaled clip by clip.
 
-**You install its package, once.** Its models ship inside NVIDIA's own
-package, `nvidia-vfx`, so there is no checkpoint to fetch -- and the pack does
-not fetch the package either. Through 2.3.44 the engine ran `pip install` itself
-the first time an NVIDIA workflow picked it; the Comfy Registry's standards
-forbid a node pack installing packages at run time, and the registry flagged
-the pack for it, so the install is yours. Run this once with ComfyUI's own
-Python (the `python.exe` inside its venv or `python_embeded` folder), never
-with a bare `pip` from your PATH, which is usually a different Python and puts
-the package where ComfyUI never looks:
+**Its package comes with the pack.** Its models ship inside NVIDIA's own
+package, `nvidia-vfx`, so there is no checkpoint to fetch. Since 2.3.45 that
+package is a declared dependency -- the way Comfy-Org's own NVIDIA VFX nodes
+declare it -- under a marker for the platforms NVIDIA builds it for, Windows
+and Linux x86-64, so a registry or Manager install already has it. Nothing is
+fetched at run time: through 2.3.44 the engine ran `pip install` itself the
+first time an NVIDIA workflow picked it, the Comfy Registry's standards forbid
+a node pack installing packages at run time, and the registry flagged the pack
+for it. If the package is missing anyway (a git clone that skipped
+`pip install -r requirements.txt`), run this once with ComfyUI's own Python
+(the `python.exe` inside its venv or `python_embeded` folder), never with a
+bare `pip` from your PATH, which is usually a different Python and puts the
+package where ComfyUI never looks:
 
 ```
 python -m pip install "nvidia-vfx>=0.2,<0.3"
@@ -125,8 +129,10 @@ python -m pip install "nvidia-vfx>=0.2,<0.3"
 
 If ComfyUI's Python has no pip (some ComfyUI Desktop installs use uv), the
 same line works as `uv pip install --python <that python> "nvidia-vfx>=0.2,<0.3"`.
-It is not a requirements.txt line, so it never lands on an AMD, Intel or Mac
-machine by itself.
+The marker keeps it off macOS, Linux on ARM and Windows on ARM, where NVIDIA
+publishes no wheel and the install would fail outright; an AMD or Intel x86-64
+box does download it (about 540 MB) and the engine refuses there by hardware
+reason, so the composite falls back to `off`.
 
 It needs an RTX card (Turing, the RTX 20 series, or newer) and NVIDIA driver
 570.65 or later on Windows, per NVIDIA's own package notes. It is about
@@ -230,7 +236,7 @@ Every NVIDIA workflow sets `upscale_engine` to `rtx_vsr` on `cuda` (operator,
 2026-10-15: "every nvidia lane to 1080p"). Several NVIDIA lanes render well
 under 1920x1080 -- 832x480 for HuMo and the 8 GB LTX 2.5 lanes, 512x288 for
 LTX 0.9.8 -- and that is where super-resolution earns its few milliseconds a
-frame. Its package is one pip line you run first, and it cannot cost the
+frame. Its package comes with the pack's requirements, and it cannot cost the
 episode: if the package is missing, the card cannot run it, or it fails
 partway through a clip, the composite logs a warning and uses `off` instead.
 

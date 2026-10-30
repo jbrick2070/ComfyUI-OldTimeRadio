@@ -56,6 +56,13 @@ dependencies = [
     # Not installable on Python 3.13 (numpy==1.26.4 pin on 0.7.16; Requires-
     # Python <3.13 on every newer kokoro/misaki). Mirrors requirements.txt.
     "kokoro>=0.7.16; python_version < '3.13'",
+    # The English phonemizer's spaCy model (2026-10-30). misaki[en] calls
+    # spacy.cli.download -- a `pip install` spawned mid-render -- when
+    # en_core_web_sm is absent, and a fresh install lacked it because spaCy
+    # publishes the model as a GitHub release wheel, not on PyPI. Declared by
+    # URL under the kokoro marker; the engine refuses by name if it is still
+    # missing, and never downloads. Mirrors requirements.txt.
+    "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl ; python_version < '3.13'",
     # The SAME kokoro voices on Python 3.13, through ONNX Runtime instead of
     # torch. The engine stays "kokoro" in every dropdown and selects the torch
     # package when that imports, kokoro-onnx otherwise, so the two markers are
@@ -123,15 +130,19 @@ dependencies = [
     # encoder everywhere. Resolved LAST, after OTR_FFMPEG / PATH / real system
     # installs, so boxes that already work are untouched.
     "imageio-ffmpeg>=0.5",
-    # ffprobe too -- imageio-ffmpeg ships only ffmpeg, and the visualizer probes
-    # back every clip it encodes (eng_visualizer.py validate_silent_clip_contract).
-    # ffmpeg-downloader installs a matched ffmpeg+ffprobe PAIR in one directory,
-    # which is how _otr_shared.ffprobe finds ffprobe (as an ffmpeg sibling).
-    "ffmpeg-downloader>=0.5",
     # PyAV: what the pack measures media with on a box that has ffmpeg and no
     # ffprobe (_otr_shared/ffprobe.py, 2026-09-11). ComfyUI core pins av>=17
     # itself; declared here so the pack states its own need.
     "av>=17.0.0",
+    # NVIDIA RTX Video Super Resolution's runtime for the rtx_vsr upscaler
+    # (2026-10-30), declared as Comfy-Org's own ComfyUI_Nvidia_VFX_Nodes
+    # declares it, instead of pip-installed by the engine at run time (the
+    # registry flagged 2.3.34/2.3.35 "code-install" for that,
+    # PBUG-20261030-01). A wheel-stub on PyPI resolving NVIDIA's ~540 MB wheel
+    # from pypi.nvidia.com; the marker is the set of platforms that wheel
+    # exists for, because the stub fails the whole install anywhere else.
+    # Mirrors requirements.txt.
+    "nvidia-vfx>=0.2,<0.3; (sys_platform == 'win32' and platform_machine == 'AMD64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
 ]
 authors = [
     {name = "Jeffrey Brick", email = "jbrick2070@gmail.com"},

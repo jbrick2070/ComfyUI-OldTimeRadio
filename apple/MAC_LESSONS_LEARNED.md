@@ -226,8 +226,10 @@ none was "Apple Silicon can't do this":
 3. **ffmpeg was never a declared dependency** -- the run died at the mp4 encode
    telling a Mac user to run `winget install ffmpeg`. Now `imageio-ffmpeg`.
 4. **ffprobe was the other half** -- imageio ships ffmpeg alone, and the
-   visualizer probes back every clip it encodes. Now `ffmpeg-downloader`, which
-   installs a matched pair.
+   visualizer probes back every clip it encodes. Now PyAV: `probe_json` builds
+   the ffprobe document from `av` when no binary resolves (2026-09-11). The
+   `ffmpeg-downloader` line that first answered this shipped a fetcher and no
+   binaries, and was dropped 2026-10-30.
 5. **SA3 returned 100% NaN** -- and the cause was OTR's own determinism wrapper
    meeting an MPS `baddbmm` bug, not the model (PBUG-20260907-09b).
 

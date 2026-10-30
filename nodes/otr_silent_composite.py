@@ -1593,9 +1593,10 @@ class OTRSilentComposite:
                         "directory / black paths are unchanged. off = today's "
                         "lanczos+unsharp, byte-identical. spandrel_esrgan = "
                         "Real-ESRGAN x2 (any device, slow). rtx_vsr = NVIDIA "
-                        "RTX Video Super Resolution (RTX card; you install NVIDIA's "
-                        "nvidia-vfx package into ComfyUI's Python first, ~540 MB; "
-                        "~100x faster than ESRGAN; falls back to off with a "
+                        "RTX Video Super Resolution (RTX card; NVIDIA's ~540 MB "
+                        "nvidia-vfx package comes with the pack's requirements on "
+                        "Windows and Linux x86-64; ~100x faster than ESRGAN; falls "
+                        "back to off with a "
                         "warning where it cannot run)."
                     ),
                 }),

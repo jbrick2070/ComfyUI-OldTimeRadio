@@ -115,46 +115,8 @@ def resolve_ffmpeg(preferred=None) -> Optional[str]:
     # raises, and a contract that depends on one particular callee staying
     # well-behaved is not a contract. Caught by
     # test_a_broken_imageio_ffmpeg_is_none_and_never_raises.
-    # The downloaded PAIR first: it carries a sibling ffprobe, which the
-    # imageio wheel does not, and several engines need both.
-    try:
-        chosen = _downloaded_ffmpeg()
-        if chosen:
-            return chosen
-    except Exception:  # noqa: BLE001 -- resolution must never raise
-        pass
     try:
         return _imageio_ffmpeg()
-    except Exception:  # noqa: BLE001 -- resolution must never raise
-        return None
-
-
-def _downloaded_ffmpeg() -> Optional[str]:
-    """The ffmpeg `ffmpeg-downloader` has installed, or ``None``.
-
-    PREFERRED over the imageio wheel, and the reason is ffprobe. imageio-ffmpeg
-    ships ONLY an ffmpeg binary -- there is no ffprobe beside it -- and
-    `_otr_shared.ffprobe.resolve_ffprobe` finds ffprobe by looking for a SIBLING
-    of the ffmpeg this box runs. So resolving to the imageio binary silently
-    leaves the box with no ffprobe at all.
-
-    That was measured, 2026-09-07 on a Mac mini M4: with only imageio-ffmpeg
-    present, a full episode rendered its audio, encoded video frames, and then
-    died in `eng_visualizer.py` at
-        validate_silent_clip_contract(ffprobe_clip_fields(out_path), fps)
-    -- the visualizer encodes a clip and probes it back to check the contract,
-    so ffmpeg alone is only half a dependency.
-
-    `ffmpeg-downloader` installs a matched ffmpeg + ffprobe PAIR into one
-    directory on Windows, Linux and macOS, which satisfies both resolvers at
-    once. Its own dependencies are light (platformdirs, tabulate).
-
-    Returns None until `ffdl install` has run; the imageio fallback below then
-    still covers plain encoding.
-    """
-    try:
-        import ffmpeg_downloader as _fdl  # noqa: PLC0415 -- optional
-        return _usable(getattr(_fdl, "ffmpeg_path", None))
     except Exception:  # noqa: BLE001 -- resolution must never raise
         return None
 
@@ -181,6 +143,14 @@ def _imageio_ffmpeg() -> Optional[str]:
     a 13-minute run. The wheel-bundled binary was already sitting in the same
     venv (ffmpeg 7.1, with libx264, aac and h264_videotoolbox); nothing had
     ever asked it.
+
+    The wheel carries no ffprobe, and that is no longer a gap: when no ffprobe
+    binary resolves, `_otr_shared.ffprobe.probe_json` builds the same document
+    from PyAV (`av`, declared beside imageio-ffmpeg), which is also how
+    Comfy-Org's own video nodes read media. ffmpeg-downloader, declared from
+    2026-09-07 to 2026-10-30 for its "matched pair", shipped a fetcher and no
+    binaries, so the step that preferred it never resolved on a cold install;
+    both are gone (2026-10-30).
 
     NEVER RAISES, per this module's contract. A missing or broken
     imageio-ffmpeg is just "this box has no ffmpeg".

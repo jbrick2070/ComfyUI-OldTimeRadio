@@ -91,7 +91,7 @@ def test_torch_is_declared_nowhere():
 
 @pytest.mark.parametrize("package", ["kokoro", "kokoro-onnx", "pycairo", "bitsandbytes",
                                      "fugashi", "jaconv", "jieba", "pypinyin", "cn2an",
-                                     "ordered-set"])
+                                     "ordered-set", "nvidia-vfx", "en_core_web_sm"])
 def test_marker_bearing_lines_carry_the_same_marker_in_both_files(package):
     """The lines whose ENVIRONMENT MARKER is the whole point.
 
@@ -102,7 +102,10 @@ def test_marker_bearing_lines_carry_the_same_marker_in_both_files(package):
     zero Linux wheels and the sdist build killed the extractor's container
     boot, and bitsandbytes without its marker blocked macOS entirely. The six
     phonemizer libraries ride kokoro-onnx's marker: they serve the pack's copy
-    of misaki, which only the ONNX backend on 3.13 uses.
+    of misaki, which only the ONNX backend on 3.13 uses. nvidia-vfx's marker is
+    the set of platforms NVIDIA publishes its wheel for (the PyPI stub fails the
+    whole install elsewhere), and en_core_web_sm rides kokoro's marker because
+    only kokoro's misaki[en] loads it.
     """
     def pick(deps):
         return {d for d in deps if re.match(r"^%s(\W|$)" % re.escape(package), d)}

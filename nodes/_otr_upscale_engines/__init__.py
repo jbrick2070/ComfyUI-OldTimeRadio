@@ -118,9 +118,9 @@ except Exception:  # noqa: BLE001
 
 # rtx_vsr (2026-10-14): NVIDIA RTX Video Super Resolution, opt-in. Its module
 # imports nothing heavy, so it always registers; its load() imports the
-# nvidia-vfx the user installed (never installing it: the registry forbids a
-# run-time pip), and anywhere it cannot run it refuses and the composite falls
-# back to off.
+# nvidia-vfx the pack's requirements declare (never installing it at run time,
+# which the registry forbids), and anywhere it cannot run it refuses and the
+# composite falls back to off.
 try:  # pragma: no cover - trivial guard
     from . import eng_rtx_vsr as _eng_rtx_vsr  # noqa: F401
 except Exception:  # noqa: BLE001

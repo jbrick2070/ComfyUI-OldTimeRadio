@@ -17458,3 +17458,11 @@ not promote it to the Bug Bible on this evidence alone.
 - status: FIXED in code; live proof is the registry's verdict on the next
   published version (a clean automated scan auto-Actives -- 22 packs did so in
   October -- and a flagged one waits for the reviewer's `reviewed-safe`).
+- 2026-10-30, later the same day: `nvidia-vfx` became a DECLARED dependency
+  (requirements.txt and pyproject, `nvidia-vfx>=0.2,<0.3` under a marker for
+  win_amd64 and linux x86_64, the wheels pypi.nvidia.com publishes; the PyPI
+  entry is a wheel-stub that fails the install anywhere else), the way
+  Comfy-Org's own ComfyUI_Nvidia_VFX_Nodes declares it. Lane `pip_manual`
+  became `pip_dependency` (the matrix says **pip**); the refusal hint stays for
+  a git clone that skipped the requirements. Operator: declare it now; if the
+  next verdict flags, the declaration is the first A/B lever.

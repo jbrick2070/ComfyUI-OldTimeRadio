@@ -970,14 +970,16 @@ Without Homebrew this engine cannot run. **Use `viz_mxc_cpu`, `viz_green` or
 problem for a different reason (no Linux wheels): `apt install libcairo2-dev
 pkg-config` first.
 
-### `ffmpeg` and `ffprobe` -- one command after `pip install`
+### `ffmpeg` and `ffprobe` -- nothing beyond `pip install`
 
-`pip install -r requirements.txt` installs `ffmpeg-downloader`, which ships the
-FETCHER, not the binaries. Run **`ffdl install`** once (or `brew install
-ffmpeg`). `imageio-ffmpeg` supplies ffmpeg only -- ffprobe has no equivalent
-bundled wheel, and the visualizer probes back every clip it encodes. This Mac
-ships ffmpeg 9.0, which removed `-vsync`; the pack probes the binary and uses
-`-fps_mode` there (section 9).
+`pip install -r requirements.txt` brings `imageio-ffmpeg` (an ffmpeg binary for
+Apple Silicon and Intel) and PyAV (`av`), which the pack probes media with when
+no ffprobe binary resolves -- the visualizer probes back every clip it encodes,
+and that probe reads the same document from PyAV. `brew install ffmpeg` still
+gives you both binaries if you prefer them. (`ffmpeg-downloader`, declared from
+2026-09-07 to 2026-10-30, shipped a fetcher and no binaries; the `ffdl install`
+step it asked for is gone.) This Mac ships ffmpeg 9.0, which removed `-vsync`;
+the pack probes the binary and uses `-fps_mode` there (section 9).
 
 ### AnimateDiff -- section 7.3
 
@@ -1030,8 +1032,8 @@ question.
 | **the machine rebooted mid-render, log stops mid-load, no traceback** | an OOM on unified memory | section 2. Check `grep -c "Loading LLM model" <log>` -- 2 per episode is right, 4 means the writer double-load is back (section 12). On an AnimateDiff lane check the beat's latent count against 136 (section 7) |
 | **ComfyUI will not start at all**, exit 1, `ImportError: tokenizers>=0.23.1 ... found 0.22.2` | the shipped `tokenizers` pin in versions `.24`-`.28` | `pip install 'tokenizers>=0.23.1,<0.24'`, and use `2.0.0-alpha.29` or later. **Do NOT reinstall from Manager** -- it serves the broken version, and a bricked boot cannot be repaired from the UI because Manager IS a ComfyUI extension |
 | music is noise, "like a broken cassette" | ComfyUI's sub-quadratic attention is wrong on MPS | fixed automatically by the pack's prestartup, which forces PyTorch attention (~1.15x cost on diffusion lanes, measured). If you disabled it with `OTR_MPS_PYTORCH_ATTENTION=0`, turn it back on |
-| render dies at the mp4 encode, `winget install ffmpeg` | ffmpeg/ffprobe were not declared dependencies | `pip install -r requirements.txt` then **`ffdl install`** -- the pip install alone is not enough (section 8) |
-| `ffprobe` still not found after `pip install -r requirements.txt` | `ffmpeg-downloader` ships the fetcher, not the binaries | `ffdl install` once, or `brew install ffmpeg` |
+| render dies at the mp4 encode, `winget install ffmpeg` | ffmpeg/ffprobe were not declared dependencies | `pip install -r requirements.txt` -- `imageio-ffmpeg` encodes and PyAV probes (section 8) |
+| `ffprobe` not found after `pip install -r requirements.txt` | no wheel ships ffprobe | expected: the pack probes through PyAV. `brew install ffmpeg` if you want the binary |
 | render dies at the scopes stage, `Unrecognized option 'vsync'` | ffmpeg 9.0 REMOVED `-vsync` and dies at argv parse | already handled: `scope_draw.cfr_flags()` probes the installed binary once and returns `-fps_mode` here (verified 2026-09-08). If you see this, something bypassed the probe -- do not hardcode either spelling |
 | `NewsCurationDeep exceeded 40s` | `llm_quant_policy` is not `none` | set it to `none` (section 1) |
 | OOM / the machine freezes mid-render | 16 GB shared with macOS and everything else | close other apps; the writer peaks near 14 GB; section 2 |

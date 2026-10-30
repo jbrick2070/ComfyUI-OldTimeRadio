@@ -198,7 +198,7 @@ def download_facts() -> dict:
 
 #: How an engine with no provisioning lane still gets its weights.
 _NO_LANE_WORD = {"hf_cache": "auto", "fetch_at_load": "auto",
-                 "pip_manual": "manual", "sidecar": "sidecar",
+                 "pip_dependency": "pip", "sidecar": "sidecar",
                  "remote": "none", "manual_doc": "manual", "builtin": "nothing",
                  "remote_unprovisioned": "none*"}
 
@@ -552,6 +552,7 @@ def _size(row: dict) -> str:
 _FRICTION_CELL = {
     "auto": "**auto**", "GATED": "GATED", "manual": "manual",
     "GATED+manual": "GATED + manual", "none": "none", "bundled": "bundled",
+    "pip": "**pip**",
     "unrouted": "*no lane*", "sidecar": "own installer", "nothing": "nothing",
     "none*": "none, **but see below**",
 }
@@ -615,9 +616,10 @@ _LEGEND = """
 none of them is a script you have to run: the engine's own library pulls it
 through the Hugging Face cache, `OTR_WorkflowValidator` -- a node inside the
 workflow -- downloads it at queue time, or the engine fetches its own pinned file
-when it loads (Real-ESRGAN). NVIDIA RTX VSR is a **manual** row on purpose: its
-`nvidia-vfx` package is a `pip install` you run into ComfyUI's Python, because a
-node pack may not install packages at run time (Comfy Registry standards). A **manual** row may still have a helper in
+when it loads (Real-ESRGAN). NVIDIA RTX VSR is a **pip** row: its `nvidia-vfx`
+package is declared in the pack's requirements for the platforms NVIDIA builds
+it for, so it installs with the pack and nothing is fetched at run time (a node
+pack may not install packages then, Comfy Registry standards). A **manual** row may still have a helper in
 `scripts/`, but `scripts/` is not in the registry bundle, so from a normal
 install it is a step you take by hand and it is labelled as one.
 
@@ -625,7 +627,8 @@ install it is a step you take by hand and it is labelled as one.
 token; just pick it and run. **GATED** -- fetches itself, but only after you
 accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
 it yourself; `apple/MACHINES.md` lists every manual pick and how to get its
-files.
+files. **pip** -- the engine's runtime ships inside a Python package the pack's
+requirements declare for the platforms it exists on; nothing to fetch or place.
 **none** -- no weights at all. *no lane* -- the engine is registered but no
 provisioning lane is declared for it, so nothing will fetch it for you.
 
@@ -1074,16 +1077,17 @@ def render_apple(rows: list) -> str:
     # ------------------------------------------------------------- 3. weights
     L.append("## Where do the manual weights come from?\n\n")
     fetcher = _load("scripts/otr_fetch_lane_weights.py", "_odm_fetcher")
-    lane_to_engines, unsourced, pip_rows = {}, [], []
+    lane_to_engines, unsourced = {}, []
+    # A pip package is not a weight file: it installs with the pack's
+    # requirements (never at run time, which the registry forbids,
+    # PBUG-20261030-01), so its row prints the line to run only if it is
+    # missing anyway, not a file to download.
+    pip_rows = [(row["public"],
+                 provision.PIP_DEPENDENCY_REQUIREMENTS.get(row["engine"], ""))
+                for row in rows
+                if provision.NO_LANE_REASON.get(row["engine"]) == "pip_dependency"]
     for row in rows:
         if "manual" not in str(row["friction"]).lower():
-            continue
-        # A pip package is not a weight file: the pack never installs it (the
-        # registry forbids a run-time pip, PBUG-20261030-01), so its row says
-        # which line to run, not which file to download.
-        if provision.NO_LANE_REASON.get(row["engine"]) == "pip_manual":
-            pip_rows.append((row["public"],
-                             provision.PIP_MANUAL_REQUIREMENTS.get(row["engine"], "")))
             continue
         lane = str(row["lane"]) if row["lane"] else ""
         specs = manual_artifacts(lane, provision, fetcher) if lane else []
@@ -1102,7 +1106,7 @@ def render_apple(rows: list) -> str:
                  "here is the whole group. A heading with no total means that "
                  "group's manifest predates byte receipts -- the machine grid still has "
                  "the figure.\n\n")
-    elif unsourced or pip_rows:
+    elif unsourced:
         L.append("Only the picks below still need a hand step.\n\n")
     else:
         L.append("None: no row in the grid above reads manual.\n\n")
@@ -1137,14 +1141,18 @@ def render_apple(rows: list) -> str:
         L.append("\n")
 
     if pip_rows:
-        L.append("### A package you install with pip\n\n")
+        L.append("### A package that installs with the pack\n\n")
         L.append("Not a weight file: the engine's runtime ships inside a pip "
-                 "package, and the pack never installs packages at run time "
-                 "(the Comfy Registry forbids it). Run the line once with "
-                 "ComfyUI's own Python, never a system pip. A box without the "
-                 "package keeps rendering: the composite says so in its report "
-                 "and uses `off`.\n\n")
-        L.append("| If you select | Run once, with ComfyUI's own Python |\n|---|---|\n")
+                 "package that `requirements.txt` declares for the platforms "
+                 "it exists on (Windows and Linux x86-64), so a registry or "
+                 "Manager install already has it and nothing is fetched at run "
+                 "time (the Comfy Registry forbids a node pack installing "
+                 "packages then). If it is missing anyway -- a git clone that "
+                 "skipped `pip install -r requirements.txt` -- run the line "
+                 "once with ComfyUI's own Python, never a system pip. A box "
+                 "without the package keeps rendering: the composite says so "
+                 "in its report and uses `off`.\n\n")
+        L.append("| If you select | If it is missing, run once with ComfyUI's own Python |\n|---|---|\n")
         for public, requirement in sorted(pip_rows):
             L.append("| `%s` | `python -m pip install \"%s\"` |\n" % (public, requirement))
         L.append("\n")

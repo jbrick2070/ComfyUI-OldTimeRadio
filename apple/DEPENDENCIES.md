@@ -68,6 +68,7 @@ spandrel~=0.4.1
 pydantic>=2.0
 PyYAML>=6.0
 kokoro>=0.7.16; python_version < "3.13"
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl ; python_version < "3.13"
 kokoro-onnx>=0.6.1; python_version >= "3.13" and python_version < "3.14"
 unidic-lite>=1.0.8
 fugashi>=1.5; python_version >= "3.13" and python_version < "3.14"
@@ -81,8 +82,8 @@ pycairo>=1.24; sys_platform == 'win32'
 pillow>=10.0
 aiohttp>=3.9
 imageio-ffmpeg>=0.5
-ffmpeg-downloader>=0.5
 av>=17.0.0
+nvidia-vfx>=0.2,<0.3; (sys_platform == "win32" and platform_machine == "AMD64") or (sys_platform == "linux" and platform_machine == "x86_64")
 ```
 
 ## 3. Isolated-venv voice engines

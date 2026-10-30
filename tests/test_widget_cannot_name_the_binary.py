@@ -402,20 +402,19 @@ def test_no_resolver_wrapper_reflects_its_argument():
 
 
 def _starve_the_resolver(monkeypatch):
-    """Leave `resolve_ffmpeg` with nothing to find, at all SIX of its steps.
+    """Leave `resolve_ffmpeg` with nothing to find, at all FIVE of its steps.
 
     The order it walks is: the preferred value, `OTR_FFMPEG`, `PATH`, the
-    Windows and macOS install candidates, `ffmpeg-downloader`, and the binary
-    imageio-ffmpeg bundles. Neutralising one of them -- which is what this
-    file used to do -- leaves five live, and on a box with imageio-ffmpeg
-    installed the last one answers.
+    Windows and macOS install candidates, and the binary imageio-ffmpeg
+    bundles. Neutralising one of them -- which is what this file used to do
+    -- leaves four live, and on a box with imageio-ffmpeg installed the last
+    one answers.
     """
     from nodes._otr_shared import ffmpeg as ffm
     monkeypatch.setattr(shutil, "which", lambda name, *a, **kw: None)
     monkeypatch.delenv("OTR_FFMPEG", raising=False)
     monkeypatch.setattr(ffm, "_WINDOWS_INSTALL_CANDIDATES", ())
     monkeypatch.setattr(ffm, "_MACOS_INSTALL_CANDIDATES", ())
-    monkeypatch.setattr(ffm, "_downloaded_ffmpeg", lambda: None)
     monkeypatch.setattr(ffm, "_imageio_ffmpeg", lambda: None)
     return ffm
 
@@ -486,9 +485,9 @@ def test_the_wrapper_never_answers_with_the_value_it_was_given(value, starved,
 def test_the_wrapper_answers_empty_when_this_box_has_no_ffmpeg(monkeypatch):
     """The other half: when nothing resolves, the answer is `""`.
 
-    `resolve_ffmpeg` has SIX steps -- the preferred value, `OTR_FFMPEG`, PATH,
-    the Windows and macOS install candidates, `ffmpeg-downloader`, and the
-    binary imageio-ffmpeg bundles. Neutralising one of them and asserting `""`
+    `resolve_ffmpeg` has FIVE steps -- the preferred value, `OTR_FFMPEG`, PATH,
+    the Windows and macOS install candidates, and the binary imageio-ffmpeg
+    bundles. Neutralising one of them and asserting `""`
     is a claim about the box rather than about the code, so all of them are
     neutralised here and the neutralisation is then PROVEN before the empty
     answer is asserted -- otherwise a seventh fallback would quietly turn this
@@ -501,7 +500,7 @@ def test_the_wrapper_answers_empty_when_this_box_has_no_ffmpeg(monkeypatch):
         "a fallback this test does not neutralise still answers %r, so the "
         "empty case below would be proving nothing about the code. "
         "resolve_ffmpeg has grown a step past preferred / OTR_FFMPEG / PATH / "
-        "the install candidates / ffmpeg-downloader / imageio-ffmpeg -- "
+        "the install candidates / imageio-ffmpeg -- "
         "neutralise that one here too." % (ffm.resolve_ffmpeg(),))
 
     for value in HOSTILE_VALUES + ("",):

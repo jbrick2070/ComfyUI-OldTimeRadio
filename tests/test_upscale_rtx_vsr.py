@@ -75,10 +75,44 @@ def test_registered_opt_in_never_default():
     assert row["practical_without_gpu"] is False
 
 
-def test_not_a_declared_dependency():
-    """Proprietary and ~540 MB: opt-in, never on an AMD/Intel/Mac install."""
-    for name in ("requirements.txt", "pyproject.toml"):
-        assert "nvidia-vfx" not in (REPO_ROOT / name).read_text(encoding="utf-8")
+def _declared_nvidia_vfx():
+    """The one nvidia-vfx requirement each dependency list declares."""
+    import tomllib
+    from packaging.requirements import Requirement
+    lines = [ln.strip() for ln in (REPO_ROOT / "requirements.txt")
+             .read_text(encoding="utf-8").splitlines()]
+    deps = tomllib.loads((REPO_ROOT / "pyproject.toml")
+                         .read_text(encoding="utf-8"))["project"]["dependencies"]
+    found = {
+        "requirements.txt": [ln for ln in lines
+                             if ln and not ln.startswith("#") and ln.startswith("nvidia-vfx")],
+        "pyproject.toml": [d for d in deps if d.startswith("nvidia-vfx")],
+    }
+    return {name: Requirement(specs[0]) for name, specs in found.items()
+            if len(specs) == 1}, found
+
+
+def test_declared_as_a_dependency_for_the_platforms_nvidia_builds_it_for():
+    """Declared the way Comfy-Org's ComfyUI_Nvidia_VFX_Nodes declares it
+    (2026-10-30), with the engine's own range, under a marker that names the
+    wheels pypi.nvidia.com publishes: win_amd64 and manylinux x86_64. The PyPI
+    entry is a wheel-stub that fails the whole install anywhere else, so the
+    marker is what keeps a Mac, an ARM Linux or a Windows-on-ARM install
+    alive; an x86-64 AMD box receives it and the engine refuses by hardware."""
+    from packaging.requirements import Requirement
+    reqs, found = _declared_nvidia_vfx()
+    assert set(reqs) == {"requirements.txt", "pyproject.toml"}, found
+    env = {"python_version": "3.12", "python_full_version": "3.12.4"}
+    for name, req in reqs.items():
+        assert str(req.specifier) == str(Requirement(V.REQUIREMENT).specifier), name
+        assert req.marker is not None, name
+        assert req.marker.evaluate({**env, "sys_platform": "win32", "platform_machine": "AMD64"})
+        assert req.marker.evaluate({**env, "sys_platform": "linux", "platform_machine": "x86_64"})
+        for platform_, machine in (("darwin", "arm64"), ("darwin", "x86_64"),
+                                   ("linux", "aarch64"), ("win32", "ARM64")):
+            assert not req.marker.evaluate(
+                {**env, "sys_platform": platform_, "platform_machine": machine}), (name, platform_, machine)
+    assert str(reqs["requirements.txt"].marker) == str(reqs["pyproject.toml"].marker)
 
 
 def test_nvidia_workflows_upscale_with_rtx_vsr_and_the_rest_stay_off():
@@ -393,7 +427,7 @@ def test_a_non_degrading_engine_failing_mid_composite_still_raises(tmp_path,
 def _sdk_absent(monkeypatch):
     """No nvvfx; a capable RTX host unless a test says otherwise; and a spawn
     boundary that FAILS THE TEST if the engine tries to run anything at all.
-    Python itself is left real: the suite runs on 3.12+, which the SDK floor
+    Python itself is left real: the suite runs on 3.10+, which the SDK floor
     accepts, and a bare tuple in sys.version_info breaks `.major` readers."""
     from nodes._otr_shared import proc as otr_proc
 
@@ -515,8 +549,8 @@ def test_the_provisioner_names_the_same_pip_line_as_the_engine():
         "otr_provision_pin", REPO_ROOT / "scripts" / "otr_provision.py")
     prov = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(prov)
-    assert prov.NO_LANE_REASON["rtx_vsr"] == "pip_manual"
-    assert prov.PIP_MANUAL_REQUIREMENTS["rtx_vsr"] == V.REQUIREMENT
+    assert prov.NO_LANE_REASON["rtx_vsr"] == "pip_dependency"
+    assert prov.PIP_DEPENDENCY_REQUIREMENTS["rtx_vsr"] == V.REQUIREMENT
 
 
 # --- AnimateDiff / Ghost rows (operator, 2026-10-15) ----------------------- #

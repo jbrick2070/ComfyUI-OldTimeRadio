@@ -121,7 +121,7 @@ You never need all the weights in this workflow. One workflow ships; the dropdow
 |---|---|---|---|---|---|---|---|
 | `off` | nothing | -- | **proven** | **proven** | **proven** | ? | ? |
 | `spandrel_esrgan` | **auto** | 0.1 GiB | fits | **proven** | measured | ? | ? |
-| `rtx_vsr` | manual | 0.5 GiB | measured | ? | not offered | not offered | not offered |
+| `rtx_vsr` | **pip** | 0.5 GiB | measured | ? | not offered | not offered | not offered |
 
 **Writer (the LLM that writes the script)**
 
@@ -140,9 +140,10 @@ You never need all the weights in this workflow. One workflow ships; the dropdow
 none of them is a script you have to run: the engine's own library pulls it
 through the Hugging Face cache, `OTR_WorkflowValidator` -- a node inside the
 workflow -- downloads it at queue time, or the engine fetches its own pinned file
-when it loads (Real-ESRGAN). NVIDIA RTX VSR is a **manual** row on purpose: its
-`nvidia-vfx` package is a `pip install` you run into ComfyUI's Python, because a
-node pack may not install packages at run time (Comfy Registry standards). A **manual** row may still have a helper in
+when it loads (Real-ESRGAN). NVIDIA RTX VSR is a **pip** row: its `nvidia-vfx`
+package is declared in the pack's requirements for the platforms NVIDIA builds
+it for, so it installs with the pack and nothing is fetched at run time (a node
+pack may not install packages then, Comfy Registry standards). A **manual** row may still have a helper in
 `scripts/`, but `scripts/` is not in the registry bundle, so from a normal
 install it is a step you take by hand and it is labelled as one.
 
@@ -150,7 +151,8 @@ install it is a step you take by hand and it is labelled as one.
 token; just pick it and run. **GATED** -- fetches itself, but only after you
 accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
 it yourself; `apple/MACHINES.md` lists every manual pick and how to get its
-files.
+files. **pip** -- the engine's runtime ships inside a Python package the pack's
+requirements declare for the platforms it exists on; nothing to fetch or place.
 **none** -- no weights at all. *no lane* -- the engine is registered but no
 provisioning lane is declared for it, so nothing will fetch it for you.
 

@@ -6,9 +6,9 @@ own ComfyUI_Nvidia_VFX_Nodes is built on. An optional second upscaler beside
 ``spandrel_esrgan``. ``off`` stays the canonical workflow's default (operator,
 2026-10-14: "one of 2 upscale options but do not activate by default for
 now"); every NVIDIA workflow variant selects it on ``cuda`` (operator,
-2026-10-15: "every nvidia lane to 1080p"). Its NVIDIA package is yours to
-install (below); wherever it cannot run it falls back to ``off`` with a
-warning, so a variant never fails on it.
+2026-10-15: "every nvidia lane to 1080p"). Its NVIDIA package comes with the
+pack's requirements where NVIDIA builds it (below); wherever it cannot run it
+falls back to ``off`` with a warning, so a variant never fails on it.
 
 WHY IT EARNS A DROPDOWN ROW -- measured on the RTX 4060 Laptop (8 GB), 48 real
 frames of a 1472x832 OTR viz clip, 2026-10-14:
@@ -29,24 +29,27 @@ frames of a 1472x832 OTR viz clip, 2026-10-14:
   bytes on repeat and after other frames (held-frame reuse stays exact); a
   1001x501 input came back exactly 2002x1002.
 
-WHAT IT NEEDS, AND WHO INSTALLS IT. An NVIDIA RTX card (Turing or newer;
+WHAT IT NEEDS, AND HOW IT ARRIVES. An NVIDIA RTX card (Turing or newer;
 driver 570.65+ on Windows) and the ``nvidia-vfx`` wheel (about 540 MB; Windows
-and Linux x86-64; NVIDIA's proprietary licence). It is NOT in requirements.txt,
-because that would put a proprietary 540 MB wheel on every AMD, Intel and Mac
-install for nothing (operator, 2026-10-15). AND THIS PACK NEVER INSTALLS IT AT
-RUN TIME. From 2.3.29 to 2.3.44 ``load`` ran ``python -m pip install`` itself
-the first time an NVIDIA workflow picked the engine. The Comfy Registry's
-published standards forbid exactly that ("runtime package installation through
-subprocess calls is not permitted"), its reviewer flagged 2.3.34 and 2.3.35
-``policy-v0.7: code-install`` for it, and no version after 2.3.20 reached
-Active while it shipped (PBUG-20261030-01). So the user runs the one pip line
-into ComfyUI's own Python, once (``INSTALL_HINT``, which the missing-package
-refusal names),
-and ``load`` imports what is there; installing NVIDIA's runtime is the user's
-own acceptance of NVIDIA's licence. A box without the package refuses like any
+and Linux x86-64; NVIDIA's proprietary licence). Since 2026-10-30 the wheel is
+a DECLARED dependency: requirements.txt and pyproject carry
+``nvidia-vfx>=0.2,<0.3`` under a marker for the two platforms NVIDIA publishes
+it for, the way Comfy-Org's own ComfyUI_Nvidia_VFX_Nodes declares it, so a
+registry or Manager install has it before the first render. AND THIS PACK NEVER
+INSTALLS IT AT RUN TIME. From 2.3.29 to 2.3.44 ``load`` ran ``python -m pip
+install`` itself the first time an NVIDIA workflow picked the engine. The Comfy
+Registry's published standards forbid exactly that ("runtime package
+installation through subprocess calls is not permitted"), its reviewer flagged
+2.3.34 and 2.3.35 ``policy-v0.7: code-install`` for it, and no version after
+2.3.20 reached Active while it shipped (PBUG-20261030-01). ``load`` imports
+what is there; a git clone that skipped the requirements is told the one pip
+line to run into ComfyUI's own Python (``INSTALL_HINT``, which the
+missing-package refusal names). A box without the package refuses like any
 other unusable case -- naming the hardware reason first where there is one, so
 a CPU, Mac, AMD or GTX box is not sent to install a wheel it cannot use -- and
-the composite degrades to ``off``.
+the composite degrades to ``off``. An AMD or Intel x86-64 box does receive the
+wheel through the marker (PEP 508 has no GPU-vendor marker) and refuses here by
+hardware; the operator took that cost over a run-time install (2026-10-30).
 
 IT NEVER FAILS A RENDER FOR LACK OF HARDWARE. ``degrades_to_off = True``:
 when this engine cannot run here -- no ``nvvfx``, no CUDA, an AMD card, a GTX
@@ -83,11 +86,14 @@ _LOG = logging.getLogger("OTR.upscale.rtx_vsr")
 REQUIREMENT = "nvidia-vfx>=0.2,<0.3"
 
 #: The missing-package refusal names it (``_refuse``'s ``hint``), and only on a
-#: box that could run the SDK. The PACK never runs it -- the user does, once,
-#: with ComfyUI's own interpreter (a system pip installs where ComfyUI never
-#: looks); the module docstring says why the registry forbids a run-time pip.
-INSTALL_HINT = ("install it first with ComfyUI's own interpreter, never a system "
-                'pip: python -m pip install "%s" (NVIDIA RTX card required)'
+#: box that could run the SDK. The package is a declared dependency, so a
+#: registry or Manager install already has it; the hint is for a git clone
+#: that skipped `pip install -r requirements.txt`. The PACK never runs it --
+#: the user does, with ComfyUI's own interpreter (a system pip installs where
+#: ComfyUI never looks); the module docstring says why.
+INSTALL_HINT = ("it comes with the pack's requirements; if it is missing, install "
+                "it with ComfyUI's own interpreter, never a system pip: "
+                'python -m pip install "%s" (NVIDIA RTX card required)'
                 % REQUIREMENT)
 
 #: The SDK's floor: RTX Video Super Resolution runs on Turing (sm_75) or newer.
@@ -98,16 +104,17 @@ MIN_COMPUTE_CAPABILITY = (7, 5)
 def _hardware_blocker(torch, dev):
     """Why RTX VSR cannot run on this host, or ``""``. Read when the SDK is
     missing, so the refusal names the real reason rather than the absent
-    package: the wheel is win_amd64 / manylinux x86-64, abi3 from CPython 3.12,
-    and the effect needs sm_75+. (GTX 16xx is Turing without tensor cores and
+    package: the wheel is win_amd64 / manylinux x86-64, built for CPython 3.10
+    and 3.11 and abi3 from 3.12 (pypi.nvidia.com, read 2026-10-30), and the
+    effect needs sm_75+. (GTX 16xx is Turing without tensor cores and
     passes this check; the load probe catches it.)"""
     import platform
     import sys
     machine = platform.machine().lower()
     if sys.platform not in ("win32", "linux") or machine not in ("amd64", "x86_64"):
         return f"nvidia-vfx ships for Windows/Linux x86-64 only ({sys.platform} {machine})"
-    if sys.version_info < (3, 12):
-        return "nvidia-vfx needs Python 3.12 or newer (this is %d.%d)" % sys.version_info[:2]
+    if sys.version_info < (3, 10):
+        return "nvidia-vfx needs Python 3.10 or newer (this is %d.%d)" % sys.version_info[:2]
     try:
         cap = tuple(torch.cuda.get_device_capability(dev))
     except Exception as exc:  # noqa: BLE001 -- an unreadable card is still a refusal

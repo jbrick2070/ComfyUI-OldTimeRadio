@@ -124,6 +124,15 @@ PyYAML>=6.0
 # should be is an open operator decision -- see apple/GO_FORWARD_PLAN.md
 # 2026-09-01. Mirror this marker into pyproject.toml on the next bump.
 kokoro>=0.7.16; python_version < "3.13"
+# The English phonemizer's spaCy model (registry review, 2026-10-30). kokoro's
+# misaki[en] loads spaCy's en_core_web_sm for English G2P, and when the model
+# package is absent it calls spacy.cli.download -- which spawns
+# `python -m pip install` in the middle of a render. A fresh install lacked
+# it because the model is not on PyPI: spaCy publishes it as a GitHub
+# release wheel, so it is declared here by URL (a PEP 508 direct reference)
+# under the kokoro marker. The engine refuses by name, and never downloads,
+# if it is still missing (`_kokoro_backends.py`). Mirrored in pyproject.toml.
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl ; python_version < "3.13"
 # 2026-09-02 (queue item 2): the SAME kokoro voices on Python 3.13, through ONNX
 # Runtime instead of torch -- `nodes/_otr_audio_engines/_kokoro_backends.py`. The
 # engine stays "kokoro" in every dropdown; it selects the torch package when that
@@ -268,18 +277,34 @@ imageio-ffmpeg>=0.5
 # encoded its video frames, and then died in eng_visualizer.py at
 #     validate_silent_clip_contract(ffprobe_clip_fields(out_path), fps)
 # -- the visualizer encodes a clip and probes it back to verify the contract,
-# so shipping ffmpeg alone is only half the dependency.
-# ffmpeg-downloader installs a MATCHED ffmpeg + ffprobe pair into one directory
-# on Windows, Linux and macOS, which is what `_otr_shared.ffprobe` wants: it
-# finds ffprobe as a SIBLING of the ffmpeg this box runs. Light deps
-# (platformdirs, tabulate). Binaries are fetched by `ffdl install`, and
-# resolve_ffmpeg prefers this pair over the imageio wheel precisely because of
-# the sibling; the imageio wheel remains the fallback for plain encoding.
-ffmpeg-downloader>=0.5
+# so shipping ffmpeg alone is only half the dependency. The other half is
+# PyAV below, not a second binary: ffmpeg-downloader was declared here from
+# 2026-09-07 to 2026-10-30 and shipped a FETCHER, not binaries -- `ffdl
+# install` was a manual step nothing ran, so a cold install never had the
+# pair it promised, and the resolver step that preferred it is gone with it.
+# Comfy-Org's own video nodes probe and encode through PyAV, and
+# VideoHelperSuite resolves ffmpeg through imageio-ffmpeg; this pack now does
+# exactly those two things and nothing else.
 # PyAV is what the pack MEASURES media with on a box that has ffmpeg and no
 # ffprobe (`_otr_shared/ffprobe.py`, the fallback section, 2026-09-11): the
-# imageio wheel above ships one binary and `ffdl install` is a manual step
-# nothing runs, so a cold install used to die at the first clip probe-back.
+# imageio wheel above ships one binary and no ffprobe, so a cold install used
+# to die at the first clip probe-back.
 # ComfyUI's own requirements.txt already pins av>=17.0.0; declared here so
 # the pack states its own need instead of borrowing the host's.
 av>=17.0.0
+# NVIDIA RTX Video Super Resolution's runtime, for the `rtx_vsr` upscaler every
+# NVIDIA workflow selects (2026-10-30). Declared the way Comfy-Org's own
+# ComfyUI_Nvidia_VFX_Nodes declares it, instead of installed at run time: from
+# 2.3.29 to 2.3.44 the engine ran `pip install` itself on first load, the Comfy
+# Registry's standards forbid a node pack installing packages at run time, and
+# the registry flagged 2.3.34/2.3.35 for it (PBUG-20261030-01). The PyPI entry
+# is a wheel-stub: `pip install` resolves the real ~540 MB wheel from
+# pypi.nvidia.com (NVIDIA's proprietary licence). The marker names the
+# platforms NVIDIA publishes wheels for -- Windows x86-64 and Linux x86-64 --
+# because the stub fails the whole all-or-nothing install anywhere else
+# (macOS, Linux on ARM, Windows on ARM): the pycairo lesson above, again. An
+# AMD or Intel x86-64 box does receive it and the engine refuses there by
+# hardware reason, so the composite falls back to off. Range pinned to the 0.2
+# line measured on the RTX 4060 (`eng_rtx_vsr.REQUIREMENT`). Mirrored in
+# pyproject.toml.
+nvidia-vfx>=0.2,<0.3; (sys_platform == "win32" and platform_machine == "AMD64") or (sys_platform == "linux" and platform_machine == "x86_64")

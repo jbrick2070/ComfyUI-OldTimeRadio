@@ -54,7 +54,10 @@ install both.
 **Both.** Not just ffmpeg. Episodes are muxed, captioned and published through
 ffmpeg, and several steps probe a file's duration with ffprobe first. The
 `imageio-ffmpeg` wheel that comes down with the requirements ships an ffmpeg
-binary and **no ffprobe**, so a system install is what you want.
+binary and **no ffprobe**; when no ffprobe binary is found the pack reads media
+through PyAV (`av`, also in the requirements), which carries a normal episode,
+but a system install of both is still what you want for the optional engines
+that probe with the binary.
 
 **Take a current build.** The final mux copies the master audio into the MP4
 losslessly (PCM in an ISOBMFF container), which older builds cannot write:
@@ -77,9 +80,10 @@ cannot do it.
   is older than 6.1, install a static build instead (for example the release
   build from johnvansickle.com into `/usr/local/bin`) or set `OTR_FFMPEG` to one.
 
-If you cannot install system-wide, `ffdl install` fetches both binaries into
-your user profile -- `ffmpeg-downloader` comes down with the requirements above
-and provides the fetcher.
+If you cannot install system-wide, the pack still runs on what
+`pip install -r requirements.txt` brought: the `imageio-ffmpeg` wheel's ffmpeg
+for encoding and PyAV for probing. Set `OTR_FFMPEG` or `OTR_FFPROBE` to a
+static build if you want a particular one.
 
 Check both answer. On macOS or Linux:
 
@@ -89,10 +93,9 @@ ffmpeg -version; ffprobe -version
 
 On Windows PowerShell use `;` as above — `&&` is a parser error there.
 
-If you used `ffdl install` rather than a system package, these may report
-"not found" and still be fine: that installs into its own profile directory and
-this pack locates the pair through the `ffmpeg-downloader` package, not through
-PATH.
+If you rely on the wheel rather than a system package, `ffprobe -version`
+reports "not found" and that is fine: the pack probes through PyAV then, and
+finds the wheel's ffmpeg through the `imageio-ffmpeg` package, not through PATH.
 
 If you keep ffmpeg somewhere unusual, set `OTR_FFMPEG` to the full path of the
 binary. That environment variable wins over PATH. (There is an `ffmpeg` widget on

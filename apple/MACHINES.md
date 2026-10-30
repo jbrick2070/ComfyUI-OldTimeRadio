@@ -133,7 +133,7 @@ If you change a dropdown yourself, these are the only picks that need anything b
 |---|---|---|---|---|---|---|---|
 | `off` | nothing | -- | **proven** | **proven** | **proven** | ? | ? |
 | `spandrel_esrgan` | **auto** | 0.1 GiB | fits | **proven** | measured | ? | ? |
-| `rtx_vsr` | manual | 0.5 GiB | measured | ? | not offered | not offered | not offered |
+| `rtx_vsr` | **pip** | 0.5 GiB | measured | ? | not offered | not offered | not offered |
 
 **Writer (the LLM that writes the script)**
 
@@ -152,11 +152,11 @@ If you change a dropdown yourself, these are the only picks that need anything b
 
 Only the picks below still need a hand step.
 
-### A package you install with pip
+### A package that installs with the pack
 
-Not a weight file: the engine's runtime ships inside a pip package, and the pack never installs packages at run time (the Comfy Registry forbids it). Run the line once with ComfyUI's own Python, never a system pip. A box without the package keeps rendering: the composite says so in its report and uses `off`.
+Not a weight file: the engine's runtime ships inside a pip package that `requirements.txt` declares for the platforms it exists on (Windows and Linux x86-64), so a registry or Manager install already has it and nothing is fetched at run time (the Comfy Registry forbids a node pack installing packages then). If it is missing anyway -- a git clone that skipped `pip install -r requirements.txt` -- run the line once with ComfyUI's own Python, never a system pip. A box without the package keeps rendering: the composite says so in its report and uses `off`.
 
-| If you select | Run once, with ComfyUI's own Python |
+| If you select | If it is missing, run once with ComfyUI's own Python |
 |---|---|
 | `rtx_vsr` | `python -m pip install "nvidia-vfx>=0.2,<0.3"` |
 
@@ -172,16 +172,18 @@ This pack cannot fetch them, and no table here can tell you the filename, becaus
 none of them is a script you have to run: the engine's own library pulls it
 through the Hugging Face cache, `OTR_WorkflowValidator` -- a node inside the
 workflow -- downloads it at queue time, or the engine fetches its own pinned file
-when it loads (Real-ESRGAN). NVIDIA RTX VSR is a **manual** row on purpose: its
-`nvidia-vfx` package is a `pip install` you run into ComfyUI's Python, because a
-node pack may not install packages at run time (Comfy Registry standards). A **manual** row may still have a helper in
+when it loads (Real-ESRGAN). NVIDIA RTX VSR is a **pip** row: its `nvidia-vfx`
+package is declared in the pack's requirements for the platforms NVIDIA builds
+it for, so it installs with the pack and nothing is fetched at run time (a node
+pack may not install packages then, Comfy Registry standards). A **manual** row may still have a helper in
 `scripts/`, but `scripts/` is not in the registry bundle, so from a normal
 install it is a step you take by hand and it is labelled as one.
 
 **auto** -- fetched on first use, no account and no
 token; just pick it and run. **GATED** -- fetches itself, but only after you
 accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
-it yourself; the section above lists every manual pick and how to get its files.
+it yourself; the section above lists every manual pick and how to get its files. **pip** -- the engine's runtime ships inside a Python package the pack's
+requirements declare for the platforms it exists on; nothing to fetch or place.
 **none** -- no weights at all. *no lane* -- the engine is registered but no
 provisioning lane is declared for it, so nothing will fetch it for you.
 

@@ -1319,13 +1319,13 @@ class Lane(NamedTuple):
 #:              -- the engine fetches its own pinned, hash-checked weights when
 #:                 it loads, through `_otr_visual_assets` rather than the
 #:                 queue-time gate. Auto for the user; still a download.
-#:   "pip_manual"
-#:              -- the engine's runtime is a pip package the USER installs
-#:                 into ComfyUI's Python by hand (rtx_vsr: nvidia-vfx, NVIDIA
-#:                 cards only). The pack never installs it: the Comfy
-#:                 Registry forbids run-time package installation, and 2.3.34
-#:                 and 2.3.35 were flagged "code-install" for doing so
-#:                 (PBUG-20261030-01). Manual for the user.
+#:   "pip_dependency"
+#:              -- the engine's runtime is a pip package the pack's own
+#:                 requirements declare (rtx_vsr: nvidia-vfx, under a marker
+#:                 for the platforms NVIDIA builds it for). Nothing to fetch
+#:                 and nothing to place; the pack never installs it at run
+#:                 time, which the Comfy Registry forbids and flagged 2.3.34
+#:                 and 2.3.35 "code-install" for (PBUG-20261030-01).
 #:   "sidecar"  -- installs through its own installer script, not the model
 #:                 provisioner. Friction lives in that installer.
 #:   "remote"   -- a hosted API. No local weights at all, only a credential.
@@ -1366,18 +1366,19 @@ NO_LANE_REASON = {
     # the hand-download instruction.
     "spandrel_esrgan": "fetch_at_load",
     # NVIDIA RTX VSR: its models ship inside NVIDIA's own nvidia-vfx wheel
-    # (proprietary, ~540 MB, NVIDIA-only) -- never a requirements.txt line,
-    # and since 2026-10-30 never installed by the engine either: the user
-    # pip-installs it once, and a box without it falls back to off.
-    "rtx_vsr": "pip_manual",
+    # (proprietary, ~540 MB, NVIDIA-only) -- a requirements.txt line since
+    # 2026-10-30, under a marker for Windows and Linux x86-64, and never
+    # installed by the engine itself; a box without it falls back to off.
+    "rtx_vsr": "pip_dependency",
     # Local video lanes whose weights are documented but have no fetcher lane.
     "mesh_stage": "manual_doc",
 }
 
-#: The pip line a ``pip_manual`` engine needs, as the docs print it. Pinned to
-#: the engine's own ``REQUIREMENT`` by tests/test_upscale_rtx_vsr.py so the
-#: refusal and apple/MACHINES.md cannot name two different ranges.
-PIP_MANUAL_REQUIREMENTS = {
+#: The pip line a ``pip_dependency`` engine needs when its package is missing
+#: anyway (a git clone that skipped the requirements), as the docs print it.
+#: Pinned to the engine's own ``REQUIREMENT`` by tests/test_upscale_rtx_vsr.py
+#: so the refusal and apple/MACHINES.md cannot name two different ranges.
+PIP_DEPENDENCY_REQUIREMENTS = {
     "rtx_vsr": "nvidia-vfx>=0.2,<0.3",
 }
 
