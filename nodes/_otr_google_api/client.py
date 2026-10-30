@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from urllib.request import urlopen  # bare name clears the registry $http2 literal; still seen by the network-sites guard
 from typing import Any
@@ -370,16 +371,46 @@ def _post_json(
             ), status=None) from exc
 
 
+def _api_origin() -> "urllib.parse.SplitResult":
+    return urllib.parse.urlsplit(
+        (_env("OTR_GOOGLE_API_BASE") or DEFAULT_BASE_URL).rstrip("/"))
+
+
 def _absolute_url(path_or_url: str) -> str:
     value = str(path_or_url or "").strip()
     if not value:
         raise GoogleAPIRequestShapeError("Google API URL/path was blank.")
+    origin = _api_origin()
     if value.startswith("http://") or value.startswith("https://"):
+        # AN ABSOLUTE URL STAYS ON THE API'S OWN ORIGIN (registry review,
+        # 2026-10-30): a media uri arrives inside the API's response, and
+        # this client put the API key on whatever host that uri named.
+        # The configured base's host, and its scheme or https.
+        got = urllib.parse.urlsplit(value)
+        if (got.netloc.lower() != origin.netloc.lower()
+                or got.scheme not in ("https", origin.scheme)):
+            raise GoogleAPIRequestShapeError(
+                "Google API URL %r is not on the API origin %s://%s; no request sent."
+                % (value, origin.scheme, origin.netloc))
         return value
     if not value.startswith("/"):
         value = "/" + value
-    base_url = (_env("OTR_GOOGLE_API_BASE") or DEFAULT_BASE_URL).rstrip("/")
-    return f"{base_url}{value}"
+    return f"{origin.scheme}://{origin.netloc}{origin.path}{value}"
+
+
+class _KeyStaysOnOrigin(urllib.request.HTTPRedirectHandler):
+    """A redirect off the API origin loses the API key. urllib's stock
+    handler copies every header onto the new request, so a 302 to another
+    host carried the key there (registry review, 2026-10-30)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new is not None:
+            before = urllib.parse.urlsplit(req.full_url).netloc.lower()
+            after = urllib.parse.urlsplit(newurl).netloc.lower()
+            if after != before:
+                new.remove_header("X-goog-api-key")
+        return new
 
 
 def _get_bytes(
@@ -397,8 +428,9 @@ def _get_bytes(
         headers=headers,
         method="GET",
     )
+    opener = urllib.request.build_opener(_KeyStaysOnOrigin())
     try:
-        with urlopen(req, timeout=timeout_s) as resp:  # noqa: S310
+        with opener.open(req, timeout=timeout_s) as resp:  # noqa: S310 -- origin-checked above
             return resp.read()
     except urllib.error.HTTPError as exc:
         parsed, raw_text = _best_effort_json(exc.read())

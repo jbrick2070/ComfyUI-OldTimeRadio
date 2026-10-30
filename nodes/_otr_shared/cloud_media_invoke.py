@@ -605,6 +605,10 @@ def _temp_dest(session, node_key: str, ext: str) -> Path:
 #: idempotency key, the watchdog cancels only the local poll, and a timed-out
 #: job that completes provider-side is billed alongside any resubmission.
 _DOWNLOAD_ATTEMPTS = 2
+#: A result body larger than this is refused mid-stream (registry review,
+#: 2026-10-30): the GET to a partner's return URL had no ceiling at all.
+#: Generous for a 4K clip; a stream that passes it is not a clip.
+_DOWNLOAD_MAX_BYTES = 2 * 1024 ** 3
 
 
 def _stream_to_temp(url: str, dest: Path) -> None:
@@ -617,19 +621,36 @@ def _stream_to_temp(url: str, dest: Path) -> None:
     """
     import urllib.request
     from urllib.request import urlopen  # bare name clears the registry $http2 literal; still seen by the network-sites guard
+    # HTTPS ONLY, AND BOUNDED (registry review, 2026-10-30): the URL is the
+    # partner node's own return value, never a workflow field, but this GET
+    # followed any scheme to any size. A partner returns https; a plain
+    # http return is refused as a provider fault, not fetched.
+    if not str(url).startswith("https://"):
+        raise CloudMediaError(
+            CloudErrorCode.PROVIDER_REJECTED,
+            f"result URL {url!r} is not https; the pack fetches no other scheme")
     req = urllib.request.Request(url, headers={"User-Agent": _USAGE_SOURCE})
     last_exc: Exception | None = None
     for attempt in range(1, _DOWNLOAD_ATTEMPTS + 1):
         try:
+            total = 0
             with urlopen(req, timeout=120) as resp, \
                     open(dest, "wb") as out:
                 while True:
                     chunk = resp.read(1 << 20)
                     if not chunk:
                         break
+                    total += len(chunk)
+                    if total > _DOWNLOAD_MAX_BYTES:
+                        raise CloudMediaError(
+                            CloudErrorCode.CORRUPT_OUTPUT,
+                            f"result from {url!r} exceeds {_DOWNLOAD_MAX_BYTES} bytes; "
+                            "refused mid-stream")
                     out.write(chunk)
             return
         except CloudMediaError:
+            with contextlib.suppress(OSError):
+                dest.unlink()          # a refused body leaves no partial file
             raise
         except Exception as exc:
             last_exc = exc

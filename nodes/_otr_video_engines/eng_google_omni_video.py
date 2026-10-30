@@ -156,6 +156,21 @@ def _image_part(ref, *, field: str) -> dict:
             "google_omni_video.render_clip: %s image ref was blank "
             "(no request sent)" % field
         )
+    # CONFINED AT THE SEAT THAT OPENS IT (registry review, 2026-10-30): the
+    # render driver confines init_image before building the request, but
+    # this adapter reads whatever ref it is handed and uploads the bytes,
+    # so it proves the path itself, as flux3_klein does.
+    try:
+        from .._otr_paths import confine_to_read_roots
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import confine_to_read_roots  # type: ignore
+    try:
+        path = confine_to_read_roots(path, field)
+    except ValueError as exc:  # OtrPathContractError
+        raise GoogleAPIRequestShapeError(
+            "google_omni_video.render_clip: %s image %r is outside the approved "
+            "folders (no request sent): %s" % (field, path, exc)
+        ) from None
     p = Path(path)
     if not p.is_file():
         raise GoogleAPIRequestShapeError(
