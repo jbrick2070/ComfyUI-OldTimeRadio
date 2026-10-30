@@ -9,7 +9,7 @@ themselves live (progress, picks, percent), so they are not here and need no art
 | Face | Label | Put it on |
 |---|---|---|
 | `studio` | STUDIO | a **Website** key: `http://127.0.0.1:8765/` |
-| `logblaster` | LOGS | a **Website** key: `http://127.0.0.1:8188/logblaster` |
+| `logblaster` | LOGS | a **Website** key: `http://127.0.0.1:8188/logblaster` (served by the [ComfyUI-LogBlaster](https://github.com/jbrick2070/ComfyUI-LogBlaster) extension) |
 | `comfyui` | GRAPH | a **Website** key: `http://127.0.0.1:8188/` |
 | `spanish` | ESPAÑOL | an **Open** key on a Spanish-language episode |
 | `reel` | REEL | an **Open** key on a highlight reel |

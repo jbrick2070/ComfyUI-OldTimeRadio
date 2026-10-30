@@ -285,18 +285,26 @@ different proof.
 
 ### The registry -- his clicks and his word
 
-* **2.3.6 is the latest published version** (`96ea436a`, 2026-09-25, after
-  2.3.5); Pending Comfy-Org's scan at last read, with 2.3.3 the Manager's
-  Active default. `pyproject.toml` stays 2.3.6 until 2.3.7, on his word.
-  2.3.4 came back **Flagged**, as the scan replica predicted (an internal doc
-  shipped in it); `tests/test_registry_scan_oracle_clean.py` keeps the tree
-  clean.
+* **2.3.43 is the latest published version** (`d6cb10e74`, 2026-10-28), and
+  it is what `/nodes/comfyui-old-time-radio/install` serves even though it is
+  **Flagged**. Its 716-file zip matches git at `d6cb10e74` byte for byte, with
+  no `contest/` (MRKT, read 2026-10-29).
+* **2.3.44 is owed: the AnimateDiff rip is not in the registry.** `2d7d00f8b`
+  and `5f697cac8` (2026-10-28, after 2.3.43) changed 11 shipped files: three
+  lab engine ids retired, and scene regions moved onto
+  `animatediff15_v3_haunted_video`. Owner: the 5080, `pyproject.toml`. Before
+  the bump: a full suite on that HEAD, diffed against a baseline. MRKT held
+  the release on 2026-10-29 because the 4060 was the live build-night demo
+  machine that evening, so the suite could not run there.
 * **Delete `v2.0-alpha`.** Unblocked: 2.1.1 is Active, the registry icon points
   at `/main/`, and the last live pin -- the RunPod bootstrap `curl` in
   RUNPOD_INSTALL -- moved to `/main/` on 2026-09-25. One click, his.
-* **Flagged registry versions.** 2.1.5, 2.1.6, 2.3.0 and 2.3.1 are Flagged;
-  2.3.2 and 2.3.3 are Active (read 2026-09-25). The API gives no reason. His
-  Discord, not a code change.
+* **Flagged registry versions.** All 30 versions from 2.3.21 to 2.3.43 are
+  Flagged, and 2.3.20 (2026-10-01) is the newest Active one (read 2026-10-29).
+  `?include_status_reason=true` gives 2.3.43's reason as
+  `policy-v0.7: reflag-pending-review`, set by a Comfy-Org admin. That is a
+  manual review queue on their side, not a code finding. His Discord, not a
+  code change.
 * **Comfy Desktop's registry Install is intermittent** (PBUG-20260925-01: a
   green "installed" toast and nothing on disk, twice; then fine). Not ours to
   fix; worth telling Comfy-Org, with the 4060's timeline. His Discord.
