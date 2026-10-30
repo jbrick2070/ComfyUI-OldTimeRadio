@@ -1496,7 +1496,15 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
     # S-A post-assemble QA artifact (best-effort): self-documents per-beat
     # delivered frames + clip-fill status next to the silent video.
     try:
-        with open(out_path + ".qa.json", "w", encoding="utf-8") as _qf:
+        try:
+            from ._otr_paths import confine_to_output_tree as _confine_qa
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_paths import confine_to_output_tree as _confine_qa  # type: ignore
+        # Its own leaf (registry review, 2026-10-30): `out_path` was proven,
+        # the sidecar beside it was not, and a link planted there redirected
+        # the write. A refusal skips the best-effort artifact like any error.
+        with open(_confine_qa(out_path + ".qa.json", "qa sidecar"), "w",
+                  encoding="utf-8") as _qf:
             json.dump(qa, _qf, ensure_ascii=True, indent=1)
     except Exception:  # noqa: BLE001 -- QA artifact is best-effort
         pass
@@ -1629,15 +1637,19 @@ class OTRSilentComposite:
             # registry review flagged "arbitrary-file-read", and statting and
             # listing a path the workflow named is a probe of its own. The
             # predicate refuses remote paths too.
+            # THE SPELLING THE CHECK PROVED IS THE SPELLING THE STAT USES
+            # (registry review, 2026-10-30): a Boolean check anchored a relative
+            # name at the output root while the stat below anchored it at the
+            # process cwd, a different tree. `confined_or_empty` returns the
+            # proven absolute spelling, and a listed child is proven inside its
+            # directory before it is stat'ed (a link among frames leads anywhere).
             try:
-                from ._otr_paths import is_readable_in_roots
+                from ._otr_paths import child_inside, confined_or_empty
             except ImportError:  # pragma: no cover -- flat (sys.path) load
-                from _otr_paths import is_readable_in_roots  # type: ignore
+                from _otr_paths import child_inside, confined_or_empty  # type: ignore
 
-            def _unreadable(path):
-                return not is_readable_in_roots(path)
-            if (base_video_path and not _unreadable(base_video_path)
-                    and os.path.isfile(base_video_path)):
+            base_video_path = confined_or_empty(base_video_path) if base_video_path else ""
+            if base_video_path and os.path.isfile(base_video_path):
                 st = os.stat(base_video_path)
                 parts.append(("base", base_video_path, st.st_mtime_ns, st.st_size))
             # 2. Clips from manifest.
@@ -1647,10 +1659,8 @@ class OTRSilentComposite:
                 return float("nan")
             for row in ((manifest or {}).get("clips") or []):
                 for k in ("path", "bg_still_path"):
-                    p = row.get(k)
+                    p = confined_or_empty(row.get(k)) if row.get(k) else ""
                     if not p:
-                        continue
-                    if _unreadable(p):
                         continue
                     if os.path.isfile(p):
                         st = os.stat(p)
@@ -1666,6 +1676,8 @@ class OTRSilentComposite:
                         dir_parts: list = []
                         for fname in frames:
                             fp = os.path.join(p, fname)
+                            if not child_inside(fp, p):
+                                continue          # a link out of the clip dir is no frame
                             try:
                                 fst = os.stat(fp)
                                 dir_parts.append((fname, fst.st_mtime_ns, fst.st_size))
@@ -1677,13 +1689,15 @@ class OTRSilentComposite:
             # steps 1 and 2 got the remote check and this one did not, so a UNC
             # `base_video_path` still reached `os.listdir(dirname(...))` during
             # fingerprinting -- the SMB session the commit set out to prevent.
-            if base_video_path and not _unreadable(base_video_path):
+            if base_video_path:
                 base_dir = os.path.dirname(base_video_path)
                 if os.path.isdir(base_dir):
                     try:
                         for candidate in sorted(os.listdir(base_dir)):
                             if candidate.endswith("_master.wav"):
                                 fp = os.path.join(base_dir, candidate)
+                                if not child_inside(fp, base_dir):
+                                    continue
                                 try:
                                     st = os.stat(fp)
                                     parts.append(("master_wav", fp,

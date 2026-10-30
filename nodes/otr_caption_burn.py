@@ -432,7 +432,16 @@ def burn_captions_on_video(video_path: str, ledger_path: str, out_path: str, *,
     # SERVER'S working directory instead of the episode folder. The destination
     # mp4 is already resolved and already lives beside the episode, so it is the
     # honest source for this. Found in QA.
-    ass_out = _ass_sidecar_path(out_path)
+    try:
+        from ._otr_paths import confine_to_output_tree as _confine_sidecar
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import confine_to_output_tree as _confine_sidecar  # type: ignore
+    # THE SIDECAR IS CONFINED BEFORE IT IS WRITTEN (registry review,
+    # 2026-10-30): `out` was proven inside the output tree, but the .ass
+    # beside it is a different leaf, and a link planted there redirected the
+    # write; the fonts check in `_shipped_fonts_option` ran only after the
+    # ASS was already on disk.
+    ass_out = _confine_sidecar(_ass_sidecar_path(out_path), "caption .ass")
     ass_path, report = _build_ass(ledger_path, style, margin_v,
                                   title_plan=title_plan, ass_out=ass_out,
                                   speech_captions=speech_captions)

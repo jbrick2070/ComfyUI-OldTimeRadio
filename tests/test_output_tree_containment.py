@@ -294,12 +294,20 @@ def test_no_post_route_ships():
 
 def test_the_composite_fingerprint_hook_checks_every_step():
     """Steps 1 and 2 got the remote check when the hook was fixed; step 3 (the
-    sibling master WAV listdir) did not, on the very file that commit named."""
+    sibling master WAV listdir) did not, on the very file that commit named.
+
+    Since 2026-10-30 the hook stats the SPELLING it proved: `base_video_path`
+    is replaced by `confined_or_empty(...)` before step 1, so step 3 inherits
+    the proof, and every listed child is proven under its directory with
+    `child_inside` before it is stat'ed (a link among them leads anywhere)."""
     src = (_NODES / "otr_silent_composite.py").read_text(encoding="utf-8")
     i = src.index("# 3. Sibling master WAV")
-    window = src[i:i + 800]
-    # The read-root predicate (2026-10-18) refuses remote paths too.
-    assert "_unreadable(base_video_path)" in window
+    hook = src[src.rfind("def IS_CHANGED", 0, i):i]
+    assert "base_video_path = confined_or_empty(base_video_path)" in hook
+    assert "_unreadable(" not in hook, "the Boolean predicate is gone; the proven spelling is used"
+    window = src[i:i + 900]
+    assert "if base_video_path:" in window
+    assert "child_inside(fp, base_dir)" in window
     assert "os.listdir" in window, "anchor drifted: this step should still listdir"
 
 

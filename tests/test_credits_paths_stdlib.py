@@ -171,7 +171,11 @@ class CreditsPathTests(unittest.TestCase):
         ledger = types.ModuleType(self.namespace + ".production_ledger")
         ledger.get_ledger = mock.Mock(return_value=types.SimpleNamespace(data={}))
         paths = types.ModuleType(self.namespace + "._otr_paths")
-        paths.confine_to_output_tree = mock.Mock()
+        # The write guard returns the lexical path it proved, and since
+        # 2026-10-30 roll() ASSIGNS that return for every derived sibling
+        # (credits clip, backdrop, base and scroll frames, concat list), so the
+        # stub hands the path straight back like the read guard below does.
+        paths.confine_to_output_tree = mock.Mock(side_effect=lambda value, field, **_k: value)
         paths.reject_remote_paths = mock.Mock()
         # The read guard (2026-10-18) returns the path it was handed when the
         # path lies in a read root; the stub hands it straight back.
@@ -306,7 +310,21 @@ class CreditsPathTests(unittest.TestCase):
         self.assertTrue(self.fs.exists(out))
         self.paths.reject_remote_paths.assert_called_once_with(video_path=BODY)
         self.paths.confine_to_read_roots.assert_called_once_with(BODY, "video_path")
-        self.paths.confine_to_output_tree.assert_called_once_with(out, "video_path")
+        confined = [call.args[0] for call in self.paths.confine_to_output_tree.call_args_list]
+        self.assertEqual(self.paths.confine_to_output_tree.call_args_list[0].args, (out, "video_path"))
+        # EVERY DERIVED SIBLING IS CONFINED BEFORE ITS WRITE (registry review,
+        # 2026-10-30): the shared directory is proven by `out`, each leaf by name.
+        # By shape, since the compacted names draw a fresh hex suffix per call:
+        # one credits clip, its backdrop, its two frames, and the concat list.
+        clips = [c for c in confined if c.endswith(".mp4") and c != out]
+        self.assertEqual(len(clips), 1, confined)
+        backdrops = [c for c in confined
+                     if c.endswith(".png") and not c.endswith((".base.png", ".scroll.png"))]
+        self.assertEqual(len(backdrops), 1, confined)
+        for suffix in (".mp4.base.png", ".mp4.scroll.png", ".concat.txt"):
+            self.assertTrue(any(c.endswith(suffix) for c in confined), (suffix, confined))
+        for written in self.fs.saved + [call.args[0] for call in self.open_mock.call_args_list]:
+            self.assertIn(written, confined)          # nothing is written unconfined
         self.assertEqual(len(self.commands), 3)  # extract, render, concat
         self.assertEqual(self.commands[0][self.commands[0].index("-i") + 1], BODY)
         self.assertTrue(all(command[-1] != BODY for command in self.commands))

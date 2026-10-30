@@ -78,6 +78,18 @@ def prove_frame_is_a_silent_image(path):
     return ext
 
 
+def _child_inside(child, parent) -> bool:
+    """Is ``child`` really under ``parent`` once links are followed? The same
+    test as ``_otr_paths.child_inside``, spelled here because this module is
+    stdlib-only by contract. Never raises."""
+    try:
+        real_parent = os.path.normcase(os.path.realpath(parent))
+        real_child = os.path.normcase(os.path.realpath(child))
+        return os.path.commonpath([real_child, real_parent]) == real_parent
+    except (OSError, ValueError):
+        return False
+
+
 def list_directory_frames(path):
     """The frames of a directory clip: every ``FRAME_EXTS`` file in ``path``,
     SORTED BY NAME (the one ordering rule), each nonzero on disk AND PROVED by
@@ -101,6 +113,14 @@ def list_directory_frames(path):
     frames = []
     for name in names:
         fp = os.path.join(path, name)
+        # A CHILD IS PROVEN INSIDE ITS DIRECTORY (registry review, 2026-10-30):
+        # the caller confined the directory, but every name here is opened and
+        # handed to ffmpeg, and a link planted among the frames pointed at a
+        # file outside the approved folders.
+        if not _child_inside(fp, path):
+            raise ValueError(
+                "directory clip: frame %r leads through a link outside its "
+                "directory, and a frame is a file in the directory" % fp)
         if not os.path.isfile(fp) or os.path.getsize(fp) == 0:
             raise ValueError(
                 "directory clip: frame %r is missing or zero-byte (a partial "

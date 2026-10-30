@@ -93,7 +93,21 @@ def episode_stills_dir(episode_id: str,
     if any(tok in ep for tok in ("/", "\\", "..", "\x00", ":")):
         raise PortraitUnresolved(
             "episode_id %r contains a path separator or traversal token" % (ep,))
-    return Path(_output_base(output_dir)) / "otr" / "episodes" / ep / "stills"
+    episodes_root = Path(_output_base(output_dir)) / "otr" / "episodes"
+    # AND PROVEN INSIDE THE EPISODES ROOT AFTER REALPATH (registry review,
+    # 2026-10-30): the text check refuses traversal in the id, but a junction
+    # already sitting at <episodes>/<ep> or at its stills folder carried every
+    # copy and the manifest write outside the output tree. The same core as
+    # every other sink; a refusal is this function's own exception.
+    try:
+        from .._otr_paths import confine_to_output_tree
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import confine_to_output_tree  # type: ignore
+    try:
+        return Path(confine_to_output_tree(str(episodes_root / ep / "stills"),
+                                           "episode stills", roots=[str(episodes_root)]))
+    except ValueError as exc:                 # OtrPathContractError
+        raise PortraitUnresolved(str(exc)) from None
 
 
 #: A content digest: hex, 8 to 128 characters (sha256 is 64).

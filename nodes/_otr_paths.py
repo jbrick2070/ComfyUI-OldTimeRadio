@@ -347,6 +347,19 @@ def _inside(path: str, root: str) -> bool:
         return False
 
 
+def child_inside(child, parent) -> bool:
+    """Is ``child`` really under ``parent`` once links are followed? For the
+    names a directory listing returns: they carry no ``..``, but a link among
+    them leads anywhere, and ``stat``, ``open`` and ffmpeg all follow it
+    (registry review, 2026-10-30). Never raises."""
+    try:
+        real_parent = os.path.normcase(os.path.realpath(str(parent)))
+        real_child = os.path.normcase(os.path.realpath(str(child)))
+        return os.path.commonpath([real_child, real_parent]) == real_parent
+    except (OSError, ValueError):
+        return False
+
+
 def _confine(value, field: str, candidates, *, base=None, verb: str = "read") -> str:
     """The containment both directions share: ``value`` proven inside a root.
 
@@ -830,6 +843,7 @@ __all__ = [
     "reject_remote_paths",
     "is_remote_path",
     "confine_to_output_tree",
+    "child_inside",
     "is_reserved_episode_entry",
     "otr_shared_root",
     "otr_shared_cache_dir",

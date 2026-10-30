@@ -1754,8 +1754,14 @@ def render_credits_clip(layout: dict, backdrop_path: str, out_path: str,
     roll_px = scroll_img.height - view_h            # = content_h + view_h
     dur, eff_pps = compute_credits_duration_s(roll_px, view_h)
 
-    base_png = out_path + ".base.png"
-    scroll_png = out_path + ".scroll.png"
+    try:
+        from ._otr_paths import confine_to_output_tree as _confine_frame
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import confine_to_output_tree as _confine_frame  # type: ignore
+    # Each derived leaf is its own name (registry review, 2026-10-30): the
+    # clip's directory was proven, a link planted at `.base.png` was not.
+    base_png = _confine_frame(out_path + ".base.png", "credits base frame")
+    scroll_png = _confine_frame(out_path + ".scroll.png", "credits scroll frame")
     base_img.convert("RGBA").save(base_png)
     scroll_img.convert("RGBA").save(scroll_png)
     try:
@@ -1822,8 +1828,15 @@ def append_credits(body_path: str, credits_path: str, out_path: str) -> str:
     # FileNotFoundError naming a directory that exists. Pure scratch: written
     # here, handed to ffmpeg's concat demuxer, deleted below, and identified by
     # nothing. Keeps its ordinary name wherever that fits.
-    lst = compact_scratch(os.path.dirname(os.path.abspath(out_path)),
-                          os.path.basename(out_path) + ".concat", ".txt")
+    try:
+        from ._otr_paths import confine_to_output_tree as _confine_list
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import confine_to_output_tree as _confine_list  # type: ignore
+    # Its own leaf (registry review, 2026-10-30): a link planted at the concat
+    # list's name redirected this write while the joined output still passed.
+    lst = _confine_list(compact_scratch(os.path.dirname(os.path.abspath(out_path)),
+                                        os.path.basename(out_path) + ".concat", ".txt"),
+                        "credits concat list")
     with open(lst, "w", encoding="utf-8") as f:
         for p in (body_path, credits_path):
             f.write("file '%s'\n" % p.replace("\\", "/").replace("'", r"'\''"))
@@ -1932,6 +1945,11 @@ class OTRCreditsRoll:
         # directory they all share. Checked here, past the TERMINAL exits, so a
         # call that will never write is never refused.
         confine_to_output_tree(out, "video_path")
+        # EVERY SIBLING TOO (registry review, 2026-10-30): the shared directory
+        # is proven by `out`, but each derived leaf is its own name, and a link
+        # planted at one of them redirected that write while `out` still passed.
+        credits_clip = confine_to_output_tree(credits_clip, "credits clip")
+        backdrop_png = confine_to_output_tree(backdrop_png, "credits backdrop")
 
         # ---- PRESENTATION-ONLY: everything that makes GLASS ---------------- #
         #

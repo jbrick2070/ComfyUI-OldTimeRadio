@@ -834,10 +834,14 @@ def _quiet_file_sha256(path: str) -> str:
     # review flagged "arbitrary-file-read"; hashing any path a workflow named
     # was a read primitive of its own. The predicate refuses remote paths too.
     try:
-        from ._otr_paths import is_readable_in_roots
+        from ._otr_paths import confined_or_empty
     except ImportError:  # pragma: no cover -- flat (sys.path) load
-        from _otr_paths import is_readable_in_roots  # type: ignore
-    if not is_readable_in_roots(path):
+        from _otr_paths import confined_or_empty  # type: ignore
+    # THE PATH THAT IS OPENED IS THE PATH THAT WAS PROVEN (registry review,
+    # 2026-10-30): the Boolean predicate anchored a relative spelling at the
+    # output root while open() anchored it at the process cwd.
+    path = confined_or_empty(path)
+    if not path:
         return ""
     try:
         digest = hashlib.sha256()

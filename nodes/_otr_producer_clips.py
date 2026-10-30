@@ -731,6 +731,15 @@ class ProducerClips:
                 raise ClipStoreError("its %s path %r is not an episode %s file"
                                      % (role, str(rel), role))
             path = self.episode_root.joinpath(*rel.parts)
+            # The spelling is pinned above; the LOCATION is proven here
+            # (registry review, 2026-10-30): a junction planted at the clips
+            # folder led the stat and the hash outside the episode.
+            try:
+                path = Path(confine_to_read_roots(str(path), "bundle %s" % role,
+                                                  roots=[str(self.episode_root)]))
+            except ValueError as exc:         # OtrPathContractError
+                raise ClipStoreError("its %s path leads outside the episode: %s"
+                                     % (role, exc)) from None
             _verify(path, item)
             paths[role] = path
         return paths
@@ -740,8 +749,16 @@ class ProducerClips:
         paths = {}
         for role, item in entry["files"].items():
             folder = self.episode_root.joinpath(*_EPISODE_DIRS[role])
+            try:
+                folder = Path(confine_to_output_tree(str(folder), "clip restore folder",
+                                                     roots=[str(self.episode_root)]))
+                target = Path(confine_to_output_tree(str(folder / item["name"]),
+                                                     "clip restore",
+                                                     roots=[str(self.episode_root)]))
+            except ValueError as exc:         # OtrPathContractError
+                raise ClipStoreError("the restore target leads outside the episode: %s"
+                                     % exc) from None
             folder.mkdir(parents=True, exist_ok=True)
-            target = folder / item["name"]
             if not (target.is_file() and target.stat().st_size == item["bytes"]
                     and file_sha256(target) == item["sha256"]):
                 partial = folder / (".%s.%s.part" % (item["name"], uuid.uuid4().hex))

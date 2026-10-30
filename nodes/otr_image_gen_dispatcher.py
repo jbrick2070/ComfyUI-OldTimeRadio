@@ -753,9 +753,17 @@ def _materialize_episode_copy(src_path, ep_dir, object_id, content_hash):
     """Copy a still into the EPISODE stills dir (idempotent; readable name
     ``{object_id}_{hash12}.png``). Returns the episode-local path. Lazy
     shutil; raises on a failed copy (the caller warns + falls back)."""
+    import re
     import shutil
-    os.makedirs(str(ep_dir), exist_ok=True)
-    dst = os.path.join(str(ep_dir), f"{object_id}_{str(content_hash)[:12]}.png")
+    try:
+        from ._otr_paths import confine_to_output_tree
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import confine_to_output_tree  # type: ignore
+    # THE DIGEST IS HEX OR IT IS NOT A DIGEST (registry review, 2026-10-30):
+    # `content_hash` is a ledger field too, and its first twelve characters
+    # were the filename's tail.
+    digest = re.sub(r"[^0-9A-Fa-f]", "", str(content_hash or ""))[:12] or "nodigest"
+    dst = os.path.join(str(ep_dir), f"{object_id}_{digest}.png")
     # THE DESTINATION MUST STAY IN THE EPISODE DIR (2026-09-05). `object_id`
     # reaches this f-string from the workflow's own ledger, so a value like
     # `../escaped` walks the copy out of stills/. Asserted here rather than at
@@ -766,6 +774,15 @@ def _materialize_episode_copy(src_path, ep_dir, object_id, content_hash):
         raise ImageRenderError(
             "image object_id %r would place its still outside the episode "
             "directory; ids name a file, never a location." % (object_id,))
+    # AND AFTER REALPATH, AGAINST THE OUTPUT TREE (registry review,
+    # 2026-10-30): the lexical check above cannot see a junction already
+    # sitting at stills/, through which the copy landed outside the tree.
+    try:
+        dst = confine_to_output_tree(dst, "episode still")
+    except ValueError as exc:                 # OtrPathContractError
+        raise ImageRenderError(
+            "image still for %r cannot be written: %s" % (object_id, exc)) from None
+    os.makedirs(str(ep_dir), exist_ok=True)
     if not os.path.exists(dst):
         shutil.copyfile(str(src_path), dst)
     return dst
@@ -2845,7 +2862,14 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     "laplacian": r.get("laplacian"),
                 } for r in ep_rows],
             }
-            with open(os.path.join(ep_dir, "stills_manifest.json"), "w",
+            try:
+                from ._otr_paths import confine_to_output_tree as _confine_manifest
+            except ImportError:  # pragma: no cover -- flat (sys.path) load
+                from _otr_paths import confine_to_output_tree as _confine_manifest  # type: ignore
+            # Its own leaf (registry review, 2026-10-30): the directory was
+            # proven, a link planted at the manifest's name was not.
+            with open(_confine_manifest(os.path.join(ep_dir, "stills_manifest.json"),
+                                        "stills manifest"), "w",
                       encoding="utf-8") as f:
                 json.dump(manifest, f, ensure_ascii=True, indent=2)
         except OSError as exc:
