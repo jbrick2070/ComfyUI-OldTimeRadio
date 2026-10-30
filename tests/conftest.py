@@ -16,6 +16,7 @@ test (left as an exercise — no current test claims that mark).
 from __future__ import annotations
 
 import os
+import socket
 import sys
 
 import pytest
@@ -130,11 +131,26 @@ def pytest_configure(config):
 
 
 def pytest_collection_modifyitems(config, items):
-    """Skip `requires_cuda`-marked tests when CUDA is masked.
+    """Mark this machine's known failures xfail(strict), and skip
+    `requires_cuda`-marked tests when CUDA is masked.
+
+    A known failure that fails as recorded is an xfail, so the run ends
+    green; one that PASSES fails the suite (strict), which is how the
+    ledger's own 2026-08-12 entry describes the pattern worth keeping: the
+    marker cannot outlive its cause, because fixing the cause fails the
+    suite until the entry leaves MACHINE_FACTS and apple/known-failures.md.
+    pytest_sessionfinish then holds each xfail to its recorded signature.
 
     Cheap, idempotent. Lets a future GPU test sit in the same suite
     without unmasking globally.
     """
+    if EXPECTED_FAILURES:
+        known = pytest.mark.xfail(
+            strict=True,
+            reason="a known failure on %s: apple/known-failures.md" % MACHINE)
+        for item in items:
+            if item.nodeid in EXPECTED_FAILURES:
+                item.add_marker(known)
     if os.environ.get("CUDA_VISIBLE_DEVICES", "") != "":
         return
     skip_marker = pytest.mark.skip(
@@ -170,7 +186,9 @@ def pytest_sessionstart(session):
     sys.stderr.write(
         f"[OTR conftest] CUDA_VISIBLE_DEVICES='{os.environ.get('CUDA_VISIBLE_DEVICES','<unset>')}' "
         f"OTR_TEST_MODE={os.environ.get('OTR_TEST_MODE','0')} "
-        f"OTR_EXTRA_OUTPUT_ROOTS='{os.environ['OTR_EXTRA_OUTPUT_ROOTS']}'\n"
+        f"OTR_EXTRA_OUTPUT_ROOTS='{os.environ['OTR_EXTRA_OUTPUT_ROOTS']}' "
+        f"machine={MACHINE} known_failures={len(EXPECTED_FAILURES)} "
+        f"OTR_COMFYUI_MODELS_ROOT='{os.environ.get('OTR_COMFYUI_MODELS_ROOT','<unset>')}'\n"
     )
 
 
@@ -188,7 +206,182 @@ def pytest_sessionstart(session):
 #     from this set + apple/known-failures.md.
 #
 # Matches apple/known-failures.md schema rewrite (S15.2).
+#
+# KEYED BY MACHINE, AND EACH ENTRY CARRIES ITS REASON (2026-10-30). The set
+# is empty on the box that holds every weight and reference (the 5080,
+# IDREAM) and names 19 nodeids on the RTX 4060 (MRKT), where no voice
+# reference WAV, no kokoro voice tensor, no upscale weight at the headless
+# roots and no `s29-clean-slate-gate` git ref exist. A flat set could only
+# have hidden those behind a count, which is what apple/known-failures.md
+# forbids. Two things keep this honest: an entry is a nodeid AND a
+# substring of the failure text measured for it, so the same test failing
+# for ANOTHER reason is reported as a regression, not excused; and every
+# nodeid must appear in apple/known-failures.md with its cause and exit
+# condition (tests/test_known_fail_guard.py holds both files together).
 # ---------------------------------------------------------------------------
+
+
+def machine_key(hostname) -> str:
+    """The first DNS label of a hostname, upper-cased: "mrkt.lan" -> "MRKT".
+
+    The key MACHINE_FACTS is read with. The banner pytest_sessionstart prints
+    names it, so a renamed box reads as "no facts" there, not as 19 silent
+    regressions."""
+    return str(hostname or "").split(".")[0].strip().upper()
+
+
+#: What the suite knows about one machine, by machine_key(gethostname()).
+#:   models_root     where this box keeps the weights when the pack's default
+#:                   root (nodes/_otr_models_root.py, C:\ComfyUI-Models) is
+#:                   not it. Set below at import, like the other env defaults
+#:                   above, unless the environment already names a root or
+#:                   the directory is gone.
+#:   expected_failed nodeid -> a substring of that test's failure MESSAGE,
+#:                   as measured on the box: the exception's own words (the
+#:                   "E   ..." lines), never a traceback source line, which
+#:                   `--tb=no` leaves out of the report. See
+#:                   apple/known-failures.md for the cause and the exit
+#:                   condition of each.
+#: A machine with no row here has an empty set and no env change.
+MACHINE_FACTS: dict = {
+    "MRKT": {
+        "models_root": r"C:\Users\jeffr\AppData\Local\Comfy-Desktop\ComfyUI-Shared\models",
+        "expected_failed": {
+            # The git ref the sweep diffs against exists only on the 5080's clone.
+            "tests/test_b7_forbidden_sweep.py::test_forbidden_sweep_runs_clean":
+                "s29-clean-slate-gate",
+            # models/TTS/refs/indextts2/*.wav: the clone references are not on this box.
+            "tests/test_cast_lock_voice_ref_completeness.py::"
+            "test_castlock_stamps_the_same_reference_the_render_path_would_open":
+                "the stamped reference must resolve to a real file on disk",
+            "tests/test_cast_lock_voice_ref_completeness.py::"
+            "test_unspecified_gender_names_the_real_render_reference_without_changing_identity[None]":
+                "the render reference must resolve to a real file on disk",
+            "tests/test_cast_lock_voice_ref_completeness.py::"
+            "test_unspecified_gender_names_the_real_render_reference_without_changing_identity[]":
+                "the render reference must resolve to a real file on disk",
+            "tests/test_cast_lock_voice_ref_completeness.py::"
+            "test_unspecified_gender_names_the_real_render_reference_without_changing_identity[   ]":
+                "the render reference must resolve to a real file on disk",
+            "tests/test_cast_lock_voice_ref_completeness.py::"
+            "test_the_render_fallback_still_works_for_a_row_castlock_never_stamped":
+                "a cloning engine must never be left without a reference",
+            "tests/test_voice_casting_identity.py::"
+            "test_a_clone_engine_takes_the_ordinary_draw_and_reaches_a_real_file":
+                "which is not a file on disk",
+            "tests/test_voice_casting_identity.py::"
+            "test_an_assigned_row_is_fingerprinted_rather_than_static":
+                "AssertionError: nan",
+            "tests/test_voice_casting_identity.py::"
+            "test_the_reserved_recording_is_delivered_to_the_character_it_names[indextts2-auto_registry]":
+                "went to nobody",
+            "tests/test_voice_casting_identity.py::"
+            "test_the_reserved_recording_is_delivered_to_the_character_it_names[indextts2-preserve_ledger]":
+                "went to nobody",
+            "tests/test_voice_casting_identity.py::"
+            "test_the_reserved_recording_is_delivered_to_the_character_it_names[chatterbox-auto_registry]":
+                "went to nobody",
+            "tests/test_voice_casting_identity.py::"
+            "test_the_reserved_recording_is_delivered_to_the_character_it_names[chatterbox-preserve_ledger]":
+                "went to nobody",
+            "tests/test_voice_casting_identity.py::"
+            "test_the_reservation_outranks_a_catalogue_assignment[auto_registry]":
+                "beat his own recording",
+            "tests/test_voice_casting_identity.py::"
+            "test_the_reservation_outranks_a_catalogue_assignment[preserve_ledger]":
+                "beat his own recording",
+            # kokoro runs on the ONNX backend here: no per-voice .pt tensor to fingerprint.
+            "tests/test_voice_casting_identity.py::test_a_pt_voice_tensor_is_fingerprinted_too":
+                "AssertionError: nan",
+            "tests/test_voice_identity_fix.py::"
+            "test_a_frozen_ledger_route_does_not_override_the_stamped_voice":
+                "assert nan == nan",
+            # The upscale gate reads the 5080's headless roots and the checkout's
+            # grandparent models dir; neither holds a weight here.
+            "tests/test_upscale_weight_resolution_gate.py::"
+            "test_every_registered_upscale_engine_can_reach_its_checkpoint":
+                "cannot reach its checkpoint",
+            "tests/test_upscale_weight_resolution_gate.py::"
+            "test_the_headless_boot_maps_upscale_models_somewhere_that_has_weights":
+                "NONE of the upscale_models roots",
+            "tests/test_upscale_weight_resolution_gate.py::"
+            "test_the_pinned_esrgan_filename_matches_what_is_on_disk":
+                "resolved None but the engine pins",
+        },
+    },
+}
+
+
+def expected_failures(hostname) -> dict:
+    """nodeid -> failure-text signature for the machine `hostname` names;
+    empty for a machine MACHINE_FACTS does not know."""
+    return dict(MACHINE_FACTS.get(machine_key(hostname), {}).get("expected_failed", {}))
+
+
+def report_outcome(reports, known=False) -> "tuple[bool, str | None]":
+    """`(executed, failure_text)` for one item's phase reports (setup, call,
+    teardown; None for a phase that never ran).
+
+    `executed` is False when no phase ran -- after `-x`, or a crash -- which
+    is no evidence either way. `failure_text` is the report text when the
+    item failed; for a `known` item (one this guard marked xfail) also when
+    it failed the way that mark expects, which pytest files as skipped with
+    `wasxfail`, so the signature can be checked. An xfail a TEST AUTHOR
+    placed is an accepted outcome, as it always was, never a failure here.
+    None when the item passed, and None too when a known item passed
+    AGAINST its strict xfail, which pytest already reports as a failure of
+    its own ("[XPASS(strict)] ...") and the guard reports as promotable."""
+    reports = [rep for rep in reports if rep is not None]
+    if not reports:
+        return False, None
+    texts = []
+    for rep in reports:
+        text = str(getattr(rep, "longreprtext", "") or "")
+        if getattr(rep, "failed", False) and not text.startswith("[XPASS(strict)]"):
+            texts.append(text)
+        elif known and getattr(rep, "skipped", False) and hasattr(rep, "wasxfail"):
+            texts.append(text)
+    return True, ("\n".join(texts) if texts else None)
+
+
+def guard_verdict(executed, failed, expected) -> "tuple[dict, set]":
+    """The diff the session-finish guard reports, as a pure function.
+
+    `executed`: nodeids that STARTED (setup ran); a collected item that never
+    started -- after `-x`, or a crash -- is no evidence either way, so it is
+    neither a failure nor promotable. `failed`: nodeid -> its failure text.
+    `expected`: nodeid -> signature. Returns `(new_failures, promotable)`:
+    new_failures maps a nodeid to why it is new -- unknown to the set, or known
+    but failing WITHOUT its signature, which is a different break wearing a
+    known test's name; promotable is every expected nodeid that ran and passed.
+    """
+    new_failures = {}
+    for nodeid, text in failed.items():
+        signature = expected.get(nodeid)
+        if signature is None:
+            new_failures[nodeid] = "not a known failure"
+        elif signature not in (text or ""):
+            new_failures[nodeid] = (
+                "a known failure, but it did not fail the known way: %r is not "
+                "in its report" % (signature,))
+    promotable = (set(expected) & set(executed)) - set(failed)
+    return new_failures, promotable
+
+
+MACHINE: str = machine_key(socket.gethostname())
+EXPECTED_FAILURES: dict = expected_failures(MACHINE)
+EXPECTED_FAILED_NODEIDS: frozenset[str] = frozenset(EXPECTED_FAILURES)
+
+# This box's weights, for the resolvers that read the configured root
+# (nodes/_otr_models_root.py): set here at import for the same reason the env
+# defaults above are, and only when nothing already names a root. An explicit
+# root is exclusive to those resolvers, so a directory that is gone is left
+# unset and the banner says so.
+_MACHINE_MODELS_ROOT = str(MACHINE_FACTS.get(MACHINE, {}).get("models_root") or "")
+if (_MACHINE_MODELS_ROOT and os.path.isdir(_MACHINE_MODELS_ROOT)
+        and not any(os.environ.get(k, "").strip()
+                    for k in ("OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT"))):
+    os.environ["OTR_COMFYUI_MODELS_ROOT"] = _MACHINE_MODELS_ROOT
 
 
 # CW-1 (2026-06-06) unwired the legacy FLUX/HuMo/LTX render path; CW-4
@@ -199,7 +392,6 @@ def pytest_sessionstart(session):
 # CW-5 (2026-06-09) promoted the chatterbox entry: the test now skips when
 # the sidecar venv is present on disk (same pattern as indextts2), so it is
 # no longer an expected failure -- the guard would fire every run.
-EXPECTED_FAILED_NODEIDS: frozenset[str] = frozenset()
 # KNOWN-FAIL-001 through KNOWN-FAIL-006 all promoted 2026-05-13
 # (s26-downstream missed-regression sweep). The 5 BUG-108 + save
 # workspace entries went green when the test fixtures + the
@@ -223,10 +415,9 @@ EXPECTED_FAILED_NODEIDS: frozenset[str] = frozenset()
 # now passes. See apple/known-failures.md Resolution log
 # KNOWN-FAIL-007/008.
 #
-# The quarantine set is now empty -- there are no known failures. The
-# pytest_sessionfinish guard below still runs (an empty set does not
-# trigger the subset-run early return), so any new failure is caught
-# as a regression.
+# From 2026-09-26 to 2026-10-30 the set was empty everywhere; it is empty
+# on the 5080 still. The MRKT entries above are the first machine-keyed
+# ones (see the header of this section).
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
@@ -252,51 +443,52 @@ def pytest_sessionfinish(session, exitstatus):  # kept: pytest hook signature co
     surface regressions was hiding the one thing needed to fix them. Running
     last lets the report print first, then the hard exit still happens.
 
-    NEW failures (actual - expected): regression -- hard-fail with
-    exit code 2 so CI surfaces it distinctly from a normal pytest
-    failed-test exit.
+    NEW failures: regression -- hard-fail with exit code 2 so CI
+    surfaces it distinctly from a normal pytest failed-test exit. A
+    failure is new when its nodeid is not in this machine's set, OR
+    when it is but its report lacks the signature the set recorded
+    for it: a known test failing a new way is a new break.
 
-    PROMOTABLE (expected - actual): a known-fail is now passing.
-    Print a PROMOTABLE banner naming the nodeid; the contributor
-    updates EXPECTED_FAILED_NODEIDS + apple/known-failures.md in
-    lockstep. Don't fail the session for promotables -- they're
-    good news, just news.
+    PROMOTABLE: a known-fail ran and passed. Its strict xfail has
+    already failed the session (pytest's own "[XPASS(strict)]"); this
+    banner names the nodeid and says what to do: remove it from
+    MACHINE_FACTS + apple/known-failures.md in lockstep.
 
-    Subset-run guard: only enforce the diff when at least 80% of
-    the expected nodeids were collected. So a focused
-    ``pytest tests/test_xyz.py`` doesn't trip "PROMOTABLE" on every
-    known-fail it didn't run.
+    Only items that STARTED count, in either direction. A focused
+    ``pytest tests/test_xyz.py`` therefore reports exactly what it
+    ran, and a run cut short by ``-x`` or a crash does not read its
+    unexecuted known-fails as passing. (Until 2026-10-30 the diff was
+    skipped whenever under 80% of the expected set was collected,
+    which with a non-empty set would have blinded every focused run.)
     """
     items = getattr(session, "items", None)
     if not items:
         return
-    collected_ids = {it.nodeid for it in items}
-    expected_seen = collected_ids & EXPECTED_FAILED_NODEIDS
-    if len(expected_seen) < 0.8 * len(EXPECTED_FAILED_NODEIDS):
-        return  # focused subset run; skip the diff
 
     # S19.1 (IMP-24): track all three pytest phases. Reading only
     # rep_call meant tests that errored in setup or teardown leaked
     # past the diff as silent-passes. pytest_runtest_makereport
     # above stashes rep_setup / rep_call / rep_teardown on the item.
-    actual_failed = set()
+    executed = set()
+    failed = {}
     for it in items:
-        failed_in_any_phase = any(
-            getattr(getattr(it, f"rep_{phase}", None), "failed", False)
-            for phase in ("setup", "call", "teardown")
-        )
-        if failed_in_any_phase:
-            actual_failed.add(it.nodeid)
+        ran, text = report_outcome(
+            (getattr(it, f"rep_{phase}", None) for phase in ("setup", "call", "teardown")),
+            known=it.nodeid in EXPECTED_FAILURES)
+        if not ran:
+            continue  # collected, never started
+        executed.add(it.nodeid)
+        if text is not None:
+            failed[it.nodeid] = text
 
-    new_failures = actual_failed - EXPECTED_FAILED_NODEIDS
-    promotable = (EXPECTED_FAILED_NODEIDS & collected_ids) - actual_failed
+    new_failures, promotable = guard_verdict(executed, failed, EXPECTED_FAILURES)
 
     if promotable:
         sys.stderr.write(
             "\n[KNOWN-FAIL-GUARD] PROMOTABLE -- the following expected "
-            "failures now PASS. Remove them from "
-            "tests/conftest.py::EXPECTED_FAILED_NODEIDS AND from "
-            "apple/known-failures.md in lockstep:\n"
+            "failures now PASS on %s (their strict xfail is what failed "
+            "this run). Remove them from tests/conftest.py::MACHINE_FACTS "
+            "AND from apple/known-failures.md in lockstep:\n" % MACHINE
         )
         for nid in sorted(promotable):
             sys.stderr.write(f"  - {nid}\n")
@@ -304,15 +496,16 @@ def pytest_sessionfinish(session, exitstatus):  # kept: pytest hook signature co
     if new_failures:
         sys.stderr.write(
             "\n[KNOWN-FAIL-GUARD] NEW failures (REGRESSION) -- the "
-            "following nodeids failed but are not in "
-            "EXPECTED_FAILED_NODEIDS:\n"
+            "following nodeids failed and are not in %s's known "
+            "failures (tests/conftest.py::MACHINE_FACTS):\n" % MACHINE
         )
         for nid in sorted(new_failures):
-            sys.stderr.write(f"  - {nid}\n")
+            sys.stderr.write(f"  - {nid}: {new_failures[nid]}\n")
         sys.stderr.write(
             "If these are intentional new known-fails, add them to "
-            "EXPECTED_FAILED_NODEIDS + apple/known-failures.md in the "
-            "same commit. Otherwise fix the regression.\n"
+            "MACHINE_FACTS (nodeid and a signature of the failure text) "
+            "+ apple/known-failures.md in the same commit. Otherwise fix "
+            "the regression.\n"
         )
         # Hard exit so CI distinguishes this from a normal pytest
         # failed-test exit. Exit code 2 per S15.1 spec.

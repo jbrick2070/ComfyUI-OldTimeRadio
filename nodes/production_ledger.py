@@ -431,8 +431,15 @@ def _rebase_episode_local_paths(
     def _walk(current: Any) -> "tuple[Any, int]":
         if isinstance(current, str):
             if not pathmod.isabs(current):
+                # Decided by the path's FORM, as the root is above and for
+                # the same reason: Python 3.13's ntpath.isabs no longer
+                # calls "\\workspace\\x" absolute, and on 3.13 the warning
+                # this feeds went silent -- the mangled path was left alone
+                # but no longer named. A Windows-rooted spelling is a drive
+                # or share followed by a separator, or a bare leading
+                # separator: ntpath.isabs's own rule before 3.13.
                 if (pathmod is posixpath and "\\" in current
-                        and ntpath.isabs(current)):
+                        and ntpath.splitdrive(current)[1][:1] in ("\\", "/")):
                     foreign.append(current)
                 return current, 0
             candidate_norm = pathmod.normcase(pathmod.normpath(current))

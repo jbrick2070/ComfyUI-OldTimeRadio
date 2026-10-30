@@ -166,9 +166,26 @@ def test_the_base_default_is_empty_so_engines_without_the_knob_do_not_move():
     assert AudioEngineAdapter().render_time_params() == {}
 
 
+def _kokoro_runs_on_onnx() -> bool:
+    """eng_kokoro.render_time_params' own branch, by the same probes it uses:
+    nothing under the torch backend; the ONNX model's stamp when kokoro-onnx
+    is the backend that will run (70a1d33b0: a swapped ONNX model must bust
+    the cache). Probes, not the backend chooser, which imports the packages
+    and raises when neither is installed."""
+    import os
+
+    from nodes._otr_audio_engines.eng_kokoro import _spec_present
+
+    torch_backend = (_spec_present("kokoro")
+                     and os.environ.get("OTR_KOKORO_BACKEND", "auto").lower() != "onnx")
+    return not torch_backend and _spec_present("kokoro_onnx")
+
+
 def test_no_other_shipped_engine_gained_a_render_time_param():
     """A hook that silently spread would re-baseline caches nobody asked to
-    move. Only the engine with the defect declares one."""
+    move. Only the engine with the defect declares one -- plus kokoro, on an
+    install where it runs on the ONNX backend, whose hook is the model stamp
+    and nothing else (tests/test_kokoro_backends.py pins its shape)."""
     from nodes._otr_audio_engines import registry as areg
 
     declaring = []
@@ -179,7 +196,10 @@ def test_no_other_shipped_engine_gained_a_render_time_param():
             continue
         if params:
             declaring.append(name)
-    assert declaring == ["indextts2"], declaring
+    expected = ["indextts2"] + (["kokoro"] if _kokoro_runs_on_onnx() else [])
+    assert declaring == expected, declaring
+    if "kokoro" in expected:
+        assert set(get_engine("kokoro").render_time_params()) == {"backend", "onnx_model"}
 
 
 def test_an_engine_with_no_render_time_param_keys_exactly_as_before():
@@ -206,12 +226,21 @@ def test_is_changed_still_answers_static_for_an_engine_without_the_knob():
     `"static"` is asserted as the literal string it has always been, not merely
     as "something stable" -- the whole point of the empty default is that these
     legs do not move.
+
+    On an install where kokoro runs on the ONNX backend it HAS a knob (the
+    model stamp), so there the honest answer is the opposite: a fingerprint,
+    never the static string. NaN stays accepted on both, as before: the
+    fail-open a profile that cannot be resolved answers with.
     """
     from nodes import batch_character_voices as bcv
 
     answer = bcv.BatchCharacterVoices.IS_CHANGED(
         script_json="{}", engine="kokoro", ledger_json="", gate_in="")
-    assert answer == "static" or answer != answer      # "static" or NaN
+    if _kokoro_runs_on_onnx():
+        assert answer != "static"
+        assert answer != answer or (isinstance(answer, str) and len(answer) == 64), answer
+    else:
+        assert answer == "static" or answer != answer      # "static" or NaN
 
 
 def test_is_changed_stops_saying_static_when_the_alpha_can_move_the_render(

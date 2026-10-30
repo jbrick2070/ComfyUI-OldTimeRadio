@@ -121,7 +121,9 @@ def test_unspecified_gender_names_the_real_render_reference_without_changing_ide
         assert row["voice_engine"] == "indextts2"
         ref = next(e for e in entries if e.voice_ref_id == row["voice_ref_id"])
         path = vnc._resolve_clone_ref_path(row["voice_engine"], row, 42)
-        assert path and path.endswith(ref.ref_path.replace("/", "\\").split("\\")[-1])
+        assert path and path.endswith(ref.ref_path.replace("/", "\\").split("\\")[-1]), (
+            "the render reference must resolve to a real file on disk, the one the "
+            "bank names: got %r for %s" % (path, ref.voice_ref_id))
 
 
 def test_the_unservable_row_is_not_refused_or_gender_restricted():
