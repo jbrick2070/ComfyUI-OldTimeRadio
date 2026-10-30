@@ -2621,8 +2621,20 @@ ALLOW_PATTERNS = (
 
 #: Matched by ALLOW_PATTERNS and still never fetched: Mistral's own
 #: consolidated format, a second full copy of the weights beside the
-#: transformers shards that the writer loads (Mistral-Nemo: 24.5 GB twice).
-IGNORE_PATTERNS = ("consolidated*.safetensors",)
+#: transformers shards that the writer loads (Mistral-Nemo: 24.5 GB twice) --
+#: and anything that is CODE OR A BINARY (registry review, 2026-10-30).
+#: `tokenizer*` has to stay a prefix (tokenizer.model.v3, tokenizer.tiktoken),
+#: so without this list a repository a ledger named could hand the downloader
+#: `tokenizer_payload.py` or `tokenizer.pyd`. Nothing here runs a downloaded
+#: file (`trust_remote_code` is False at every loader), but a node pack must
+#: not fetch code at run time at all, and the ignore list is the one place
+#: both the size estimate and the download read.
+IGNORE_PATTERNS = (
+    "consolidated*.safetensors",
+    "*.py", "*.pyc", "*.pyd", "*.pyw", "*.so", "*.dll", "*.dylib", "*.exe",
+    "*.bat", "*.cmd", "*.ps1", "*.sh", "*.pkl", "*.pickle", "*.pt", "*.pth",
+    "*.bin", "*.zip", "*.tar", "*.gz",
+)
 
 
 def _fetched_paths(paths: "list[str]") -> "set[str]":

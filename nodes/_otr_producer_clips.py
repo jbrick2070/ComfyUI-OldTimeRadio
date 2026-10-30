@@ -54,11 +54,13 @@ from typing import Any, Dict, Iterable, Optional
 
 try:
     from . import _otr_producer_direction as _PD
-    from ._otr_paths import OUTPUT_DIR_ENV
+    from ._otr_paths import (OUTPUT_DIR_ENV, confine_to_output_tree,
+                             confine_to_read_roots, confined_or_empty)
     from ._otr_shared import env as otr_env
 except ImportError:  # pragma: no cover -- flat (sys.path) load
     import _otr_producer_direction as _PD  # type: ignore
-    from _otr_paths import OUTPUT_DIR_ENV  # type: ignore
+    from _otr_paths import (OUTPUT_DIR_ENV, confine_to_output_tree,  # type: ignore
+                            confine_to_read_roots, confined_or_empty)
     from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR.producer_clips")
@@ -158,11 +160,21 @@ def causal_env() -> Dict[str, str]:
 def _as_file(value: Any) -> Any:
     """A request value as what it holds. A path names a file, so it enters the
     key as that file's sha256 -- never as a workspace path, which changes on
-    every replay. Anything else is kept as it is."""
+    every replay. Anything else is kept as it is.
+
+    ONLY A PATH INSIDE THE READ ROOTS IS A FILE HERE (registry review,
+    2026-10-30). The value can be a ledger-chosen string -- a shot's `char_id`
+    rides in `conditioning_refs` -- and an absolute spelling reached `isfile`
+    and a full-file hash of whatever it named; a UNC spelling, an SMB
+    session. A string the roots do not admit stays the string it is: the key
+    still changes with it, and nothing on disk is touched to learn it."""
     if not isinstance(value, str) or not value or not os.path.isabs(value):
         return value
-    digest = file_sha256(value) if os.path.isfile(value) else None
-    return {"sha256": digest} if digest else {"absent": os.path.basename(value)}
+    confined = confined_or_empty(value)
+    if not confined:
+        return value
+    digest = file_sha256(confined) if os.path.isfile(confined) else None
+    return {"sha256": digest} if digest else {"absent": os.path.basename(confined)}
 
 
 def request_projection(request: Any) -> Dict[str, Any]:

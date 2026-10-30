@@ -1020,14 +1020,31 @@ def _still_spine_materialize_row(row, stills_root):
     object_id = _still_spine_row_key(
         row.get("object_id") or row.get("beat_id") or row.get("char_id")
     )
-    content_hash = str(
+    # THE DIGEST IS HEX OR IT IS NOT A DIGEST (registry review, 2026-10-30):
+    # `content_hash` arrives in a patched ledger row, and its first twelve
+    # characters became the filename's tail, so `\..\..\zz` wrote outside the
+    # stills directory. Anything but hex is replaced by the source's own
+    # digest, and the destination is proven inside the output tree -- lexically
+    # and after realpath, the one core every sink uses; against the tree, not
+    # against `root`, since a junction sitting AT the stills folder resolves
+    # both sides to the same outside place -- before the copy. A
+    # refusal degrades loud to "absent" like any other unusable row (Law 7).
+    content_hash = re.sub(r"[^0-9A-Fa-f]", "", str(
         row.get("content_hash") or row.get("sha256") or row.get("hash") or ""
-    ).strip()
-    if not content_hash:
+    ))
+    if len(content_hash) < 12:
         content_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
-    destination = os.path.join(
-        root, "%s_%s.png" % (object_id, content_hash[:12])
-    )
+    try:
+        from .._otr_paths import confine_to_output_tree as _confine_write
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import confine_to_output_tree as _confine_write  # type: ignore
+    try:
+        destination = _confine_write(
+            os.path.join(root, "%s_%s.png" % (object_id, content_hash[:12])),
+            "still destination")
+    except ValueError as exc:  # OtrPathContractError: a link under the stills dir
+        _LOG.warning("[still-spine] row %s not materialized: %s", object_id, exc)
+        return ""
     os.makedirs(root, exist_ok=True)
     if not os.path.isfile(destination):
         shutil.copyfile(source, destination)
