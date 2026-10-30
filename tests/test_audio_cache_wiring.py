@@ -831,10 +831,17 @@ def test_cache_persist_failure_does_not_mask_render_exception(
     be logged as a warning (Codex r4 SF-2: no return-value channel is
     available when the sentinel escapes, so caplog is the only surface).
 
-    Uses three lines with a raise on the third call so ledger_stamps has
+    Uses three lines with a raise on the THIRD LINE so ledger_stamps has
     entries when the finally runs -- otherwise the guarded inner block
     ``if cache_enabled and ledger_stamps:`` short-circuits and the
     persistence stub never fires, defeating the assertion.
+
+    Keyed to the line, never to the call count: google_tts renders its lines
+    in parallel (cloud fan-out, 4 workers unless OTR_CLOUD_FANOUT says
+    otherwise), so which line makes the third call is up to the thread
+    scheduler. When it was line 1, the line-order commit walk raised before
+    any line had been stamped, nothing was flushed, and this test failed with
+    an empty caplog -- order-dependent, seen in a full suite on 2026-10-29.
     """
     from nodes._otr_audio_engines import get_engine
     from nodes.announcer_voice import AnnouncerVoice
@@ -858,12 +865,10 @@ def test_cache_persist_failure_does_not_mask_render_exception(
     monkeypatch.setenv("OTR_AUDIO_CACHE_DIR", str(cache_dir))
 
     sentinel = RuntimeError("render sentinel escapes past finally")
-    calls = {"n": 0}
 
     def _gen(text, voice_ref, delivery_vector, seed,
              *, disable_retry=False, resolved_model=None):
-        calls["n"] += 1
-        if calls["n"] == 3:
+        if text.startswith("Line 3"):
             raise sentinel
         return {
             "waveform": torch.zeros(1, 1, 16, dtype=torch.float32),

@@ -295,9 +295,11 @@ different proof.
   stamps. Expect it to go Flagged like 2.3.21-2.3.43 (below). The release
   gate, kept for the next one: on this box the full suite had the same 23
   failures on 2.3.43 and on HEAD, plus
-  `test_cache_persist_failure_does_not_mask_render_exception`, which depends
-  on test order (its render assertion passes; only its caplog capture comes
-  back empty, and it fails alone on 2.3.43 too).
+  `test_cache_persist_failure_does_not_mask_render_exception`, which failed
+  by thread schedule: it raised on the third CALL, and Google TTS renders its
+  lines in parallel (cloud fan-out), so when line 1 made that call nothing
+  was stamped or flushed. Fixed the same night: it raises on line 3 now,
+  proven with each line held back in turn.
 * **Delete `v2.0-alpha`.** Unblocked: 2.1.1 is Active, the registry icon points
   at `/main/`, and the last live pin -- the RunPod bootstrap `curl` in
   RUNPOD_INSTALL -- moved to `/main/` on 2026-09-25. One click, his.
