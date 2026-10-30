@@ -112,6 +112,11 @@ def list_directory_frames(path):
             "directory clip: %r contains no %s frames" % (path, FRAME_EXTS))
     frames = []
     for name in names:
+        if any(ord(ch) < 32 or ord(ch) == 127 for ch in name):
+            # A listed name never passes the path text check, and a newline
+            # in it would be a second line in the concat list ffmpeg reads.
+            raise ValueError(
+                "directory clip: frame name %r carries a control character" % name)
         fp = os.path.join(path, name)
         # A CHILD IS PROVEN INSIDE ITS DIRECTORY (registry review, 2026-10-30):
         # the caller confined the directory, but every name here is opened and

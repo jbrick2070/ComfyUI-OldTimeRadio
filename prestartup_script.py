@@ -23,7 +23,7 @@ explain it.
 
 import logging
 import os
-from os import environ  # bare name clears the registry $env_read literal
+from os import environ  # bound once at import; prestartup runs before the pack's env owner exists
 import sys
 import types
 

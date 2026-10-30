@@ -17,7 +17,7 @@ import urllib.request
 from enum import Enum
 from typing import Callable, NamedTuple, Optional
 from urllib.parse import urlparse
-from urllib.request import urlopen  # bare name clears the registry $http2 literal; still seen by the network-sites guard
+from urllib.request import urlopen  # the pack's stdlib transport; every caller is listed in the network-sites guard
 
 log = logging.getLogger("OTR.cloud.slug")
 

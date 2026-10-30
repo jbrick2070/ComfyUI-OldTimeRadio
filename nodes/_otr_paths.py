@@ -323,6 +323,11 @@ def _refuse_by_text(text: str, field: str) -> None:
     """
     if "\x00" in text:
         raise OtrPathContractError("%s contains a NUL character." % field)
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in text):
+        # A newline inside a filename is legal on POSIX and a second line
+        # inside an ffmpeg concat list (registry review, 2026-10-30): an
+        # injected `file` directive read another file into the output.
+        raise OtrPathContractError("%s contains a control character." % field)
     reject_remote_path(text, field)
     if ".." in text.replace("\\", "/").split("/"):
         raise OtrPathContractError(

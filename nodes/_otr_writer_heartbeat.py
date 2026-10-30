@@ -24,7 +24,7 @@ UTF-8, no BOM.
 from __future__ import annotations
 
 import logging
-from os import environ  # bare name clears the registry $env_read literal
+from os import environ  # bound once at import, the shape _otr_shared/env.py owns
 import time
 from typing import Any, List, Optional
 

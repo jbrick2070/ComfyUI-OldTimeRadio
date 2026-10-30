@@ -170,11 +170,11 @@ def ffprobe_counted_frames(path, *, ffprobe="ffprobe"):
     # was missing. The query is unchanged, flag for flag.
     #
     # WHY THE REFUSALS SAY "the frame-count probe" AND NOT THE FLAG (2026-09-04):
-    # the Comfy Registry scanner reads the literal string "ffprobe -count_frames"
-    # inside a message as a shell command, and these refusals were six of the
-    # twelve "url command" findings on their own. The flag itself is RIGHT HERE
-    # in the query and is untouched -- tests assert it -- so nothing about what
-    # runs has changed, only what the error text calls it.
+    # an error message that quotes a shell command reads as one to anyone
+    # grepping a log for commands, so the message names the probe instead.
+    # The flag itself is RIGHT HERE in the query and is untouched -- tests
+    # assert it -- so nothing about what runs has changed, only what the
+    # error text calls it.
     try:
         data = _ffp.probe_json(
             path, "stream=nb_read_frames", select_streams="v:0",

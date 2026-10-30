@@ -176,6 +176,17 @@ class ElevenLabsCloudVoice(AudioEngineAdapter):
                 "elevenlabs.generate_voice: no provider_voice_id on this cast "
                 "entry -- the S2 pool / CastLock stamp must supply the ElevenLabs "
                 "voice_id. NO FALLBACK (never inherits another voice).")
+        import re
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", vid):
+            # THE ID IS INTERPOLATED INTO THE PROXY'S URL PATH (registry review,
+            # 2026-10-30): a ledger row can carry it, and `../users/me` steered
+            # a credentialed POST onto another api.comfy.org path. An ElevenLabs
+            # id is letters and digits (the bank's are 20 of them); a dash or an
+            # underscore is harmless, and nothing with a separator, a query, a
+            # fragment or a space is a voice.
+            raise ValueError(
+                "elevenlabs.generate_voice: provider_voice_id %r is not an ElevenLabs "
+                "voice id (letters, digits, dash, underscore)" % (vid[:80],))
 
         from .._otr_shared.cloud_media_invoke import invoke_partner_node
         from .._otr_shared.cloud_media_canonical import canonicalize_audio

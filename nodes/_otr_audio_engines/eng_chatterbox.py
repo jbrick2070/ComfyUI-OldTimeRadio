@@ -202,7 +202,14 @@ class ChatterboxEngine:
     def generate_voice(self, text, ref_clip_path, delivery_vector, seed):
         self.load()
         ref_clip_path = self._resolve_ref(ref_clip_path)
-        out_path = tempfile.mktemp(suffix=".wav", prefix="otr_cbx_")
+        # The pack's own allocator (registry review, 2026-10-30): mkstemp-
+        # reserved under the in-tree scratch folder, never tempfile.mktemp
+        # in the shared system temp directory.
+        try:
+            from .._otr_video_engines._tmp import otr_engine_tmp_path
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_video_engines._tmp import otr_engine_tmp_path  # type: ignore
+        out_path = otr_engine_tmp_path("otr_cbx_", ".wav")
         req = {
             "text": text,
             "ref_clip": ref_clip_path,

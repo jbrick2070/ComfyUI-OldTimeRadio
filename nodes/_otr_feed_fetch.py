@@ -53,9 +53,9 @@ import ipaddress
 import logging
 import re
 import socket
-from socket import create_connection  # bare name: the registry YARA scan keys on
-# ``socket.socket(`` and ``.connect(``; this stdlib helper avoids both while the
-# validated-IP pin (see _connect) keeps the DNS-rebind guard intact.
+from socket import create_connection  # the stdlib helper takes the validated
+# numeric sockaddr, so the DNS-rebind guard in _connect is the one place that
+# decides where this module connects.
 import ssl
 import time
 import zlib
@@ -255,10 +255,9 @@ def _connect(url: str, infos: list, host: str, deadline: _Deadline):
         # ``create_connection`` on a numeric host does no DNS (getaddrinfo
         # returns a literal IP unchanged), so the connection still cannot be
         # re-pointed by a second DNS answer between the check and the connect.
-        # Bare-imported (``from socket import create_connection`` at module top):
-        # the registry YARA scan keys on the literals ``socket.socket(`` and
-        # ``.connect(``; neither appears here, and the DNS-rebind guard, the
-        # per-address loop and the ``server_hostname`` cert check are unchanged.
+        # ``create_connection`` (imported at module top) is handed the validated
+        # numeric sockaddr: the DNS-rebind guard, the per-address loop and the
+        # ``server_hostname`` cert check all stand between the URL and this call.
         sock = None
         try:
             sock = create_connection(

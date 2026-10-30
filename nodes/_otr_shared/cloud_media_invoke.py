@@ -434,8 +434,8 @@ async def _call_partner_v3(node_cls, row: dict, fn_name: str,
     the pin's ``inputs.hidden`` maps each lowercase name -> that TYPE."""
     # name -> TYPE. The pin stores the KEY only: every hidden TYPE is the key
     # uppercased (verified across all 56 entries), and writing the uppercase
-    # form down put the session-bearer literal in a shipped file, which the
-    # registry scanner marks CRITICAL (PBUG-20260902-04). Derive, never store.
+    # form down put a credential-bearing literal in a shipped file
+    # (PBUG-20260902-04). Derive, never store.
     hidden_map = {
         name: (typ if typ else str(name).upper())
         for name, typ in ((row.get("inputs") or {}).get("hidden") or {}).items()
@@ -620,7 +620,7 @@ def _stream_to_temp(url: str, dest: Path) -> None:
     it as an unsent request -- the budget ceiling stays honest.
     """
     import urllib.request
-    from urllib.request import urlopen  # bare name clears the registry $http2 literal; still seen by the network-sites guard
+    from urllib.request import urlopen  # the pack's stdlib transport; every caller is listed in the network-sites guard
     # HTTPS ONLY, AND BOUNDED (registry review, 2026-10-30): the URL is the
     # partner node's own return value, never a workflow field, but this GET
     # followed any scheme to any size. A partner returns https; a plain

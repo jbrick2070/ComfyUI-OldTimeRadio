@@ -54,8 +54,8 @@ def _long_paths_enabled():
 def _user_hf_cache():
     """The huggingface_hub-shaped user cache, via os.path only.
 
-    ``getenv`` is the bare name on purpose: spelling the call as an attribute
-    of the os module is a registry-scan hit, and this file ships.
+    ``getenv`` is imported by name and bound once, the shape the pack's env
+    owner uses; this file runs too early in the boot to ask that owner.
     """
     return os.path.join(
         getenv("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache"),

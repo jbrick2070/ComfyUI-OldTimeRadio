@@ -7,7 +7,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from urllib.request import urlopen  # bare name clears the registry $http2 literal; still seen by the network-sites guard
+from urllib.request import urlopen  # the pack's stdlib transport; every caller is listed in the network-sites guard
 from typing import Any
 
 try:

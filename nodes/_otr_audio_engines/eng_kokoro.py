@@ -309,7 +309,12 @@ class KokoroEngine:
         if name == "torch":
             backend = _kb.TorchKokoroBackend(device, lang_code=lang,
                                              voices_dir=_kokoro_voices_dir())
-            backend.load()          # KPipeline errors stay as they were (S4: loud)
+            try:
+                backend.load()      # KPipeline errors stay as they were (S4: loud)
+            except _kb.BackendUnavailable as exc:
+                # A named missing piece (the spaCy English model) is a refusal
+                # with its install line, the same shape as a missing weight.
+                raise self._unusable(EngineUsabilityReason.MISSING_MODEL, str(exc)) from None
             log.info("[OTR.kokoro] backend=torch device=%s lang=%s", device, lang)
         else:
             model_path = _kokoro_onnx_model_path()

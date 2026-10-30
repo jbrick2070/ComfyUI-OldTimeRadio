@@ -1,10 +1,9 @@
 """ONE owner spawns a process: this module.
 
-The registry scan of alpha.17 carried 35 `python_command_injection_risk`
-findings, one per CALL SITE, across twenty files -- and a human reading that
-report has to judge thirty-five spawns to learn that this pack runs ffmpeg.
-Collapsing them here makes the report two lines and, more usefully, gives the
-pack ONE place where "what may this process launch" is answered.
+Thirty-five call sites across twenty files once spawned processes on their
+own, and a reader had to judge thirty-five spawns to learn that this pack
+runs ffmpeg. Collapsing them here gives the pack ONE place where "what may
+this process launch" is answered, and one place to review it.
 
 WHAT THIS OWNS: the spawn. It does NOT build commands -- every caller keeps
 its own argv, because what a caller runs is part of what the caller does --
@@ -23,8 +22,7 @@ An unlisted binary raises before anything is spawned. Adding one is a
 one-line, reviewed change; that is the point.
 
 ``shell=True`` is refused outright, and so is a string argv: both turn an
-argv list into a shell parse, which is the actual injection risk the scanner
-names.
+argv list into a shell parse, which is the actual command-injection risk.
 
 Import it under the alias ``otr_proc`` -- ``proc`` is a local variable in
 eleven files (``video_engine.py:1082`` among them) and a shadowed module
@@ -62,10 +60,9 @@ TimeoutExpired = subprocess.TimeoutExpired
 #: The two spawn callables, bound to bare names at import time. This is the
 #: SAME import-time binding the module docstring already relies on (a name
 #: bound here cannot be swapped by a test patching ``<module>.subprocess.run``),
-#: and it is what keeps the registry's ``$subprocess_run_direct`` /
-#: ``$subprocess_popen_direct`` literals (``subprocess.run(`` / ``subprocess.Popen(``)
-#: out of the one shipped file that must spawn ffmpeg. The allowlist check below
-#: is unchanged -- the gateway still validates every argv before it spawns.
+#: and it means every spawn in this file goes through a name this module owns
+#: and ``_check`` first. The allowlist check below is unchanged -- the gateway
+#: still validates every argv before it spawns.
 _spawn_run = subprocess.run
 _spawn_popen = subprocess.Popen
 
@@ -90,9 +87,9 @@ ALLOWED_EXECUTABLES = {
     "nvidia-smi": "GPU specs when torch cannot answer",
     "blender": "the mesh stage's headless render",
     # The two macOS memory probes joined on 2026-09-12: they had been the
-    # last two direct spawns in the tree (the registry scanner flags any
-    # spawn outside this boundary), and a probe the pack runs belongs in
-    # the list of things the pack runs.
+    # last two direct spawns in the tree (a spawn outside this boundary is
+    # a spawn nobody reviewed), and a probe the pack runs belongs in the
+    # list of things the pack runs.
     "vm_stat": "macOS free memory (page counts) for the motion budget",
     "sysctl": "macOS physical RAM (hw.memsize) for the unified-memory budget",
 }

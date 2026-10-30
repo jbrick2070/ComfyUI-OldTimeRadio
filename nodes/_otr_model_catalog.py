@@ -2609,7 +2609,14 @@ ALLOW_PATTERNS = (
     "*.safetensors",
     "*.txt",
     "*.model",
-    "tokenizer*",
+    # EXACT tokenizer names, never a prefix (registry review, 2026-10-30):
+    # `tokenizer*` admitted `tokenizer_payload.py`, and a deny list beneath
+    # it was case-sensitive and could never be complete. `*.json` and
+    # `*.model` above already carry tokenizer.json, tokenizer_config.json
+    # and tokenizer.model; these are the other spellings the curated rows use.
+    "tokenizer.model.v3",
+    "tokenizer.model.v7",
+    "tokenizer.tiktoken",
     "special_tokens_map.json",
     "generation_config.json",
     "preprocessor_config.json",
@@ -2631,6 +2638,9 @@ ALLOW_PATTERNS = (
 #: both the size estimate and the download read.
 IGNORE_PATTERNS = (
     "consolidated*.safetensors",
+    # The pack's own completion receipt is written by the pack after a
+    # verified download; a repository's copy would be read as one.
+    ".otr_download_complete*", "*/.otr_download_complete*",
     "*.py", "*.pyc", "*.pyd", "*.pyw", "*.so", "*.dll", "*.dylib", "*.exe",
     "*.bat", "*.cmd", "*.ps1", "*.sh", "*.pkl", "*.pickle", "*.pt", "*.pth",
     "*.bin", "*.zip", "*.tar", "*.gz",

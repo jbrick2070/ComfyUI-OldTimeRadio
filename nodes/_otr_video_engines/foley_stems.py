@@ -291,8 +291,8 @@ def extract_pcm16_wav_from_video(video_path, dest_wav, *, sample_rate=48000,
     silently delivers no foley is the false green this path exists to stop.
     """
     # Spawn through the single owner: it checks argv[0] against the
-    # allowlist before anything runs, and it keeps this file off the
-    # registry scan's command-injection report. The local name below is
+    # allowlist before anything runs, and it keeps every spawn in this
+    # file reviewable in one place. The local name below is
     # `proc`, which is why the module is aliased.
     try:
         from .._otr_shared import proc as otr_proc

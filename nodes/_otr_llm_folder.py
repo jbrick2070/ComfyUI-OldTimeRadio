@@ -179,6 +179,18 @@ def _receipt(folder: Path) -> Optional[dict]:
     files = data.get("files")
     if not isinstance(files, dict) or not files:
         return None
+    # EVERY KEY NAMES A FILE INSIDE THIS FOLDER (registry review, 2026-10-30):
+    # the receipt is a file on disk like any other, and a key of `../x` or an
+    # absolute path reached `stat` outside the folder. A receipt that names
+    # anything else is no receipt, and the structural check decides instead.
+    try:
+        from ._otr_paths import confined_or_empty
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import confined_or_empty  # type: ignore
+    root = str(folder)
+    for rel in files:
+        if not isinstance(rel, str) or not confined_or_empty(rel, roots=[root], base=root):
+            return None
     return data
 
 

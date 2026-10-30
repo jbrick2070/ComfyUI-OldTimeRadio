@@ -825,6 +825,22 @@ class TorchKokoroBackend:
             self._pipeline = OwnG2PPipeline(self.lang_code, self.device, self.voices_dir)
             return
 
+        if self.lang_code in ("a", "b"):
+            # ENGLISH NEEDS spaCy's en_core_web_sm, AND THIS PACK CHECKS
+            # (registry review, 2026-10-30): misaki's English G2P calls
+            # spacy.cli.download when the model package is absent, and that
+            # spawns `python -m pip install` in the middle of a render. A node
+            # pack never installs packages at run time, so the absence is a
+            # named refusal with the one line to run, and the download never
+            # starts. The model is not on PyPI, which is why a fresh install
+            # can lack it; see requirements.txt beside the kokoro line.
+            import importlib.util
+            if importlib.util.find_spec("en_core_web_sm") is None:
+                raise BackendUnavailable(
+                    "Kokoro's English phonemizer (misaki) needs spaCy's en_core_web_sm "
+                    "model, which is not installed in ComfyUI's Python. Install it once, "
+                    "outside the render, with ComfyUI's own interpreter: "
+                    "python -m spacy download en_core_web_sm")
         from kokoro import KPipeline
 
         kwargs = {"lang_code": self.lang_code, "device": self.device}

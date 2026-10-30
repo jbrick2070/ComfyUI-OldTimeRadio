@@ -387,32 +387,48 @@ try:
 
     import re as _otr_re
 
-    #: An absolute local path, in the spellings a ledger actually holds:
-    #: `C:\...`, `C:/...`, a POSIX `/...`, and the UNC `\\host\share`. Matched
-    #: on the WHOLE value -- a sentence that merely mentions a path is prose and
-    #: is left alone, because rewriting narrative text would corrupt the reader's
-    #: view of the episode for no privacy gain.
-    _OTR_ABS_PATH = _otr_re.compile(
-        r"^(?:[A-Za-z]:[\\/]|\\\\|/)[^\r\n]*$")
+    #: An absolute local path TOKEN wherever it sits in a string: `C:\...`,
+    #: `C:/...`, the UNC `\\host\share\...`, a POSIX `/a/b` and a `file://`
+    #: URI. Matched as a SUBSTRING (registry review, 2026-10-30): the earlier
+    #: whole-value match left a path verbatim whenever prose, an exception
+    #: message, a file:// URI or a second line carried it, and this route is
+    #: unauthenticated. A token ends at whitespace or a quote; a drive letter
+    #: must not follow a letter or digit (the `s:` inside `https:` is not a
+    #: drive); a POSIX token needs a second segment and must not follow `:`
+    #: or `/` or a word, so a URL's `//host/path` and a lone `/` in prose are
+    #: left alone.
+    _OTR_PATH_TOKEN = _otr_re.compile(
+        r"(?:file:/*)?(?:(?<![A-Za-z0-9])[A-Za-z]:[\\/][^\s'\"<>|]*"
+        r"|\\\\[^\s'\"<>|]+"
+        r"|(?<![:/\w])/(?:[^\s'\"<>|/]+/)+[^\s'\"<>|/]*)")
+
+    def _otr_scrub_one(text):
+        def _base(match):
+            token = match.group(0)
+            # `basename` on a Windows path under POSIX returns the whole string,
+            # so split on both separators rather than trusting os.path here.
+            return token.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1] or token
+        return _OTR_PATH_TOKEN.sub(_base, text)
 
     def _otr_scrub_paths(value, _depth=0):
-        """Return ``value`` with every absolute-path STRING reduced to its
-        basename. Recursive over dicts and lists; never mutates the input.
+        """Return ``value`` with every absolute-path TOKEN in every string --
+        values AND dict keys -- reduced to its basename. Recursive over dicts
+        and lists; never mutates the input.
 
         Depth-bounded because this walks a document that arrived from disk, and
         an unbounded recursion in an HTTP handler is a denial of service the
-        route would hand out for free. A ledger nests ~6 deep; 24 is slack.
+        route would hand out for free. A ledger nests ~6 deep; 24 is slack,
+        and what lies deeper is withheld rather than served raw.
         """
         if _depth > 24:
-            return value
+            return "<redacted>"
         if isinstance(value, dict):
-            return {k: _otr_scrub_paths(v, _depth + 1) for k, v in value.items()}
+            return {(_otr_scrub_one(k) if isinstance(k, str) else k):
+                    _otr_scrub_paths(v, _depth + 1) for k, v in value.items()}
         if isinstance(value, list):
             return [_otr_scrub_paths(v, _depth + 1) for v in value]
-        if isinstance(value, str) and _OTR_ABS_PATH.match(value):
-            # `basename` on a Windows path under POSIX returns the whole string,
-            # so split on both separators rather than trusting os.path here.
-            return value.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1] or value
+        if isinstance(value, str):
+            return _otr_scrub_one(value)
         return value
 
     @_otr_PromptServer.instance.routes.get("/otr/latest_ledger")

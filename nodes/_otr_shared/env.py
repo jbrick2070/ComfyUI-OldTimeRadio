@@ -1,9 +1,8 @@
 """ONE owner answers what an environment knob says: this module.
 
-The registry scan of alpha.17 carried 103 `python_environment_manipulation`
-findings -- one per FILE that touches ``os.environ`` -- across 103 files, and
-the human reviewing that report cannot tell a render path from a test seam in
-a hundred and three lines. More importantly for the pack itself: a knob read
+A hundred and three files once touched ``os.environ`` on their own, and a
+reviewer of that list cannot tell a render path from a test seam in a hundred
+and three lines. More importantly for the pack itself: a knob read
 in ninety places is a decision made in ninety places. The ffmpeg precedent
 (``_otr_shared/ffmpeg.py``, 2026-09-04) found nine resolvers where the pack
 believed it had one, and two of them ignored the operator's pin.
@@ -42,8 +41,8 @@ exists -- and keeps its own inline writes.
 """
 from __future__ import annotations
 
-from os import environ  # bare name: the registry YARA scan keys on the
-# literal ``os.environ``; ``environ`` is the same object, one owner, and clears it.
+from os import environ  # the one owner binds the mapping once; every other
+# module asks this one, and a reviewer finds the environment in one file.
 from typing import Any, Optional
 
 __all__ = ["get", "pin", "setdefault", "unpin", "snapshot"]

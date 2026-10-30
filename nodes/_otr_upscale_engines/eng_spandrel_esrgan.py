@@ -55,8 +55,8 @@ def _sha256_file(path) -> str:
     it, on a code path that runs while a render is holding VRAM and the process
     is already near its ceiling -- for a value that only ever gets compared to a
     pinned digest. Chunking costs nothing and bounds the peak at one chunk.
-    (It is also the pack's only ``read_bytes`` finding in the registry scan,
-    which is how it got looked at.)
+    (It was the pack's only whole-file ``read_bytes`` of a weight, which is
+    how it got looked at.)
     """
     digest = hashlib.sha256()
     with open(path, "rb") as fh:

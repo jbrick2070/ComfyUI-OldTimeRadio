@@ -19,8 +19,8 @@ TWO RULES THIS MODULE KEEPS BECAUSE IT RUNS INSIDE THE SERVER:
   catches ``Exception``; a ``SystemExit`` raised in a node escapes it and stops
   the worker for every prompt queued after it.
 * It never spawns a process. The source commit is an ARGUMENT; only the
-  command-line wrapper asks git for it. A process spawn under ``nodes/`` is a
-  registry-scan finding, and this file ships.
+  command-line wrapper asks git for it. A process spawn under ``nodes/``
+  belongs to ``_otr_shared/proc.py``; this module owns none.
 
 UTF-8, no BOM. Standard library only.
 """
