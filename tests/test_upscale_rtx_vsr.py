@@ -138,13 +138,6 @@ def test_fingerprint_does_not_import_torch_or_nvvfx():
     assert r.returncode == 0, r.stdout + r.stderr
 
 
-def test_without_the_package_load_refuses_with_the_pip_line(monkeypatch):
-    calls = _install_spy(monkeypatch)        # never a real pip, whatever the shell exports
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-    with pytest.raises(EngineUnusable, match="pip install nvidia-vfx"):
-        V.RtxVsr().load(torch.device("cpu"))
-
-
 def test_a_non_cuda_device_refuses(monkeypatch):
     _fake_nvvfx(monkeypatch)
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
@@ -384,69 +377,95 @@ def test_a_non_degrading_engine_failing_mid_composite_still_raises(tmp_path,
         _composite_with(SC, tmp_path, "spandrel_esrgan")
 
 
-# --- auto-install (operator, 2026-10-15) ----------------------------------- #
+# --- the SDK is the user's install (Comfy Registry standards, 2026-10-30) --- #
+#
+# From 2.3.29 to 2.3.44 load() pip-installed nvidia-vfx itself. The registry's
+# reviewer flagged that "policy-v0.7: code-install" (2.3.34, 2.3.35), and the
+# published standards forbid runtime package installation through subprocess
+# calls (PBUG-20261030-01). So: a missing SDK is a REFUSAL that names the pip
+# line, the pack spawns nothing to get it, and the hardware refusals still come
+# first so a CPU, AMD, Mac or GTX box hears its real reason, not "install a
+# package it cannot use".
 
-def _install_spy(monkeypatch, ok=True, provide=None):
-    calls = []
+def _sdk_absent(monkeypatch):
+    """No nvvfx; a capable RTX host unless a test says otherwise; and a spawn
+    boundary that FAILS THE TEST if the engine tries to run anything at all."""
+    from nodes._otr_shared import proc as otr_proc
 
-    def fake_pip():
-        calls.append(True)
-        if ok and provide is not None:
-            monkeypatch.setitem(sys.modules, "nvvfx", provide)
-        return ok, "pip exit %d: stub" % (0 if ok else 1)
-    monkeypatch.setattr(V, "_pip_install_nvidia_vfx", fake_pip)
-    monkeypatch.setattr(V, "_AUTO_INSTALL_OUTCOME", None)
+    def never(*argv, **kw):
+        pytest.fail("rtx_vsr spawned %r: the pack must never install the SDK" % (argv,))
+    monkeypatch.setattr(otr_proc, "run", never)
+    monkeypatch.setattr(otr_proc, "popen", never)
     monkeypatch.setitem(sys.modules, "nvvfx", None)       # absent
-    # A capable host unless a test says otherwise: an RTX 40-series card on
-    # Windows x86-64 with Python 3.13, so the suite is portable to any runner.
     import platform
     monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d=None: (8, 9))
-    monkeypatch.setattr(torch.cuda, "get_device_name", lambda d=None: "NVIDIA GeForce RTX 4060 Laptop GPU")
+    monkeypatch.setattr(torch.cuda, "get_device_name",
+                        lambda d=None: "NVIDIA GeForce RTX 4060 Laptop GPU")
     monkeypatch.setattr(platform, "machine", lambda: "AMD64")
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setattr(sys, "version_info", (3, 13, 0, "final", 0))
-    return calls
 
 
-def test_a_cpu_box_never_installs_the_sdk(monkeypatch):
-    calls = _install_spy(monkeypatch)
+def test_without_the_package_load_refuses_with_the_pip_line(monkeypatch):
+    _sdk_absent(monkeypatch)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.version, "hip", None, raising=False)
+    for _ in range(2):                          # stateless: the same answer twice
+        with pytest.raises(EngineUnusable) as exc:
+            V.RtxVsr().load(torch.device("cuda:0"))
+        assert "not installed" in str(exc.value)
+        assert 'pip install "nvidia-vfx' in str(exc.value)
+        assert V.REQUIREMENT in str(exc.value)
+
+
+def test_a_cpu_box_is_refused_for_its_hardware_not_the_package(monkeypatch):
+    _sdk_absent(monkeypatch)
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
     with pytest.raises(EngineUnusable, match="NVIDIA CUDA device"):
         V.RtxVsr().load(torch.device("cpu"))
-    assert calls == []
 
 
-def test_an_amd_box_never_installs_the_sdk(monkeypatch):
-    calls = _install_spy(monkeypatch)
+def test_an_amd_box_is_refused_for_its_hardware_not_the_package(monkeypatch):
+    _sdk_absent(monkeypatch)
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(torch.version, "hip", "6.2", raising=False)
     with pytest.raises(EngineUnusable, match="ROCm"):
         V.RtxVsr().load(torch.device("cuda:0"))
-    assert calls == []
 
 
-def test_an_nvidia_box_installs_once_and_a_failure_is_not_retried(monkeypatch):
-    calls = _install_spy(monkeypatch, ok=False)
+def test_a_pre_turing_card_without_the_sdk_hears_the_real_reason(monkeypatch):
+    _sdk_absent(monkeypatch)
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(torch.version, "hip", None, raising=False)
-    for _ in range(2):
-        with pytest.raises(EngineUnusable, match="pip install nvidia-vfx"):
-            V.RtxVsr().load(torch.device("cuda:0"))
-    assert calls == [True]                      # tried once per process
-    assert V._AUTO_INSTALL_OUTCOME.startswith("failed")
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d=None: (6, 1))
+    with pytest.raises(EngineUnusable, match="Turing"):
+        V.RtxVsr().load(torch.device("cuda:0"))
 
 
-def test_a_successful_install_is_imported_in_the_same_process(monkeypatch):
-    fake = types.SimpleNamespace(QualityLevel=types.SimpleNamespace(__members__={}))
-    calls = _install_spy(monkeypatch, ok=True, provide=fake)
-    assert V._import_nvvfx_installing_if_missing() is fake
-    assert calls == [True] and V._AUTO_INSTALL_OUTCOME.startswith("installed")
-    # Present now: no second install.
-    assert V._import_nvvfx_installing_if_missing() is fake and calls == [True]
+def test_an_arm_or_mac_host_without_the_sdk_hears_the_real_reason(monkeypatch):
+    import platform
+    _sdk_absent(monkeypatch)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.version, "hip", None, raising=False)
+    monkeypatch.setattr(platform, "machine", lambda: "aarch64")
+    with pytest.raises(EngineUnusable, match="x86-64"):
+        V.RtxVsr().load(torch.device("cuda:0"))
 
 
-def test_a_present_but_broken_sdk_is_not_reinstalled(monkeypatch):
-    calls = _install_spy(monkeypatch)
+def test_a_gtx_card_without_the_sdk_hears_the_real_reason(monkeypatch):
+    _sdk_absent(monkeypatch)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.version, "hip", None, raising=False)
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d=None: (7, 5))
+    monkeypatch.setattr(torch.cuda, "get_device_name",
+                        lambda d=None: "NVIDIA GeForce GTX 1660 SUPER")
+    with pytest.raises(EngineUnusable, match="GTX"):
+        V.RtxVsr().load(torch.device("cuda:0"))
+
+
+def test_a_present_but_broken_sdk_raises_its_own_error(monkeypatch):
+    """A DLL or driver error is not "missing": it surfaces as itself, never as
+    the install hint for a package that is already there."""
     import builtins
     real_import = builtins.__import__
 
@@ -456,24 +475,7 @@ def test_a_present_but_broken_sdk_is_not_reinstalled(monkeypatch):
         return real_import(name, *a, **kw)
     monkeypatch.setattr(builtins, "__import__", broken)
     with pytest.raises(ImportError, match="DLL load failed"):
-        V._import_nvvfx_installing_if_missing()
-    assert calls == []
-
-
-def test_the_install_goes_through_the_pack_subprocess_boundary(monkeypatch):
-    seen = {}
-
-    def fake_run(argv, **kw):
-        seen["argv"], seen["kw"] = list(argv), kw
-        return types.SimpleNamespace(returncode=0, stdout="ok", stderr="")
-    from nodes._otr_shared import proc as otr_proc
-    monkeypatch.setattr(otr_proc, "run", fake_run)
-    ok, _detail = V._pip_install_nvidia_vfx()
-    assert ok and seen["argv"][0] == sys.executable
-    assert seen["argv"][1:4] == ["-m", "pip", "install"]
-    assert seen["argv"][-1] == V.AUTO_INSTALL_REQUIREMENT
-    assert seen["kw"]["timeout"] == V.AUTO_INSTALL_TIMEOUT_S
-    otr_proc._check(seen["argv"])               # the allowlist admits it
+        V._import_nvvfx()
 
 
 # --- AnimateDiff / Ghost rows (operator, 2026-10-15) ----------------------- #
@@ -554,70 +556,6 @@ def test_a_ghost_row_already_at_canvas_keeps_its_declared_chain(monkeypatch):
     assert "flags=lanczos" in vf and "unsharp" not in vf and "pad=1920" not in vf
 
 
-def test_a_pre_turing_gtx_card_never_downloads_the_sdk(monkeypatch):
-    calls = _install_spy(monkeypatch)
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
-    monkeypatch.setattr(torch.version, "hip", None, raising=False)
-    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d=None: (6, 1))
-    with pytest.raises(EngineUnusable, match="Turing"):
-        V.RtxVsr().load(torch.device("cuda:0"))
-    assert calls == []
-
-
-def test_an_arm_or_mac_host_never_downloads_the_sdk(monkeypatch):
-    import platform
-    calls = _install_spy(monkeypatch)
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
-    monkeypatch.setattr(torch.version, "hip", None, raising=False)
-    monkeypatch.setattr(platform, "machine", lambda: "aarch64")
-    with pytest.raises(EngineUnusable, match="x86-64"):
-        V.RtxVsr().load(torch.device("cuda:0"))
-    assert calls == []
-
-
-def _fake_proc(monkeypatch, results):
-    from nodes._otr_shared import proc as otr_proc
-    seen = []
-
-    def fake_run(argv, **kw):
-        seen.append(list(argv))
-        rc, out = results.pop(0)
-        return types.SimpleNamespace(returncode=rc, stdout=out, stderr="")
-    monkeypatch.setattr(otr_proc, "run", fake_run)
-    return seen
-
-
-def test_no_pip_falls_back_to_uv_pip(monkeypatch):
-    seen = _fake_proc(monkeypatch, [(1, "No module named pip"), (0, "Installed 1 package")])
-    ok, detail = V._pip_install_nvidia_vfx()
-    assert ok and "uv pip" in detail
-    assert seen[0][1:4] == ["-m", "pip", "install"] and "--no-input" in seen[0]
-    assert seen[1][1:5] == ["-m", "uv", "pip", "install"]
-    assert seen[1][seen[1].index("--python") + 1] == sys.executable
-    from nodes._otr_shared import proc as otr_proc
-    for argv in seen:
-        otr_proc._check(argv)
-
-
-def test_a_real_pip_failure_does_not_try_uv(monkeypatch):
-    seen = _fake_proc(monkeypatch, [(1, "ERROR: No matching distribution found")])
-    ok, detail = V._pip_install_nvidia_vfx()
-    assert not ok and len(seen) == 1 and "No matching distribution" in detail
-
-
-def test_a_failed_install_logs_the_whole_pip_output(monkeypatch, caplog):
-    long_reason = "x" * 400 + " ERROR: No matching distribution found for nvidia-vfx"
-    monkeypatch.setattr(V, "_pip_install_nvidia_vfx", lambda: (False, "pip exit 1: " + long_reason))
-    monkeypatch.setattr(V, "_AUTO_INSTALL_OUTCOME", None)
-    monkeypatch.setitem(sys.modules, "nvvfx", None)
-    import logging
-    with caplog.at_level(logging.WARNING, logger="OTR.upscale.rtx_vsr"):
-        with pytest.raises(ModuleNotFoundError):
-            V._import_nvvfx_installing_if_missing()
-    assert any("No matching distribution found for nvidia-vfx" in r.getMessage()
-               and "x" * 400 in r.getMessage() for r in caplog.records)
-
-
 def test_the_full_frame_fit_fills_any_canvas_with_no_pad():
     from nodes._otr_upscale_engines._pipeline import (
         _fit_full_frame_bhwc, _fit_and_pad_bhwc)
@@ -692,31 +630,6 @@ def test_a_ghost_only_key_ignores_unsharp_but_carries_the_engine(tmp_path, monke
     assert key("off", "0.4") == key("off", "0.9")
 
 
-def test_a_standalone_uv_executable_is_used_when_uv_is_not_a_module(monkeypatch):
-    import shutil
-    seen = _fake_proc(monkeypatch, [(1, "No module named pip"),
-                                    (1, "No module named uv"), (0, "Installed")])
-    monkeypatch.setattr(shutil, "which", lambda name: r"C:\tools\uv.exe")
-    ok, detail = V._pip_install_nvidia_vfx()
-    assert ok and seen[2][0] == r"C:\tools\uv.exe" and seen[2][1:3] == ["pip", "install"]
-    assert "No module named pip" in detail
-    from nodes._otr_shared import proc as otr_proc
-    otr_proc._check(seen[2])                       # the allowlist admits uv
-
-
-def test_pip_output_is_redacted_before_it_is_logged(monkeypatch, caplog):
-    monkeypatch.setattr(V, "_pip_install_nvidia_vfx", lambda: (
-        False, "pip exit 1: GET https://idx.example/simple?access_key=SECRET123 403"))
-    monkeypatch.setattr(V, "_AUTO_INSTALL_OUTCOME", None)
-    monkeypatch.setitem(sys.modules, "nvvfx", None)
-    import logging
-    with caplog.at_level(logging.WARNING, logger="OTR.upscale.rtx_vsr"):
-        with pytest.raises(ModuleNotFoundError) as exc:
-            V._import_nvvfx_installing_if_missing()
-    assert "SECRET123" not in str(exc.value)
-    assert not any("SECRET123" in r.getMessage() for r in caplog.records)
-
-
 def test_a_mixed_manifest_key_still_tracks_unsharp(tmp_path, monkeypatch):
     import nodes.otr_silent_composite as SC
     manifest = _ghost_manifest(tmp_path)
@@ -735,19 +648,6 @@ def test_a_mixed_manifest_key_still_tracks_unsharp(tmp_path, monkeypatch):
             clip_manifest_json=json.dumps(manifest),
             upscale_engine="rtx_vsr", upscale_device="cuda")
     assert key("0.4") != key("0.9")                # the legacy row can carry unsharp
-
-
-def test_the_redactor_fails_closed(monkeypatch):
-    import builtins
-    real_import = builtins.__import__
-
-    def no_assets(name, *a, **kw):
-        if "_otr_visual_assets" in name or (a and a[2] and "_otr_visual_assets" in a[2]):
-            raise ImportError("blocked")
-        return real_import(name, *a, **kw)
-    monkeypatch.setattr(builtins, "__import__", no_assets)
-    out = V._redacted("token=SECRET123")
-    assert "SECRET123" not in out and "withheld" in out
 
 
 def test_a_non_upscaler_failure_mid_composite_is_not_redone(tmp_path, monkeypatch):
@@ -782,18 +682,6 @@ def test_a_non_upscaler_failure_mid_composite_is_not_redone(tmp_path, monkeypatc
     assert calls == ["rtx_vsr"]                    # no second, off pass
 
 
-def test_a_gtx_card_never_downloads_the_sdk(monkeypatch):
-    calls = _install_spy(monkeypatch)
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
-    monkeypatch.setattr(torch.version, "hip", None, raising=False)
-    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d=None: (7, 5))
-    monkeypatch.setattr(torch.cuda, "get_device_name",
-                        lambda d=None: "NVIDIA GeForce GTX 1660 SUPER")
-    with pytest.raises(EngineUnusable, match="GTX"):
-        V.RtxVsr().load(torch.device("cuda:0"))
-    assert calls == []
-
-
 def test_every_gpu_spatial_step_sits_inside_the_typed_boundary():
     """Codex review 2026-10-16: a CUDA OOM in the device transfer, the fit or
     the conversion back is the upscaler's failure too, so it must raise
@@ -808,21 +696,3 @@ def test_every_gpu_spatial_step_sits_inside_the_typed_boundary():
                  "_validate_engine_output(", "_fit(out_bhwc", ".cpu().numpy()"):
         assert step in guarded, step
     assert "enc.stdin.write" not in guarded
-
-
-def test_pip_output_is_redacted_before_it_is_folded_to_one_line(monkeypatch, caplog):
-    """A credential whose value is on the NEXT line of pip output is only
-    visible to the redactor while the line breaks are still there."""
-    seen = _fake_proc(monkeypatch, [(1, "ERROR: 403 for index\nAuthorization:\nQ7m9Z2x4\nbye")])
-    ok, detail = V._pip_install_nvidia_vfx()
-    assert not ok and "\n" in detail                # raw lines kept for the redactor
-    monkeypatch.setattr(V, "_pip_install_nvidia_vfx", lambda: (ok, detail))
-    monkeypatch.setattr(V, "_AUTO_INSTALL_OUTCOME", None)
-    monkeypatch.setitem(sys.modules, "nvvfx", None)
-    import logging
-    with caplog.at_level(logging.WARNING, logger="OTR.upscale.rtx_vsr"):
-        with pytest.raises(ModuleNotFoundError) as exc:
-            V._import_nvvfx_installing_if_missing()
-    assert "Q7m9Z2x4" not in str(exc.value)
-    assert not any("Q7m9Z2x4" in r.getMessage() for r in caplog.records)
-    assert any("ERROR: 403 for index" in r.getMessage() for r in caplog.records)

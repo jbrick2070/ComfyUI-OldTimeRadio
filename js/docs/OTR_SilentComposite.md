@@ -43,7 +43,7 @@ OTR_VideoRenderBatch clip manifest. When it carries per-beat clips the composite
 
 **Upscaler** (`upscale_engine`) -- a choice from the dropdown.
 
-Post-render upscale/enhance stage. Runs INSIDE the composite per-clip (sharpen=True branch only); floor / directory / black paths are unchanged. off = today's lanczos+unsharp, byte-identical. spandrel_esrgan = Real-ESRGAN x2 (any device, slow). rtx_vsr = NVIDIA RTX Video Super Resolution (RTX card; installs NVIDIA's nvidia-vfx package itself on first use, ~540 MB; ~100x faster than ESRGAN; falls back to off with a warning where it cannot run).
+Post-render upscale/enhance stage. Runs INSIDE the composite per-clip (sharpen=True branch only); floor / directory / black paths are unchanged. off = today's lanczos+unsharp, byte-identical. spandrel_esrgan = Real-ESRGAN x2 (any device, slow). rtx_vsr = NVIDIA RTX Video Super Resolution (RTX card; you install NVIDIA's nvidia-vfx package into ComfyUI's Python first, ~540 MB; ~100x faster than ESRGAN; falls back to off with a warning where it cannot run).
 
 **`upscale_device`** -- text; starts as `cpu`.
 

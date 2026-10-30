@@ -1585,8 +1585,8 @@ class OTRSilentComposite:
                         "directory / black paths are unchanged. off = today's "
                         "lanczos+unsharp, byte-identical. spandrel_esrgan = "
                         "Real-ESRGAN x2 (any device, slow). rtx_vsr = NVIDIA "
-                        "RTX Video Super Resolution (RTX card; installs NVIDIA's "
-                        "nvidia-vfx package itself on first use, ~540 MB; "
+                        "RTX Video Super Resolution (RTX card; you install NVIDIA's "
+                        "nvidia-vfx package into ComfyUI's Python first, ~540 MB; "
                         "~100x faster than ESRGAN; falls back to off with a "
                         "warning where it cannot run)."
                     ),
@@ -1872,7 +1872,7 @@ class OTRSilentComposite:
             except Exception as exc:  # noqa: BLE001 -- see the gate just below
                 # AN OPTIONAL ACCELERATOR NEVER COSTS THE EPISODE (2026-10-14).
                 # An engine that declares `degrades_to_off` (rtx_vsr: it needs
-                # an RTX card and NVIDIA's SDK, which it installs itself) falls
+                # an RTX card and NVIDIA's SDK, which the user installs) falls
                 # back to off -- the
                 # lanczos path -- with a warning when it cannot run here. This is
                 # the last stage of an episode; everything before it is done.

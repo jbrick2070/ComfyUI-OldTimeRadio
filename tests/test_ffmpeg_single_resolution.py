@@ -10,8 +10,10 @@ reader from looking. So the claim here is made by an AST walk over ``nodes/``:
   tool owners -- the ffmpeg owner and the probe owner (``ffprobe.py``). As of
   2026-09-04 nothing else did, once the twelve ffmpeg copies were retired. A
   new copy fails this test the day it is written, whether it spells the tool
-  as a constant or as a variable. A literal naming some other tool (the RTX
-  VSR installer's ``which("uv")``, 2026-10-16) is not an ffmpeg decision.
+  as a constant or as a variable. A literal naming some other tool is not an
+  ffmpeg decision (the carve-out was earned by the RTX VSR installer's
+  ``which("uv")`` on 2026-10-16; that installer left on 2026-10-30 and the
+  carve-out stays generic).
 """
 from __future__ import annotations
 
@@ -40,8 +42,9 @@ _MEDIA_STEMS = {"ffmpeg", "ffprobe"}
 
 
 def _names_another_tool(node: ast.Call) -> bool:
-    """A which() whose argument is a literal naming some OTHER tool (the RTX
-    VSR installer's ``which("uv")``) is not an ffmpeg decision. A variable
+    """A which() whose argument is a literal naming some OTHER tool is not an
+    ffmpeg decision (the case that earned this, the RTX VSR installer's
+    ``which("uv")``, has since left the tree). A variable
     argument still counts -- it could hold "ffmpeg" -- so the ratchet keeps
     its teeth for every spelling that can reach the media tools."""
     arg = node.args[0] if node.args else None

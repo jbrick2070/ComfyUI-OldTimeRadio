@@ -198,7 +198,7 @@ def download_facts() -> dict:
 
 #: How an engine with no provisioning lane still gets its weights.
 _NO_LANE_WORD = {"hf_cache": "auto", "fetch_at_load": "auto",
-                 "pip_at_load": "auto", "sidecar": "sidecar",
+                 "pip_manual": "manual", "sidecar": "sidecar",
                  "remote": "none", "manual_doc": "manual", "builtin": "nothing",
                  "remote_unprovisioned": "none*"}
 
@@ -611,12 +611,13 @@ def render_table(rows: list, machines=MACHINES) -> str:
 
 
 _LEGEND = """
-**How you get the weights.** Four things do the fetching for an **auto** row, and
+**How you get the weights.** Three things do the fetching for an **auto** row, and
 none of them is a script you have to run: the engine's own library pulls it
 through the Hugging Face cache, `OTR_WorkflowValidator` -- a node inside the
-workflow -- downloads it at queue time, the engine fetches its own pinned file
-when it loads (Real-ESRGAN), or it pip-installs its own runtime package when it
-loads on hardware that can use it (NVIDIA RTX VSR). A **manual** row may still have a helper in
+workflow -- downloads it at queue time, or the engine fetches its own pinned file
+when it loads (Real-ESRGAN). NVIDIA RTX VSR is a **manual** row on purpose: its
+`nvidia-vfx` package is a `pip install` you run into ComfyUI's Python, because a
+node pack may not install packages at run time (Comfy Registry standards). A **manual** row may still have a helper in
 `scripts/`, but `scripts/` is not in the registry bundle, so from a normal
 install it is a step you take by hand and it is labelled as one.
 

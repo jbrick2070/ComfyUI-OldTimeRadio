@@ -19,7 +19,7 @@ it to **off**. See the end of this page for why each.
 |---|---|---|
 | **`off`** -- ships this way | Leaves the composite's own resize in charge | Nothing |
 | **`spandrel_esrgan`** | Runs Real-ESRGAN x2plus over each eligible clip, one frame at a time, then fits the result to the canvas | Nothing: its one 64 MB file downloads itself the first time the engine loads |
-| **`rtx_vsr`** | NVIDIA RTX Video Super Resolution: the same upscaler an RTX card applies to browser video, x2, then fitted to the canvas | An NVIDIA RTX card. Its ~540 MB NVIDIA package installs itself the first time it runs (below) |
+| **`rtx_vsr`** | NVIDIA RTX Video Super Resolution: the same upscaler an RTX card applies to browser video, x2, then fitted to the canvas | An NVIDIA RTX card, and one pip line you run first for its ~540 MB NVIDIA package (below) |
 
 **Those are the ones that ship.** The dropdown is built from the pack's live upscale
 registry, so a new engine would appear by itself the day one ships. Today the list
@@ -109,34 +109,34 @@ edges -- so it is the canonical graph's default, while every NVIDIA workflow
 selects `rtx_vsr` (since 2026-10-15). First published with it on the RTX 4060
 on 2026-10-16: AnimateDiff episodes upscaled clip by clip.
 
-**The install happens by itself.** Its models ship inside NVIDIA's own
-package, `nvidia-vfx`, so there is no checkpoint to fetch. The first time the
-engine loads on an NVIDIA card -- which means a workflow picked it; only the
-NVIDIA workflows do -- it runs `pip install nvidia-vfx` into ComfyUI's own
-Python, once, and carries on. It is not a requirements.txt line, so it never
-lands on an AMD, Intel or Mac machine.
-
-It needs an RTX card (Turing, the RTX 20 series, or newer) and NVIDIA driver
-570.65 or later on Windows, per NVIDIA's own package notes. It is about
-540 MB, Windows and Linux x86-64 only, under NVIDIA's licence; running an
-NVIDIA workflow on an NVIDIA card is taken as accepting it, as you did for the
-driver. It skips the download where it could not help: a card older than
-Turing (a GTX 10-series, say), ARM Linux, macOS, or Python older than 3.12.
-If ComfyUI's Python has no pip (some ComfyUI Desktop installs use uv), it
-installs with `uv pip` instead. If an install fails, the whole pip output is in
-the ComfyUI log, and the server does not retry until it restarts. To install it
-ahead of time, or on a machine whose first run is offline, run this with
-ComfyUI's own Python:
+**You install its package, once.** Its models ship inside NVIDIA's own
+package, `nvidia-vfx`, so there is no checkpoint to fetch -- and the pack does
+not fetch the package either. Until 2.3.44 the engine ran `pip install` itself
+the first time an NVIDIA workflow picked it; the Comfy Registry's standards
+forbid a node pack installing packages at run time, and the registry flagged
+the pack for it, so the install is yours. Run this once with ComfyUI's own
+Python (the `python.exe` inside its venv or `python_embeded` folder):
 
 ```
 pip install "nvidia-vfx>=0.2,<0.3"
 ```
 
-Budget about 1.1 GB of disk the first time: the 540 MB package plus pip's
-cached copy of it.
+If ComfyUI's Python has no pip (some ComfyUI Desktop installs use uv), the
+same line works as `uv pip install --python <that python> "nvidia-vfx>=0.2,<0.3"`.
+It is not a requirements.txt line, so it never lands on an AMD, Intel or Mac
+machine by itself.
+
+It needs an RTX card (Turing, the RTX 20 series, or newer) and NVIDIA driver
+570.65 or later on Windows, per NVIDIA's own package notes. It is about
+540 MB, Windows and Linux x86-64 only, under NVIDIA's licence, which you
+accept by installing it. Where it could not run anyway -- a card older than
+Turing (a GTX 10-series, say), ARM Linux, macOS, or Python older than 3.12 --
+the engine's refusal says so instead of pointing you at the install.
+
+Budget about 1.1 GB of disk: the 540 MB package plus pip's cached copy of it.
 
 **It never costs you an episode.** If `rtx_vsr` cannot run where you picked
-it -- the install failed, the card is AMD or an older GTX, the machine is a
+it -- the package is not installed, the card is AMD or an older GTX, the machine is a
 Mac --
 the composite says why in the log and in its report line, and finishes the
 episode with `off`. The upscaler is the last stage of a run; everything before
@@ -228,8 +228,8 @@ Every NVIDIA workflow sets `upscale_engine` to `rtx_vsr` on `cuda` (operator,
 2026-10-15: "every nvidia lane to 1080p"). Several NVIDIA lanes render well
 under 1920x1080 -- 832x480 for HuMo and the 8 GB LTX 2.5 lanes, 512x288 for
 LTX 0.9.8 -- and that is where super-resolution earns its few milliseconds a
-frame. It installs its package itself on the first run, and it cannot cost
-the episode: if that install fails, the card cannot run it, or it fails
+frame. Its package is one pip line you run first, and it cannot cost the
+episode: if the package is missing, the card cannot run it, or it fails
 partway through a clip, the composite logs a warning and uses `off` instead.
 
 The canonical graph and every non-NVIDIA workflow keep `off`, and that is the

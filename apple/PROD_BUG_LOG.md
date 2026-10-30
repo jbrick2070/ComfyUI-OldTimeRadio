@@ -17418,3 +17418,43 @@ not promote it to the Bug Bible on this evidence alone.
   Pinned in tests/test_scifi_news_pro_post_coda_announcer.py (the refused
   draft rebuilt from the heartbeats and line number).
 - status: FIXED in code; live proof is the next news-bank leg on the 8 GB writer.
+
+## PBUG-20261030-01 -- the registry flagged 2.3.34/2.3.35 "code-install": rtx_vsr pip-installed its SDK at load
+- evidence: `GET api.comfy.org/nodes/comfyui-old-time-radio/versions?include_status_reason=true`,
+  read 2026-10-30. 2.3.34 and 2.3.35 Flagged `policy-v0.7: code-install` (by
+  drltdata@comfy.org, after an earlier `policy-v0.6: reflag-pending-review`);
+  2.3.36-2.3.43 Flagged `policy-v0.7: reflag-pending-review` with no verdict
+  yet; 2.3.44 Pending; 2.3.20 (2026-10-01) the newest Active. The published
+  2.3.35 and 2.3.44 zips both carry `nodes/_otr_upscale_engines/eng_rtx_vsr.py`
+  with `_pip_install_nvidia_vfx` spawning `[sys.executable, "-m", "pip",
+  "install", ...]` (and a `uv pip` fallback) from `load()`, byte-identical
+  between them. docs.comfy.org/registry/standards: "Runtime package
+  installation through subprocess calls is not permitted." The scan replica
+  read 0 findings on every one of these versions because it models the
+  lexical YARA pass only; the registry also runs a pylint pass (rule
+  `subprocess-pip-install`, severity high, seen in Auto-TensorRT-RIFE's
+  structured verdict) and the policy review that writes the class verdict.
+  `reflag-pending-review` is the queue state every flagged pack gets before
+  its verdict (kjnodes 1.5.3 and rgthree-comfy carried the same words this
+  month), not a finding of its own.
+- cause: `509e88bc` (2026-10-15) made the engine install `nvidia-vfx` itself on
+  first load so an NVIDIA workflow needed no extra step. A node pack installing
+  a package at run time is a registry standards violation whatever the package,
+  and the reviewer read through the pack's spawn boundary (`otr_proc.run`) to
+  find it. The file-access verdicts on 2.3.21-2.3.33 (PBUG-20261018-01) were
+  fixed by 2.3.34; this was the one class left, and it shipped unchanged in
+  every version from 2.3.29 to 2.3.44.
+- fix: the install path is gone. `load()` imports the SDK the user installed
+  and otherwise refuses (`EngineUnusable`; the composite degrades to `off`)
+  naming the one pip line, `INSTALL_HINT`; the hardware refusals still run
+  first so a CPU, AMD, Mac or GTX box hears its real reason. The `uv` entry left
+  the spawn allowlist with the installer. The scan replica gained the two rules
+  this exposed: `__import__(` (YARA `$import_func_direct`) and an AST model of
+  the pylint `subprocess-pip-install` rule, so a run-time pip anywhere in the
+  shipped set fails `tests/test_registry_scan_oracle_clean.py` before a
+  publish. Provisioning lane `pip_at_load` became `pip_manual` (the dropdown
+  matrix now says **manual** for `rtx_vsr`), and every document that said the
+  engine installs itself now says the user does, with the pip line.
+- status: FIXED in code; live proof is the registry's verdict on the next
+  published version (a clean automated scan auto-Actives -- 22 packs did so in
+  October -- and a flagged one waits for the reviewer's `reviewed-safe`).

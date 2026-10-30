@@ -121,7 +121,7 @@ You never need all the weights in this workflow. One workflow ships; the dropdow
 |---|---|---|---|---|---|---|---|
 | `off` | nothing | -- | **proven** | **proven** | **proven** | ? | ? |
 | `spandrel_esrgan` | **auto** | 0.1 GiB | fits | **proven** | measured | ? | ? |
-| `rtx_vsr` | **auto** | 0.5 GiB | measured | ? | not offered | not offered | not offered |
+| `rtx_vsr` | manual | 0.5 GiB | measured | ? | not offered | not offered | not offered |
 
 **Writer (the LLM that writes the script)**
 
@@ -136,12 +136,13 @@ You never need all the weights in this workflow. One workflow ships; the dropdow
 | `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 22.8 GiB | **no** | **proven** | **no** | ? | ? |
 | `Qwen/Qwen3.8-27B` | **auto** | 51.7 GiB | **no** | **24 GB+** | **no** | ? | ? |
 
-**How you get the weights.** Four things do the fetching for an **auto** row, and
+**How you get the weights.** Three things do the fetching for an **auto** row, and
 none of them is a script you have to run: the engine's own library pulls it
 through the Hugging Face cache, `OTR_WorkflowValidator` -- a node inside the
-workflow -- downloads it at queue time, the engine fetches its own pinned file
-when it loads (Real-ESRGAN), or it pip-installs its own runtime package when it
-loads on hardware that can use it (NVIDIA RTX VSR). A **manual** row may still have a helper in
+workflow -- downloads it at queue time, or the engine fetches its own pinned file
+when it loads (Real-ESRGAN). NVIDIA RTX VSR is a **manual** row on purpose: its
+`nvidia-vfx` package is a `pip install` you run into ComfyUI's Python, because a
+node pack may not install packages at run time (Comfy Registry standards). A **manual** row may still have a helper in
 `scripts/`, but `scripts/` is not in the registry bundle, so from a normal
 install it is a step you take by hand and it is labelled as one.
 

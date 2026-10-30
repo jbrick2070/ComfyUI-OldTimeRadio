@@ -95,9 +95,6 @@ ALLOWED_EXECUTABLES = {
     # the list of things the pack runs.
     "vm_stat": "macOS free memory (page counts) for the motion budget",
     "sysctl": "macOS physical RAM (hw.memsize) for the unified-memory budget",
-    # rtx_vsr's first-load install of NVIDIA's nvidia-vfx wheel, on a
-    # ComfyUI venv with no pip module and uv shipped as its own executable.
-    "uv": "rtx_vsr installs nvidia-vfx through uv when the venv has no pip",
 }
 
 #: basename PREFIX -> why. For tools whose PACKAGING puts a version or a

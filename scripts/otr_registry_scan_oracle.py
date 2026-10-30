@@ -18,9 +18,16 @@ Calibrated against measured verdicts from the 2026-09-05 scanner research:
 
 The patterns below are the twelve identifiers the registry reported against
 OTR alpha.21, plus the conservative supersets artokun's public replica proved
-necessary (e.g. reads count on the socket rule). This is a MODEL of a private
-rule, so it errs toward over-reporting: a hit here is a line to fix, and a clean
-run here is necessary but not a guarantee.
+necessary (e.g. reads count on the socket rule). Two more joined on 2026-10-30,
+read off the structured verdicts the registry now writes for other packs:
+``__import__(`` (YARA ``$import_func_direct``, python_bytecode_manipulation)
+and a run-time ``pip install`` spawned from Python -- the registry's second,
+pylint-based pass reports that as ``subprocess-pip-install`` (severity high),
+and because it is an AST check it is modelled below as one, on raw source.
+That second rule is the one that earned OTR 2.3.34 and 2.3.35 a
+``policy-v0.7: code-install`` verdict (PBUG-20261030-01). This is a MODEL of
+private rules, so it errs toward over-reporting: a hit here is a line to fix,
+and a clean run here is necessary but not a guarantee.
 
 Usage:
     python scripts/otr_registry_scan_oracle.py            # scan the packed set
@@ -56,7 +63,58 @@ RULES = [
     ("$subprocess_direct",
      re.compile(r"subprocess\.(?:Popen|run|call|check_output|check_call)\s*\(|os\.system\s*\("),
      "subprocess.<spawn>( / os.system("),
+    # --- python_bytecode_manipulation (import evasion) ---
+    # Read 2026-10-30 off the registry's structured verdicts (rgthree-comfy,
+    # ComfyUI-DistorchMemoryManager): `__import__(` matches $import_func_direct.
+    ("$import_func_direct", re.compile(r"__import__\s*\("), "__import__("),
 ]
+
+_PIP_SHELL_RE = re.compile(r"\bpip\s+install\b")
+_SPAWN_CALLEES = {"run", "Popen", "call", "check_call", "check_output", "system", "popen"}
+
+
+def _pip_install_spawns(rel: str, raw: str) -> list:
+    """The registry's pylint-scanner rule ``subprocess-pip-install``, modelled.
+
+    An AST check, not a lexical one: it fires on a call whose arguments spell a
+    pip install -- an argv list carrying ``"pip"`` and then ``"install"`` as
+    separate elements, or a spawn-named callee (run, Popen, call, check_call,
+    check_output, system, popen) handed a string containing ``pip install``.
+    Any callee counts for the argv shape, because this pack spawns through its
+    own boundary (``otr_proc.run``) and the reviewer read through it. An error
+    message that merely quotes a pip line is neither shape and does not fire.
+    """
+    import ast
+    try:
+        tree = ast.parse(raw)
+    except SyntaxError:
+        return []
+    raw_lines = raw.splitlines()
+    out = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        hit = False
+        for arg in node.args:
+            if isinstance(arg, (ast.List, ast.Tuple)):
+                words = [e.value for e in arg.elts
+                         if isinstance(e, ast.Constant) and isinstance(e.value, str)]
+                if "pip" in words and "install" in words[words.index("pip"):]:
+                    hit = True
+            elif isinstance(arg, ast.Constant) and isinstance(arg.value, str) \
+                    and _PIP_SHELL_RE.search(arg.value):
+                fn = node.func
+                callee = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+                if callee in _SPAWN_CALLEES:
+                    hit = True
+        if hit:
+            out.append({
+                "file": rel, "line": node.lineno, "rule": "$subprocess_pip_install",
+                "label": "a pip install spawned at run time (pylint subprocess-pip-install)",
+                "text": (raw_lines[node.lineno - 1].strip()
+                         if node.lineno <= len(raw_lines) else "")[:100],
+            })
+    return out
 
 _CODE_EXT = {".py", ".pyw", ".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"}
 _DATA_EXT = {".json", ".md", ".txt", ".yaml", ".yml", ".cfg", ".ini", ".toml"}
@@ -171,6 +229,8 @@ def scan(all_tracked: bool = False):
             raw = p.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
+        if ext in {".py", ".pyw"}:
+            findings.extend(_pip_install_spawns(rel, raw))
         scanned = _blank_line_comments(raw, ext)
         lines = scanned.splitlines()
         raw_lines = raw.splitlines()

@@ -303,12 +303,24 @@ different proof.
 * **Delete `v2.0-alpha`.** Unblocked: 2.1.1 is Active, the registry icon points
   at `/main/`, and the last live pin -- the RunPod bootstrap `curl` in
   RUNPOD_INSTALL -- moved to `/main/` on 2026-09-25. One click, his.
-* **Flagged registry versions.** All 30 versions from 2.3.21 to 2.3.43 are
-  Flagged, and 2.3.20 (2026-10-01) is the newest Active one (read 2026-10-29).
-  `?include_status_reason=true` gives 2.3.43's reason as
-  `policy-v0.7: reflag-pending-review`, set by a Comfy-Org admin. That is a
-  manual review queue on their side, not a code finding. His Discord, not a
-  code change.
+* **Flagged registry versions -- diagnosed 2026-10-30, and it IS a code
+  finding.** Every registry version from 2.3.21 to 2.3.43 is Flagged (21 of
+  them; 2.3.41 and 2.3.42 never appeared on the registry), 2.3.20
+  (2026-10-01) is the newest Active one, and 2.3.44 is Pending. Read with
+  `?include_status_reason=true`, the verdicts come in two eras. 2.3.21-2.3.33
+  carry `policy-v0.6` class verdicts (arbitrary-file-read, -write,
+  path-traversal, information-disclosure) that PBUG-20261018-01 fixed by
+  2.3.34. 2.3.34 and 2.3.35 carry `policy-v0.7: code-install`: `rtx_vsr` ran
+  `python -m pip install nvidia-vfx` at load, which the registry's published
+  standards forbid ("runtime package installation through subprocess calls is
+  not permitted"). 2.3.36-2.3.43 sit at `policy-v0.7: reflag-pending-review`,
+  the queue state every flagged pack gets before its verdict (kjnodes 1.5.3
+  and rgthree-comfy got the same words this month), and every one of them
+  still shipped that install. PBUG-20261030-01 removes it: the user
+  pip-installs the SDK, every refusal names the line, the composite still
+  degrades to `off`. The next release carries the fix. A clean automated scan
+  auto-Actives (22 packs did in October); a flagged one waits for the
+  reviewer, whose last pass over OTR stopped at 2.3.35.
 * **Comfy Desktop's registry Install is intermittent** (PBUG-20260925-01: a
   green "installed" toast and nothing on disk, twice; then fine). Not ours to
   fix; worth telling Comfy-Org, with the 4060's timeline. His Discord.
@@ -513,8 +525,10 @@ two lanes that ran.
 **What changed since, and why the rerun is worth more now:** `232e372d`
 (2026-10-15) moved the three 8 GB LTX 2.5 lanes to a single stage decoded at
 832x480, not yet proven on a leg, and `ece6ed34` put every NVIDIA workflow on
-`rtx_vsr`, which installs `nvidia-vfx` itself on first load (`509e88bc`,
-`dd889dcc`). Rerun from current main, not 2.3.26: legs 1-2 again (rtx_vsr is
+`rtx_vsr`, which until 2.3.44 installed `nvidia-vfx` itself on first load
+(`509e88bc`, `dd889dcc`; the install left on 2026-10-30, PBUG-20261030-01, so
+the 4060 runs `pip install "nvidia-vfx>=0.2,<0.3"` once before these legs).
+Rerun from current main, not 2.3.26: legs 1-2 again (rtx_vsr is
 new on them), then legs 3-7 once the weights decision is made.
 
 ### 0. Voice-route deletion -- DONE 2026-09-26 (`88211ed2`), proven live
