@@ -302,7 +302,9 @@ av>=17.0.0
 # pypi.nvidia.com (NVIDIA's proprietary licence). The marker names the
 # platforms NVIDIA publishes wheels for -- Windows x86-64 and Linux x86-64 --
 # because the stub fails the whole all-or-nothing install anywhere else
-# (macOS, Linux on ARM, Windows on ARM): the pycairo lesson above, again. An
+# (macOS, Linux on ARM; Windows on ARM is left out by choice -- NVIDIA's
+# win_arm64 wheels start at Python 3.11 and no ARM Windows box carries an RTX
+# card): the pycairo lesson above, again. An
 # AMD or Intel x86-64 box does receive it and the engine refuses there by
 # hardware reason, so the composite falls back to off. Range pinned to the 0.2
 # line measured on the RTX 4060 (`eng_rtx_vsr.REQUIREMENT`). Mirrored in

@@ -105,8 +105,10 @@ def _hardware_blocker(torch, dev):
     """Why RTX VSR cannot run on this host, or ``""``. Read when the SDK is
     missing, so the refusal names the real reason rather than the absent
     package: the wheel is win_amd64 / manylinux x86-64, built for CPython 3.10
-    and 3.11 and abi3 from 3.12 (pypi.nvidia.com, read 2026-10-30), and the
-    effect needs sm_75+. (GTX 16xx is Turing without tensor cores and
+    and 3.11 and abi3 from 3.12 (pypi.nvidia.com, read 2026-10-30; the
+    win_arm64 wheels from 3.11 are left out here and in the requirements
+    marker alike), and the effect needs sm_75+. The card half is asked again
+    after the SDK imports, by `_card_blocker`. (GTX 16xx is Turing without tensor cores and
     passes this check; the load probe catches it.)"""
     import platform
     import sys
@@ -115,9 +117,22 @@ def _hardware_blocker(torch, dev):
         return f"nvidia-vfx ships for Windows/Linux x86-64 only ({sys.platform} {machine})"
     if sys.version_info < (3, 10):
         return "nvidia-vfx needs Python 3.10 or newer (this is %d.%d)" % sys.version_info[:2]
+    return _card_blocker(torch, dev)
+
+
+def _card_blocker(torch, dev, *, unreadable_is_blocker=True):
+    """Why THIS CARD cannot run RTX VSR, or ``""``: the capability floor and
+    the GTX tell. Asked again after the SDK imports (Codex review of
+    8667ab55c): with the wheel a declared dependency, a GTX 10-series box has
+    ``nvvfx`` installed, and its refusal must still name the card rather than
+    the SDK's own load error. A card whose capability cannot be READ is a
+    blocker only before the import (the hint would send a box we know nothing
+    about to install a wheel); after it, the SDK's own load probe decides."""
     try:
         cap = tuple(torch.cuda.get_device_capability(dev))
     except Exception as exc:  # noqa: BLE001 -- an unreadable card is still a refusal
+        if not unreadable_is_blocker:
+            return ""
         return f"could not read the card's compute capability ({type(exc).__name__}: {exc})"
     if cap < MIN_COMPUTE_CAPABILITY:
         return ("this card is compute capability %d.%d; RTX VSR needs %d.%d "
@@ -286,6 +301,11 @@ class RtxVsr:
             raise self._refuse(EngineUsabilityReason.MISSING_MODEL,
                                f"the nvidia-vfx package is not usable here "
                                f"({type(exc).__name__}: {exc})")
+        card = _card_blocker(torch, dev, unreadable_is_blocker=False)
+        if card:
+            # The SDK is present and importable and the card still cannot run
+            # it: the refusal names the card (Codex review of 8667ab55c).
+            raise self._refuse(EngineUsabilityReason.INCOMPATIBLE_PROFILE, card)
         quality = _quality()
         if quality not in getattr(nvvfx.QualityLevel, "__members__", {}):
             raise self._refuse(

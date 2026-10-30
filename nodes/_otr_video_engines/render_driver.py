@@ -953,11 +953,16 @@ def _trusted_still_source(candidate, stills_root) -> bool:
         if not text:
             return False
         try:
-            from .._otr_paths import is_remote_path
+            from .._otr_paths import _refuse_by_text, is_remote_path
         except ImportError:  # pragma: no cover -- flat (sys.path) load
-            from _otr_paths import is_remote_path  # type: ignore
+            from _otr_paths import _refuse_by_text, is_remote_path  # type: ignore
         if is_remote_path(text):
             return False
+        # The same text refusals as every confined sink (Codex review of
+        # 8667ab55c): a `..` segment or an alternate stream named a file inside
+        # the tree that no listing would, and realpath normalised the first
+        # away. Refused by text first; the raise lands in the catch-all below.
+        _refuse_by_text(text, "still source")
         # BOTH SIDES REALPATH'D, symmetrically. Comparing `realpath(value)` to
         # `abspath(root)` is identical on a plain tree and WRONG behind a
         # junction, a symlink or a `subst` drive -- there every legitimate pool

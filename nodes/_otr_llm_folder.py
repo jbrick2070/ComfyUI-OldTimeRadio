@@ -188,9 +188,17 @@ def _receipt(folder: Path) -> Optional[dict]:
     except ImportError:  # pragma: no cover -- flat (sys.path) load
         from _otr_paths import confined_or_empty  # type: ignore
     root = str(folder)
-    for rel in files:
-        if not isinstance(rel, str) or not confined_or_empty(rel, roots=[root], base=root):
+    cleaned = {}
+    for rel, size in files.items():
+        confined = (confined_or_empty(rel, roots=[root], base=root)
+                    if isinstance(rel, str) else "")
+        if not confined:
             return None
+        # THE CONFINED SPELLING IS THE ONE THE CALLER USES (Codex review of
+        # 8667ab55c): a key with trailing whitespace validated as its stripped
+        # sibling and was then stat'ed as typed.
+        cleaned[os.path.relpath(confined, root).replace(os.sep, "/")] = size
+    data["files"] = cleaned
     return data
 
 

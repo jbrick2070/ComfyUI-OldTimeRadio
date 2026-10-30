@@ -389,7 +389,7 @@ try:
 
     #: An absolute local path TOKEN wherever it sits in a string: a `file:`
     #: URI, `C:\...` / `C:/...`, the UNC `\\host\share\...`, a drive-less
-    #: `\Users\...`, and a POSIX `/a/b`. Matched as a SUBSTRING (registry
+    #: `\Users\...`, a `..\x` run, and a POSIX `/a/b`. Matched as a SUBSTRING (registry
     #: review, 2026-10-30): the earlier whole-value match left a path verbatim
     #: whenever prose, an exception message, a file: URI or a second line
     #: carried it, and this route is unauthenticated. A token ends at
@@ -407,6 +407,7 @@ try:
         r"|(?<![A-Za-z])[A-Za-z]:[\\/][^\s\"<>|]*"
         r"|\\\\[^\s\"<>|]+"
         r"|(?<![A-Za-z0-9\\])\\(?!\\)[^\s\"<>|\\/]+[\\/][^\s\"<>|]*"
+        r"|(?<![A-Za-z0-9_.\\/])(?:\.\.[\\/])+[^\s\"<>|]*"
         r"|(?<![/\w])/(?!/)(?:[^\s\"<>|/]+/)+[^\s\"<>|/]*)"
         r"(?:[ \t]+[^\s\"<>|\\/]*[\\/][^\s\"<>|]*)*")
 

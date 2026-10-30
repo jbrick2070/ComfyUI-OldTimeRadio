@@ -97,8 +97,10 @@ def test_declared_as_a_dependency_for_the_platforms_nvidia_builds_it_for():
     (2026-10-30), with the engine's own range, under a marker that names the
     wheels pypi.nvidia.com publishes: win_amd64 and manylinux x86_64. The PyPI
     entry is a wheel-stub that fails the whole install anywhere else, so the
-    marker is what keeps a Mac, an ARM Linux or a Windows-on-ARM install
-    alive; an x86-64 AMD box receives it and the engine refuses by hardware."""
+    marker is what keeps a Mac or an ARM Linux install alive (Windows on ARM
+    is left out by choice: NVIDIA's win_arm64 wheels start at Python 3.11 and
+    no ARM Windows box carries an RTX card); an x86-64 AMD box receives it
+    and the engine refuses by hardware."""
     from packaging.requirements import Requirement
     reqs, found = _declared_nvidia_vfx()
     assert set(reqs) == {"requirements.txt", "pyproject.toml"}, found
@@ -481,6 +483,23 @@ def test_a_pre_turing_card_without_the_sdk_hears_the_real_reason(monkeypatch):
     with pytest.raises(EngineUnusable, match="Turing") as exc:
         V.RtxVsr().load(torch.device("cuda:0"))
     assert "pip install" not in str(exc.value)     # it could not use the wheel
+
+
+def test_a_pre_turing_card_with_the_sdk_installed_still_hears_the_card(monkeypatch):
+    """Codex review of 8667ab55c: with the wheel a declared dependency, a GTX
+    10-series box has nvvfx installed, so the card check must run after the
+    import too, or the refusal names the SDK's own load error."""
+    import platform
+    _fake_nvvfx(monkeypatch)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.version, "hip", None, raising=False)
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda d=None: (6, 1))
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda d=None: "NVIDIA GeForce GTX 1080")
+    monkeypatch.setattr(platform, "machine", lambda: "AMD64")
+    monkeypatch.setattr(sys, "platform", "win32")
+    with pytest.raises(EngineUnusable, match="Turing"):
+        V.RtxVsr().load(torch.device("cuda:0"))
+    assert _FakeEffect.instances == []          # the SDK was never asked to load
 
 
 def test_an_arm_or_mac_host_without_the_sdk_hears_the_real_reason(monkeypatch):

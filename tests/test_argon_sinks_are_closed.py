@@ -120,6 +120,25 @@ def test_a_receipt_key_outside_its_folder_is_no_receipt(tmp_path):
     assert LF._receipt(folder) is None
     receipt({"model.safetensors": 10, "config.json": 2})
     assert LF._receipt(folder) is not None
+    # the confined spelling is the one handed on (Codex review of 8667ab55c)
+    receipt({"config.json\n": 2, "model.safetensors": 10})
+    got = LF._receipt(folder)
+    assert got is not None and set(got["files"]) == {"config.json", "model.safetensors"}
+
+
+def test_the_still_cache_probe_refuses_by_text_before_it_reads(tmp_path):
+    """Codex review of 8667ab55c: the probe realpath'd a `..` segment away and
+    never asked the text questions every confined sink asks."""
+    import inspect
+    from nodes._otr_video_engines import render_driver as RD
+    assert '_refuse_by_text(text, "still source")' in inspect.getsource(RD._trusted_still_source)
+    stills = tmp_path / "otr" / "episodes" / "ep" / "stills"
+    stills.mkdir(parents=True)
+    png = stills / "x.png"
+    png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 200)
+    assert RD._trusted_still_source(str(png), str(stills)) is True
+    assert RD._trusted_still_source(str(stills / ".." / "stills" / "x.png"), str(stills)) is False
+    assert RD._trusted_still_source(str(png) + ":stream", str(stills)) is False
 
 
 # --- RANK 8 ---------------------------------------------------------------- #
@@ -165,6 +184,9 @@ def test_the_ledger_route_scrubs_a_path_wherever_it_sits():
     assert scrub("9C:" + b + "Users" + b + "jeffr" + b + "x.wav") == "9x.wav"
     assert scrub(b + "Users" + b + "jeffr" + b + "x.wav") == "x.wav"
     assert scrub("from C:" + b + "a" + b + "b.wav to D:" + b + "c" + b + "d.wav") == "from b.wav to d.wav"
+    # a relative run of `..` is a path too (Codex review of 8667ab55c)
+    assert scrub(".." + b + ".." + b + "Users" + b + "jeffr" + b + "secret.wav") == "secret.wav"
+    assert scrub("see ../../Users/jeffr/x.wav now") == "see x.wav now"
 
 
 # --- RANK 10 --------------------------------------------------------------- #

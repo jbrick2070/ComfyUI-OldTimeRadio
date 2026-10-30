@@ -129,16 +129,17 @@ python -m pip install "nvidia-vfx>=0.2,<0.3"
 
 If ComfyUI's Python has no pip (some ComfyUI Desktop installs use uv), the
 same line works as `uv pip install --python <that python> "nvidia-vfx>=0.2,<0.3"`.
-The marker keeps it off macOS, Linux on ARM and Windows on ARM, where NVIDIA
-publishes no wheel and the install would fail outright; an AMD or Intel x86-64
-box does download it (about 540 MB) and the engine refuses there by hardware
-reason, so the composite falls back to `off`.
+The marker keeps it off macOS and Linux on ARM, where NVIDIA publishes no
+wheel and the install would fail outright, and off Windows on ARM by choice
+(NVIDIA's ARM wheels start at Python 3.11, and no ARM Windows box carries an
+RTX card); an AMD or Intel x86-64 box does download it (about 540 MB) and the
+engine refuses there by hardware reason, so the composite falls back to `off`.
 
 It needs an RTX card (Turing, the RTX 20 series, or newer) and NVIDIA driver
 570.65 or later on Windows, per NVIDIA's own package notes. It is about
 540 MB, Windows and Linux x86-64 only, under NVIDIA's licence, which you
 accept by installing it. Where it could not run anyway -- a card older than
-Turing (a GTX 10-series, say), ARM Linux, macOS, or Python older than 3.12 --
+Turing (a GTX 10-series, say), ARM Linux, macOS, or Python older than 3.10 --
 the engine's refusal says so instead of pointing you at the install.
 
 Budget about 1.1 GB of disk: the 540 MB package plus pip's cached copy of it.
