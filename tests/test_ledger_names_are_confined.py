@@ -64,3 +64,22 @@ def test_the_writer_download_never_fetches_code():
     ])
     assert got == {"tokenizer.json", "tokenizer.model", "tokenizer.model.v3",
                    "model.safetensors", "config.json", "README.md"}
+
+
+def test_a_mixed_hash_does_not_keep_shaping_the_still_name(tmp_path, monkeypatch):
+    """Codex review of 502aeeda6: stripping the non-hex characters let
+    `zzabcdef123456` still choose the suffix `abcdef123456`. A digest is hex
+    as a WHOLE, or the row gets the source's own."""
+    from nodes._otr_video_engines import render_driver as RD
+    stills = tmp_path / "otr" / "episodes" / "ep1" / "stills"
+    stills.mkdir(parents=True)
+    src = tmp_path / "otr" / "episodes" / "_shared" / "cache" / "src.png"
+    src.parent.mkdir(parents=True)
+    src.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 80)
+    monkeypatch.setattr(RD, "_trusted_still_source",
+                        lambda candidate, root: candidate == str(src))
+    out = RD._still_spine_materialize_row(
+        {"object_id": "x", "path": str(src), "content_hash": "zzabcdef123456"}, str(stills))
+    assert Path(out).name != "x_abcdef123456.png"
+    assert Path(out).name == "x_%s.png" % __import__("hashlib").sha256(
+        str(src).encode("utf-8")).hexdigest()[:12]

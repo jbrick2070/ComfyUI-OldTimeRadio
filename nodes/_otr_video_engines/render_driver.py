@@ -1029,10 +1029,12 @@ def _still_spine_materialize_row(row, stills_root):
     # against `root`, since a junction sitting AT the stills folder resolves
     # both sides to the same outside place -- before the copy. A
     # refusal degrades loud to "absent" like any other unusable row (Law 7).
-    content_hash = re.sub(r"[^0-9A-Fa-f]", "", str(
+    content_hash = str(
         row.get("content_hash") or row.get("sha256") or row.get("hash") or ""
-    ))
-    if len(content_hash) < 12:
+    ).strip()
+    if not re.fullmatch(r"[0-9A-Fa-f]{12,}", content_hash):
+        # Whole-string, not stripped (Codex review of 502aeeda6): a mixed
+        # value must not keep shaping the name through its hex remainder.
         content_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
     try:
         from .._otr_paths import confine_to_output_tree as _confine_write

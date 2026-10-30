@@ -188,3 +188,34 @@ def test_child_inside_follows_the_link_not_the_name(tmp_path, outside):
     if not _link_file(outside / "away.txt", tmp_path / "link.txt"):
         pytest.skip("this box cannot create a file symlink")
     assert not child_inside(tmp_path / "link.txt", tmp_path)
+
+
+def test_two_sources_without_a_digest_never_share_a_name(tmp_path):
+    """Codex review of 502aeeda6: the `nodigest` fallback collided, so the
+    second source kept the first one's bytes. The fallback is the source's
+    own digest."""
+    from nodes import otr_image_gen_dispatcher as D
+    ep_dir = tmp_path / "otr" / "episodes" / "ep1" / "stills"
+    ep_dir.mkdir(parents=True)
+    a = tmp_path / "a.png"
+    b = tmp_path / "b.png"
+    a.write_bytes(b"\x89PNG a")
+    b.write_bytes(b"\x89PNG b")
+    da = Path(D._materialize_episode_copy(str(a), str(ep_dir), "same", ""))
+    db = Path(D._materialize_episode_copy(str(b), str(ep_dir), "same", "x"))
+    assert da != db and da.read_bytes() == b"\x89PNG a" and db.read_bytes() == b"\x89PNG b"
+    mixed = Path(D._materialize_episode_copy(str(a), str(ep_dir), "m", "zzabcdef123456"))
+    assert mixed.name != "m_abcdef123456.png"
+
+
+def test_a_refused_still_destination_degrades_at_every_fail_soft_site():
+    """Codex review of 502aeeda6: the materialization callers caught only
+    OSError, so a confinement refusal (ImageRenderError, a ValueError for the
+    manifest leaf) aborted the dispatch instead of pointing the row at the
+    pool copy, as their own warnings advertise."""
+    import inspect
+    from nodes import otr_image_gen_dispatcher as D
+    src = inspect.getsource(D)
+    assert src.count("except (OSError, ImageRenderError) as exc:") == 2
+    assert "except (OSError, ValueError) as exc:        # ValueError: a refused leaf" in src
+    assert "except OSError as exc:\n        ctx[\"warnings\"].append(" not in src

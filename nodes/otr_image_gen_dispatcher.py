@@ -762,7 +762,14 @@ def _materialize_episode_copy(src_path, ep_dir, object_id, content_hash):
     # THE DIGEST IS HEX OR IT IS NOT A DIGEST (registry review, 2026-10-30):
     # `content_hash` is a ledger field too, and its first twelve characters
     # were the filename's tail.
-    digest = re.sub(r"[^0-9A-Fa-f]", "", str(content_hash or ""))[:12] or "nodigest"
+    digest = str(content_hash or "").strip()
+    if not re.fullmatch(r"[0-9A-Fa-f]{12,}", digest):
+        # Not a digest (a placeholder, a stripped remainder): name the copy
+        # by the source's own bytes, so two sources never share a name
+        # (Codex review of 502aeeda6).
+        with open(str(src_path), "rb") as _fh:
+            digest = hashlib.sha256(_fh.read()).hexdigest()
+    digest = digest[:12]
     dst = os.path.join(str(ep_dir), f"{object_id}_{digest}.png")
     # THE DESTINATION MUST STAY IN THE EPISODE DIR (2026-09-05). `object_id`
     # reaches this f-string from the workflow's own ledger, so a value like
@@ -1404,7 +1411,7 @@ def _commit_minted_still(job, pixels, content_hash, lap, ctx):
     try:
         ep_path = _materialize_episode_copy(
             str(path), ctx["ep_dir"], oid, content_hash)
-    except OSError as exc:
+    except (OSError, ImageRenderError) as exc:   # a refused destination degrades too
         ctx["warnings"].append(
             f"{oid}: episode materialization failed ({exc}); row points "
             "at the pool copy (LOUD)")
@@ -2336,8 +2343,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 try:
                     dst = _materialize_episode_copy(
                         src, ep_dir, oid,
-                        (ref_row or {}).get("portrait_content_hash") or "x")
-                except OSError as exc:
+                        (ref_row or {}).get("portrait_content_hash") or "")
+                except (OSError, ImageRenderError) as exc:   # a refused destination degrades too
                     warnings.append(
                         f"{oid}: episode materialization of cache hit failed "
                         f"({exc}); row points at the pool copy (LOUD)")
@@ -2872,7 +2879,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                                         "stills manifest"), "w",
                       encoding="utf-8") as f:
                 json.dump(manifest, f, ensure_ascii=True, indent=2)
-        except OSError as exc:
+        except (OSError, ValueError) as exc:        # ValueError: a refused leaf
             warnings.append(f"stills_manifest.json write failed ({exc}); "
                             "episode stills are on disk but unindexed (LOUD)")
     # ONE aggregate banana line per dispatch, never per object. A split env

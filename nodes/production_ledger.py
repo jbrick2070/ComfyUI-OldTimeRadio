@@ -698,6 +698,7 @@ def load_replay_manifest(bundle_dir: str) -> Dict[str, Any]:
             raise ReplayBundleError("manifest lists %r twice (case-folded)" % (rel,))
         seen.add(key)
         exact.add(rel)
+        row["path"] = rel          # the verified spelling, for every later reader
         full = os.path.join(bundle, *rel.split("/"))
         if os.path.islink(full):
             raise ReplayBundleError("manifest entry is a link: %r" % (rel,))

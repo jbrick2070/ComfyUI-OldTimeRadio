@@ -180,3 +180,19 @@ def test_a_clean_episode_still_freezes(tmp_path):
     bundle = FZ.freeze(ep, tmp_path / "bundles")
     manifest = PL.load_replay_manifest(str(bundle))
     assert {r["path"] for r in manifest["files"]} >= {"stills/scene_b001.png"}
+
+
+def test_a_dot_prefixed_cards_row_is_admitted_once_and_read_once(tmp_path):
+    """Codex review of 502aeeda6: admission normalized `./cards.json` to
+    `cards.json` and `_read_cards` then compared the raw row. The verified
+    row now carries its canonical spelling."""
+    b = _bundle(tmp_path / "a", cards=True)
+    mpath = b / PL.REPLAY_MANIFEST_NAME
+    manifest = json.loads(mpath.read_text(encoding="utf-8"))
+    for row in manifest["files"]:
+        if row["path"] == PD.CARDS_NAME:
+            row["path"] = "./" + PD.CARDS_NAME
+    mpath.write_text(json.dumps(manifest), encoding="utf-8")
+    loaded = PL.load_replay_manifest(str(b))
+    assert {r["path"] for r in loaded["files"]} >= {PD.CARDS_NAME}
+    assert PD._read_cards(Path(b), loaded)["version"] == PD.CARDS_VERSION
