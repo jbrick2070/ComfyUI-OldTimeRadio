@@ -322,9 +322,14 @@ different proof.
   clean automated scan auto-Actives (22 packs did in October); a flagged one
   waits for the reviewer, whose last pass over OTR stopped at 2.3.35.
 * **2.3.45 is the registry-hardening release -- what it carries, and the
-  backup plan if it is flagged again (2026-10-30).** Nine commits on `main`
-  since 2.3.44, `68d0a1417..8667ab55c`: the run-time pip is gone
-  (`68d0a1417`, `9112ef498`), then "Registry sinks" A-G. Two panels were
+  backup plan if it is flagged again (2026-10-30).** Ten commits on `main`
+  since 2.3.44, `68d0a1417..d2cc6a027`: the run-time pip is gone
+  (`68d0a1417`, `9112ef498`), then "Registry sinks" A-H, where H folds the
+  Sonnet refutation of the pushed diff (the ledger route's scrubber stopped
+  at a space and served a user name, the result download followed a redirect
+  off https, the Google POST path carried the key across a redirect; Codex's
+  first QA pass produced nothing -- OpenAI's safeguard flagged the brief's
+  wording -- and was re-run as the defensive review it is). Two panels were
   asked what else the policy reviewer would flag -- Codex Astra (eleven
   file-access claims) and Gemini Argon (twelve, run by the operator) -- and a
   Sonnet fan-out reproduced every claim against the real files with executed
