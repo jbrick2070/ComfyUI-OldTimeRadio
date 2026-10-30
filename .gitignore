@@ -97,6 +97,8 @@ venv/
 # v2 generated artifacts
 *.mp4
 !assets/*.mp4
+# Demo clips chosen to live beside the contest app (contest/ never ships to the registry).
+!contest/radio-play-studio/media/*.mp4
 
 # --- 2026-04-18 scratch hygiene ---
 # Regression + QC scratch

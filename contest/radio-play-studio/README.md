@@ -11,6 +11,8 @@ with nothing to pay per episode; cloud models are there if you pick them. The ap
 and each model keeps its own license (see License).
 
 > **Demo video (1:53):** https://youtu.be/UeQQeVMaMVs
+>
+> **LogBlaster demo (0:48):** [`media/comfyui_logblaster_demo.mp4`](media/comfyui_logblaster_demo.mp4), the clip shown at the LA ComfyUI Build Night on 2026-10-29: [LogBlaster](https://github.com/jbrick2070/ComfyUI-LogBlaster), the companion pack that plays ComfyUI's live log as a GPU shader HUD while an episode renders.
 
 ```
 browser  ->  Radio Play Studio  ->  Comfy SDK  ->  comfy-api-proxy  ->  your ComfyUI + Old-Time Radio pack
