@@ -36,3 +36,8 @@
 2026-10-29 | Upscale | MiniMax-H3 latent upscaler (core support, LBH-123-AI weights) | WATCH | https://huggingface.co/LBH-123-AI/Minimax_h3_latent_Upscaler
 2026-10-29 | Voice | audio.cpp GGUF collection | WATCH | https://huggingface.co/audio-cpp/audio.cpp-gguf
 2026-10-29 | Image | anima-ref-adapter | SKIP | https://huggingface.co/ElectronGirl/anima-ref-adapter
+2026-10-30 | Voice | VintageVoice (F5-TTS pre-1955 fine-tune) | TEST | https://huggingface.co/AutomatedJanitor/vintage-voice
+2026-10-30 | Voice | Breeze-TTS-2 | SKIP | https://huggingface.co/BreezeBlue/Breeze-TTS-2
+2026-10-30 | Video | Pika H3 Flex (6-step H3 LoRAs) | TEST | https://huggingface.co/Pika-Labs/Pika-H3-Flex
+2026-10-30 | Video | trydrama DRAMA (closed weights) | SKIP | https://huggingface.co/trydrama-neuralgarage/DRAMA
+2026-10-30 | Writer | GPT-1900 / GPT-1905 (mhla) | WATCH | https://huggingface.co/mhla/gpt1900-instruct-v3-sft
