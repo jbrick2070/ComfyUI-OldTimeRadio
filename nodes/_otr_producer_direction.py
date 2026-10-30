@@ -460,7 +460,10 @@ def manifest_digest(bundle_dir: str) -> str:
     (relative to ComfyUI's output folder) and must sit inside the read roots.
     """
     bundle = confine_to_read_roots(bundle_dir, "replay_from")
-    path = os.path.join(bundle, MANIFEST_NAME)
+    # The child too (registry review, 2026-10-30): a link planted at
+    # manifest.json was hashed from wherever it pointed.
+    path = confine_to_read_roots(os.path.join(bundle, MANIFEST_NAME), MANIFEST_NAME,
+                                 roots=[bundle])
     if not os.path.isfile(path):
         raise DirectionError("no %s under %s" % (MANIFEST_NAME, bundle))
     with open(path, "rb") as fh:
@@ -585,11 +588,23 @@ def manifest_producer_fields(direction: Dict[str, Any]) -> Dict[str, Any]:
                      "clips": list(direction["kept"]["clips"])}}
 
 
-def _read_cards(bundle: Path) -> Dict[str, Any]:
+def _read_cards(bundle: Path, manifest: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """The bundle's ``cards.json`` -- a member the manifest lists, so admission
-    has already hashed it -- or a refusal when a producer bundle carries none."""
-    path = os.path.join(str(bundle), CARDS_NAME)
+    has already hashed it -- or a refusal when a producer bundle carries none.
+
+    Both halves are CHECKED (registry review, 2026-10-30): the file is proven
+    inside the bundle before it is opened (a link planted at its name was read
+    from wherever it pointed), and when the verified manifest is given, the
+    name must be among its files[], or admission never hashed it."""
+    if manifest is not None:
+        listed = {str(row.get("path") or "") for row in (manifest.get("files") or [])
+                  if isinstance(row, dict)}
+        if CARDS_NAME not in listed:
+            raise DirectionError("bundle %s's manifest does not list %s, so admission "
+                                 "never hashed it" % (bundle.name, CARDS_NAME))
     try:
+        path = confine_to_read_roots(os.path.join(str(bundle), CARDS_NAME), CARDS_NAME,
+                                     roots=[str(bundle)])
         with open(path, "r", encoding="utf-8") as fh:
             cards = json.load(fh)
     except (OSError, ValueError) as exc:
@@ -1242,7 +1257,7 @@ def admit_prompt_direction(prompt: Any) -> Optional[Dict[str, Any]]:
                 "is %s, the direction names %s)" % (_shown(replay_from), digest[:12],
                                                     direction["source"][:12]))
         _check_image_engines(prompt, manifest, bundle.name)
-        cards = _read_cards(bundle)
+        cards = _read_cards(bundle, manifest)
         check_direction_ids(cards, direction)
         if direction["stage"] in ("video", "publish"):
             # UNPAINTED EDITS (plan, "Validation"): a Video or Publish run films
@@ -1325,7 +1340,9 @@ def producer_replay_needs(prompt: Any) -> Optional[Dict[str, Any]]:
     replay_from = (writers[0][1].get("inputs") or {}).get("replay_from", "") if writers else ""
     try:
         bundle = confine_to_read_roots(str(replay_from or "").strip(), "replay_from")
-        with open(os.path.join(bundle, MANIFEST_NAME), "r", encoding="utf-8") as fh:
+        manifest_path = confine_to_read_roots(os.path.join(bundle, MANIFEST_NAME),
+                                              MANIFEST_NAME, roots=[bundle])
+        with open(manifest_path, "r", encoding="utf-8") as fh:
             manifest = json.load(fh)
     except (OtrPathContractError, OSError, ValueError) as exc:
         raise DirectionError("the bundle in replay_from cannot be read: %s" % exc) from None

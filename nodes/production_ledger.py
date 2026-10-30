@@ -666,7 +666,11 @@ def load_replay_manifest(bundle_dir: str) -> Dict[str, Any]:
     # a bundle may only be read from the approved folders -- the exporter's
     # default is <episodes>/_replay. The confinement refuses a remote path first.
     bundle = _confine_replay(bundle_dir, "replay_from")
-    mpath = os.path.join(bundle, REPLAY_MANIFEST_NAME)
+    # THE CHILD TOO (registry review, 2026-10-30): the bundle directory was
+    # proven, but `manifest.json` is its own leaf, and a link planted there
+    # was opened and parsed from wherever it pointed.
+    mpath = _confine_replay(os.path.join(bundle, REPLAY_MANIFEST_NAME),
+                            "replay manifest", roots=[bundle])
     if not os.path.isfile(mpath):
         raise ReplayBundleError("no %s under %s" % (REPLAY_MANIFEST_NAME, bundle))
     # A CORRUPT MANIFEST IS A REFUSAL LIKE ANY OTHER (Sonnet QA, 2026-10-22).
@@ -684,6 +688,7 @@ def load_replay_manifest(bundle_dir: str) -> Dict[str, Any]:
     if not isinstance(files, list) or not files:
         raise ReplayBundleError("manifest lists no files")
     seen = set()
+    exact = set()
     for row in files:
         if not isinstance(row, dict):
             raise ReplayBundleError("manifest file entry is not an object: %.80r" % (row,))
@@ -692,6 +697,7 @@ def load_replay_manifest(bundle_dir: str) -> Dict[str, Any]:
         if key in seen:
             raise ReplayBundleError("manifest lists %r twice (case-folded)" % (rel,))
         seen.add(key)
+        exact.add(rel)
         full = os.path.join(bundle, *rel.split("/"))
         if os.path.islink(full):
             raise ReplayBundleError("manifest entry is a link: %r" % (rel,))
@@ -718,14 +724,20 @@ def load_replay_manifest(bundle_dir: str) -> Dict[str, Any]:
     # row in files[]; checking these two keys only for SHAPE would let a
     # bundle name a ledger that was never hashed -- swapped after
     # freezing, and the "verified" import would open it anyway. Membership is
-    # case-folded to match the duplicate check above. The exporter always
-    # lists both first, so no bundle the shipped tool produced is refused.
+    # EXACT (registry review, 2026-10-30): it used to be case-folded like the
+    # duplicate check while the import opened the raw spelling, so
+    # `AUDIO/EP_LEDGER.JSON` passed against `audio/ep_ledger.json` and, on a
+    # case-sensitive filesystem, opened a file nobody hashed. The manifest
+    # carries the verified spelling from here on, so every later open and
+    # comparison uses it. The exporter writes the listed spelling, so no
+    # bundle the shipped tool produced is refused.
     for key in ("ledger", "master_audio"):
         rel = _safe_relative(manifest[key])
-        if rel.lower() not in seen:
+        if rel not in exact:
             raise ReplayBundleError(
                 "manifest %r names %r, which is not among its verified files[] "
                 "-- the bundle's %s was never hashed" % (key, rel, key))
+        manifest[key] = rel
     return manifest
 
 
@@ -784,7 +796,8 @@ def import_replay_bundle(bundle_dir: str, new_episode_id: Optional[str] = None) 
     manifest = load_replay_manifest(bundle)
     source_id = str(manifest["source_episode_id"])
     new_id = str(new_episode_id or "").strip() or replay_episode_id(source_id)
-    ledger_path = os.path.join(bundle, *manifest["ledger"].split("/"))
+    ledger_path = _confine_replay(os.path.join(bundle, *manifest["ledger"].split("/")),
+                                  "replay ledger", roots=[bundle])
     with open(ledger_path, "r", encoding="utf-8") as fh:
         source = json.load(fh)
     if not isinstance(source, dict) or not source.get("lines"):

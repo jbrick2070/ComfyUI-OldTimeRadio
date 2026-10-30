@@ -43,6 +43,7 @@ try:
     )
     from ._otr_producer_direction import (CARDS_NAME, MANIFEST_PRODUCER_KEY,
                                           META_IMAGE_ENGINES, META_IMAGE_SEED, build_cards)
+    from ._otr_paths import confine_to_read_roots, is_readable_in_roots
 except ImportError:  # pragma: no cover -- flat (sys.path) load
     from production_ledger import (  # type: ignore
         REPLAY_MANIFEST_NAME, REPLAY_MANIFEST_SCHEMA, ReplayBundleError,
@@ -50,6 +51,7 @@ except ImportError:  # pragma: no cover -- flat (sys.path) load
     )
     from _otr_producer_direction import (  # type: ignore
         CARDS_NAME, MANIFEST_PRODUCER_KEY, META_IMAGE_ENGINES, META_IMAGE_SEED, build_cards)
+    from _otr_paths import confine_to_read_roots, is_readable_in_roots  # type: ignore
 
 log = logging.getLogger("OTR.replay_freezer")
 
@@ -119,7 +121,8 @@ def find_master(ep_dir: PathLike, ledger: dict) -> pathlib.Path:
             "current tree, then freeze it.")
     audio_dir = ep_dir / "audio"
     matches = [p for p in sorted(audio_dir.glob("*_master.wav"))
-               if p.is_file() and sha256_file(p) == want]
+               if is_readable_in_roots(str(p), roots=[str(ep_dir)])
+               and p.is_file() and sha256_file(p) == want]
     if not matches:
         raise ReplayBundleError(
             "no *_master.wav under %s matches the ledger's assembler master %s "
@@ -258,7 +261,13 @@ def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
     a relative root cannot do.
     """
     ep_dir = pathlib.Path(os.path.abspath(ep_dir))
-    ledger_path = find_ledger(ep_dir)
+    # EVERY SOURCE IS PROVEN INSIDE THE EPISODE (registry review, 2026-10-30):
+    # the walk below follows links, so a linked ledger, master, canon or still
+    # was copied from wherever it pointed into a bundle the output tree then
+    # serves. `_add` confines each file against the episode root; the ledger
+    # is confined here because it is read before `_add` ever sees it.
+    ledger_path = pathlib.Path(confine_to_read_roots(
+        str(find_ledger(ep_dir)), "episode ledger", roots=[str(ep_dir)]))
     ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
     if not isinstance(ledger, dict) or not ledger.get("lines"):
         raise ReplayBundleError("ledger carries no lines: %s" % ledger_path)
@@ -314,6 +323,8 @@ def freeze(ep_dir: PathLike, out_root: Optional[PathLike], *,
     files = []
 
     def _add(src: pathlib.Path, rel: str) -> None:
+        src = pathlib.Path(confine_to_read_roots(str(src), "freeze source %s" % rel,
+                                                 roots=[str(ep_dir)]))
         if not src.is_file() or src.stat().st_size <= 0:
             raise ReplayBundleError("refusing to freeze a missing or empty file: %s" % src)
         dst = tmp / pathlib.Path(rel)
