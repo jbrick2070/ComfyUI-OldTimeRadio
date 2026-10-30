@@ -808,7 +808,9 @@ const MODEL_NAMES = {
   musicgen: "MusicGen",
 };
 function modelName(kind, value) {
-  const id = String(value).replace(/ \([^)]*\)$/, "");     // "ltx25_foley_16gb (16:9)"
+  // A label is the id and its suffixes, each starting " (" (otr_video_director._label_for):
+  // "ltx25_foley_16gb (16:9)", "viz_camera (16:9) (audio-reactive, no scene image)".
+  const id = String(value).split(" (")[0];
   if (kind === "stills") return t("choice.stills." + slug(id), null, id);
   if (kind === "writer") {
     if (CLOUD_WRITERS[id]) return t("writer.handle." + slug(id), null, id);

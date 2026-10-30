@@ -8,7 +8,7 @@
 // invisible to a test that fed the renderer its own strings.)
 import { describe, expect, it } from "vitest";
 import { offeredChoices } from "../src/actions/choice-math.js";
-import { ENGINE_NAMES, PHASE_WORDS, renderChoice, renderMakeKey, renderMenu } from "../src/actions/faces.js";
+import { ENGINE_NAMES, engineName, PHASE_WORDS, renderChoice, renderMakeKey, renderMenu } from "../src/actions/faces.js";
 import { CELL, NODE_KEY } from "../src/gfx/svg-renderer.js";
 import { MachineEntry, MenuPart, RunState, STAGE_BUSY, StudioPhase, StudioStore } from "../src/state/studio-store.js";
 import { StudioField } from "../src/types/contract.js";
@@ -61,23 +61,27 @@ const REAL_FIELDS: Record<string, StudioField> = {
   style: choiceField("style", STYLES),
   acts: choiceField("acts", ["1", "2", "3", "4", "5", "6", "7"])
 };
-/** config.MACHINES with the lane each graph saves, the unproven rows as
- *  config.UNPROVEN names them, a lane the deck has no name for yet, a way read
- *  without node definitions, and a machine the deck has no name for yet. */
+/** The live menu of 2026-10-29 (GET /api/options on the 4060, c41bd4bb8): each
+ *  way with the lane its graph saves, labelled as the director labels it, with
+ *  every suffix; plus a lane the deck has no name for yet, a way read without
+ *  node definitions, and a machine the deck has no name for yet. */
+const VIZ = "viz_camera (16:9) (audio-reactive, no scene image)";
 const REAL_ENTRIES: MachineEntry[] = (
   [
-    ["nvidia8", "foley", true, "ltx25_foley_8gb"], ["nvidia8", "video", true, "ltx098_low_video"],
-    ["nvidia8", "stills", true, "still_motion"], ["nvidia8", "animatediff", true, "animatediff15_v3_haunted_video"],
-    ["nvidia8", "mime", true, "ltx25_mime_8gb"], ["nvidia8", "audio_in", true, "ltx25_audio_in_8gb"],
-    ["nvidia8", "visualiser", true, "viz_camera"],
-    ["nvidia16", "foley", true, "ltx25_foley_16gb (16:9)"], ["nvidia16", "video", true, "ltx25_high_video"],
-    ["nvidia16", "stills", true, "still_motion"], ["nvidia16", "animatediff", true, "animatediff15_v3_haunted_video"],
-    ["nvidia16", "mime", false, "ltx25_mime_16gb"], ["nvidia16", "visualiser", true, "viz_camera"],
-    ["mac16", "video", true, "ltx098_low_video"], ["mac16", "stills", true, "still_motion"],
-    ["mac16", "animatediff", true, "animatediff15_lightning_video"], ["mac16", "visualiser", true, "viz_camera"],
-    ["amd", "stills", true, "still_motion"],
-    ["comfy_cloud", "foley", false, "cloud_ltx25_foley_plus"], ["comfy_cloud", "video", false, "cloud_vidu_q2_pro_fast_720p"],
-    ["google_cloud", "stills", false, "a_lane_added_later"],
+    ["nvidia8", "foley", true, "ltx25_foley_8gb (16:9)"], ["nvidia8", "video", true, "ltx098_low_video (16:9)"],
+    ["nvidia8", "stills", true, "still_motion (16:9)"], ["nvidia8", "animatediff", true, "animatediff15_v3_haunted_video (16:9)"],
+    ["nvidia8", "mime", true, "ltx25_mime_8gb (16:9)"], ["nvidia8", "audio_in", true, "ltx25_audio_in_8gb (16:9)"],
+    ["nvidia8", "visualiser", true, VIZ],
+    ["nvidia16", "foley", true, "ltx25_foley_16gb (16:9)"], ["nvidia16", "video", true, "ltx25_high_video (16:9)"],
+    ["nvidia16", "stills", true, "still_motion (16:9)"], ["nvidia16", "animatediff", true, "animatediff15_v3_haunted_video (16:9)"],
+    ["nvidia16", "mime", false, "ltx25_mime_16gb (16:9)"], ["nvidia16", "visualiser", true, VIZ],
+    ["mac16", "video", true, "ltx098_low_video (16:9)"], ["mac16", "stills", true, "still_motion (16:9)"],
+    ["mac16", "animatediff", true, "animatediff15_lightning_video (16:9)"], ["mac16", "visualiser", true, VIZ],
+    ["amd", "stills", true, "still_motion (16:9)"],
+    ["comfy_cloud", "foley", false, "cloud_ltx25_foley_plus (16:9)"],
+    ["comfy_cloud", "video", false, "cloud_vidu_q2_pro_fast_720p (16:9)"],
+    ["google_cloud", "stills", false, "still_flat (16:9)"],
+    ["google_cloud", "video", false, "a_lane_added_later (16:9)"],
     ["a_machine_added_later", "audio_in", false, ""]
   ] as Array<[string, string, boolean, string]>
 ).map(([machine, way, proven, video]) => ({
@@ -167,11 +171,22 @@ describe("every face the factories draw fits, and only a server's long text is e
     expect(face("engine", at("nvidia16_mime.json"))).toContain("not yet proven");
     // A lane the deck has no name for yet reads as its way; a way read without
     // node definitions too.
-    expect(face("engine", at("google_cloud_stills.json"))).toContain("stills");
+    expect(face("engine", at("google_cloud_video.json"))).toContain("video");
     expect(face("engine", at("a_machine_added_later_audio_in.json"))).toContain("audio-in");
     expect(face("machine", at("nvidia8_visualiser.json"))).toContain("8 GB card");
     expect(face("machine", at("nvidia8_visualiser.json"))).toContain("Visualiser");
     expect(face("machine", at("nvidia16_mime.json"))).toContain("not yet proven");
+  });
+
+  it("every lane the live menu names has its own name, whatever suffixes its label carries", () => {
+    for (const { way } of REAL_ENTRIES) {
+      const lane = way.uses?.video ?? "";
+      if (!lane || lane.startsWith("a_lane_added_later")) {
+        continue;
+      }
+      expect(engineName(way), lane).toBe(ENGINE_NAMES[lane.split(" ")[0]]);
+    }
+    expect(engineName({ key: "visualiser", workflow: "x.json", proven: true, uses: { video: VIZ } })).toBe("Visualiser");
   });
 
   it("the Make key: every phase word, minutes to three digits, known and long reasons", () => {

@@ -115,8 +115,9 @@ export const WAY_WORDS: Record<string, string> = {
 
 /** What a way films with: the engine its graph saves, else the way itself. */
 export function engineName(way: MenuWay): string {
-  // A lane can carry its frame after it: "ltx25_foley_16gb (16:9)".
-  const lane = String(way.uses?.video ?? "").replace(/ \([^)]*\)$/, "");
+  // The director's label is the lane and its suffixes, each starting " (":
+  // "viz_camera (16:9) (audio-reactive, no scene image)" (otr_video_director._label_for).
+  const lane = String(way.uses?.video ?? "").split(" (")[0];
   return ENGINE_NAMES[lane] ?? WAY_WORDS[way.key] ?? displayValue(way.key);
 }
 

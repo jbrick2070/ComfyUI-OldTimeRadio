@@ -179,3 +179,24 @@ def test_the_mode_strings_the_script_builds_from_parts_exist(code):
     for mode in ("classic", "own"):
         for part in ("title", "text"):
             assert strings.get(f"mode.{mode}.{part}"), (code, mode, part)
+
+
+def test_the_page_names_every_video_lane_the_deck_names():
+    """A way's card names its video lane in a person's words (MODEL_NAMES), and
+    the deck's Video control names the same lanes (faces.ts ENGINE_NAMES); a
+    lane only one of them knows reads as its raw id on the other."""
+    deck = (PAGE.parents[2] / "streamdeck" / "src" / "actions" / "faces.ts").read_text(encoding="utf-8")
+    block = deck[deck.index("export const ENGINE_NAMES"):]
+    lanes = set(re.findall(r"^\s*(\w+):", block[:block.index("};")], re.M))
+    page = CODE[CODE.index("const MODEL_NAMES"):]
+    named = set(re.findall(r"(\w+):\s*\"", page[:page.index("};")]))
+    assert lanes and lanes <= named, sorted(lanes - named)
+
+
+def test_a_lane_label_keeps_only_its_id_however_many_suffixes_it_carries():
+    """The director labels a lane with suffixes that each start " (" --
+    "viz_camera (16:9) (audio-reactive, no scene image)" -- so the page cuts at
+    the first, as the director's own resolver does; cutting only the last one
+    left the visualiser named "viz_camera (16:9)"."""
+    body = CODE[CODE.index("function modelName"):]
+    assert 'String(value).split(" (")[0]' in body[:body.index("\n}")]
