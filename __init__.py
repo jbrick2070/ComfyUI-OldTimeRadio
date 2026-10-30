@@ -387,20 +387,28 @@ try:
 
     import re as _otr_re
 
-    #: An absolute local path TOKEN wherever it sits in a string: `C:\...`,
-    #: `C:/...`, the UNC `\\host\share\...`, a POSIX `/a/b` and a `file://`
-    #: URI. Matched as a SUBSTRING (registry review, 2026-10-30): the earlier
-    #: whole-value match left a path verbatim whenever prose, an exception
-    #: message, a file:// URI or a second line carried it, and this route is
-    #: unauthenticated. A token ends at whitespace or a quote; a drive letter
-    #: must not follow a letter or digit (the `s:` inside `https:` is not a
-    #: drive); a POSIX token needs a second segment and must not follow `:`
-    #: or `/` or a word, so a URL's `//host/path` and a lone `/` in prose are
-    #: left alone.
+    #: An absolute local path TOKEN wherever it sits in a string: a `file:`
+    #: URI, `C:\...` / `C:/...`, the UNC `\\host\share\...`, a drive-less
+    #: `\Users\...`, and a POSIX `/a/b`. Matched as a SUBSTRING (registry
+    #: review, 2026-10-30): the earlier whole-value match left a path verbatim
+    #: whenever prose, an exception message, a file: URI or a second line
+    #: carried it, and this route is unauthenticated. A token ends at
+    #: whitespace or a double quote -- but it CONTINUES across spaces while
+    #: the next word carries a separator, so `C:\Users\Jeffrey Brick\x.wav`
+    #: and `/Users/Jeffrey Brick/x.wav` are one token: the first substring
+    #: version stopped at the space and served the user name (Sonnet review
+    #: of 438e98081). A drive letter must not follow a letter (the `s:`
+    #: inside `https:` is not a drive); a POSIX token needs a second segment,
+    #: must not follow `/` or a word and must not start `//`, so a URL's
+    #: `//host/path` and a lone `/` in prose are left alone while
+    #: `Wrote:/Users/x` is scrubbed.
     _OTR_PATH_TOKEN = _otr_re.compile(
-        r"(?:file:/*)?(?:(?<![A-Za-z0-9])[A-Za-z]:[\\/][^\s'\"<>|]*"
-        r"|\\\\[^\s'\"<>|]+"
-        r"|(?<![:/\w])/(?:[^\s'\"<>|/]+/)+[^\s'\"<>|/]*)")
+        r"(?:file:/+[^\s\"<>|]*"
+        r"|(?<![A-Za-z])[A-Za-z]:[\\/][^\s\"<>|]*"
+        r"|\\\\[^\s\"<>|]+"
+        r"|(?<![A-Za-z0-9\\])\\(?!\\)[^\s\"<>|\\/]+[\\/][^\s\"<>|]*"
+        r"|(?<![/\w])/(?!/)(?:[^\s\"<>|/]+/)+[^\s\"<>|/]*)"
+        r"(?:[ \t]+[^\s\"<>|\\/]*[\\/][^\s\"<>|]*)*")
 
     def _otr_scrub_one(text):
         def _base(match):

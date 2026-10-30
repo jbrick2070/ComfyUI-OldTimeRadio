@@ -203,7 +203,7 @@ def test_real_transport_classifies_429_and_reads_retry_after(_fast, monkeypatch)
                 io.BytesIO(b'{"error": {"message": "You exceeded your current quota"}}'))
         return _Resp(b'{"name": "operations/abc"}')
 
-    monkeypatch.setattr(gc, "urlopen", fake_urlopen)
+    monkeypatch.setattr(gc, "_open_on_origin", fake_urlopen)
     out = gc.post_json("/v1beta/models/veo:predictLongRunning", {"instances": []})
     assert out == {"name": "operations/abc"}
     assert calls["n"] == 2

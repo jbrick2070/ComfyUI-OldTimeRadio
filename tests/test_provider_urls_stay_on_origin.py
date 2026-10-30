@@ -86,8 +86,53 @@ def test_a_partner_result_is_https_only_and_bounded(tmp_path, monkeypatch):
 
         def read(self, n):
             return b"\x00" * n
+    class _Opener:
+        def open(self, req, timeout=None):
+            return _Endless()
     monkeypatch.setattr(I, "_DOWNLOAD_MAX_BYTES", 3 << 20)
-    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: _Endless())
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *handlers: _Opener())
     with pytest.raises(I.CloudMediaError, match="exceeds"):
         I._stream_to_temp("https://provider.example/out.mp4", dest)
     assert not dest.exists()
+
+
+def test_a_result_redirected_off_https_is_refused_before_it_is_followed():
+    """Sonnet review of 636b18227: the https check read the first URL only,
+    and urllib's stock handler follows a 30x to http or ftp. The redirect
+    handler now asks the same question of every target."""
+    import inspect
+    from nodes._otr_shared import cloud_media_invoke as I
+    for bad in ("http://provider.example/out.mp4", "ftp://provider.example/out.mp4",
+                "file:///etc/hosts", ""):
+        with pytest.raises(I.CloudMediaError, match="not https"):
+            I._refuse_off_https(bad, redirected=True)
+    I._refuse_off_https("https://provider.example/out.mp4")
+    src = inspect.getsource(I._stream_to_temp)
+    assert "_refuse_off_https(newurl, redirected=True)" in src
+    assert "build_opener(_HttpsOnly())" in src and "urlopen(" not in src
+
+
+def test_the_post_path_keeps_the_key_on_the_origin_and_a_scheme_change_strips_it(monkeypatch):
+    """Sonnet review of 636b18227: _post_json used the stock opener, so a
+    30x on a POST became a GET to the new URL with the key copied; and the
+    handler compared hosts only, so https://H -> http://H kept the key."""
+    from nodes._otr_google_api import client as C
+    monkeypatch.delenv("OTR_GOOGLE_API_BASE", raising=False)
+    seen, handlers = [], []
+
+    class _Opener:
+        def open(self, req, timeout=None):
+            seen.append(req)
+            return io.BytesIO(b'{"ok": true}')
+    monkeypatch.setattr(urllib.request, "build_opener",
+                        lambda *h: handlers.extend(h) or _Opener())
+    assert C._post_json("/v1beta/models/x:generateContent", {"a": 1},
+                        api_key="K", timeout_s=5) == {"ok": True}
+    assert any(isinstance(h, C._KeyStaysOnOrigin) for h in handlers)
+    assert seen and seen[0].get_header("X-goog-api-key") == "K"
+    handler = C._KeyStaysOnOrigin()
+    req = urllib.request.Request("https://generativelanguage.googleapis.com/v1beta/files/x",
+                                 headers={"x-goog-api-key": "K"})
+    down = handler.redirect_request(req, io.BytesIO(b""), 302, "Found", {},
+                                    "http://generativelanguage.googleapis.com/v1beta/files/x")
+    assert down is not None and not down.has_header("X-goog-api-key")

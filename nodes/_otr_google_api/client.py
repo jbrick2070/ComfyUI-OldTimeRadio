@@ -7,7 +7,6 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from urllib.request import urlopen  # the pack's stdlib transport; every caller is listed in the network-sites guard
 from typing import Any
 
 try:
@@ -351,7 +350,7 @@ def _post_json(
         method="POST",
     )
     try:
-        with urlopen(req, timeout=timeout_s) as resp:  # noqa: S310
+        with _open_on_origin(req, timeout=timeout_s) as resp:  # noqa: S310
             return _safe_json(resp.read())
     except urllib.error.HTTPError as exc:
         # Read the body ONCE and parse best-effort. The previous _safe_json
@@ -401,16 +400,27 @@ def _absolute_url(path_or_url: str) -> str:
 class _KeyStaysOnOrigin(urllib.request.HTTPRedirectHandler):
     """A redirect off the API origin loses the API key. urllib's stock
     handler copies every header onto the new request, so a 302 to another
-    host carried the key there (registry review, 2026-10-30)."""
+    host carried the key there (registry review, 2026-10-30). Origin means
+    scheme AND host: https://H to http://H keeps the host and would send
+    the key in the clear. Installed on the GET and the POST path alike."""
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         new = super().redirect_request(req, fp, code, msg, headers, newurl)
         if new is not None:
-            before = urllib.parse.urlsplit(req.full_url).netloc.lower()
-            after = urllib.parse.urlsplit(newurl).netloc.lower()
-            if after != before:
+            before = urllib.parse.urlsplit(req.full_url)
+            after = urllib.parse.urlsplit(newurl)
+            if ((after.scheme or "").lower(), (after.netloc or "").lower()) != (
+                    (before.scheme or "").lower(), (before.netloc or "").lower()):
                 new.remove_header("X-goog-api-key")
         return new
+
+
+def _open_on_origin(req, timeout=None):
+    """The one transport for both request paths. An opener whose redirect
+    handler keeps the key on the origin; `_post_json` used the stock opener
+    until the Sonnet review of 636b18227, so a 30x on a POST became a GET to
+    the new URL with the key copied. tests fake this name to answer HTTP."""
+    return urllib.request.build_opener(_KeyStaysOnOrigin()).open(req, timeout=timeout)
 
 
 def _get_bytes(
@@ -428,9 +438,8 @@ def _get_bytes(
         headers=headers,
         method="GET",
     )
-    opener = urllib.request.build_opener(_KeyStaysOnOrigin())
     try:
-        with opener.open(req, timeout=timeout_s) as resp:  # noqa: S310 -- origin-checked above
+        with _open_on_origin(req, timeout=timeout_s) as resp:  # noqa: S310 -- origin-checked above
             return resp.read()
     except urllib.error.HTTPError as exc:
         parsed, raw_text = _best_effort_json(exc.read())

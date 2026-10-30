@@ -110,6 +110,9 @@ def _literal_words(node, names) -> list:
                 out.append(elt.value)
             elif isinstance(elt, ast.Starred):
                 out.extend(_literal_words(elt.value, names))
+            elif isinstance(elt, ast.Name):
+                # `PIP = "pip"; run([..., PIP, "install", x])` (Sonnet, 2026-10-30)
+                out.extend(names.get(elt.id, ()))
         return out
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
         return _literal_words(node.left, names) + _literal_words(node.right, names)
@@ -129,6 +132,9 @@ def _collect_argv_names(tree) -> dict:
     for node in ast.walk(tree):
         if (isinstance(node, ast.Assign) and len(node.targets) == 1
                 and isinstance(node.targets[0], ast.Name)):
+            if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                names[node.targets[0].id] = [node.value.value]
+                continue
             words = _literal_words(node.value, names)
             if words:
                 names[node.targets[0].id] = words
@@ -161,7 +167,9 @@ def _pip_install_spawns(rel: str, raw: str) -> list:
       through it -- handed, positionally or by keyword, a list whose first pip
       token is followed by ``install`` (options allowed between). The list may
       be a literal, a ``+`` of literals, a starred splice, or a NAME the file
-      assigned or grew from literals (``cmd = [...]``, ``cmd.extend([...])``).
+      assigned or grew from literals (``cmd = [...]``, ``cmd.extend([...])``);
+      a NAME inside the list that the file assigned a string resolves to it
+      (``PIP = "pip"``).
     * SHELL TEXT: a spawn-named callee (run, Popen, call, check_call,
       check_output, system, popen, spawn, exec) with ``pip ... install`` in any
       string constant anywhere in its arguments -- a plain string, an f-string,

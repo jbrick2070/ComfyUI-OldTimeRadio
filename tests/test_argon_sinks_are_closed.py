@@ -153,6 +153,18 @@ def test_the_ledger_route_scrubs_a_path_wherever_it_sits():
     # prose and URLs are left alone
     assert scrub("https://example.com/path/to/thing") == "https://example.com/path/to/thing"
     assert scrub("the fraction 3/4 and a /dev word") == "the fraction 3/4 and a /dev word"
+    # a path with a space is one token (Sonnet review of 438e98081: the first
+    # substring version stopped at the space and served the user name)
+    assert scrub("C:" + b + "Users" + b + "Jeffrey Brick" + b + "ComfyUI" + b + "x.wav") == "x.wav"
+    assert scrub("C:" + b + "Program Files" + b + "ComfyUI" + b + "x.wav") == "x.wav"
+    assert scrub("/Users/Jeffrey Brick/Documents/x.wav") == "x.wav"
+    assert "Brien" not in scrub("C:" + b + "Users" + b + "O'Brien" + b + "x.wav")
+    # the spellings the same review found verbatim
+    assert scrub("file:///home/jeffr/ComfyUI/output/x.wav") == "x.wav"
+    assert scrub("Wrote:/Users/jeffr/x.wav") == "Wrote:x.wav"
+    assert scrub("9C:" + b + "Users" + b + "jeffr" + b + "x.wav") == "9x.wav"
+    assert scrub(b + "Users" + b + "jeffr" + b + "x.wav") == "x.wav"
+    assert scrub("from C:" + b + "a" + b + "b.wav to D:" + b + "c" + b + "d.wav") == "from b.wav to d.wav"
 
 
 # --- RANK 10 --------------------------------------------------------------- #

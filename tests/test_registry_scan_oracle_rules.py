@@ -59,6 +59,7 @@ FIRES = {
     "pip.exe": 'subprocess.check_call(["pip.exe", "install", "x"])\n',
     "options between pip and install": 'run(["pip", "--no-cache-dir", "--quiet", "install", "x"])\n',
     "shell text with an option": 'subprocess.call("pip --no-input install x", shell=True)\n',
+    "pip token through a constant name": 'PIP = "pip"\nrun([sys.executable, "-m", PIP, "install", x])\n',
 }
 
 STAYS_QUIET = {

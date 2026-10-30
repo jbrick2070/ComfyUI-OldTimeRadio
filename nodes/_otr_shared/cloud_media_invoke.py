@@ -611,6 +611,18 @@ _DOWNLOAD_ATTEMPTS = 2
 _DOWNLOAD_MAX_BYTES = 2 * 1024 ** 3
 
 
+def _refuse_off_https(url: str, *, redirected: bool = False) -> None:
+    """A result URL that is not https is refused before any request -- the
+    first URL and every redirect target alike. urllib's stock redirect
+    handler follows a 30x to http or ftp, so a check on the first URL alone
+    read nothing about where the body came from (Sonnet review of 636b18227)."""
+    if not str(url).startswith("https://"):
+        raise CloudMediaError(
+            CloudErrorCode.PROVIDER_REJECTED,
+            "result URL %s%r is not https; the pack fetches no other scheme"
+            % ("redirected to " if redirected else "", url))
+
+
 def _stream_to_temp(url: str, dest: Path) -> None:
     """Chunked download; never buffers the whole body. Retried once.
 
@@ -620,21 +632,24 @@ def _stream_to_temp(url: str, dest: Path) -> None:
     it as an unsent request -- the budget ceiling stays honest.
     """
     import urllib.request
-    from urllib.request import urlopen  # the pack's stdlib transport; every caller is listed in the network-sites guard
     # HTTPS ONLY, AND BOUNDED (registry review, 2026-10-30): the URL is the
     # partner node's own return value, never a workflow field, but this GET
     # followed any scheme to any size. A partner returns https; a plain
-    # http return is refused as a provider fault, not fetched.
-    if not str(url).startswith("https://"):
-        raise CloudMediaError(
-            CloudErrorCode.PROVIDER_REJECTED,
-            f"result URL {url!r} is not https; the pack fetches no other scheme")
+    # http return is refused as a provider fault, not fetched -- and so is
+    # a redirect off https, which the stock handler would have followed.
+    _refuse_off_https(url)
+
+    class _HttpsOnly(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            _refuse_off_https(newurl, redirected=True)
+            return super().redirect_request(req, fp, code, msg, headers, newurl)
+    opener = urllib.request.build_opener(_HttpsOnly())
     req = urllib.request.Request(url, headers={"User-Agent": _USAGE_SOURCE})
     last_exc: Exception | None = None
     for attempt in range(1, _DOWNLOAD_ATTEMPTS + 1):
         try:
             total = 0
-            with urlopen(req, timeout=120) as resp, \
+            with opener.open(req, timeout=120) as resp, \
                     open(dest, "wb") as out:
                 while True:
                     chunk = resp.read(1 << 20)

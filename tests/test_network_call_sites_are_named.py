@@ -31,8 +31,10 @@ from tests._support.ratchet import REPO, assert_ratchet, scan
 NODES = REPO / "nodes"
 ROOTS = (NODES,)
 
-#: The calls that open an outbound connection.
-_URLLIB_CALLS = frozenset({"urlopen", "urlretrieve"})
+#: The calls that open an outbound connection. `build_opener` is built for
+#: nothing but its `.open`; the two urllib callers reach the network through
+#: one (a redirect handler each) since 2026-10-30.
+_URLLIB_CALLS = frozenset({"urlopen", "urlretrieve", "build_opener"})
 _REQUESTS_VERBS = frozenset({"get", "post", "put", "patch", "delete", "head",
                              "request", "Session"})
 _CONNECTIONS = frozenset({"HTTPConnection", "HTTPSConnection"})
@@ -53,8 +55,9 @@ NETWORK_CALLERS = {
         "control -- a raw socket plus http.client, so it can bound a hostile "
         "or slow feed itself rather than inherit a library's timeout policy"),
     "nodes/_otr_google_api/client.py": (
-        "the Google API transport: two `urllib.request.urlopen` sites with "
-        "their own error mapping, which a shared helper would flatten"),
+        "the Google API transport: a POST and a GET through one opener whose "
+        "redirect handler keeps the key on the origin, each with its own "
+        "error mapping, which a shared helper would flatten"),
     "nodes/_otr_openrouter_backend.py": (
         "the OpenRouter transport -- a catalog GET and a completion POST, the "
         "second of which STREAMS; wrapping it is risk taken for a report line"),
@@ -67,8 +70,8 @@ NETWORK_CALLERS = {
         "retired upstream is caught before a render starts instead of "
         "failing mid-episode"),
     "nodes/_otr_shared/cloud_media_invoke.py": (
-        "invokes a cloud media provider and reads the result back over "
-        "`urllib.request.urlopen`"),
+        "invokes a cloud media provider and reads the result back through an "
+        "opener that refuses any redirect off https"),
 }
 
 
@@ -126,6 +129,7 @@ def test_the_finder_catches_every_outbound_spelling():
     for src in (
             "import urllib.request\nurllib.request.urlopen(r)\n",
             "from urllib.request import urlopen\nurlopen(r)\n",
+            "import urllib.request\nurllib.request.build_opener(h).open(r)\n",
             "import requests\nrequests.get(u)\n",
             "import requests\nrequests.post(u)\n",
             "import requests\nrequests.Session()\n",
