@@ -74,7 +74,21 @@ web UI here (All selected, filters cleared). Desktop has not been checked.
    EXTENSIONS entry is present, but `--disable-all-custom-nodes` and the missing
    `--enable-manager` are both non-standard.
 
+5. **The operator's memory, 2026-10-29: "maybe it was just the Desktop app, not the web
+   page -- I could find the whole pack."** That is, a pack that is not installed was
+   discoverable from inside the Desktop app, perhaps through its built-in Manager, which
+   the Desktop launch enables and tonight's demo launch does not, or through a
+   Desktop-only search. Measured tonight from outside ComfyUI: a signed-out search for
+   "old time radio" on registry.comfy.org returns exactly one card, Old-Time Radio by
+   @fluxus, which reads v2.3.40 although `/install` serves 2.3.43, so the search index
+   lags. Not yet checked: what the Desktop app shows for an uninstalled pack.
+
 ## How to settle it
+
+- [ ] **First:** in the Comfy Desktop app, search "old time radio" in every search box it
+      has (Templates, the Manager's custom-node search, and anything else that offers one)
+      for a pack that is NOT installed. Use a fresh install, or a profile without OTR.
+      Screenshot what a newcomer sees.
 
 - [ ] In the **Comfy Desktop app** on this laptop, normally launched, open Templates with
       All selected and filters cleared. Search `old-time radio`, `otr_canonical` and
