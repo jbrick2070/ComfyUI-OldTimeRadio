@@ -21,13 +21,15 @@
     "validate": "streamdeck validate com.jbrick2070.otr.sdPlugin",
     "link": "streamdeck link com.jbrick2070.otr.sdPlugin",
     "pack": "npm run build && streamdeck pack com.jbrick2070.otr.sdPlugin --output dist --force",
-    "images": "esbuild scripts/render-static-images.ts --bundle --platform=node --format=esm --outfile=release/render-static-images.mjs --log-level=warning && node release/render-static-images.mjs"
+    "images": "esbuild scripts/render-static-images.ts --bundle --platform=node --format=esm --outfile=release/render-static-images.mjs --log-level=warning && node release/render-static-images.mjs",
+    "key-art": "esbuild scripts/render-key-art.ts --bundle --platform=node --format=esm --packages=external --outfile=release/render-key-art.mjs --log-level=warning && node release/render-key-art.mjs"
   },
   "dependencies": {
     "@elgato/streamdeck": "3.0.3"
   },
   "devDependencies": {
     "@elgato/cli": "1.10.3",
+    "@resvg/resvg-js": "2.6.2",
     "@rollup/plugin-commonjs": "^28.0.3",
     "@rollup/plugin-node-resolve": "^16.0.1",
     "@rollup/plugin-typescript": "^12.1.2",

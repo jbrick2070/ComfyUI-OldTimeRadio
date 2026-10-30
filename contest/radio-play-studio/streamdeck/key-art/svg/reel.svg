@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 120 120"><title>REEL</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="60" cy="49" r="32" fill="#9146FF" stroke="#C084FC" stroke-width="3.5"/>
+    <g fill="#08070B" stroke="none"><circle cx="60" cy="28" r="6"/><circle cx="80" cy="43" r="6"/><circle cx="72" cy="66" r="6"/><circle cx="48" cy="66" r="6"/><circle cx="40" cy="43" r="6"/></g>
+    <path d="m54 40 15 9-15 9Z" fill="#FFF04B"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="18" font-weight="800">REEL</text></svg>

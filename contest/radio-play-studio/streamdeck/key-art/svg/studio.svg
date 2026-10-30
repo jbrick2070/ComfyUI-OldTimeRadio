@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 120 120"><title>STUDIO</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="45" y="17" width="30" height="43" rx="14" fill="#9146FF" stroke="#C084FC" stroke-width="3.5"/>
+    <path d="M53 29h14m-14 9h14m-14 9h14" stroke="#FFF04B" stroke-width="4"/>
+    <path d="M35 47v4a25 25 0 0 0 50 0v-4M60 76v-1m-14 2h28" stroke="#C084FC" stroke-width="4.5"/>
+    <path d="M60 76v-8" stroke="#C084FC" stroke-width="4.5"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="18" font-weight="800">STUDIO</text></svg>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 120 120"><title>CLIPS</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="40" y="23" width="28" height="38" rx="3" fill="#24152F" stroke="#C084FC" stroke-width="3" transform="rotate(-14 54 42)"/>
+    <rect x="66" y="22" width="25" height="39" rx="3" fill="#24152F" stroke="#C084FC" stroke-width="3" transform="rotate(12 78 42)"/>
+    <path d="M23 44V33h25l10 11" fill="#FFF04B" stroke="#FFF04B" stroke-width="3.5"/>
+    <path d="M22 45h76l-8 34H30Z" fill="#9146FF" stroke="#C084FC" stroke-width="4"/>
+    <path d="m54 53 14 9-14 9Z" fill="#FFF04B"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="18" font-weight="800">CLIPS</text></svg>

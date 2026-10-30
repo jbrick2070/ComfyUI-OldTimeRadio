@@ -49,6 +49,10 @@ Stream Deck 7.1 or newer on Windows 10 or 11, and Radio Play Studio running on t
    key.
 4. Start the Studio ([its README](../README.md)). Until it answers, the faces read *Off air*.
 
+For the keys around them -- the Studio page, LogBlaster, the ComfyUI graph, your clips --
+[`key-art/`](key-art/README.md) has six matching faces for the Stream Deck app's own
+Website and Open actions.
+
 If the Studio runs on another port, set it in any action's settings; the host is always
 `127.0.0.1`, because the Studio answers no other. The port and the picks are saved and come back
 after a restart. To update, install the newer package the same way.
@@ -75,6 +79,7 @@ npm test          # vitest: the faces fit, dial math, the event stream, the stor
 npm run typecheck
 npm run validate  # the Elgato CLI's manifest check
 npm run images    # redraw the default key images from the live renderer
+npm run key-art   # redraw key-art/, the faces for the Website and Open keys beside the plugin
 npm run pack      # build, then write dist/com.jbrick2070.otr.streamDeckPlugin
 ```
 

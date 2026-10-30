@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="792" height="714" viewBox="0 0 792 714"><rect width="792" height="714" fill="#141118"/><text x="36" y="39" fill="#FAF7FF" font-family="Segoe UI" font-size="22" font-weight="700">RADIO PLAY STUDIO · FADESTER STYLE</text><g transform="translate(36,76) scale(1.8)"><title>STUDIO</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="45" y="17" width="30" height="43" rx="14" fill="#9146FF" stroke="#C084FC" stroke-width="3.5"/>
+    <path d="M53 29h14m-14 9h14m-14 9h14" stroke="#FFF04B" stroke-width="4"/>
+    <path d="M35 47v4a25 25 0 0 0 50 0v-4M60 76v-1m-14 2h28" stroke="#C084FC" stroke-width="4.5"/>
+    <path d="M60 76v-8" stroke="#C084FC" stroke-width="4.5"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="18" font-weight="800">STUDIO</text></g><g transform="translate(288,76) scale(1.8)"><title>LOGS</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M24 40h14l20-15v48L38 58H24Z" fill="#9146FF" stroke="#C084FC" stroke-width="3.5"/>
+    <path d="M34 61l4 15h12l-4-10" fill="#24152F" stroke="#C084FC" stroke-width="3.5"/>
+    <path d="M71 31h22M71 48h28M71 65h18" stroke="#FFF04B" stroke-width="5"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="18" font-weight="800">LOGS</text></g><g transform="translate(540,76) scale(1.8)"><title>GRAPH</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M45 34h24M82 46v18H60" stroke="#C084FC" stroke-width="4"/>
+    <rect x="20" y="23" width="28" height="23" rx="5" fill="#9146FF" stroke="#C084FC" stroke-width="3.5"/>
+    <rect x="69" y="23" width="28" height="23" rx="5" fill="#9146FF" stroke="#C084FC" stroke-width="3.5"/>
+    <rect x="33" y="59" width="29" height="23" rx="5" fill="#FFF04B" stroke="#FFF04B" stroke-width="3.5"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="18" font-weight="800">GRAPH</text></g><g transform="translate(36,320) scale(1.8)"><title>ESPAÑOL</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M28 76V45a32 27 0 0 1 64 0v31Z" fill="#24152F" stroke="#C084FC" stroke-width="4"/>
+    <path d="M40 38h25M40 48h25M40 58h25" stroke="#9146FF" stroke-width="5"/>
+    <circle cx="79" cy="43" r="5" fill="#FFF04B"/>
+    <path d="M48 59h29v23H48Z" fill="#9146FF" stroke="#C084FC" stroke-width="3"/>
+    <path d="m57 65 11 6-11 6Z" fill="#FFF04B"/>
+    <path d="M32 79h9m41 0h8" stroke="#C084FC" stroke-width="4"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="16.5" font-weight="800">ESPAÑOL</text></g><g transform="translate(288,320) scale(1.8)"><title>REEL</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="60" cy="49" r="32" fill="#9146FF" stroke="#C084FC" stroke-width="3.5"/>
+    <g fill="#08070B" stroke="none"><circle cx="60" cy="28" r="6"/><circle cx="80" cy="43" r="6"/><circle cx="72" cy="66" r="6"/><circle cx="48" cy="66" r="6"/><circle cx="40" cy="43" r="6"/></g>
+    <path d="m54 40 15 9-15 9Z" fill="#FFF04B"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="18" font-weight="800">REEL</text></g><g transform="translate(540,320) scale(1.8)"><title>CLIPS</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="40" y="23" width="28" height="38" rx="3" fill="#24152F" stroke="#C084FC" stroke-width="3" transform="rotate(-14 54 42)"/>
+    <rect x="66" y="22" width="25" height="39" rx="3" fill="#24152F" stroke="#C084FC" stroke-width="3" transform="rotate(12 78 42)"/>
+    <path d="M23 44V33h25l10 11" fill="#FFF04B" stroke="#FFF04B" stroke-width="3.5"/>
+    <path d="M22 45h76l-8 34H30Z" fill="#9146FF" stroke="#C084FC" stroke-width="4"/>
+    <path d="m54 53 14 9-14 9Z" fill="#FFF04B"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="18" font-weight="800">CLIPS</text></g><text x="36" y="582" fill="#CFC0DF" font-family="Segoe UI" font-size="14">72 px readability check</text><g transform="translate(36,600) scale(0.6)"><title>STUDIO</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="45" y="17" width="30" height="43" rx="14" fill="#9146FF" stroke="#C084FC" stroke-width="3.5"/>
+    <path d="M53 29h14m-14 9h14m-14 9h14" stroke="#FFF04B" stroke-width="4"/>
+    <path d="M35 47v4a25 25 0 0 0 50 0v-4M60 76v-1m-14 2h28" stroke="#C084FC" stroke-width="4.5"/>
+    <path d="M60 76v-8" stroke="#C084FC" stroke-width="4.5"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="18" font-weight="800">STUDIO</text></g><g transform="translate(158,600) scale(0.6)"><title>LOGS</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M24 40h14l20-15v48L38 58H24Z" fill="#9146FF" stroke="#C084FC" stroke-width="3.5"/>
+    <path d="M34 61l4 15h12l-4-10" fill="#24152F" stroke="#C084FC" stroke-width="3.5"/>
+    <path d="M71 31h22M71 48h28M71 65h18" stroke="#FFF04B" stroke-width="5"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="18" font-weight="800">LOGS</text></g><g transform="translate(280,600) scale(0.6)"><title>GRAPH</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M45 34h24M82 46v18H60" stroke="#C084FC" stroke-width="4"/>
+    <rect x="20" y="23" width="28" height="23" rx="5" fill="#9146FF" stroke="#C084FC" stroke-width="3.5"/>
+    <rect x="69" y="23" width="28" height="23" rx="5" fill="#9146FF" stroke="#C084FC" stroke-width="3.5"/>
+    <rect x="33" y="59" width="29" height="23" rx="5" fill="#FFF04B" stroke="#FFF04B" stroke-width="3.5"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="18" font-weight="800">GRAPH</text></g><g transform="translate(402,600) scale(0.6)"><title>ESPAÑOL</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M28 76V45a32 27 0 0 1 64 0v31Z" fill="#24152F" stroke="#C084FC" stroke-width="4"/>
+    <path d="M40 38h25M40 48h25M40 58h25" stroke="#9146FF" stroke-width="5"/>
+    <circle cx="79" cy="43" r="5" fill="#FFF04B"/>
+    <path d="M48 59h29v23H48Z" fill="#9146FF" stroke="#C084FC" stroke-width="3"/>
+    <path d="m57 65 11 6-11 6Z" fill="#FFF04B"/>
+    <path d="M32 79h9m41 0h8" stroke="#C084FC" stroke-width="4"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="16.5" font-weight="800">ESPAÑOL</text></g><g transform="translate(524,600) scale(0.6)"><title>REEL</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="60" cy="49" r="32" fill="#9146FF" stroke="#C084FC" stroke-width="3.5"/>
+    <g fill="#08070B" stroke="none"><circle cx="60" cy="28" r="6"/><circle cx="80" cy="43" r="6"/><circle cx="72" cy="66" r="6"/><circle cx="48" cy="66" r="6"/><circle cx="40" cy="43" r="6"/></g>
+    <path d="m54 40 15 9-15 9Z" fill="#FFF04B"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="18" font-weight="800">REEL</text></g><g transform="translate(646,600) scale(0.6)"><title>CLIPS</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="40" y="23" width="28" height="38" rx="3" fill="#24152F" stroke="#C084FC" stroke-width="3" transform="rotate(-14 54 42)"/>
+    <rect x="66" y="22" width="25" height="39" rx="3" fill="#24152F" stroke="#C084FC" stroke-width="3" transform="rotate(12 78 42)"/>
+    <path d="M23 44V33h25l10 11" fill="#FFF04B" stroke="#FFF04B" stroke-width="3.5"/>
+    <path d="M22 45h76l-8 34H30Z" fill="#9146FF" stroke="#C084FC" stroke-width="4"/>
+    <path d="m54 53 14 9-14 9Z" fill="#FFF04B"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="18" font-weight="800">CLIPS</text></g></svg>

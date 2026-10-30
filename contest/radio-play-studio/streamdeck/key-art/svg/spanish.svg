@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 120 120"><title>ESPAÑOL</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M28 76V45a32 27 0 0 1 64 0v31Z" fill="#24152F" stroke="#C084FC" stroke-width="4"/>
+    <path d="M40 38h25M40 48h25M40 58h25" stroke="#9146FF" stroke-width="5"/>
+    <circle cx="79" cy="43" r="5" fill="#FFF04B"/>
+    <path d="M48 59h29v23H48Z" fill="#9146FF" stroke="#C084FC" stroke-width="3"/>
+    <path d="m57 65 11 6-11 6Z" fill="#FFF04B"/>
+    <path d="M32 79h9m41 0h8" stroke="#C084FC" stroke-width="4"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="16.5" font-weight="800">ESPAÑOL</text></svg>

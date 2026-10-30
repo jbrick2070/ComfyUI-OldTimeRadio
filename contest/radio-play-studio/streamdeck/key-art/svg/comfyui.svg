@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 120 120"><title>GRAPH</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M45 34h24M82 46v18H60" stroke="#C084FC" stroke-width="4"/>
+    <rect x="20" y="23" width="28" height="23" rx="5" fill="#9146FF" stroke="#C084FC" stroke-width="3.5"/>
+    <rect x="69" y="23" width="28" height="23" rx="5" fill="#9146FF" stroke="#C084FC" stroke-width="3.5"/>
+    <rect x="33" y="59" width="29" height="23" rx="5" fill="#FFF04B" stroke="#FFF04B" stroke-width="3.5"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="18" font-weight="800">GRAPH</text></svg>

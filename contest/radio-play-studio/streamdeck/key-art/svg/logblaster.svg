@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 120 120"><title>LOGS</title>
+  <rect width="120" height="120" fill="#08070B"/>
+  <rect x="3" y="3" width="114" height="114" rx="14" fill="#08070B" stroke="#9146FF" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M24 40h14l20-15v48L38 58H24Z" fill="#9146FF" stroke="#C084FC" stroke-width="3.5"/>
+    <path d="M34 61l4 15h12l-4-10" fill="#24152F" stroke="#C084FC" stroke-width="3.5"/>
+    <path d="M71 31h22M71 48h28M71 65h18" stroke="#FFF04B" stroke-width="5"/></g>
+  <text x="60" y="103" text-anchor="middle" fill="#FAF7FF" font-family="Segoe UI" font-size="18" font-weight="800">LOGS</text></svg>
