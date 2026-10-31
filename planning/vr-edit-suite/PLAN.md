@@ -1,77 +1,76 @@
-# OTR VR Edit Suite - concept brief
+# OTR VR Staging Room - concept brief
 
-Status: idea, 2026-10-30. Nothing built. Baseline `main` 439ba9854. This is a design with more than one defensible answer, so it gets the full review arc before any code (CLAUDE.md, 2026-08-17 amendment).
+Status: idea, 2026-10-30. Nothing built. Baseline `main` ff78c374. This design has more than one defensible answer, so it goes through review before any code (CLAUDE.md, 2026-08-17 amendment).
 
 ## What it is
 
-A VR room you stand inside to review and fix an episode's pictures **before the final OTR render**. You look at each shot's still (or its filmed clip) wrapped around you, say what you want in plain words, point at the part you mean, and an AI assistant makes the change. When you are happy, you leave the headset and the episode publishes with your edits.
+A VR room for making **the big staging calls** on an episode's shots **before the final OTR render**: where the camera stands, the angle, how wide or tight the shot is, where each character stands and faces, and whether a shot should be a different shot entirely. You walk around the scene, grab the camera, move a character, say "lower, looking up at him, she's in the doorway behind", and an AI assistant turns that into the next take of that shot.
 
-It does two kinds of work:
+Operator, 2026-10-30: not a colorist's tool. Fine work (color, small fixes) is out of scope. The suite is for the decisions that change what the picture *is*.
 
-1. **Color and look (fast, no AI needed to run).** Exposure, white balance, contrast, curves, film looks, LUTs. Runs live in the headset, so a knob turn shows instantly. The AI's job is only to set the starting values from what you said ("1940s tungsten, a little faded") and to keep the look the same across shots.
-2. **Picture edits (slower, AI does the work).** "Add rain on the window", "make her coat red", "remove the chair", "paint this shot again". Sent to ComfyUI on the 5080; the result fades in a few seconds later.
+"Strategic" means it works on a **whole scene**, not one picture: the shots of a scene sit around you in order, so you can see that three shots in a row are the same medium two-shot, or that the camera jumps sides between two shots of the same conversation, and fix the pattern instead of one frame.
 
-"Strategic" means it works on the **whole episode**, not one picture at a time: it shows every shot of a scene around you, flags the ones that do not match (a face that changed, a shot much brighter than its neighbors), and lets one decision apply to a scene or the whole episode.
+## Where it sits: a VR front end for the Scene Producer
 
-## Where it sits: it is a VR front end for the Scene Producer
+The Scene Producer (`planning/scene-producer/PLAN.md`, schema in `nodes/_otr_producer_direction.py`) already does the hard part. A producer run writes, voices and paints the episode, then **stops before video** (`ExecutionBlocker`). It leaves a bundle with `cards.json`, one card per shot. The next run carries a `direction_json` saying which cards to paint again, keep, or change, and only what changed is rendered again. Audio, cast, voices and timing never move.
 
-The Scene Producer (`planning/scene-producer/PLAN.md`, schema in `nodes/_otr_producer_direction.py`) already does the hard part. A producer run writes, voices and paints the episode, then **stops before video** (`ExecutionBlocker`). It leaves a bundle with `cards.json`, one card per shot. The next run carries a `direction_json` saying which cards to paint again, which to keep, which takes to use, and only what changed is rendered again. Audio, cast, voices and timing never move.
-
-So the VR suite does not need its own pipeline. It reads the same bundle and writes the same direction:
+The suite reads the same bundle and writes the same direction:
 
 ```
-write + voice + paint      VR review           film           VR review          publish
-  (stills stage)    -->  stills in VR  -->  (video stage) --> clips in VR --> (publish stage)
-                         edits -> direction_json        edits -> direction_json
+write + voice + paint    VR staging        film          VR review        publish
+  (stills stage)    -->  of the stills --> (video stage) --> of the clips --> (publish)
+                         -> direction_json                  -> direction_json
 ```
 
 | VR action | What it becomes | Exists today? |
 |---|---|---|
 | "Paint this again" / pick take 2 | `takes.stills` | Yes |
-| Change what a shot shows | `cards.<shot>.picture_text` | Yes |
-| Change how it moves | `cards.<shot>.motion_text` | Yes |
+| New framing, angle or blocking, described | `cards.<shot>.picture_text` | Yes |
+| New camera move for the clip | `cards.<shot>.motion_text` | Yes |
 | "This one is fine" | `kept.stills` / `kept.clips` | Yes |
-| Note on a scene | `scenes.<id>.note` | Yes |
-| Color look per shot / scene / episode | **new `grade` section** | No - schema change |
-| Region edit ("make this coat red") | **new edit request with a mask** | No - schema change |
+| Note on a whole scene | `scenes.<id>.note` | Yes |
+| Exact camera position and character marks | **new `staging` per shot** | No - schema change |
 
-The first five need no change to the graph. A VR viewer that only does those is a new front end and nothing else.
+Framing today lives only in prompt words: the image engines (`nodes/_otr_image_engines/`) take text and, for Klein, reference pictures; none takes a depth or pose control image. So the first five rows are buildable now. The last row is the real new idea.
 
-## The interface: an HTML page on the Comfy SDK, never the node canvas
+## The interface: an HTML page, never the node canvas
 
-Operator, 2026-10-30: fine-tuning a look by wiring nodes is not fun. The person in the headset never sees a node. The page is plain HTML/WebXR and talks to ComfyUI the same way Radio Play Studio does:
+Operator, 2026-10-30: tuning by wiring nodes is not fun. The person in the headset never sees a node.
 
-- **Submit** through the Comfy SDK and `comfy-api-proxy` (:8189 in front of ComfyUI on :8000). A stage is one SDK job; its id is the ComfyUI prompt id, so the page can re-attach after the headset sleeps (`client.jobs.get(id)`).
-- **Hear back** without polling by hand: ComfyUI's own `/ws` websocket streams progress and "executed" events, so the room can show "painting shot 4..." and swap the picture in the moment it lands. Whether the proxy can also call a webhook out to the page is not checked yet; the websocket is enough on one machine.
-- **Read** pictures and `cards.json` through core `/view`, as the Producer plan already does. No new server route.
-- **Graphs stay hidden.** The page fills `direction_json` and the existing widgets on `workflows/otr_canonical.json`; it never builds its own graph (CLAUDE.md section 0).
+- The page is WebXR, opened in the headset's browser, and served by **Radio Play Studio's own server** (`contest/radio-play-studio/radio_play_studio/server.py`, port 8765), which already reads Producer bundles (`producer.py`) and submits stages to ComfyUI through the Comfy SDK (`runner.py`). The VR room becomes another view of Studio, not a second app that mirrors the schema again.
+- Progress already reaches Studio through its runner (ComfyUI `/history`, SDK jobs). The room shows "painting shot 4..." and swaps the picture in when it lands.
+- Graphs stay hidden: Studio fills `direction_json` on `workflows/otr_canonical.json` as it does today (CLAUDE.md section 0).
 
 ## The decisions the review has to settle
 
-1. **Grade the still before filming, or the clip after?** Grading the still means the video model films the graded picture, so the look is baked in and costs a re-film to change. Grading after (at publish, as an ffmpeg filter or LUT) is cheap to change and never re-films, but the video model never sees it. Lean: grade after, at publish, with an option to bake a strong look into the still.
-2. **Which engine does a region edit?** `admit_prompt_direction` refuses a run that paints with a different image engine than the bundle's stills (a mix of two looks). A region edit with a separate edit model would break that rule on purpose. Either the rule learns about an edit layer, or region edits go through the same engine as a masked repaint. Faces are the risk: the MOSS edit LoRA does not hold identity; Klein-ref is the engine that does.
-3. **A wrap-around picture, or a flat screen in a VR room?** OTR stills are flat 16:9 frames. Wrapping them 360 degrees needs outpainting and seam-matching for every shot. A large curved screen in a dark room (a screening room) needs none of that and is how a real colorist works. Lean: screening room first; a 360 "step inside" view later as an extra.
-4. **Where does it run?** The page is served from the ComfyUI server and opened in the headset's browser (WebXR). No app store. It mirrors the direction schema the way Radio Play Studio does, or becomes a mode of Studio.
-5. **Voice.** The headset browser's speech input, or local Whisper on the 5080. Cloud is optional and off by default; the suite has to work offline.
+1. **How does a staging change reach the picture?** Three ways, in rising cost:
+   - **A. Words.** The room turns your moves into framing words in `picture_text` ("low angle, wide, she stands in the doorway behind him"). Works today, but the engine may not obey, so the result is approximate.
+   - **B. A rough layout picture.** The room renders a grey-box view from the camera you placed (stand-in figures, the set as blocks) and Klein uses it as a reference picture along with the cast portraits. No new engine type, but untested whether Klein follows a layout reference rather than copying it.
+   - **C. A depth or pose control.** The grey-box view becomes a depth or pose map driving a ControlNet-style input. Most exact, but it is a new engine input that no shipped engine has, and it collides with the rule below.
+   Lean: A first (free), then measure B on a handful of shots before anyone builds C.
+2. **The same-engine rule.** `admit_prompt_direction` refuses a later run whose image engines differ from the bundle's (`producer_image_engines`), to avoid two looks in one episode. Path C, or any separate "staging" engine, breaks that rule on purpose. Either the rule learns about a staging layer or staging stays inside the same engine. Faces are the risk throughout: Klein-ref holds identity, the MOSS edit LoRA does not.
+3. **What are the characters in the room?** Flat cut-outs of each shot's still (cheap, shows the current picture), or 3D stand-ins. `eng_mesh_stage.py` already turns each character's portrait into a cached GLB (Hunyuan3D-2mv) and drives Blender, so real 3D stand-ins are closer than they look, but that engine is opt-in (`OTR_ENABLE_MESH_STAGE`) and unproven as a staging tool.
+4. **Where does the set come from?** Without a 3D set, "stand in the doorway" has no doorway. Options: a blank stage with marks, a set guessed from the still (depth estimate), or a few stock rooms. This decides how much of the room is real.
+5. **Does staging carry to the video stage?** A camera move set in VR becomes `motion_text` words today. A real camera path would need the video engines to take a path, which none do.
+6. **Voice.** Headset browser speech input, or local Whisper on the 5080. Cloud is optional and off by default; the suite works offline.
 
 ## Limits that already apply
 
-- 16 GB, one job at a time. An AI edit waits in the ComfyUI queue; it does not run beside an episode render.
-- Color work runs in the headset (a WebGL shader), so it costs the 5080 nothing.
-- An edit never changes audio, cast or timing (the Producer's rule).
-- A partial result never publishes (the Producer's rule).
-- Generated content is not filtered; the AI applies what you ask.
+- 16 GB, one job at a time. A repaint waits in the ComfyUI queue; nothing runs beside an episode render.
+- The room itself (moving stand-ins, flying the camera) runs in the headset and costs the 5080 nothing; only "paint it" does.
+- An edit never changes audio, cast or timing, and a partial result never publishes (both Producer rules).
+- Generated content is not filtered; the assistant applies what you ask.
 
 ## Smallest useful first version
 
-A screening room in the headset browser that loads one stills bundle and shows the cards scene by scene. You can:
-
-- say or tap **keep**, **paint again** or **change the picture**, and the page writes a `direction_json` and submits the next stage;
-- set a **look** with a voice prompt plus a few knobs, previewed live, stored in the page only until decision 1 is settled.
-
-No schema change and no new node for this version. It shows whether reviewing in VR beats reviewing on the flat page before anything shared is touched.
+The stills of one scene in a curved row around you, in order, in the headset browser via Studio. For each shot you can say or tap **keep**, **paint again**, or describe a new framing; the assistant writes the `picture_text` (path A) and Studio submits the next stage. No schema change and no new node. It answers the first question cheaply: is planning shots in VR better than on the flat Studio page?
 
 ## Not in scope
 
+- Fine retouching (operator, 2026-10-30).
+
+## Side quest: color looks
+
+Operator, 2026-10-30: color shifts can be a side quest. Not part of the staging room's first version. When it comes back, the open question is the same one as before: grade the still before filming (the video model films the look; changing it costs a re-film) or grade the clip at publish (cheap to change; the video model never sees it). The earlier lean was grading at publish. Color runs in the headset as a live preview, so it costs the 5080 nothing until it is applied.
 - Reopening story or music quality (both closed by operator directive).
 - Changing the shipped default workflow. The suite is opt-in, like the Producer.
