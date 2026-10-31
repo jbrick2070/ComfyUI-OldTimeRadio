@@ -285,7 +285,7 @@ different proof.
 
 ### The registry -- his clicks and his word
 
-* **2.3.48 is the latest published version** (`f5545e5ff`, 2026-10-31 23:57
+* **2.3.48 is the latest published version** (`f5545e5ff`, 2026-10-30 23:57
   PT): cut at the operator's new rule, "bumps should be done at every
   logical step" (CLAUDE.md 7A, amended 2026-10-31). The step: Studio /direct
   and the VR staging-room plans, plus the fresh-install proof of 2.3.47. The
