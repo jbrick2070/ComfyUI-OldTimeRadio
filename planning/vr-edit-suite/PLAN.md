@@ -16,6 +16,8 @@ So the first thing in the headset is the Stream Deck's choices, not the shot edi
 - **Reviewed:** Codex (`gpt-5.6-sol`, read-only, briefed to refute) on the first commit found seven defects, all real, all folded the same night (`74d11e16` then the fix commit); a second Codex pass reviewed the fixes.
 - **Tests:** `tests/test_rps_direct.py` -- the route, the loopback rule, unique ids, every id the script asks for, and the posted fields pinned to the deck's `DIAL_FIELDS` so one contract covers both.
 
+- **How it reaches people:** from GitHub, the way Studio always has. `.comfyignore` keeps `contest/` out of the registry zip (since 2.3.39, operator 2026-10-23), so `/direct` needs no registry version and must never be the reason for one. A 2.3.48 bump was staged on the wrong premise on 2026-10-30 and reverted before any push.
+
 The per-shot director's pass below is the advanced mode that opens once an episode exists.
 
 ## What it is
