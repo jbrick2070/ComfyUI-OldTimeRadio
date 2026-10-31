@@ -113,8 +113,20 @@ const PRETTY = {language: "Language", bank: "Story bank", style: "Visual style",
                 machine: "Machine", video: "Video"};
 const ROLL_PREFIX = "roll";
 
+/* The phases the run reports, in the page's own words (the full page's English
+   strings; this page speaks English until it gets its own files). */
+const PHASES = {writing: "writing the script", casting: "casting", voicing: "voicing the cast",
+                music: "composing the music", pictures: "painting the pictures",
+                planning: "planning the shots", filming: "filming", sound: "mixing the sound",
+                finishing: "finishing and publishing"};
+function phaseWords(phase) {
+  const key = String(phase || "").replace(/^phase\./, "");
+  return PHASES[key] || key;
+}
+
 const S = {
   options: null,          // /api/options for the chosen workflow
+  foreign: false,         // following a run this page did not start: its picks are unknown
   picks: [],              // [{key, label, choices: [{value, label, note}], value}]
   step: 0,                // which pick the cursor is on; picks.length = the MAKE tile
   cursor: 0,              // which choice in the live pick
@@ -176,7 +188,12 @@ async function load(workflow) {
   S.busy = true;
   setStatus(workflow ? `reading the choices for ${workflow}...` : "reading the choices...");
   render();
-  const options = await getJSON("/api/options" + (workflow ? "?workflow=" + encodeURIComponent(workflow) : ""));
+  let options;
+  try {
+    options = await getJSON("/api/options" + (workflow ? "?workflow=" + encodeURIComponent(workflow) : ""));
+  } finally {
+    S.busy = false;   // a failed read never locks the picker (Codex QA, 2026-10-30)
+  }
   S.options = options;
   const machine = machinePicks(options);
   const kept = new Map(S.picks.map((p) => [p.key, p.value]));
@@ -191,7 +208,6 @@ async function load(workflow) {
     if (!p.choices.some((c) => c.value === p.value) && p.choices.length) p.value = p.choices[0].value;
   }
   S.picks = picks;
-  S.busy = false;
   setStatus(options.menu ? `${options.menu.current.workflow}` : "the server's own workflow");
 }
 
@@ -205,6 +221,7 @@ function move(delta) {
   const n = live().choices.length;
   if (!n) return;
   S.cursor = (S.cursor + delta + n) % n;
+  XR.base = S.cursor;   // the ring re-centres on a stick or key move, never on a gaze
   render();
 }
 
@@ -214,6 +231,7 @@ function enter(step) {
     const p = live();
     const i = p.choices.findIndex((c) => c.value === p.value);
     S.cursor = i < 0 ? 0 : i;
+    XR.base = S.cursor;
   }
   render();
 }
@@ -230,12 +248,14 @@ async function pick() {
     if (!video.choices.some((c) => c.value === video.value)) video.value = video.choices.length ? video.choices[0].value : null;
   }
   if (p.key === "video") {
-    // The workflow changes with the way: the dial fields are read for it.
+    // The workflow changes with the way: the dial fields are read for it. A
+    // read that fails leaves the cursor on Video, with the reason shown.
     const way = p.choices[S.cursor];
     if (way && way.workflow && way.workflow !== S.options.menu.current.workflow) {
-      try { await load(way.workflow); } catch (e) { showError(e.message); }
+      try { await load(way.workflow); } catch (e) { showError(e.message); return; }
     }
   }
+  hideError();
   enter(S.step + 1);
 }
 
@@ -253,15 +273,26 @@ function chosenWorkflow() {
 
 /* ---- making the episode ----------------------------------------------- */
 async function make() {
+  if (S.making) return;
   const choices = {};
   for (const p of S.picks) if (DIAL_FIELDS.includes(p.key) && p.value != null) choices[p.key] = p.value;
   const workflow = chosenWorkflow();
   if (workflow) choices.workflow = workflow;
   hideError();
-  const r = await fetch("/api/episodes", {method: "POST", headers: {"Content-Type": "application/json"},
-                                           body: JSON.stringify({choices})});
-  const body = await r.json().catch(() => ({}));
-  if (!r.ok) return showError(body.error || `the server answered ${r.status}`);
+  // Latched before the post goes out, so a second press, pad hit or trigger
+  // pull while the server answers sends nothing (Codex QA, 2026-10-30).
+  S.making = {id: null, value: 0, phase: "sending", minutes: null};
+  render();
+  let r, body;
+  try {
+    r = await fetch("/api/episodes", {method: "POST", headers: {"Content-Type": "application/json"},
+                                      body: JSON.stringify({choices})});
+    body = await r.json().catch(() => ({}));
+  } catch (e) {
+    S.making = null;
+    return showError(`could not reach the Studio (${e.message})`);
+  }
+  if (!r.ok) { S.making = null; return showError(body.error || `the server answered ${r.status}`); }
   follow(body.id);
 }
 
@@ -269,6 +300,7 @@ function follow(id) {
   S.making = {id, value: 0, phase: "sent", minutes: null};
   S.done = null;
   $("making").hidden = false;
+  $("fill").style.width = "0%";
   $("player").hidden = true;
   const source = new EventSource(`/api/episodes/${encodeURIComponent(id)}/events`);
   S.making.source = source;
@@ -282,12 +314,15 @@ function follow(id) {
       source.close();
       S.done = {run: event.run, file: event.file};
       S.making = null;
+      $("fill").style.width = "100%";
+      $("phase").textContent = "100% done";
       $("player").src = `/episodes/${encodeURIComponent(event.run)}/${encodeURIComponent(event.file)}`;
       $("player").hidden = false;
       $("again").hidden = false;
     } else if (event.type === "error") {
       source.close();
       S.making = null;
+      $("making").hidden = true;
       showError(event.message || "the run failed");
       $("again").hidden = false;
     }
@@ -301,7 +336,7 @@ function showError(text) { $("error").textContent = text; $("error").hidden = fa
 function hideError() { $("error").hidden = true; }
 
 function again() {
-  S.done = null; S.making = null;
+  S.done = null; S.making = null; S.foreign = false;
   $("player").hidden = true; $("player").removeAttribute("src");
   $("making").hidden = true; $("again").hidden = true;
   hideError();
@@ -312,7 +347,9 @@ function again() {
 function render() {
   const trail = $("trail");
   trail.textContent = "";
-  S.picks.forEach((p, i) => {
+  // A run found already going was picked elsewhere (the page, the deck): the
+  // trail would show this page's defaults as if they were its picks.
+  if (!S.foreign) S.picks.forEach((p, i) => {
     const li = document.createElement("li");
     const c = p.choices.find((x) => x.value === p.value);
     const b = document.createElement("b"); b.textContent = p.label;
@@ -329,17 +366,23 @@ function render() {
     row.appendChild(tile({label: "one moment", note: "ComfyUI is listing what this workflow offers"}, false));
     return;
   }
+  if (S.making && S.making.id === null) {
+    $("prompt").textContent = "Sending the picks...";
+    return;
+  }
   if (S.making) {
     $("prompt").textContent = "Making the episode";
     $("fill").style.width = Math.round(S.making.value * 100) + "%";
     const mins = S.making.minutes != null ? ` - about ${Math.max(1, Math.round(S.making.minutes))} min left` : "";
-    $("phase").textContent = `${Math.round(S.making.value * 100)}% ${S.making.phase || ""}${mins}`;
+    $("phase").textContent = `${Math.round(S.making.value * 100)}% ${phaseWords(S.making.phase)}${mins}`;
     return;
   }
   if (S.done) { $("prompt").textContent = "Done. Press play."; return; }
   if (atMake()) {
     $("prompt").textContent = "Everything is picked.";
-    row.appendChild(tile({label: "MAKE", note: "the episode, with these picks"}, true, "make"));
+    const go = tile({label: "MAKE", note: "the episode, with these picks"}, true, "make");
+    go.addEventListener("click", () => pick());
+    row.appendChild(go);
     return;
   }
   const p = live();
@@ -368,7 +411,9 @@ function tile(choice, current, extra, count) {
 
 /* ---- inputs: keyboard, gamepad, MIDI ------------------------------------ */
 document.addEventListener("keydown", (ev) => {
-  if (ev.target && ev.target.tagName === "VIDEO") return;
+  // A focused button, link or the player keeps its own keys: Enter on
+  // "Enter VR" must not also pick a tile.
+  if (ev.target && ["VIDEO", "BUTTON", "A"].includes(ev.target.tagName)) return;
   if (ev.key === "ArrowRight" || ev.key === "ArrowDown") { move(1); ev.preventDefault(); }
   else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") { move(-1); ev.preventDefault(); }
   else if (ev.key === "Enter" || ev.key === " ") { pick(); ev.preventDefault(); }
@@ -415,7 +460,7 @@ function onMIDI(msg) {
     const n = live().choices.length;
     if (!n) return;
     const i = Math.min(n - 1, Math.round(data2 / 127 * (n - 1)));
-    if (i !== lastCC) { lastCC = i; S.cursor = i; render(); }
+    if (i !== lastCC) { lastCC = i; S.cursor = i; XR.base = i; render(); }
   }
 }
 
@@ -425,8 +470,11 @@ function onMIDI(msg) {
    tile to put the cursor on it, or push the thumbstick; pull the trigger to
    pick; squeeze to go back.
    ------------------------------------------------------------------------ */
+/* ``base`` is the choice drawn straight ahead. It moves with the stick and
+   the keys, never with a gaze, so the tile you look at stays where it is
+   while the cursor lands on it (Codex QA, 2026-10-30). */
 const XR = {session: null, gl: null, prog: null, buf: null, tex: new Map(), refSpace: null,
-            lastStick: 0, gazeIndex: -1};
+            lastStick: 0, base: 0};
 const RING = {radius: 2.2, step: 0.42, w: 0.95, h: 0.5};
 
 function xrReady() {
@@ -442,12 +490,22 @@ async function enterVR() {
   const canvas = $("xr-canvas");
   const gl = canvas.getContext("webgl", {xrCompatible: true, alpha: false});
   if (!gl) return showError("WebGL is not available in this browser");
-  const session = await navigator.xr.requestSession("immersive-vr", {optionalFeatures: ["local-floor"]});
-  XR.session = session; XR.gl = gl;
-  await gl.makeXRCompatible();
-  session.updateRenderState({baseLayer: new XRWebGLLayer(session, gl)});
-  XR.refSpace = await session.requestReferenceSpace("local");
-  initGL(gl);
+  let session;
+  try {
+    session = await navigator.xr.requestSession("immersive-vr", {optionalFeatures: ["local-floor"]});
+    XR.session = session; XR.gl = gl;
+    await gl.makeXRCompatible();
+    session.updateRenderState({baseLayer: new XRWebGLLayer(session, gl)});
+    XR.refSpace = await session.requestReferenceSpace("local");
+    initGL(gl);
+  } catch (e) {
+    // Refused permission, a headset that went away, a layer the browser could
+    // not make: said on the page, and the flat view carries on.
+    XR.session = null;
+    if (session) { try { await session.end(); } catch (_) { /* already gone */ } }
+    return showError(`VR could not start (${e.message})`);
+  }
+  XR.base = S.cursor;
   session.addEventListener("selectstart", () => pick());
   session.addEventListener("squeezestart", () => back());
   session.addEventListener("end", () => { XR.session = null; XR.tex.clear(); });
@@ -521,7 +579,7 @@ function ringTiles() {
   }
   if (S.making) {
     const pct = Math.round(S.making.value * 100);
-    out.push({key: "mk", text: JSON.stringify([`${pct}%`, S.making.phase || "making", true, ""]), angle: 0, y: 0});
+    out.push({key: "mk", text: JSON.stringify([`${pct}%`, phaseWords(S.making.phase) || "making", true, ""]), angle: 0, y: 0});
     return out;
   }
   if (S.done) {
@@ -536,11 +594,12 @@ function ringTiles() {
   const p = live();
   const n = p.choices.length;
   out.push({key: "ttl", text: JSON.stringify([`${p.label}  ${S.step + 1}/${S.picks.length}`, "look at one, pull the trigger", false, ""]), angle: 0, y: .62});
+  // Centred on ``base``, not the cursor: a gaze lights a tile where it is.
   const span = Math.min(n, 7);
   for (let k = -Math.floor(span / 2); k <= Math.floor((span - 1) / 2); k++) {
-    const i = ((S.cursor + k) % n + n) % n;
+    const i = ((XR.base + k) % n + n) % n;
     const c = p.choices[i];
-    out.push({key: "c" + k, index: i, text: JSON.stringify([c.label, c.note || "", k === 0, ""]), angle: k * RING.step, y: 0});
+    out.push({key: "c" + k, index: i, text: JSON.stringify([c.label, c.note || "", i === S.cursor, ""]), angle: k * RING.step, y: 0});
   }
   return out;
 }
@@ -591,16 +650,17 @@ function xrInputs(session, time, pose) {
       if (time - XR.lastStick > 260) { move(x > 0 ? 1 : -1); XR.lastStick = time; }
     }
   }
-  if (stickUsed || S.making || S.done || atMake()) return;
+  if (stickUsed || S.making || S.done || S.busy || atMake()) return;
   const m = pose.views[0].transform.matrix;        // forward is -z of the view
   const fx = -m[8], fz = -m[10];
   const yaw = Math.atan2(fx, -fz);                 // 0 straight ahead, + to the right
   const k = Math.round(yaw / RING.step);
   const n = live().choices.length;
-  if (!n || Math.abs(k) > 3 || k === 0) return;
-  if (Math.abs(yaw - k * RING.step) < RING.step * .4 && time - XR.lastStick > 350) {
-    S.cursor = ((S.cursor + k) % n + n) % n; XR.lastStick = time; render();
-  }
+  const span = Math.min(n, 7);
+  if (!n || k < -Math.floor(span / 2) || k > Math.floor((span - 1) / 2)) return;
+  if (Math.abs(yaw - k * RING.step) > RING.step * .4) return;   // between two tiles: keep the last
+  const gazed = ((XR.base + k) % n + n) % n;
+  if (gazed !== S.cursor) { S.cursor = gazed; render(); }
 }
 
 /* ---- tiny matrix helpers (column-major, like WebGL) ---- */
@@ -636,7 +696,7 @@ $("again").addEventListener("click", again);
     // A run already going (started from the page or the deck) is followed here.
     const eps = await getJSON("/api/episodes").catch(() => ({episodes: []}));
     const going = (eps.episodes || []).find((e) => !e.finished && !e.project_id);
-    if (going) follow(going.id); else enter(0);
+    if (going) { S.foreign = true; follow(going.id); } else enter(0);
     presence(false);
     xrReady();
   } catch (e) {

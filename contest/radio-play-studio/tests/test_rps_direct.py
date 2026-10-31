@@ -6,11 +6,33 @@ from __future__ import annotations
 
 import pathlib
 import re
+import threading
 from html.parser import HTMLParser
 
-from test_rps_server import _request, app  # noqa: F401 - the fixture, over real HTTP
+import pytest
+
+from radio_play_studio import server as server_module
+from radio_play_studio.runner import Studio
+from radio_play_studio.server import make_server
+
+from test_rps_runner import FakeClient, _good_job  # noqa: E402 - sibling test module
+from test_rps_server import _request  # noqa: E402 - one request over real HTTP
 
 PAGE = pathlib.Path(__file__).resolve().parents[1] / "radio_play_studio" / "static" / "direct.html"
+
+
+@pytest.fixture
+def app(settings, schemas, monkeypatch):
+    """The real server on a free port, without its GPU watcher: that thread
+    loops for good after shutdown and would ask the fixture's comfy.invalid
+    to /free (Codex QA, 2026-10-30; the deck contract does the same)."""
+    monkeypatch.setattr(server_module, "_watch_gpu", lambda runs: None)
+    studio = Studio(settings, client_factory=lambda url: FakeClient(_good_job()), fetch=lambda url: schemas)
+    httpd = make_server(studio, "127.0.0.1", 0)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    yield httpd.server_address[1], settings
+    httpd.shutdown()
+    httpd.server_close()
 SETTINGS_TS = (pathlib.Path(__file__).resolve().parents[1] / "streamdeck" / "src" / "types"
                / "settings.ts").read_text(encoding="utf-8")
 HTML = PAGE.read_text(encoding="utf-8")
