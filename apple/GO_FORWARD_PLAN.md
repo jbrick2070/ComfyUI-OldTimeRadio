@@ -318,7 +318,14 @@ different proof.
 * **Flagged registry versions -- diagnosed 2026-10-30, and it IS a code
   finding.** Every registry version from 2.3.21 to 2.3.43 is Flagged (21 of
   them; 2.3.41 and 2.3.42 never appeared on the registry), 2.3.20
-  (2026-10-01) is the newest Active one, and 2.3.44 is Pending. Read with
+  (2026-10-01) is the newest Active one, and 2.3.44 is Pending. [Superseded
+  the same night: he soft-deleted every version but 2.3.45 from the registry
+  page. A direct sweep of `/versions/2.3.0` through `/versions/2.3.45` read
+  44 rows Deleted, 2.3.37 still Flagged mid-sweep, 2.3.45 Pending. Two
+  corrections it measured: 2.3.41 and 2.3.42 HAD been on the registry (now
+  Deleted), and the versions LIST endpoint hides Deleted rows and returns
+  different row sets from different replicas (19 rows one read, 34 the
+  next), so only a per-version GET is a fact about a version.] Read with
   `?include_status_reason=true`, the verdicts come in two eras. 2.3.21-2.3.33
   carry `policy-v0.6` class verdicts (arbitrary-file-read, -write,
   path-traversal, information-disclosure) that PBUG-20261018-01 fixed by
