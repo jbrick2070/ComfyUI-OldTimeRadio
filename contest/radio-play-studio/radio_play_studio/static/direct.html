@@ -193,6 +193,7 @@ async function load(workflow) {
     options = await getJSON("/api/options" + (workflow ? "?workflow=" + encodeURIComponent(workflow) : ""));
   } finally {
     S.busy = false;   // a failed read never locks the picker (Codex QA, 2026-10-30)
+    if (!options && S.options) setStatus(workflowWords(S.options));   // the header names what still stands
   }
   S.options = options;
   const machine = machinePicks(options);
@@ -208,7 +209,11 @@ async function load(workflow) {
     if (!p.choices.some((c) => c.value === p.value) && p.choices.length) p.value = p.choices[0].value;
   }
   S.picks = picks;
-  setStatus(options.menu ? `${options.menu.current.workflow}` : "the server's own workflow");
+  setStatus(workflowWords(options));
+}
+
+function workflowWords(options) {
+  return options.menu ? `${options.menu.current.workflow}` : "the server's own workflow";
 }
 
 /* ---- moving the cursor and picking ------------------------------------ */
@@ -296,7 +301,10 @@ async function make() {
   follow(body.id);
 }
 
-function follow(id) {
+function follow(id, foreign = false) {
+  // ``foreign``: a run found already going, picked elsewhere. A run this page
+  // starts always shows its own trail (Codex QA round 2, 2026-10-30).
+  S.foreign = foreign;
   S.making = {id, value: 0, phase: "sent", minutes: null};
   S.done = null;
   $("making").hidden = false;
@@ -696,7 +704,7 @@ $("again").addEventListener("click", again);
     // A run already going (started from the page or the deck) is followed here.
     const eps = await getJSON("/api/episodes").catch(() => ({episodes: []}));
     const going = (eps.episodes || []).find((e) => !e.finished && !e.project_id);
-    if (going) { S.foreign = true; follow(going.id); } else enter(0);
+    if (going) follow(going.id, true); else enter(0);
     presence(false);
     xrReady();
   } catch (e) {
