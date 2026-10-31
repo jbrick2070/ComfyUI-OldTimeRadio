@@ -285,7 +285,16 @@ different proof.
 
 ### The registry -- his clicks and his word
 
-* **2.3.47 is the latest published version** (`6cf093da5`, 2026-10-30 21:50
+* **2.3.48 is the latest published version** (`f5545e5ff`, 2026-10-31 23:57
+  PT): cut at the operator's new rule, "bumps should be done at every
+  logical step" (CLAUDE.md 7A, amended 2026-10-31). The step: Studio /direct
+  and the VR staging-room plans, plus the fresh-install proof of 2.3.47. The
+  shipped files equal 2.3.47's apart from the version stamps. Gate: full
+  suite on the exact tree 19,181 passed, no failures; replica 0 findings.
+  Registry: Pending, 31 dependencies, none a URL; installs serve it. The
+  reviewers' "no bump while Pending" stopping rule below is superseded for
+  logical steps; the scheduled check judges whichever version is newest.
+* **2.3.47 was published before it** (`6cf093da5`, 2026-10-30 21:50
   PT, at the operator's "i say asap"): 2.3.46 plus K (`17c820333`, the spaCy
   URL line out of both dependency files) and L (`c9cd41fac`, the two October
   scanner rules that flag a version alone cleared: three `Path(x).read_text(`

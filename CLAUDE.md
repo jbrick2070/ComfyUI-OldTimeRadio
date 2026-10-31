@@ -708,6 +708,17 @@ The pack is published to registry.comfy.org as **`comfyui-old-time-radio`** unde
     Do not stack a version for tidiness. DO publish when the Active version cannot
     run what the repo ships -- a real gap is the reason the rule exists, not an
     exception to it. Say in the commit which gap it closes.
+  * **AMENDED 2026-10-31 (operator): A VERSION AT EVERY LOGICAL STEP.** Operator:
+    *"bumps should be done at every logical step, operator says so."* When a
+    piece of work lands as a logical step, cut the next patch version even if
+    a version is Pending and even if the step lives in files the zip does not
+    ship (2.3.48 was cut for Studio /direct, which sits in `contest/`). This
+    supersedes "do not stack a version" and the reviewers' "no bump while
+    Pending" stopping rule for logical steps. What does NOT change: the gate
+    (full suite on the exact bumped tree, `scripts/otr_registry_scan_oracle.py`
+    at 0 findings, version-only release commit), the third digit only, ONE
+    window bumps at a time (message the window that last bumped before you
+    do), and nobody deletes registry versions but him.
   * **NEVER PUBLISH A TREE WITH AN UNEXPLAINED REGRESSION.** Three versions
     (alpha.26-29) were BANNED. A publish is the one action here that reaches
     strangers and cannot be taken back -- the version string burns even on a soft
