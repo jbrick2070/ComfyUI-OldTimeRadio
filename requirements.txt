@@ -124,15 +124,18 @@ PyYAML>=6.0
 # should be is an open operator decision -- see apple/GO_FORWARD_PLAN.md
 # 2026-09-01. Mirror this marker into pyproject.toml on the next bump.
 kokoro>=0.7.16; python_version < "3.13"
-# The English phonemizer's spaCy model (registry review, 2026-10-30). kokoro's
-# misaki[en] loads spaCy's en_core_web_sm for English G2P, and when the model
-# package is absent it calls spacy.cli.download -- which spawns
-# `python -m pip install` in the middle of a render. A fresh install lacked
-# it because the model is not on PyPI: spaCy publishes it as a GitHub
-# release wheel, so it is declared here by URL (a PEP 508 direct reference)
-# under the kokoro marker. The engine refuses by name, and never downloads,
-# if it is still missing (`_kokoro_backends.py`). Mirrored in pyproject.toml.
-en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl ; python_version < "3.13"
+# spaCy's English model is NOT declared, on purpose (2026-10-31). kokoro's
+# misaki[en] needs en_core_web_sm for English G2P and, when it is absent,
+# calls spacy.cli.download, a package install in the middle of a render;
+# `_kokoro_backends.py` refuses by name before misaki can, and names the one
+# line to run: python -m spacy download en_core_web_sm. The model is not on
+# PyPI, only on spaCy's GitHub releases, and a direct-URL requirement in this
+# file is exactly what the registry's pattern scan flags as
+# contains_custom_url_dependency: any web address here, a comment included,
+# is a finding, and that one finding alone flagged comfyui-visage 1.0.0 (read
+# 2026-10-31). 2.3.45 and 2.3.46 carried the URL line. Keep this file free of
+# web addresses and wheel file names; scripts/otr_registry_scan_oracle.py
+# checks it before every publish.
 # 2026-09-02 (queue item 2): the SAME kokoro voices on Python 3.13, through ONNX
 # Runtime instead of torch -- `nodes/_otr_audio_engines/_kokoro_backends.py`. The
 # engine stays "kokoro" in every dropdown; it selects the torch package when that

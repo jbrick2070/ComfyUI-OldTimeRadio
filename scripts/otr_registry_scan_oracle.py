@@ -213,6 +213,52 @@ def _pip_install_spawns(rel: str, raw: str) -> list:
             })
     return out
 
+#: The registry's YARA rule `contains_custom_url_dependency` ("Detects custom
+#: wheel or URL dependencies", strings `$plaintext_url` and `$whl_string`),
+#: read 2026-10-31 off three packs' structured verdicts. It matches TEXT, so a
+#: web address in a requirements comment counts (comfyui-prompt-tag-editor
+#: 1.5.0), and that one finding alone flagged comfyui-visage 1.0.0. In
+#: pyproject.toml it fired on a dependency line (comfyui-soda-storyboard);
+#: the [project.urls] and [tool.comfy] Icon addresses every pack carries did
+#: not flag this pack's 2.3.15-2.3.20, so only the dependency arrays count there.
+_URL_DEP_RE = re.compile(r"://|\.whl\b|\bgit\+", re.IGNORECASE)
+_REQUIREMENTS_NAME_RE = re.compile(r"(^|/)requirements[^/]*\.txt$", re.IGNORECASE)
+
+
+def _custom_url_dependencies(rel: str, raw: str) -> list:
+    """`contains_custom_url_dependency`, modelled: any address or wheel file
+    name in a requirements file, comments included; in pyproject.toml, one
+    inside a `dependencies` or `optional-dependencies` array."""
+    name = rel.replace("\\", "/")
+    out = []
+    if _REQUIREMENTS_NAME_RE.search(name):
+        for n, line in enumerate(raw.splitlines(), 1):
+            if _URL_DEP_RE.search(line):
+                out.append({"file": rel, "line": n, "rule": "$custom_url_dependency",
+                            "label": "a web address or wheel in a requirements file "
+                                     "(YARA contains_custom_url_dependency)",
+                            "text": line.strip()[:100]})
+    elif name.lower().endswith("pyproject.toml"):
+        import tomllib
+        try:
+            project = tomllib.loads(raw).get("project", {})
+        except tomllib.TOMLDecodeError:
+            return out
+        specs = list(project.get("dependencies") or [])
+        for group in (project.get("optional-dependencies") or {}).values():
+            specs.extend(group or [])
+        raw_lines = raw.splitlines()
+        for spec in specs:
+            if not isinstance(spec, str) or not _URL_DEP_RE.search(spec):
+                continue
+            n = next((i for i, line in enumerate(raw_lines, 1) if spec in line), 0)
+            out.append({"file": rel, "line": n, "rule": "$custom_url_dependency",
+                        "label": "a web address or wheel in a pyproject dependency "
+                                 "(YARA contains_custom_url_dependency)",
+                        "text": spec[:100]})
+    return out
+
+
 _CODE_EXT = {".py", ".pyw", ".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"}
 _DATA_EXT = {".json", ".md", ".txt", ".yaml", ".yml", ".cfg", ".ini", ".toml"}
 
@@ -328,6 +374,7 @@ def scan(all_tracked: bool = False):
             continue
         if ext in {".py", ".pyw"}:
             findings.extend(_pip_install_spawns(rel, raw))
+        findings.extend(_custom_url_dependencies(rel, raw))
         scanned = _blank_line_comments(raw, ext)
         lines = scanned.splitlines()
         raw_lines = raw.splitlines()

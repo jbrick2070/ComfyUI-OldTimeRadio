@@ -89,6 +89,57 @@ def test_a_mention_of_pip_stays_quiet(shape):
     assert _oracle()._pip_install_spawns("x.py", STAYS_QUIET[shape]) == [], shape
 
 
+# `contains_custom_url_dependency`, from three packs' structured verdicts read
+# 2026-10-31: comfyui-visage 1.0.0 was flagged on this finding ALONE.
+URL_DEP_FIRES = {
+    "git direct reference (comfyui-visage 1.0.0)": (
+        "requirements.txt", "visage-image @ git+https://github.com/x/Visage-Image@main\n"),
+    "a wheel URL (this pack's 2.3.45/2.3.46 spaCy line)": (
+        "requirements.txt", 'en_core_web_sm @ https://github.com/explosion/spacy-models/'
+        'releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl'
+        ' ; python_version < "3.13"\n'),
+    "an address in a COMMENT (comfyui-prompt-tag-editor 1.5.0)": (
+        "requirements.txt", "numpy\n#   https://github.com/JamePeng/llama-cpp-python/releases\n"),
+    "an index flag": ("requirements-gpu.txt", "--extra-index-url https://download.example/whl\n"),
+    "a pyproject dependency (comfyui-soda-storyboard 0.1.1)": (
+        "pyproject.toml", '[project]\nname = "x"\ndependencies = [\n'
+        '    "soda @ https://github.com/x/soda/releases/download/v1/soda-1-py3-none-any.whl",\n]\n'),
+}
+
+URL_DEP_QUIET = {
+    "plain names and markers": (
+        "requirements.txt", 'nvidia-vfx>=0.2,<0.3; (sys_platform == "win32" and platform_machine == "AMD64")\n'
+        "# spaCy publishes the model as a GitHub release wheel, not on PyPI\n"),
+    "pyproject metadata addresses every pack carries (2.3.15-2.3.20 passed with them)": (
+        "pyproject.toml", '[project]\nname = "x"\ndependencies = ["numpy>=1.24"]\n'
+        '[project.urls]\nRepository = "https://github.com/x/y"\n'
+        '[tool.comfy]\nIcon = "https://raw.githubusercontent.com/x/y/main/icon.png"\n'),
+    "a URL in a node's code is another rule's business": ("nodes/x.py", 'URL = "https://example.com/a.whl"\n'),
+}
+
+
+@pytest.mark.parametrize("shape", sorted(URL_DEP_FIRES))
+def test_a_custom_url_dependency_fires(shape):
+    rel, raw = URL_DEP_FIRES[shape]
+    hits = _oracle()._custom_url_dependencies(rel, raw)
+    assert hits and all(h["rule"] == "$custom_url_dependency" for h in hits), shape
+
+
+@pytest.mark.parametrize("shape", sorted(URL_DEP_QUIET))
+def test_a_plain_dependency_stays_quiet(shape):
+    rel, raw = URL_DEP_QUIET[shape]
+    assert _oracle()._custom_url_dependencies(rel, raw) == [], shape
+
+
+def test_the_shipped_dependency_files_carry_no_address():
+    """The real files, through the same rule the clean test runs over the
+    packed set -- stated here so a failure names the rule."""
+    oracle = _oracle()
+    for rel in ("requirements.txt", "pyproject.toml"):
+        raw = (REPO / rel).read_text(encoding="utf-8")
+        assert oracle._custom_url_dependencies(rel, raw) == [], rel
+
+
 def test_the_old_engine_is_reported_at_its_spawn_line():
     (hit,) = _oracle()._pip_install_spawns("eng.py", _OLD_ENGINE)
     assert "attempt([sys.executable" in hit["text"]

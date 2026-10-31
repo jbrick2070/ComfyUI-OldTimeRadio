@@ -832,17 +832,17 @@ class TorchKokoroBackend:
             # spawns `python -m pip install` in the middle of a render. A node
             # pack never installs packages at run time, so the absence is a
             # named refusal with the one line to run, and the download never
-            # starts. The model is not on PyPI, so requirements.txt declares
-            # it by its GitHub release wheel beside the kokoro line; a git
-            # clone that skipped the requirements can still lack it.
+            # starts. The model is not on PyPI and the registry's pattern scan
+            # flags a direct-URL requirement (contains_custom_url_dependency),
+            # so the pack does not declare it: this refusal is how a Python
+            # 3.12 install learns the one line to run.
             import importlib.util
             if importlib.util.find_spec("en_core_web_sm") is None:
                 raise BackendUnavailable(
                     "Kokoro's English phonemizer (misaki) needs spaCy's en_core_web_sm "
-                    "model, which is not installed in ComfyUI's Python. It is declared "
-                    "in the pack's requirements (pip install -r requirements.txt); or "
-                    "install it once, outside the render, with ComfyUI's own "
-                    "interpreter: python -m spacy download en_core_web_sm")
+                    "model, which is not installed in ComfyUI's Python. Install it once, "
+                    "outside the render, with ComfyUI's own interpreter: "
+                    "python -m spacy download en_core_web_sm")
         from kokoro import KPipeline
 
         kwargs = {"lang_code": self.lang_code, "device": self.device}

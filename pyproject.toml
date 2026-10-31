@@ -56,13 +56,10 @@ dependencies = [
     # Not installable on Python 3.13 (numpy==1.26.4 pin on 0.7.16; Requires-
     # Python <3.13 on every newer kokoro/misaki). Mirrors requirements.txt.
     "kokoro>=0.7.16; python_version < '3.13'",
-    # The English phonemizer's spaCy model (2026-10-30). misaki[en] calls
-    # spacy.cli.download -- a `pip install` spawned mid-render -- when
-    # en_core_web_sm is absent, and a fresh install lacked it because spaCy
-    # publishes the model as a GitHub release wheel, not on PyPI. Declared by
-    # URL under the kokoro marker; the engine refuses by name if it is still
-    # missing, and never downloads. Mirrors requirements.txt.
-    "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl ; python_version < '3.13'",
+    # spaCy's English model is deliberately NOT declared: it is not on PyPI,
+    # and a direct-URL requirement is what the registry's pattern scan flags
+    # (contains_custom_url_dependency, 2026-10-31). The Kokoro engine refuses by
+    # name and names the install line instead. See requirements.txt.
     # The SAME kokoro voices on Python 3.13, through ONNX Runtime instead of
     # torch. The engine stays "kokoro" in every dropdown and selects the torch
     # package when that imports, kokoro-onnx otherwise, so the two markers are
