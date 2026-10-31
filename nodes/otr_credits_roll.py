@@ -729,6 +729,15 @@ def _credits_script_font_paths(fd: str, policy: str) -> list:
     return os_faces + [shipped]
 
 
+def _shipped_latin_mono() -> "str | None":
+    """The pack's DejaVu Sans Mono (``_otr_script_fonts.LATIN``), or None."""
+    try:
+        from . import _otr_script_fonts as _SF
+    except ImportError:  # pragma: no cover -- flat/standalone load
+        import _otr_script_fonts as _SF  # type: ignore
+    return _SF.bundled_path("latin_mono")
+
+
 def _os_script_font_paths(fd: str, policy: str) -> list:
     """The operating systems' own faces for the row's script, in order."""
     if policy == "devanagari":
@@ -818,6 +827,11 @@ def _load_font(pt: int):
             "/System/Library/Fonts/Supplemental/Courier New Bold.ttf",
             "/Library/Fonts/Courier New Bold.ttf",
         ]
+        # LAST: the pack's own DejaVu Sans Mono. Comfy Cloud's image carries no
+        # fonts at all (2026-10-31) and its credits drew in the bitmap face,
+        # squashed, the third column off the frame; every box with a face of
+        # its own resolves above and never reaches this.
+        + [p for p in [_shipped_latin_mono()] if p]
     )
     for path in candidates:
         try:

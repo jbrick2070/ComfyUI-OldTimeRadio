@@ -463,9 +463,13 @@ def _shipped_family_if_no_os_face(policy: str) -> "str | None":
         from otr_credits_roll import _os_script_font_paths  # type: ignore
     if _SF.bundled_family(policy) is None:
         return None
-    fd = os.path.join(otr_env.get("WINDIR", r"C:\Windows"), "Fonts")
-    if _SF.os_face(policy, _os_script_font_paths(fd, policy)):
-        return None
+    if policy in _SF.LATIN:
+        if _SF.os_latin_face(policy):
+            return None
+    else:
+        fd = os.path.join(otr_env.get("WINDIR", r"C:\Windows"), "Fonts")
+        if _SF.os_face(policy, _os_script_font_paths(fd, policy)):
+            return None
     if _SF.bundled_path(policy) is None:
         return None
     log.info("[captions] no %s face on this machine; using the pack's %s",
@@ -686,6 +690,13 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
         except Exception:
             wrap_policy = "word_split"
             title_font = None
+    if st["font"] == "Arial":
+        # A FONT-LESS BOX (Comfy Cloud, 2026-10-31) has no Arial and nothing
+        # for fontconfig to substitute, and libass then draws NO caption at
+        # all. The pack's DejaVu Sans stands in only there; the monospace
+        # styles already name DejaVu Sans Mono off Windows and macOS, which
+        # the burn hands libass the same way (``_shipped_fonts_option``).
+        st["font"] = _shipped_family_if_no_os_face("latin_sans") or "Arial"
     mv = int(margin_v) if margin_v is not None else int(st["margin_v"])
 
     try:

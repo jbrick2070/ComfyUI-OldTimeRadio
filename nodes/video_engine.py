@@ -257,7 +257,20 @@ def _mono_font_families():
             "/usr/share/fonts/liberation-mono-fonts/LiberationMono-Regular.ttf",
             "/usr/share/fonts/liberation/LiberationMono-Regular.ttf",
         ], ["LiberationMono-Regular.ttf", "LiberationMono-Regular"]),
+        # LAST: the pack's own DejaVu Sans Mono, for a box with no fonts at all
+        # (Comfy Cloud, 2026-10-31). The same family the captions name, and
+        # the file the burn hands libass there, so measure and draw agree.
+        ("DejaVu Sans Mono", [p for p in [_shipped_latin_face("latin_mono")] if p], []),
     )
+
+
+def _shipped_latin_face(policy):
+    """The pack's own Latin face for ``policy``, or None."""
+    try:
+        from . import _otr_script_fonts as _SF
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        import _otr_script_fonts as _SF  # type: ignore
+    return _SF.bundled_path(policy)
 
 
 def _find_mono_font_path(size=12):

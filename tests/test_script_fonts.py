@@ -106,3 +106,71 @@ def test_the_burn_hands_libass_the_shipped_face(tmp_path):
 def test_the_burn_command_carries_the_option():
     import inspect
     assert 'f"ass={ass_name}{fonts_opt},fps=' in inspect.getsource(BURN)
+
+
+# -- Latin faces for a font-less box (Comfy Cloud, 2026-10-31) ---------------
+# The serverless image carries no font files: five episodes published with no
+# captions, no hero title, and credits drawn in Pillow's built-in face.
+
+def _fontless(monkeypatch, tmp_path):
+    """This machine, made to look like Comfy Cloud's image: no Latin face."""
+    monkeypatch.setenv("WINDIR", str(tmp_path))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(SF, "_OS_LATIN_PATHS", {k: [] for k in SF.LATIN})
+    monkeypatch.setattr(SF, "_OS_LATIN_NAMES", {k: ["NoSuchFace-Regular"] for k in SF.LATIN})
+
+
+@pytest.mark.parametrize("policy", sorted(SF.LATIN))
+def test_each_latin_face_is_there_with_its_licence(policy):
+    tt = pytest.importorskip("fontTools.ttLib")
+    path = SF.bundled_path(policy)
+    assert path and Path(path).is_file(), policy
+    font = tt.TTFont(path)
+    assert font["name"].getDebugName(1) == SF.bundled_family(policy)
+    assert all(ord(ch) in font.getBestCmap() for ch in "AZaz09/:-'!?")
+    licence = Path(path).parent / "LICENSE-DejaVu.txt"
+    assert "Bitstream Vera" in licence.read_text(encoding="utf-8")
+
+
+def test_a_box_with_fonts_keeps_its_own(tmp_path):
+    """This Windows box has Consolas and Arial, so nothing changes here."""
+    if not Path(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "arial.ttf").is_file():
+        pytest.skip("needs a machine with Arial")
+    assert SF.os_latin_face("latin_mono") and SF.os_latin_face("latin_sans")
+    assert CAP._shipped_family_if_no_os_face("latin_sans") is None
+    ass = tmp_path / "episode_captions.ass"
+    ass.write_text("Style: Default,DejaVu Sans Mono,40,&H00FFFFFF\n", encoding="utf-8")
+    assert BURN._shipped_fonts_option(str(ass)) == ""
+
+
+def test_a_fontless_box_hands_libass_the_shipped_latin_faces(monkeypatch, tmp_path):
+    _fontless(monkeypatch, tmp_path)
+    assert SF.os_latin_face("latin_mono") is None
+    assert CAP._shipped_family_if_no_os_face("latin_sans") == "DejaVu Sans"
+    ass = tmp_path / "episode_captions.ass"
+    ass.write_text("Style: Default,DejaVu Sans,40,&H00FFFFFF\n"
+                   "Style: Title,DejaVu Sans Mono,48,&H0041FF00\n", encoding="utf-8")
+    assert BURN._shipped_fonts_option(str(ass)) == ":fontsdir=otr_fonts"
+    for policy in SF.LATIN:
+        assert (tmp_path / "otr_fonts" / Path(SF.bundled_path(policy)).name).is_file()
+
+
+def test_the_caption_builder_swaps_arial_only_through_the_seam():
+    import inspect
+    assert ('st["font"] = _shipped_family_if_no_os_face("latin_sans") or "Arial"'
+            in inspect.getsource(CAP))
+
+
+def test_fontless_credits_draw_in_the_shipped_mono(monkeypatch, tmp_path):
+    _fontless(monkeypatch, tmp_path)
+    monkeypatch.setattr(CR, "_FONT_CACHE", {})
+    monkeypatch.delenv("OTR_CREDITS_FONT", raising=False)
+    assert CR._load_font(40).path == SF.bundled_path("latin_mono")
+
+
+def test_fontless_linux_measures_the_title_in_the_shipped_mono(monkeypatch):
+    from nodes import video_engine as VE
+    monkeypatch.setattr(VE.sys, "platform", "linux")
+    family, paths, _names = VE._mono_font_families()[-1]
+    assert family == "DejaVu Sans Mono" == CAP._MONO_FALLBACK
+    assert paths == [SF.bundled_path("latin_mono")]

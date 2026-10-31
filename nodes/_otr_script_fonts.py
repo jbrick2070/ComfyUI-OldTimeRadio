@@ -19,6 +19,18 @@ output does not change.
 
 All are the Noto Project's fonts under the SIL Open Font License 1.1
 (``nodes/fonts/OFL-*.txt``). Pure lookup: nothing is fetched.
+
+LATIN, FOR A BOX WITH NO FONTS AT ALL (2026-10-31). Comfy Cloud's serverless
+image carries no font files, not even DejaVu, and a five-episode run published
+every episode with no captions, no hero title and the credits drawn in Pillow's
+built-in face -- squashed letters, the third column off the right edge. libass
+with nothing to select draws nothing and exits 0, so no step failed. The pack
+ships DejaVu Sans Mono (every monospace surface) and DejaVu Sans (the SDH
+caption's Arial) under ``LATIN``, reached the same way: only when the machine
+has no Latin face of its own, so Windows, macOS and any Linux with a font
+package render exactly as before. DejaVu's licence is
+``nodes/fonts/LICENSE-DejaVu.txt`` (Bitstream Vera terms; DejaVu's changes are
+public domain).
 UTF-8 no BOM, ASCII-only source.
 """
 from __future__ import annotations
@@ -26,6 +38,11 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat (sys.path) load
+    from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR")
 
@@ -37,16 +54,59 @@ BUNDLED = {
     "devanagari": ("OTRNotoDevanagariLatin-Regular.ttf", "OTR Noto Devanagari Latin"),
 }
 
+#: Latin faces for a font-less machine: key -> (file in nodes/fonts, family).
+#: Kept apart from ``BUNDLED`` because those keys are language-row font
+#: policies and these are not.
+LATIN = {
+    "latin_mono": ("DejaVuSansMono.ttf", "DejaVu Sans Mono"),
+    "latin_sans": ("DejaVuSans.ttf", "DejaVu Sans"),
+}
+
 #: The install line that gives a Linux box its own face for a script.
-LINUX_PACKAGE = {"cjk": "fonts-noto-cjk", "devanagari": "fonts-noto-core"}
+LINUX_PACKAGE = {"cjk": "fonts-noto-cjk", "devanagari": "fonts-noto-core",
+                 "latin_mono": "fonts-dejavu-core", "latin_sans": "fonts-dejavu-core"}
+
+#: Where the operating systems keep their own Latin faces, absolute paths
+#: first, then names Pillow resolves through the platform font folders (on
+#: Linux the XDG set), which finds a face under a layout not listed here.
+_OS_LATIN_PATHS = {
+    "latin_mono": [
+        "{fd}/consola.ttf", "{fd}/cour.ttf", "{fd}/lucon.ttf",
+        "/System/Library/Fonts/Menlo.ttc", "/System/Library/Fonts/Monaco.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+        "/usr/share/fonts/dejavu-sans-mono-fonts/DejaVuSansMono.ttf",
+        "/usr/share/fonts/liberation-mono-fonts/LiberationMono-Regular.ttf",
+        "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
+    ],
+    "latin_sans": [
+        "{fd}/arial.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf",
+        "/usr/share/fonts/liberation-sans-fonts/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+    ],
+}
+_OS_LATIN_NAMES = {
+    "latin_mono": ["DejaVuSansMono", "LiberationMono-Regular", "NotoSansMono-Regular"],
+    "latin_sans": ["DejaVuSans", "LiberationSans-Regular", "NotoSans-Regular", "Arial"],
+}
 
 _WARNED: set = set()
+
+
+def _entry(policy: str):
+    key = str(policy or "").strip()
+    return BUNDLED.get(key) or LATIN.get(key)
 
 
 def bundled_path(policy: str) -> "str | None":
     """The shipped face for ``policy``, or None when the policy has none or the
     file is missing from this install (warned once, with the fix)."""
-    entry = BUNDLED.get(str(policy or "").strip())
+    entry = _entry(policy)
     if entry is None:
         return None
     path = FONTS_DIR / entry[0]
@@ -63,8 +123,28 @@ def bundled_path(policy: str) -> "str | None":
 
 
 def bundled_family(policy: str) -> "str | None":
-    entry = BUNDLED.get(str(policy or "").strip())
+    entry = _entry(policy)
     return entry[1] if entry else None
+
+
+def os_latin_face(policy: str) -> "str | None":
+    """The machine's own Latin face for ``policy`` (``latin_mono`` or
+    ``latin_sans``), or None on a font-less box such as Comfy Cloud's image."""
+    from PIL import ImageFont
+
+    fd = os.path.join(otr_env.get("WINDIR", r"C:\Windows"), "Fonts")
+    found = os_face(policy, [p.format(fd=fd) for p in _OS_LATIN_PATHS.get(policy, ())])
+    if found:
+        return found
+    shipped = bundled_path(policy)
+    for name in _OS_LATIN_NAMES.get(policy, ()):
+        try:
+            path = ImageFont.truetype(name, 12).path
+        except OSError:
+            continue
+        if path != shipped:
+            return path
+    return None
 
 
 def os_face(policy: str, candidates) -> "str | None":
@@ -79,6 +159,9 @@ def os_face(policy: str, candidates) -> "str | None":
 
 def families_in(text: str) -> list:
     """The shipped families named in an ASS script, so the burn can hand libass
-    exactly those files."""
-    return [policy for policy, (_file, family) in BUNDLED.items()
-            if ("," + family + ",") in str(text or "")]
+    exactly those files. A Latin face is handed over only when the machine has
+    none of its own, so a burn on a box with fonts is unchanged."""
+    named = [policy for policy, (_file, family) in {**BUNDLED, **LATIN}.items()
+             if ("," + family + ",") in str(text or "")]
+    return [policy for policy in named
+            if policy not in LATIN or os_latin_face(policy) is None]
