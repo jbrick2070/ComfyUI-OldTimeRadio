@@ -202,14 +202,26 @@ def test_the_socket_rules_read_browser_calls_as_sockets():
         assert "$socket3" not in found and "$socket4" not in found, quiet
 
 
-def test_html_pages_are_scanned_and_read_raw():
+def test_html_pages_are_scanned_and_read_raw(tmp_path):
     """LogBlaster 1.1.1 was flagged on lines inside web_app/index.html, so the
     replica scans .html and .htm. Whether the scanner strips HTML comments is
     unknown, so a page is read raw: a literal in a comment still counts."""
+    import subprocess
+
     oracle = _oracle()
-    assert {".html", ".htm"} <= oracle._SCANNED_EXT
-    page = ("<script>\n  gain.connect(ctx.destination);\n</script>\n"
-            "<!-- node.connect(other) -->\n")
-    assert oracle._blank_line_comments(page, ".html") == page
-    socket3 = next(pat for rule, pat, _label in oracle.RULES if rule == "$socket3")
-    assert sum(1 for line in page.splitlines() if socket3.search(line)) == 2
+    # Line 2 is code, line 3 a script comment, line 5 a page comment: read raw,
+    # all three count.
+    page = ("<script>\n  gain.connect(ctx.destination);\n  // osc.connect(gain) was the old wiring\n"
+            "</script>\n<!-- node.connect(other) -->\n")
+    # A small packed set of its own, run through the replica's real scan():
+    # both pages are read, raw, and a file type the scanner skips is not.
+    repo = tmp_path
+    (repo / "web_app").mkdir()
+    (repo / "web_app" / "index.html").write_text(page, encoding="utf-8")
+    (repo / "web_app" / "old.htm").write_text(page, encoding="utf-8")
+    (repo / "theme.css").write_text("a.connect(b);\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "web_app/index.html", "web_app/old.htm", "theme.css"], cwd=repo, check=True)
+    found = sorted((f["file"], f["line"]) for f in oracle.scan(repo=repo) if f["rule"] == "$socket3")
+    assert found == [("web_app/index.html", 2), ("web_app/index.html", 3), ("web_app/index.html", 5),
+                     ("web_app/old.htm", 2), ("web_app/old.htm", 3), ("web_app/old.htm", 5)]

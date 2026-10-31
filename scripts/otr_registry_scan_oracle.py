@@ -290,12 +290,12 @@ _MARKUP_EXT = {".html", ".htm"}
 _SCANNED_EXT = _CODE_EXT | _DATA_EXT | _MARKUP_EXT
 
 
-def _shipped_files(all_tracked: bool):
+def _shipped_files(all_tracked: bool, repo: Path = REPO):
     """The files a publish would pack: git-tracked minus ``.comfyignore``."""
     # -z: without it git quotes a non-ASCII name ("caf\303\251.mp4"), which then
     # matches no .comfyignore line and no path prefix a caller checks.
     tracked = subprocess.run(  # noqa: S603
-        ["git", "ls-files", "-z"], cwd=REPO, capture_output=True, text=True, encoding="utf-8", check=True
+        ["git", "ls-files", "-z"], cwd=repo, capture_output=True, text=True, encoding="utf-8", check=True
     ).stdout.split("\0")
     tracked = [p for p in tracked if p]
     if all_tracked:
@@ -305,7 +305,7 @@ def _shipped_files(all_tracked: bool):
     except ImportError:
         print("pathspec not installed; scanning ALL tracked files", file=sys.stderr)
         return tracked
-    ci = REPO / ".comfyignore"
+    ci = repo / ".comfyignore"
     if not ci.exists():
         return tracked
     spec = pathspec.PathSpec.from_lines("gitwildmatch", ci.read_text(encoding="utf-8").splitlines())
@@ -354,12 +354,15 @@ def _strip_python(text: str) -> str:
 
 
 def _blank_line_comments(text: str, ext: str) -> str:
-    """Blank comments/strings in CODE files, preserving offsets; DATA files raw.
+    """Blank comments/strings in CODE files, preserving offsets; DATA and markup
+    files raw.
 
     A literal that lives only in a code comment or string does not flag; one in
     a data file's prose does (measured: a URL in a requirements.txt comment
-    flagged comfyui-vosr2). Python uses the real tokenizer; other code files get
-    a simpler ``//`` line-comment blank (string-aware for the comment start).
+    flagged comfyui-vosr2). HTML pages are read raw too, comments included,
+    because whether the scanner strips them is not known. Python uses the real
+    tokenizer; other code files get a simpler ``//`` line-comment blank
+    (string-aware for the comment start).
     """
     if ext not in _CODE_EXT:
         return text
@@ -388,10 +391,12 @@ def _blank_line_comments(text: str, ext: str) -> str:
     return "\n".join(out)
 
 
-def scan(all_tracked: bool = False):
+def scan(all_tracked: bool = False, repo: Path = REPO):
+    """Every finding in the packed set of `repo` (this pack by default; a test
+    passes a small repository of its own)."""
     findings = []
-    for rel in _shipped_files(all_tracked):
-        p = REPO / rel
+    for rel in _shipped_files(all_tracked, repo):
+        p = repo / rel
         ext = p.suffix.lower()
         if ext not in _SCANNED_EXT:
             continue
