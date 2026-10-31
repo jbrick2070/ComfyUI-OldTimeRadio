@@ -41,3 +41,4 @@
 2026-10-30 | Video | Pika H3 Flex (6-step H3 LoRAs) | TEST | https://huggingface.co/Pika-Labs/Pika-H3-Flex
 2026-10-30 | Video | trydrama DRAMA (closed weights) | SKIP | https://huggingface.co/trydrama-neuralgarage/DRAMA
 2026-10-30 | Writer | GPT-1900 / GPT-1905 (mhla) | WATCH | https://huggingface.co/mhla/gpt1900-instruct-v3-sft
+2026-10-31 | Video | DMAD (4/8-step MiniMax-H3 distillation LoRAs) | WATCH | https://huggingface.co/ZhengmingYu/DMAD
