@@ -285,7 +285,27 @@ different proof.
 
 ### The registry -- his clicks and his word
 
-* **2.3.46 is the latest published version** (`bdebb3512`, 2026-10-30 20:19
+* **2.3.47 is the latest published version** (`6cf093da5`, 2026-10-30 21:50
+  PT, at the operator's "i say asap"): 2.3.46 plus K (`17c820333`, the spaCy
+  URL line out of both dependency files) and L (`c9cd41fac`, the two October
+  scanner rules that flag a version alone cleared: three `Path(x).read_text(`
+  reads and a literal-name import). Registry record: Pending, 31
+  dependencies, none a URL, no accelerators; the install endpoint serves it.
+  Release gate: full suite on the exact tree 19,181 passed, no failures;
+  replica 0 findings. Also checked clear that night: the 100 MB size limit
+  (zip 11.7 MB), every shipped `.py` parses, the lint layer's prohibited
+  string `AUTH_TOKEN_COMFY_ORG` (only in a YAML pylint does not read; 2.3.20
+  shipped it and passed), the provenance check (flags bundled libraries; our
+  six JavaScript files are hand-written and unchanged since 2.3.20). Open
+  suspect if it is flagged: `tempfile.gettempdir(` (`$encoded_stage_temp`,
+  three sites, never flagged a version alone). How others recovered, measured
+  the same night: of 394 packs auto-flagged since 10-08, 24 published a fixed
+  version that passed (median about a day from the flag, usually first try;
+  comfyui-visage, flagged for the same URL rule, passed 2.1 hours later), 7
+  got a human reviewed-safe, 363 have nothing Active. And what a flag costs
+  users: Manager installs a Flagged version anyway when ComfyUI listens on
+  127.0.0.1 (Desktop and portable do), and Pending has no status gate.
+* **2.3.46 was published earlier that night** (`bdebb3512`, 2026-10-30 20:19
   PT): the same code as 2.3.45; the one change is pyproject's classifiers,
   which now declare NO accelerator. ComfyUI-Manager's version picker compares
   the machine's short device name ("CUDA", "Metal", "ROCm", "CPU") against
