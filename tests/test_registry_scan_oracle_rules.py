@@ -151,6 +151,26 @@ def _lexical(oracle, source: str):
                    for rule, pat, _label in oracle.RULES if pat.search(line)})
 
 
+def test_the_october_rules_fire_on_the_flagged_shapes_only():
+    """$importlib_direct and $pathlib2, from the registry's own verdicts:
+    the shapes that flagged versions alone fire; the shapes that 60 packs
+    carried through a passing scan since 2026-10-08 stay quiet."""
+    oracle = _oracle()
+    assert "$importlib_direct" in _lexical(oracle, 'm = importlib.import_module("nodes")\n')
+    assert "$importlib_direct" in _lexical(oracle, "m = importlib.import_module('a.b', pkg)\n")
+    for quiet in ('m = importlib.import_module(name)\n',
+                  'm = importlib.import_module(f"misaki.{sub}")\n',
+                  'm = importlib.import_module(".nodes." + modname, pkg)\n',
+                  '# importlib.import_module("nodes") in a comment\n'):
+        assert "$importlib_direct" not in _lexical(oracle, quiet), quiet
+    assert "$pathlib2" in _lexical(oracle, 'text = Path(path).read_text()\n')
+    assert "$pathlib2" in _lexical(oracle, 'text = Path(p).read_text(encoding="utf-8")\n')
+    assert "$pathlib2" in _lexical(oracle, 'raw = Path(p).read_bytes()\n')
+    for quiet in ('with open(p, encoding="utf-8") as fh:\n    text = fh.read()\n',
+                  'text = p.read_text(encoding="utf-8")\n'):
+        assert "$pathlib2" not in _lexical(oracle, quiet), quiet
+
+
 def test_import_func_direct_fires_in_code_not_in_prose():
     oracle = _oracle()
     assert "$import_func_direct" in _lexical(oracle, 'exe = __import__("sys").executable\n')

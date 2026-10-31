@@ -1333,9 +1333,8 @@ def load_llm(
                         hf_home=_hf_home_resolved,
                     )
                 if _template_path:
-                    tokenizer.chat_template = Path(_template_path).read_text(
-                        encoding="utf-8",
-                    )
+                    with open(_template_path, encoding="utf-8") as _template_fh:
+                        tokenizer.chat_template = _template_fh.read()
                     _runtime_log(
                         "[StoryOrchestrator] Attached chat_template.jinja "
                         f"from local cached metadata: {_template_path}"

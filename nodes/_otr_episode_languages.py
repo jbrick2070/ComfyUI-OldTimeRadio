@@ -574,10 +574,11 @@ def _misaki_g2p_failure(sub: str):
     import importlib
     import warnings
 
+    module_name = "misaki." + sub
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
-            module = importlib.import_module("misaki.%s" % sub)
+            module = importlib.import_module(module_name)
     except Exception as exc:  # noqa: BLE001 -- any failure to import is "not ready"
         return ("import", exc)
     if _MISAKI_BUILT.get(sub) is module:

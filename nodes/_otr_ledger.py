@@ -172,7 +172,8 @@ def load_ledger_safe(path: Path) -> Optional[dict]:
     write-back". Errors are logged at WARNING.
     """
     try:
-        return json.loads(Path(path).read_text(encoding="utf-8"))
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
     except FileNotFoundError:
         log.warning("[OTR_Ledger] ledger not found: %s", path)
         return None

@@ -67,6 +67,20 @@ RULES = [
     # Read 2026-10-30 off the registry's structured verdicts (rgthree-comfy,
     # ComfyUI-DistorchMemoryManager): `__import__(` matches $import_func_direct.
     ("$import_func_direct", re.compile(r"__import__\s*\("), "__import__("),
+    # Two rules the registry added in October 2026 (first flags 2026-10-08),
+    # each of which has flagged versions on its own, read 2026-10-31 off the
+    # structured verdicts of 6,829 Flagged versions; 60 packs that passed
+    # since then carry neither shape. Matched on the comment- and
+    # string-blanked text, so a string argument shows as spaces.
+    # python_bytecode_manipulation: an import of a fully literal module name
+    # (`importlib.import_module("nodes")`, flagged 6 versions alone); a
+    # variable, an f-string or a literal joined to a variable passed.
+    ("$importlib_direct", re.compile(r"importlib\.import_module\(\s+[,)]"),
+     "importlib.import_module(\"<literal>\")"),
+    # python_sensitive_file_access: `Path(x).read_text(` (flagged 2 versions
+    # alone); read_bytes is the same rule family ($pathlib3).
+    ("$pathlib2", re.compile(r"\bPath\([^()\n]*\)\.read_(?:text|bytes)\s*\("),
+     "Path(x).read_text( / .read_bytes("),
 ]
 
 #: ``pip install`` as shell text: a pip token, any options, then ``install``.

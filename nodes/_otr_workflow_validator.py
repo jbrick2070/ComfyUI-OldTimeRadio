@@ -874,8 +874,8 @@ class WorkflowValidator:
             # Standalone / test context: the parent package is NOT resolvable by
             # a dotted module name. The on-disk package dir is
             # "ComfyUI-OldTimeRadio" -- the hyphen is an illegal Python
-            # identifier, so importlib.import_module("custom_nodes.ComfyUI-Old"
-            # "TimeRadio") could NEVER succeed and always fell through to an
+            # identifier, so importing it by its dotted name under custom_nodes
+            # could NEVER succeed and always fell through to an
             # empty mapping (silently no-opping the contract + widget-drift
             # checks outside the ComfyUI app). Resolve the already-loaded OTR
             # package from sys.modules by its NODE_CLASS_MAPPINGS attribute --

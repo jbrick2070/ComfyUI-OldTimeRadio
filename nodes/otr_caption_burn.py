@@ -240,7 +240,8 @@ def _shipped_fonts_option(ass_path: str) -> str:
     # otherwise carry the copy, the rename and libass's fontsdir off the tree.
     # Each is checked resolved, immediately before its own operation.
     ass = confine_to_output_tree(ass_path, "caption .ass")
-    text = Path(ass).read_text(encoding="utf-8", errors="replace")
+    with open(ass, encoding="utf-8", errors="replace") as fh:
+        text = fh.read()
     policies = _SF.families_in(text)
     if not policies:
         return ""
