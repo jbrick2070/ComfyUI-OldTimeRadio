@@ -315,7 +315,7 @@ def test_a_failed_download_is_retried_once_and_lands(tmp_path, monkeypatch):
         return _Body()
 
     import urllib.request
-    monkeypatch.setattr(urllib.request, "urlopen", _urlopen)
+    monkeypatch.setattr(cmi, "_open_https_only", _urlopen)
     dest = tmp_path / "clip.mp4"
     cmi._stream_to_temp("https://cdn.example.invalid/clip.mp4", dest)
     assert calls["n"] == 2
@@ -331,7 +331,7 @@ def test_a_download_that_fails_twice_is_billed_not_released(tmp_path,
     def _urlopen(req, timeout=None):
         raise ConnectionResetError("reset by peer")
 
-    monkeypatch.setattr(urllib.request, "urlopen", _urlopen)
+    monkeypatch.setattr(cmi, "_open_https_only", _urlopen)
     with pytest.raises(cmb.CloudMediaError) as ei:
         cmi._stream_to_temp("https://cdn.example.invalid/clip.mp4",
                             tmp_path / "clip.mp4")

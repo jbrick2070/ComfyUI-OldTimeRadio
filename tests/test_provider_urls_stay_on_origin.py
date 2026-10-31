@@ -108,8 +108,10 @@ def test_a_result_redirected_off_https_is_refused_before_it_is_followed():
             I._refuse_off_https(bad, redirected=True)
     I._refuse_off_https("https://provider.example/out.mp4")
     src = inspect.getsource(I._stream_to_temp)
-    assert "_refuse_off_https(newurl, redirected=True)" in src
-    assert "build_opener(_HttpsOnly())" in src and "urlopen(" not in src
+    assert "_open_https_only(req" in src and "urlopen(" not in src
+    opener_src = inspect.getsource(I._open_https_only)
+    assert "_refuse_off_https(newurl, redirected=True)" in opener_src
+    assert "build_opener(_HttpsOnly())" in opener_src
 
 
 def test_the_post_path_keeps_the_key_on_the_origin_and_a_scheme_change_strips_it(monkeypatch):

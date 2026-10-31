@@ -623,6 +623,19 @@ def _refuse_off_https(url: str, *, redirected: bool = False) -> None:
             % ("redirected to " if redirected else "", url))
 
 
+def _open_https_only(req, timeout=None):
+    """The one transport for a result GET: an opener whose redirect handler
+    asks `_refuse_off_https` of every target before following it. Tests fake
+    this name to answer HTTP; the stock `urlopen` is no longer on the path."""
+    import urllib.request
+
+    class _HttpsOnly(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            _refuse_off_https(newurl, redirected=True)
+            return super().redirect_request(req, fp, code, msg, headers, newurl)
+    return urllib.request.build_opener(_HttpsOnly()).open(req, timeout=timeout)
+
+
 def _stream_to_temp(url: str, dest: Path) -> None:
     """Chunked download; never buffers the whole body. Retried once.
 
@@ -636,20 +649,15 @@ def _stream_to_temp(url: str, dest: Path) -> None:
     # partner node's own return value, never a workflow field, but this GET
     # followed any scheme to any size. A partner returns https; a plain
     # http return is refused as a provider fault, not fetched -- and so is
-    # a redirect off https, which the stock handler would have followed.
+    # a redirect off https, which the stock handler would have followed
+    # (`_open_https_only`).
     _refuse_off_https(url)
-
-    class _HttpsOnly(urllib.request.HTTPRedirectHandler):
-        def redirect_request(self, req, fp, code, msg, headers, newurl):
-            _refuse_off_https(newurl, redirected=True)
-            return super().redirect_request(req, fp, code, msg, headers, newurl)
-    opener = urllib.request.build_opener(_HttpsOnly())
     req = urllib.request.Request(url, headers={"User-Agent": _USAGE_SOURCE})
     last_exc: Exception | None = None
     for attempt in range(1, _DOWNLOAD_ATTEMPTS + 1):
         try:
             total = 0
-            with opener.open(req, timeout=120) as resp, \
+            with _open_https_only(req, timeout=120) as resp, \
                     open(dest, "wb") as out:
                 while True:
                     chunk = resp.read(1 << 20)
