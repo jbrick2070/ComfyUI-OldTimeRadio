@@ -356,6 +356,10 @@ class Handler(BaseHTTPRequestHandler):
         path = unquote(urlsplit(self.path).path)
         if path == "/":
             return self._send_file(STATIC_DIR / "index.html", "text/html; charset=utf-8")
+        if path == "/direct":
+            # The fast pop-up: the deck's picks as big tiles, with a WebXR view
+            # of the same tiles (planning/vr-edit-suite/PLAN.md).
+            return self._send_file(STATIC_DIR / "direct.html", "text/html; charset=utf-8")
         if path == "/api/options":
             return self._options()
         if path == "/api/languages":

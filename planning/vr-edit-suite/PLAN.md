@@ -1,6 +1,21 @@
 # OTR VR Director's Pass - concept brief
 
-Status: idea, 2026-10-30. Nothing built. Reviewed once (r1, below). Baseline `main` 396f8920. This design has more than one defensible answer, so it goes through review before any code (CLAUDE.md, 2026-08-17 amendment).
+Status: 2026-10-30. The CORE is built and proven live (below); the per-shot pass is ADVANCED MODE, designed and measured, not built. Reviewed once (r1, at the end). Baseline `main` 396f8920.
+
+## The core: the deck's picks as a fast pop-up (built 2026-10-30)
+
+Operator, 2026-10-30, while the per-shot pass was being built: *"the highest layer, they are just choosing the same options as on the app / Stream Deck, if this is a true fast-paced pop-up ... advanced mode you are working on now is ok but not the core."*
+
+So the first thing in the headset is the Stream Deck's choices, not the shot editor: **Machine, Video, Language, Story bank, Visual style, Acts, then MAKE**, one at a time, in big tiles. Ten seconds of picking, then the episode is made. It is `/direct` on Radio Play Studio's own server (`contest/radio-play-studio/radio_play_studio/static/direct.html`), the same routes the page and the deck use (`/api/options`, `/api/episodes`, the event stream, `/episodes/<run>/<file>`), and nothing on the server changed but the one route that serves the page.
+
+- **Machine and Video come first** because they pick the workflow, and the workflow decides what the other four offer. Switching the way of filming re-reads the choices for that workflow (a few seconds; the page shows "one moment" and keeps every pick that the new workflow still offers). Staying on the server's own workflow costs no read at all.
+- **My Story is skipped**, as on the deck: it needs typed text, which stays on the full page.
+- **Inputs:** arrow keys and Enter; a gamepad's stick, d-pad, A and B (the Gamepad API); any MIDI knob or fader scrubs the row and any pad or key picks (Web MIDI, so the APC40 works as it is); a click or tap on a tile.
+- **WebXR:** the same picks drawn as tiles on a ring around the viewer, in raw WebGL with no library: look at a tile to put the cursor on it, or push the thumbstick; pull the trigger to pick; squeeze to go back. The MAKE tile and the progress tile sit straight ahead. "Enter VR" appears only when the browser reports an immersive session. It is a view of the one state, so the flat page and the headset never disagree. **Tethered only** (decision 5 below still stands): the browser on the PC opens `localhost`, which WebXR counts as secure.
+- **Proven live 2026-10-30** in the PC browser: all six picks in about ten seconds; a workflow switch (foley to stills) re-read the choices and kept every pick; MAKE posted `{language, bank, style, acts, workflow}` and the page followed the run's progress from the event stream. The headset leg (an immersive session on a tethered Quest) is not yet run on hardware; the WebGL path is written against the WebXR API as specified and has no code path the flat view does not share except the drawing.
+- **Tests:** `tests/test_rps_direct.py` -- the route, the loopback rule, unique ids, every id the script asks for, and the posted fields pinned to the deck's `DIAL_FIELDS` so one contract covers both.
+
+The per-shot director's pass below is the advanced mode that opens once an episode exists.
 
 ## What it is
 

@@ -273,6 +273,16 @@ over the same routes, and the server did not change for it (`streamdeck/API-CONT
 packed ready to install: double-click `streamdeck/dist/com.jbrick2070.otr.streamDeckPlugin`, and
 keys work too, for a deck without dials ([install steps](streamdeck/README.md#install)).
 
+## Direct: the same picks as big tiles, a gamepad, a MIDI pad, or a headset
+
+`http://127.0.0.1:8765/direct` is the fast version of the form: Machine, Video, Language,
+Story bank, Visual style and Acts, one at a time, as big tiles, then MAKE. Arrow keys and
+Enter; a gamepad's stick and A/B; any MIDI knob scrubs the row and any pad picks (an APC40
+works as it is); a click on a tile. On a browser that offers WebXR, Enter VR draws the same
+tiles on a ring around you: look at one, pull the trigger. It uses the routes above and
+nothing else, and it skips My story, as the deck does. The episode plays on the page when it
+is done.
+
 ## The page speaks nine languages
 
 English, Español, Português, Italiano, Français, हिन्दी, 日本語, 简体中文 and 繁體中文: the eight languages the

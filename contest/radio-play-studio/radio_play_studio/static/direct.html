@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radio Play Studio - Direct</title>
+<style>
+  /* The fast pop-up: the Stream Deck's picks, one at a time, in big tiles.
+     Same colours as the Studio page (planning/studio-ui/DESIGN_ANCHOR.md). */
+  :root {
+    color-scheme: dark;
+    --bg: #12092f; --panel: #1c1240; --strip: #24184c; --ink: #f4edfb; --muted: #b9acdc;
+    --line: #3b2b70; --accent: #7c3aed; --accent-text: #b794ff; --ok: #50f898; --bad: #ff8a7a;
+    --grid: rgba(72, 48, 136, .18);
+    --sans: system-ui, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+    --serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Noto Serif", serif;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; color: var(--ink); font: 18px/1.4 var(--sans); background-color: var(--bg);
+         background-image: linear-gradient(var(--grid) 1px, transparent 1px),
+                           linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+         background-size: 56px 56px; display: flex; flex-direction: column; }
+  :focus-visible { outline: 3px solid var(--ok); outline-offset: 2px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+           padding: 14px 20px 0; }
+  h1 { font: 800 1.4rem/1.1 var(--sans); text-transform: uppercase; letter-spacing: .04em;
+       margin: 0; text-shadow: 2px 2px 0 var(--accent); }
+  #status { color: var(--muted); font-size: .95rem; margin: 0; }
+  /* The trail: what is picked so far, one chip per field, the live one lit. */
+  #trail { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 20px 0; list-style: none; margin: 0; }
+  #trail li { padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; font-size: .9rem;
+              color: var(--muted); background: var(--panel); }
+  #trail li.live { border-color: var(--ok); color: var(--ok); }
+  #trail li.set { color: var(--ink); }
+  #trail li b { font-weight: 600; color: var(--accent-text); margin-right: 6px; }
+  main { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 10px 20px 20px;
+         min-height: 0; }
+  #prompt { font: 600 1.1rem var(--sans); color: var(--accent-text); margin: 0 0 10px; }
+  /* The row of tiles: the one under the cursor is big and lit; its neighbours fall away. */
+  /* Centred, so the lit tile is always in the middle and the ends fall off both sides. */
+  #row { display: flex; gap: 14px; align-items: center; justify-content: center; overflow: hidden;
+         min-height: 180px; padding: 6px 0; }
+  .tile { flex: 0 0 auto; width: 220px; min-height: 150px; padding: 16px 18px; border-radius: 16px;
+          border: 2px solid var(--line); background: var(--panel); display: flex; flex-direction: column;
+          justify-content: center; gap: 6px; cursor: pointer; transition: transform .12s, opacity .12s;
+          opacity: .55; transform: scale(.92); user-select: none; }
+  .tile .k { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .tile .v { font: 600 1.35rem/1.2 var(--serif); overflow-wrap: anywhere; }
+  .tile .n { font-size: .85rem; color: var(--muted); }
+  .tile.cur { opacity: 1; transform: scale(1.06); border-color: var(--ok);
+              box-shadow: 0 0 0 4px rgba(80, 248, 152, .18), 0 10px 30px rgba(0, 0, 0, .4); }
+  .tile.make { border-color: var(--accent); background: var(--accent); }
+  .tile.make .v { font: 800 1.6rem var(--sans); letter-spacing: .06em; }
+  #hint { color: var(--muted); font-size: .9rem; margin: 12px 0 0; }
+  kbd { font: .85rem var(--sans); padding: 1px 6px; border: 1px solid var(--line); border-radius: 6px;
+        background: var(--strip); }
+  /* Making: one bar, the phase and the minutes; then the play button. */
+  #making { margin-top: 10px; }
+  #bar { height: 14px; border-radius: 999px; background: var(--strip); overflow: hidden; }
+  #fill { height: 100%; width: 0; background: var(--ok); transition: width .4s; }
+  #phase { margin: 8px 0 0; color: var(--muted); }
+  #error { color: var(--bad); white-space: pre-wrap; margin: 8px 0 0; }
+  video { width: min(100%, 960px); border-radius: 8px; background: #000; margin-top: 12px; }
+  footer { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 0 20px 16px; }
+  button { font: 600 .95rem var(--sans); min-height: 42px; padding: 8px 18px; border: 1px solid var(--accent);
+           border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .quiet { background: transparent; color: var(--accent-text); border-color: var(--line); }
+  #inputs { color: var(--muted); font-size: .85rem; margin-left: auto; }
+  #inputs span { margin-left: 10px; }
+  #inputs span.on { color: var(--ok); }
+  #xr-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Direct</h1>
+  <p id="status">reading the choices...</p>
+</header>
+<ul id="trail"></ul>
+<main>
+  <p id="prompt"></p>
+  <div id="row" role="listbox" aria-label="choices"></div>
+  <p id="hint"><kbd>&larr;</kbd> <kbd>&rarr;</kbd> move &middot; <kbd>Enter</kbd> pick &middot; <kbd>Backspace</kbd> back &middot; gamepad stick and A/B &middot; a MIDI knob scrubs, any pad picks</p>
+  <div id="making" hidden>
+    <div id="bar"><div id="fill"></div></div>
+    <p id="phase"></p>
+  </div>
+  <p id="error" hidden></p>
+  <video id="player" controls playsinline hidden></video>
+</main>
+<footer>
+  <button id="vr" class="quiet" hidden>Enter VR</button>
+  <button id="again" class="quiet" hidden>Direct another</button>
+  <a class="quiet" href="/" style="font-size:.9rem;color:var(--accent-text)">the full page</a>
+  <p id="inputs"><span id="in-pad">gamepad</span><span id="in-midi">MIDI</span><span id="in-xr">VR</span></p>
+</footer>
+<canvas id="xr-canvas"></canvas>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------------
+   The state: an ordered list of picks. Each has a key, a label, its choices
+   and its value. Machine and video come first, because they decide which
+   workflow runs and that workflow decides what the other fields offer.
+   ------------------------------------------------------------------------ */
+const $ = (id) => document.getElementById(id);
+const DIAL_FIELDS = ["language", "bank", "style", "acts"];   // the deck's four dials
+const MY_STORY_BANK = "my_story";                            // needs typed text: not here
+const PRETTY = {language: "Language", bank: "Story bank", style: "Visual style", acts: "Acts",
+                machine: "Machine", video: "Video"};
+const ROLL_PREFIX = "roll";
+
+const S = {
+  options: null,          // /api/options for the chosen workflow
+  picks: [],              // [{key, label, choices: [{value, label, note}], value}]
+  step: 0,                // which pick the cursor is on; picks.length = the MAKE tile
+  cursor: 0,              // which choice in the live pick
+  making: null,           // {id, source} while an episode is made
+  done: null,             // {run, file}
+  busy: false,
+};
+
+function setStatus(text) { $("status").textContent = text; }
+
+async function getJSON(path) {
+  const r = await fetch(path, {headers: {"Accept": "application/json"}});
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.error || `${r.status} for ${path}`);
+  return body;
+}
+
+/* ---- building the picks from /api/options ---------------------------- */
+function machinePicks(options) {
+  const menu = options.menu;
+  if (!menu) return [];
+  const current = menu.current || {};
+  const machines = menu.machines.map((m) => ({
+    value: m.key, label: m.key, note: m.key === menu.detected ? "this computer" : "",
+  }));
+  const machine = {key: "machine", label: PRETTY.machine, choices: machines, value: current.machine};
+  const video = {key: "video", label: PRETTY.video, choices: [], value: current.way};
+  return [machine, video];
+}
+
+function waysFor(options, machineKey) {
+  const m = (options.menu.machines || []).find((x) => x.key === machineKey);
+  if (!m) return [];
+  return m.ways.map((w) => ({value: w.key, label: w.key.replace(/_/g, " "),
+                             note: (w.uses && w.uses.video ? w.uses.video : "") + (w.proven ? "" : " (not yet proven)"),
+                             workflow: w.workflow}));
+}
+
+function dialPicks(options) {
+  const out = [];
+  for (const key of DIAL_FIELDS) {
+    const f = (options.fields || []).find((x) => x.key === key);
+    if (!f) continue;
+    let choices = [];
+    if (f.kind === "choice") {
+      choices = (f.choices || []).filter((c) => !(key === "bank" && c === MY_STORY_BANK))
+        .map((c) => ({value: c, label: String(c).startsWith(ROLL_PREFIX) ? "Surprise me" : String(c).replace(/_/g, " "),
+                      note: String(c).startsWith(ROLL_PREFIX) ? "rolls one for you" : ""}));
+    } else if (f.kind === "int") {
+      const lo = f.min == null ? 1 : f.min, hi = Math.min(f.max == null ? lo + 5 : f.max, lo + 9);
+      for (let n = lo; n <= hi; n++) choices.push({value: n, label: String(n), note: n === 1 ? "short" : n >= 3 ? "a full play" : ""});
+    }
+    out.push({key, label: PRETTY[key] || f.label, choices, value: f.default});
+  }
+  return out;
+}
+
+async function load(workflow) {
+  S.busy = true;
+  setStatus(workflow ? `reading the choices for ${workflow}...` : "reading the choices...");
+  render();
+  const options = await getJSON("/api/options" + (workflow ? "?workflow=" + encodeURIComponent(workflow) : ""));
+  S.options = options;
+  const machine = machinePicks(options);
+  const kept = new Map(S.picks.map((p) => [p.key, p.value]));
+  const picks = [...machine, ...dialPicks(options)];
+  for (const p of picks) {
+    // The machine keeps its pick first, so the video's ways are read for it.
+    if (kept.has(p.key) && p.choices.some((c) => c.value === kept.get(p.key))) p.value = kept.get(p.key);
+    if (p.key === "video") {
+      p.choices = waysFor(options, picks[0].value);
+      if (kept.has(p.key) && p.choices.some((c) => c.value === kept.get(p.key))) p.value = kept.get(p.key);
+    }
+    if (!p.choices.some((c) => c.value === p.value) && p.choices.length) p.value = p.choices[0].value;
+  }
+  S.picks = picks;
+  S.busy = false;
+  setStatus(options.menu ? `${options.menu.current.workflow}` : "the server's own workflow");
+}
+
+/* ---- moving the cursor and picking ------------------------------------ */
+function live() { return S.picks[S.step]; }
+function atMake() { return S.step >= S.picks.length; }
+
+function move(delta) {
+  if (S.making || S.busy) return;
+  if (atMake()) return;
+  const n = live().choices.length;
+  if (!n) return;
+  S.cursor = (S.cursor + delta + n) % n;
+  render();
+}
+
+function enter(step) {
+  S.step = step;
+  if (!atMake()) {
+    const p = live();
+    const i = p.choices.findIndex((c) => c.value === p.value);
+    S.cursor = i < 0 ? 0 : i;
+  }
+  render();
+}
+
+async function pick() {
+  if (S.making || S.busy) return;
+  if (atMake()) return make();
+  const p = live();
+  if (!p.choices.length) return enter(S.step + 1);
+  p.value = p.choices[S.cursor].value;
+  if (p.key === "machine") {
+    const video = S.picks.find((x) => x.key === "video");
+    video.choices = waysFor(S.options, p.value);
+    if (!video.choices.some((c) => c.value === video.value)) video.value = video.choices.length ? video.choices[0].value : null;
+  }
+  if (p.key === "video") {
+    // The workflow changes with the way: the dial fields are read for it.
+    const way = p.choices[S.cursor];
+    if (way && way.workflow && way.workflow !== S.options.menu.current.workflow) {
+      try { await load(way.workflow); } catch (e) { showError(e.message); }
+    }
+  }
+  enter(S.step + 1);
+}
+
+function back() {
+  if (S.making || S.busy) return;
+  if (S.step > 0) enter(S.step - 1);
+}
+
+function chosenWorkflow() {
+  const video = S.picks.find((x) => x.key === "video");
+  if (!video) return null;
+  const way = video.choices.find((c) => c.value === video.value);
+  return way ? way.workflow : null;
+}
+
+/* ---- making the episode ----------------------------------------------- */
+async function make() {
+  const choices = {};
+  for (const p of S.picks) if (DIAL_FIELDS.includes(p.key) && p.value != null) choices[p.key] = p.value;
+  const workflow = chosenWorkflow();
+  if (workflow) choices.workflow = workflow;
+  hideError();
+  const r = await fetch("/api/episodes", {method: "POST", headers: {"Content-Type": "application/json"},
+                                           body: JSON.stringify({choices})});
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) return showError(body.error || `the server answered ${r.status}`);
+  follow(body.id);
+}
+
+function follow(id) {
+  S.making = {id, value: 0, phase: "sent", minutes: null};
+  S.done = null;
+  $("making").hidden = false;
+  $("player").hidden = true;
+  const source = new EventSource(`/api/episodes/${encodeURIComponent(id)}/events`);
+  S.making.source = source;
+  source.onmessage = (ev) => {
+    let event; try { event = JSON.parse(ev.data); } catch { return; }
+    if (event.type === "progress" || event.type === "step") {
+      if (typeof event.value === "number") S.making.value = Math.max(S.making.value, event.value);
+      if (event.phase) S.making.phase = event.phase;
+      if (event.minutes_left != null) S.making.minutes = event.minutes_left;
+    } else if (event.type === "done") {
+      source.close();
+      S.done = {run: event.run, file: event.file};
+      S.making = null;
+      $("player").src = `/episodes/${encodeURIComponent(event.run)}/${encodeURIComponent(event.file)}`;
+      $("player").hidden = false;
+      $("again").hidden = false;
+    } else if (event.type === "error") {
+      source.close();
+      S.making = null;
+      showError(event.message || "the run failed");
+      $("again").hidden = false;
+    }
+    render();
+  };
+  source.onerror = () => { /* the browser reconnects with Last-Event-ID */ };
+  render();
+}
+
+function showError(text) { $("error").textContent = text; $("error").hidden = false; render(); }
+function hideError() { $("error").hidden = true; }
+
+function again() {
+  S.done = null; S.making = null;
+  $("player").hidden = true; $("player").removeAttribute("src");
+  $("making").hidden = true; $("again").hidden = true;
+  hideError();
+  enter(0);
+}
+
+/* ---- the flat view ------------------------------------------------------ */
+function render() {
+  const trail = $("trail");
+  trail.textContent = "";
+  S.picks.forEach((p, i) => {
+    const li = document.createElement("li");
+    const c = p.choices.find((x) => x.value === p.value);
+    const b = document.createElement("b"); b.textContent = p.label;
+    li.appendChild(b); li.appendChild(document.createTextNode(c ? c.label : "-"));
+    if (i === S.step && !S.making) li.classList.add("live");
+    if (i < S.step || S.making) li.classList.add("set");
+    trail.appendChild(li);
+  });
+  const row = $("row");
+  row.textContent = "";
+  if (S.busy) {
+    // A workflow switch reads its choices from ComfyUI; keys wait until it lands.
+    $("prompt").textContent = "Reading the choices for this way of filming...";
+    row.appendChild(tile({label: "one moment", note: "ComfyUI is listing what this workflow offers"}, false));
+    return;
+  }
+  if (S.making) {
+    $("prompt").textContent = "Making the episode";
+    $("fill").style.width = Math.round(S.making.value * 100) + "%";
+    const mins = S.making.minutes != null ? ` - about ${Math.max(1, Math.round(S.making.minutes))} min left` : "";
+    $("phase").textContent = `${Math.round(S.making.value * 100)}% ${S.making.phase || ""}${mins}`;
+    return;
+  }
+  if (S.done) { $("prompt").textContent = "Done. Press play."; return; }
+  if (atMake()) {
+    $("prompt").textContent = "Everything is picked.";
+    row.appendChild(tile({label: "MAKE", note: "the episode, with these picks"}, true, "make"));
+    return;
+  }
+  const p = live();
+  $("prompt").textContent = `${p.label}: pick one  (${S.step + 1} of ${S.picks.length})`;
+  const n = p.choices.length;
+  const span = Math.min(n, 7);
+  for (let k = -Math.floor(span / 2); k <= Math.floor((span - 1) / 2); k++) {
+    const i = ((S.cursor + k) % n + n) % n;
+    const el = tile(p.choices[i], k === 0, "", `${i + 1}/${n}`);
+    el.addEventListener("click", () => { S.cursor = i; render(); pick(); });
+    row.appendChild(el);
+  }
+}
+
+function tile(choice, current, extra, count) {
+  const el = document.createElement("div");
+  el.className = "tile" + (current ? " cur" : "") + (extra ? " " + extra : "");
+  el.setAttribute("role", "option");
+  el.setAttribute("aria-selected", current ? "true" : "false");
+  const k = document.createElement("div"); k.className = "k"; k.textContent = count || "";
+  const v = document.createElement("div"); v.className = "v"; v.textContent = choice.label;
+  const nn = document.createElement("div"); nn.className = "n"; nn.textContent = choice.note || "";
+  el.append(k, v, nn);
+  return el;
+}
+
+/* ---- inputs: keyboard, gamepad, MIDI ------------------------------------ */
+document.addEventListener("keydown", (ev) => {
+  if (ev.target && ev.target.tagName === "VIDEO") return;
+  if (ev.key === "ArrowRight" || ev.key === "ArrowDown") { move(1); ev.preventDefault(); }
+  else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") { move(-1); ev.preventDefault(); }
+  else if (ev.key === "Enter" || ev.key === " ") { pick(); ev.preventDefault(); }
+  else if (ev.key === "Backspace" || ev.key === "Escape") { back(); ev.preventDefault(); }
+});
+
+const pad = {seen: false, lastMove: 0, held: new Set()};
+function pollGamepads() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  const now = performance.now();
+  for (const g of pads) {
+    if (!g) continue;
+    if (!pad.seen) { pad.seen = true; $("in-pad").classList.add("on"); }
+    const x = g.axes[0] || 0;
+    const dpadL = g.buttons[14] && g.buttons[14].pressed, dpadR = g.buttons[15] && g.buttons[15].pressed;
+    if ((x > .5 || dpadR) && now - pad.lastMove > 220) { move(1); pad.lastMove = now; }
+    if ((x < -.5 || dpadL) && now - pad.lastMove > 220) { move(-1); pad.lastMove = now; }
+    edge(g, 0, pick); edge(g, 1, back);
+  }
+  requestAnimationFrame(pollGamepads);
+}
+function edge(g, index, fn) {
+  const b = g.buttons[index];
+  const key = g.index + ":" + index;
+  if (b && b.pressed) { if (!pad.held.has(key)) { pad.held.add(key); fn(); } }
+  else pad.held.delete(key);
+}
+requestAnimationFrame(pollGamepads);
+
+if (navigator.requestMIDIAccess) {
+  navigator.requestMIDIAccess().then((access) => {
+    const wire = (port) => { port.onmidimessage = onMIDI; };
+    access.inputs.forEach(wire);
+    access.onstatechange = (e) => { if (e.port.type === "input" && e.port.state === "connected") wire(e.port); };
+    if (access.inputs.size) $("in-midi").classList.add("on");
+  }).catch(() => {});
+}
+let lastCC = -1;
+function onMIDI(msg) {
+  const [status, data1, data2] = msg.data;
+  const kind = status & 0xf0;
+  if (kind === 0x90 && data2 > 0) pick();                 // any pad or key: pick
+  else if (kind === 0xb0 && !S.making && !atMake()) {     // any knob or fader: scrub
+    const n = live().choices.length;
+    if (!n) return;
+    const i = Math.min(n - 1, Math.round(data2 / 127 * (n - 1)));
+    if (i !== lastCC) { lastCC = i; S.cursor = i; render(); }
+  }
+}
+
+/* ------------------------------------------------------------------------
+   WebXR: the same picks drawn as tiles on a ring around the viewer. Raw
+   WebGL, no library: the tiles are canvases uploaded as textures. Look at a
+   tile to put the cursor on it, or push the thumbstick; pull the trigger to
+   pick; squeeze to go back.
+   ------------------------------------------------------------------------ */
+const XR = {session: null, gl: null, prog: null, buf: null, tex: new Map(), refSpace: null,
+            lastStick: 0, gazeIndex: -1};
+const RING = {radius: 2.2, step: 0.42, w: 0.95, h: 0.5};
+
+function xrReady() {
+  if (!navigator.xr) return;
+  navigator.xr.isSessionSupported("immersive-vr").then((ok) => {
+    if (!ok) return;
+    $("vr").hidden = false; $("in-xr").classList.add("on");
+    $("vr").addEventListener("click", enterVR);
+  }).catch(() => {});
+}
+
+async function enterVR() {
+  const canvas = $("xr-canvas");
+  const gl = canvas.getContext("webgl", {xrCompatible: true, alpha: false});
+  if (!gl) return showError("WebGL is not available in this browser");
+  const session = await navigator.xr.requestSession("immersive-vr", {optionalFeatures: ["local-floor"]});
+  XR.session = session; XR.gl = gl;
+  await gl.makeXRCompatible();
+  session.updateRenderState({baseLayer: new XRWebGLLayer(session, gl)});
+  XR.refSpace = await session.requestReferenceSpace("local");
+  initGL(gl);
+  session.addEventListener("selectstart", () => pick());
+  session.addEventListener("squeezestart", () => back());
+  session.addEventListener("end", () => { XR.session = null; XR.tex.clear(); });
+  session.requestAnimationFrame(xrFrame);
+}
+
+const VS = `attribute vec3 p; attribute vec2 t; uniform mat4 mvp; varying vec2 v;
+            void main(){ v = t; gl_Position = mvp * vec4(p, 1.0); }`;
+const FS = `precision mediump float; uniform sampler2D s; varying vec2 v;
+            void main(){ gl_FragColor = texture2D(s, v); }`;
+
+function initGL(gl) {
+  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; };
+  const prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(prog);
+  XR.prog = prog;
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  // a unit quad, x/y in [-.5,.5], with uvs
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -.5, -.5, 0, 0, 1,   .5, -.5, 0, 1, 1,   -.5, .5, 0, 0, 0,
+    -.5, .5, 0, 0, 0,    .5, -.5, 0, 1, 1,   .5, .5, 0, 1, 0]), gl.STATIC_DRAW);
+  XR.buf = buf;
+  gl.enable(gl.DEPTH_TEST);
+}
+
+function tileTexture(gl, key, text) {
+  // One canvas per drawn tile, redrawn only when its text changes.
+  let entry = XR.tex.get(key);
+  if (entry && entry.text === text) return entry.tex;
+  const [label, note, current, kind] = JSON.parse(text);
+  const c = entry ? entry.canvas : document.createElement("canvas");
+  c.width = 512; c.height = 256;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = kind === "make" ? "#7c3aed" : "#1c1240";
+  ctx.fillRect(0, 0, 512, 256);
+  ctx.lineWidth = 10; ctx.strokeStyle = current ? "#50f898" : "#3b2b70";
+  ctx.strokeRect(5, 5, 502, 246);
+  ctx.fillStyle = "#f4edfb"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.font = (kind === "make" ? "800 72px " : "600 46px ") + "system-ui, Segoe UI, Arial";
+  wrapText(ctx, label, 256, note ? 110 : 128, 460, 52);
+  if (note) { ctx.fillStyle = "#b9acdc"; ctx.font = "28px system-ui, Segoe UI, Arial"; ctx.fillText(note.slice(0, 40), 256, 200); }
+  const tex = entry ? entry.tex : gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  XR.tex.set(key, {tex, text, canvas: c});
+  return tex;
+}
+
+function wrapText(ctx, text, x, y, maxW, lineH) {
+  const words = String(text).split(" "); const lines = []; let cur = "";
+  for (const w of words) {
+    const t = cur ? cur + " " + w : w;
+    if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t;
+  }
+  if (cur) lines.push(cur);
+  const top = y - (lines.length - 1) * lineH / 2;
+  lines.slice(0, 3).forEach((l, i) => ctx.fillText(l, x, top + i * lineH));
+}
+
+/* What the ring shows this frame: [{key, text, angle, y, w, h}]. */
+function ringTiles() {
+  const out = [];
+  if (S.busy) {
+    out.push({key: "mk", text: JSON.stringify(["one moment", "reading the choices", true, ""]), angle: 0, y: 0});
+    return out;
+  }
+  if (S.making) {
+    const pct = Math.round(S.making.value * 100);
+    out.push({key: "mk", text: JSON.stringify([`${pct}%`, S.making.phase || "making", true, ""]), angle: 0, y: 0});
+    return out;
+  }
+  if (S.done) {
+    out.push({key: "dn", text: JSON.stringify(["Done", "take the headset off to play it", true, "make"]), angle: 0, y: 0});
+    return out;
+  }
+  if (atMake()) {
+    out.push({key: "mk", text: JSON.stringify(["MAKE", "pull the trigger", true, "make"]), angle: 0, y: 0});
+    out.push({key: "ttl", text: JSON.stringify(["Everything is picked", "", false, ""]), angle: 0, y: .62});
+    return out;
+  }
+  const p = live();
+  const n = p.choices.length;
+  out.push({key: "ttl", text: JSON.stringify([`${p.label}  ${S.step + 1}/${S.picks.length}`, "look at one, pull the trigger", false, ""]), angle: 0, y: .62});
+  const span = Math.min(n, 7);
+  for (let k = -Math.floor(span / 2); k <= Math.floor((span - 1) / 2); k++) {
+    const i = ((S.cursor + k) % n + n) % n;
+    const c = p.choices[i];
+    out.push({key: "c" + k, index: i, text: JSON.stringify([c.label, c.note || "", k === 0, ""]), angle: k * RING.step, y: 0});
+  }
+  return out;
+}
+
+function xrFrame(time, frame) {
+  const session = XR.session;
+  if (!session) return;
+  session.requestAnimationFrame(xrFrame);
+  const pose = frame.getViewerPose(XR.refSpace);
+  if (!pose) return;
+  const gl = XR.gl;
+  const layer = session.renderState.baseLayer;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
+  gl.clearColor(0.07, 0.035, 0.18, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  xrInputs(session, time, pose);
+  const tiles = ringTiles();
+  gl.useProgram(XR.prog);
+  gl.bindBuffer(gl.ARRAY_BUFFER, XR.buf);
+  const ap = gl.getAttribLocation(XR.prog, "p"), at = gl.getAttribLocation(XR.prog, "t");
+  gl.enableVertexAttribArray(ap); gl.vertexAttribPointer(ap, 3, gl.FLOAT, false, 20, 0);
+  gl.enableVertexAttribArray(at); gl.vertexAttribPointer(at, 2, gl.FLOAT, false, 20, 12);
+  const um = gl.getUniformLocation(XR.prog, "mvp");
+  for (const view of pose.views) {
+    const vp = layer.getViewport(view);
+    gl.viewport(vp.x, vp.y, vp.width, vp.height);
+    const pv = mul(view.projectionMatrix, view.transform.inverse.matrix);
+    for (const t of tiles) {
+      const scale = t.key === "ttl" ? .8 : 1;
+      const model = mul(rotY(-t.angle), mul(translate(0, t.y, -RING.radius), scaleM(RING.w * scale, RING.h * scale, 1)));
+      gl.uniformMatrix4fv(um, false, mul(pv, model));
+      gl.bindTexture(gl.TEXTURE_2D, tileTexture(gl, t.key, t.text));
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+  }
+}
+
+function xrInputs(session, time, pose) {
+  // Thumbstick: move the cursor, with a rest between steps. Gaze: the tile
+  // the head faces becomes the cursor when the stick is idle.
+  let stickUsed = false;
+  for (const src of session.inputSources) {
+    const g = src.gamepad;
+    if (!g) continue;
+    const x = g.axes.length >= 4 ? g.axes[2] : (g.axes[0] || 0);
+    if (Math.abs(x) > .6) {
+      stickUsed = true;
+      if (time - XR.lastStick > 260) { move(x > 0 ? 1 : -1); XR.lastStick = time; }
+    }
+  }
+  if (stickUsed || S.making || S.done || atMake()) return;
+  const m = pose.views[0].transform.matrix;        // forward is -z of the view
+  const fx = -m[8], fz = -m[10];
+  const yaw = Math.atan2(fx, -fz);                 // 0 straight ahead, + to the right
+  const k = Math.round(yaw / RING.step);
+  const n = live().choices.length;
+  if (!n || Math.abs(k) > 3 || k === 0) return;
+  if (Math.abs(yaw - k * RING.step) < RING.step * .4 && time - XR.lastStick > 350) {
+    S.cursor = ((S.cursor + k) % n + n) % n; XR.lastStick = time; render();
+  }
+}
+
+/* ---- tiny matrix helpers (column-major, like WebGL) ---- */
+function mul(a, b) {
+  const o = new Float32Array(16);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++)
+    o[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
+  return o;
+}
+function translate(x, y, z) { const o = ident(); o[12] = x; o[13] = y; o[14] = z; return o; }
+function scaleM(x, y, z) { const o = ident(); o[0] = x; o[5] = y; o[10] = z; return o; }
+function rotY(a) { const o = ident(); const c = Math.cos(a), s = Math.sin(a); o[0] = c; o[2] = -s; o[8] = s; o[10] = c; return o; }
+function ident() { const o = new Float32Array(16); o[0] = o[5] = o[10] = o[15] = 1; return o; }
+
+/* ---- presence, so the GPU is kept warm while this page is open -------- */
+const PAGE_ID = Math.random().toString(16).slice(2, 10);
+function presence(closing) {
+  const body = JSON.stringify({page: PAGE_ID, closing: !!closing});
+  if (closing && navigator.sendBeacon) {
+    navigator.sendBeacon("/api/presence", new Blob([body], {type: "application/json"}));
+  } else {
+    fetch("/api/presence", {method: "POST", headers: {"Content-Type": "application/json"}, body}).catch(() => {});
+  }
+}
+setInterval(() => presence(false), 20000);
+window.addEventListener("pagehide", () => presence(true));
+
+/* ---- start ------------------------------------------------------------- */
+$("again").addEventListener("click", again);
+(async () => {
+  try {
+    await load(null);
+    // A run already going (started from the page or the deck) is followed here.
+    const eps = await getJSON("/api/episodes").catch(() => ({episodes: []}));
+    const going = (eps.episodes || []).find((e) => !e.finished && !e.project_id);
+    if (going) follow(going.id); else enter(0);
+    presence(false);
+    xrReady();
+  } catch (e) {
+    setStatus("could not read the choices");
+    showError(e.message);
+  }
+})();
+</script>
+</body>
+</html>
