@@ -318,6 +318,19 @@ different proof.
   Pending or Banned changes nothing, and 2.3.46 is never deleted by a window.
   A one-time scheduled task, `otr-registry-verdict-2346`, reads the verdict
   2026-11-01 20:07 PST and acts on exactly this rule.
+  **2.3.46 will most likely be auto-Flagged, and the fix is already on main
+  (`17c820333`, 2026-10-31).** The registry's pattern scan has a rule our
+  replica never modelled, `contains_custom_url_dependency` (strings
+  `$plaintext_url`, `$whl_string`): any web address in a requirements file,
+  a comment included, and a URL dependency in pyproject. comfyui-visage 1.0.0
+  was Flagged on that one finding alone; the Active versions that carry such
+  a line got there by a human's reviewed-safe. 2.3.45/2.3.46 carried exactly
+  one: the `en_core_web_sm` wheel URL from G, the only difference from
+  2.3.20's dependency files. K removed it (the Kokoro refusal names
+  `python -m spacy download en_core_web_sm` on a 3.12 install; 3.13 never
+  needed it) and the replica now models the rule. Publishing it as 2.3.47 is
+  the operator's call; the scheduled task does it if 2.3.46 comes back
+  flagged on that finding and nothing has been published since.
 
   **Registry-install receipt, the 4060, 2026-10-30 20:30-21:00 PT** (the box
   that owns the fresh-install path; ComfyUI 0.43.2, Python 3.13.12, frontend
