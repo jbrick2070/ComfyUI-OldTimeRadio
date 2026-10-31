@@ -303,7 +303,14 @@ different proof.
   reviewers gave, to hold from here: no further bump while the newest version
   is Pending or `reflag-pending-review`; bump only on a signed
   `policy-vN: <class>`, one lever per verdict; the "Security verification
-  pending" line in the picker clears only when the scan passes.
+  pending" line in the picker clears only when the scan passes. **How long
+  to expect, measured 2026-10-31:** the registry's public
+  `GET /versions?statuses=NodeVersionStatusPending` listed 88 Pending
+  versions registry-wide, none older than 49 hours, so every version gets a
+  status within about two days; re-read that endpoint before calling the
+  wait stuck. (The public registry-backend's scan code, last changed
+  2025-02-05, is not what production runs: production's install endpoint did
+  not follow that code's version-string sort.)
 
   **Registry-install receipt, the 4060, 2026-10-30 20:30-21:00 PT** (the box
   that owns the fresh-install path; ComfyUI 0.43.2, Python 3.13.12, frontend
