@@ -9,9 +9,10 @@ working copy: every later `comfy build` / `comfy deploy` command reads it.
 | Build | `971bd986-c1ef-4b2f-a91f-96659b0755c6` |
 | Release v1 | `7f0bcc94-9acd-49f2-a6e7-30dedf728e1c`, linux/nvidia, deployable (pack at `fa6f469e`) |
 | Release v2 | `d908f8bb-fb8c-4fc6-bff4-34764137557d`, linux/nvidia, deployable (pack at `e3885726`, 2.3.49) |
-| Deployment | `dep-3b611093-3d7f-4047-87c5-00fc632663bf` "production", rtx-pro-6000-mig-2g-48gb, min 0 / max 1, on release v2 since 2026-10-31 |
+| Release v3 | `33213b10-a779-442c-b199-a31fc9570801`, linux/nvidia, deployable (pack at `a31f954f`, 2.3.49 + fontless-host fonts) |
+| Deployment | `dep-3b611093-3d7f-4047-87c5-00fc632663bf` "production", rtx-pro-6000-mig-2g-48gb, min 0 / max 1, on release v3 since 2026-10-31 |
 | Cut | 2026-10-31, first cut green, about 4 minutes of build |
-| Pack | ComfyUI-OldTimeRadio at main `e3885726` = 2.3.49 (git pin, not the registry) |
+| Pack | ComfyUI-OldTimeRadio at main `a31f954f` (git pin, not the registry) |
 | ComfyUI | v0.43.2, base image cuda130-py312 (torch 2.12.1) |
 | pip pins | none; the pack's requirements.txt resolves on its own |
 | Models | 11 weights, 61.5 GB, fetched by the builder from Hugging Face by pinned revision and sha256 |
@@ -49,9 +50,22 @@ The three one-acts came back `failed` because node 12 reported a file the
 mux's asset cleanup deletes (PBUG-20261031-01); the three-act, run with
 cleanup off, came back `succeeded`. Release v2 carries the fix.
 
+Release v2, same day: a one-act with cleanup on came back `succeeded`
+(job `d9e8a234`), so the node 12 fix holds on the endpoint.
+
+## What release v3 fixed (2026-10-31)
+
+The runtime image carries no font files at all. Every v1 and v2 episode
+published with no captions and no title card (libass found nothing to draw
+with and exited 0), and the credits fell back to Pillow's built-in face,
+squashed with the third column off the frame. The pack now ships DejaVu Sans
+and DejaVu Sans Mono in `nodes/fonts` and uses them only when the machine has
+no Latin face of its own. Job `af276e53` on release v3 (one-act, 88 s,
+cleanup on) came back `succeeded`, with burned captions, the hero title and
+the credits drawn in DejaVu Sans Mono.
+
 ## Next
 
-* Prove release v2 with cleanup on: a job should now end `succeeded`.
 * Kokoro on the endpoint needs `en_core_web_sm` in the image.
 * `comfy deploy stop planning/comfy-build/otr-24gb-foley` when idle time
   should not hold compute; storage still bills while stopped.
