@@ -19,6 +19,7 @@ import argparse
 import base64
 import json
 import math
+import os
 import subprocess
 import time
 import urllib.request
@@ -408,6 +409,9 @@ def shoot_vr(page, lengths):
             if kind == "hold":
                 goal = head["yaw"]
             elif kind == "gaze":
+                span = min(len(live_state(page)["values"]), 7)
+                if not -(span // 2) <= move[1] <= (span - 1) // 2:
+                    raise RuntimeError(f"gaze {move[1]} is off a ring of {span} tiles")
                 goal = move[1] * RING_STEP
             else:
                 goal = gaze_yaw(move[1])
@@ -494,10 +498,14 @@ def cut():
     comp.mkdir(parents=True, exist_ok=True)
     for old in comp.glob("*.png"):
         old.unlink()
-    entries = []                      # (file, frames)
+    # One numbered image per video frame, read at exactly 30 fps. A held still
+    # is the same file hard-linked under each frame number it covers. (An
+    # ffmpeg concat list with per-image durations put the images on a 1/25 s
+    # clock and repeated about one frame in five: Sonnet QA, 2026-10-31.)
     voice_at = {}                     # beat -> frame its segment starts on
     cursor = 0
     cache = {}
+    last = None
 
     def layer(tag, caption, badge):
         key = (tag, caption, badge)
@@ -505,15 +513,21 @@ def cut():
             cache[key] = overlay(tag, caption, badge)
         return cache[key]
 
-    def add(src, frames, tag=None, caption=None, badge=None):
+    def hold(first, frames):
         nonlocal cursor
+        for _ in range(frames):
+            if cursor != int(first.stem):
+                os.link(first, comp / f"{cursor:05d}.png")
+            cursor += 1
+
+    def add(src, frames, tag=None, caption=None, badge=None):
+        nonlocal last
         base = Image.open(src).convert("RGBA")
         if base.size != (W, H):
             base = base.resize((W, H), Image.LANCZOS)
-        out = comp / f"{len(entries):05d}.png"
-        Image.alpha_composite(base, layer(tag, caption, badge)).convert("RGB").save(out)
-        entries.append((out, frames))
-        cursor += frames
+        last = comp / f"{cursor:05d}.png"
+        Image.alpha_composite(base, layer(tag, caption, badge)).convert("RGB").save(last)
+        hold(last, frames)
 
     def card(name):
         for path in sorted((WORK / "cards" / name).glob("*.png")):
@@ -540,18 +554,22 @@ def cut():
     end_frames = len(list((WORK / "cards" / "end").glob("*.png")))
     need = round(beat_seconds(lengths, "end") * FPS)
     if need > end_frames:             # hold the last end frame under the line
-        last = entries[-1][0]
-        entries.append((last, need - end_frames))
-        cursor += need - end_frames
+        hold(last, need - end_frames)
     total_s = cursor / FPS
+    assert len(list(comp.glob("*.png"))) == cursor, "the frame sequence has a gap"
 
     # One voice track: every beat's wav laid on its segment's start, after the lead.
-    rate = 24000
+    clips = {}
+    for beat in voice_at:
+        with wave.open(str(WORK / "narration" / f"{beat}.wav")) as w:
+            clips[beat] = (w.getframerate(),
+                           np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32767)
+    rates = {r for r, _ in clips.values()}
+    assert len(rates) == 1, f"the narration wavs disagree on sample rate: {rates}"
+    rate = rates.pop()
     track = np.zeros(int(total_s * rate) + rate, dtype=np.float32)
     for beat, start in voice_at.items():
-        with wave.open(str(WORK / "narration" / f"{beat}.wav")) as w:
-            rate = w.getframerate()
-            pcm = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32767
+        pcm = clips[beat][1]
         at = int((start / FPS + LEAD_S) * rate)
         track[at:at + len(pcm)] += pcm[: max(0, len(track) - at)]
     voice = WORK / "voice.wav"
@@ -561,16 +579,9 @@ def cut():
         w.setframerate(rate)
         w.writeframes((np.clip(track[: int(total_s * rate)], -1, 1) * 32767).astype(np.int16).tobytes())
 
-    # The concat list holds every composited image with its length in frames.
-    listing = WORK / "frames.txt"
-    lines = []
-    for path, frames in entries:
-        lines.append(f"file '{path.as_posix()}'\nduration {frames / FPS:.6f}\n")
-    lines.append(f"file '{entries[-1][0].as_posix()}'\n")
-    listing.write_text("".join(lines), encoding="utf-8")
     run = ["ffmpeg", "-v", "error", "-y"]
-    subprocess.run([*run, "-f", "concat", "-safe", "0", "-i", str(listing), "-i", str(voice),
-                    "-filter_complex", "[0:v]fps=30,format=yuv420p[v];"
+    subprocess.run([*run, "-framerate", str(FPS), "-i", str(comp / "%05d.png"), "-i", str(voice),
+                    "-filter_complex", "[0:v]format=yuv420p[v];"
                     "[1:a]loudnorm=I=-16:TP=-1.5,aresample=48000,aformat=channel_layouts=stereo[a]",
                     "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-crf", "16", "-preset", "slow",
                     "-c:a", "aac", "-b:a", "192k", "-t", f"{total_s:.3f}", "-movflags", "+faststart",
