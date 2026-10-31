@@ -418,6 +418,17 @@ different proof.
   published text; each is on the A/B list below in the order the panel
   ranked them.
 
+  **Metadata defect to ride the next bump (seen 2026-10-30 in Manager's
+  version picker, not a lever):** pyproject's classifiers declare
+  `Environment :: GPU :: NVIDIA CUDA` alone (since 2.3.38), so the registry
+  records `supported_accelerators = ['GPU :: NVIDIA CUDA']` and Manager tells
+  every Mac, AMD and CPU box "GPU/Accelerator not supported" -- while the pack
+  ships Mac and AMD workflows. Add `Environment :: GPU :: Apple Metal` and
+  `Environment :: GPU :: AMD ROCm` (the registry spec lists those; it has no
+  CPU classifier, so a CPU-only box will always see the warning on any pack
+  that declares accelerators). Editing pyproject fires a publish, so this
+  waits for 2.3.46 rather than stacking a Pending version under review.
+
   **If 2.3.45 is flagged: the backup plan, one lever per version.** Codex
   (gpt-5.6-sol, file-grounded, 2026-10-30) ranked the levers and agreed with
   the driver's own order; it also grepped the 714-file shipped set for
