@@ -310,7 +310,14 @@ different proof.
   status within about two days; re-read that endpoint before calling the
   wait stuck. (The public registry-backend's scan code, last changed
   2025-02-05, is not what production runs: production's install endpoint did
-  not follow that code's version-string sort.)
+  not follow that code's version-string sort.) **Standing authorization
+  (operator, 2026-10-30, "Fix and publish"):** if 2.3.46 comes back Flagged
+  with a SIGNED policy class, fix the one cause the reason names (matched to
+  the class, not the next lever in a list) and publish 2.3.47 without asking,
+  full suite green on the bumped tree first; a bare `reflag-pending-review`,
+  Pending or Banned changes nothing, and 2.3.46 is never deleted by a window.
+  A one-time scheduled task, `otr-registry-verdict-2346`, reads the verdict
+  2026-11-01 20:07 PST and acts on exactly this rule.
 
   **Registry-install receipt, the 4060, 2026-10-30 20:30-21:00 PT** (the box
   that owns the fresh-install path; ComfyUI 0.43.2, Python 3.13.12, frontend
