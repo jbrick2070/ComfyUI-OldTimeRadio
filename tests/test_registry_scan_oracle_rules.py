@@ -176,3 +176,40 @@ def test_import_func_direct_fires_in_code_not_in_prose():
     assert "$import_func_direct" in _lexical(oracle, 'exe = __import__("sys").executable\n')
     assert _lexical(oracle, '# __import__("sys") in a comment\nx = "__import__(\'sys\')"\n') == []
     assert _lexical(oracle, "import importlib\nmod = importlib.import_module(name)\n") == []
+
+
+def _rules_in(oracle, source: str, ext: str):
+    """The rule ids that fire on `source` read as a file with extension `ext`."""
+    scanned = oracle._blank_line_comments(source, ext)
+    return sorted({rule for line in scanned.splitlines()
+                   for rule, pat, _label in oracle.RULES if pat.search(line)})
+
+
+def test_the_socket_rules_read_browser_calls_as_sockets():
+    """From comfyui-logblaster 1.1.1's structured verdict (2026-10-31): a dotted
+    bind call in a .js file matched `$socket4`, and Web Audio wiring matched
+    `$socket3`. The respelling LogBlaster 1.1.2 shipped stays quiet."""
+    oracle = _oracle()
+    assert "$socket4" in _rules_in(oracle, "const orig = api.queuePrompt.bind(api);\n", ".js")
+    assert "$socket4" in _lexical(oracle, "server.bind((host, port))\n")
+    assert "$socket3" in _rules_in(oracle, "synthMasterGain.connect(analyser);\n", ".js")
+    for quiet, ext in (("// api.queuePrompt.bind(api) in a comment\n", ".js"),
+                       ("# sock.bind(addr) in a comment\n", ".py"),
+                       ("address = bind_address(host)\n", ".py"),
+                       ("const orig = api.queuePrompt;\nawait orig.apply(api, args);\n", ".js"),
+                       ("const wireAudio = (a, b) => AudioNode.prototype.connect.call(a, b);\n", ".js")):
+        found = _rules_in(oracle, quiet, ext)
+        assert "$socket3" not in found and "$socket4" not in found, quiet
+
+
+def test_html_pages_are_scanned_and_read_raw():
+    """LogBlaster 1.1.1 was flagged on lines inside web_app/index.html, so the
+    replica scans .html and .htm. Whether the scanner strips HTML comments is
+    unknown, so a page is read raw: a literal in a comment still counts."""
+    oracle = _oracle()
+    assert {".html", ".htm"} <= oracle._SCANNED_EXT
+    page = ("<script>\n  gain.connect(ctx.destination);\n</script>\n"
+            "<!-- node.connect(other) -->\n")
+    assert oracle._blank_line_comments(page, ".html") == page
+    socket3 = next(pat for rule, pat, _label in oracle.RULES if rule == "$socket3")
+    assert sum(1 for line in page.splitlines() if socket3.search(line)) == 2

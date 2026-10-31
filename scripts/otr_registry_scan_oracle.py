@@ -13,6 +13,10 @@ Calibrated against measured verdicts from the 2026-09-05 scanner research:
 * it is spelling-sensitive: it keys on the literal API text;
 * comments are stripped in CODE files (.py/.js) but NOT in data files, where
   prose that quotes a literal still flags;
+* HTML pages are scanned too: on 2026-10-31 comfyui-logblaster 1.1.1 was
+  Flagged for `$socket3` on Web Audio wiring inside ``web_app/index.html``.
+  Whether the scanner strips HTML comments is not known, so this replica
+  reads ``.html`` / ``.htm`` raw, like a data file;
 * one finding of any severity flags the whole version, so this gate is
   ALL-OR-NOTHING and fails closed.
 
@@ -59,6 +63,11 @@ RULES = [
     ("$socket1", re.compile(r"socket\.socket\s*\("), "socket.socket("),
     ("$socket2", re.compile(r"socket\.create_connection\s*\("), "socket.create_connection("),
     ("$socket3", re.compile(r"\.connect\s*\("), ".connect("),
+    # Read 2026-10-31 off comfyui-logblaster 1.1.1's structured verdict: a
+    # dotted bind call in a shipped .js file (`api.queuePrompt.bind(api)`)
+    # matched `$socket4` on its own. Like `$socket3`, it keys on the spelling,
+    # so a browser call reads as a socket.
+    ("$socket4", re.compile(r"\.bind\s*\("), ".bind("),
     # --- python_command_injection_risk ---
     ("$subprocess_direct",
      re.compile(r"subprocess\.(?:Popen|run|call|check_output|check_call)\s*\(|os\.system\s*\("),
@@ -275,6 +284,10 @@ def _custom_url_dependencies(rel: str, raw: str) -> list:
 
 _CODE_EXT = {".py", ".pyw", ".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"}
 _DATA_EXT = {".json", ".md", ".txt", ".yaml", ".yml", ".cfg", ".ini", ".toml"}
+#: Pages the registry scans (measured on comfyui-logblaster 1.1.1); read raw,
+#: comments included, since whether the scanner strips them is not known.
+_MARKUP_EXT = {".html", ".htm"}
+_SCANNED_EXT = _CODE_EXT | _DATA_EXT | _MARKUP_EXT
 
 
 def _shipped_files(all_tracked: bool):
@@ -380,7 +393,7 @@ def scan(all_tracked: bool = False):
     for rel in _shipped_files(all_tracked):
         p = REPO / rel
         ext = p.suffix.lower()
-        if ext not in _CODE_EXT and ext not in _DATA_EXT:
+        if ext not in _SCANNED_EXT:
             continue
         try:
             raw = p.read_text(encoding="utf-8")
