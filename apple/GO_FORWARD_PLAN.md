@@ -285,7 +285,26 @@ different proof.
 
 ### The registry -- his clicks and his word
 
-* **2.3.45 is the latest published version** (`8b0f26173`, 2026-10-30 17:25
+* **2.3.46 is the latest published version** (`bdebb3512`, 2026-10-30 20:19
+  PT): the same code as 2.3.45; the one change is pyproject's classifiers,
+  which now declare NO accelerator. ComfyUI-Manager's version picker compares
+  the machine's short device name ("CUDA", "Metal", "ROCm", "CPU") against
+  the registry's string ("GPU :: NVIDIA CUDA") as an exact match
+  (ComfyUI_frontend issue 15364, open since 2026-08-17, fix PR 15468
+  unmerged, frontend 1.59 has it), so any declared accelerator made EVERY
+  machine, CUDA boxes included, read "GPU/Accelerator not supported"; an
+  empty list is unrestricted. Registry record: Pending,
+  `supported_accelerators = []`, the three OS tags, 32 dependencies; the
+  install endpoint serves it. Codex and agy both advised waiting for 2.3.45's
+  verdict and keeping an Active version up; the operator chose to publish
+  now and delete 2.3.45 himself, and took their shared metadata verdict.
+  **Restore `Environment :: GPU :: NVIDIA CUDA`, `:: Apple Metal` and
+  `:: AMD ROCm` the day that frontend fix ships.** The stopping rule both
+  reviewers gave, to hold from here: no further bump while the newest version
+  is Pending or `reflag-pending-review`; bump only on a signed
+  `policy-vN: <class>`, one lever per verdict; the "Security verification
+  pending" line in the picker clears only when the scan passes.
+* **2.3.45 was published first that night** (`8b0f26173`, 2026-10-30 17:25
   PT, at the operator's word "once you're all done, publish your best guess
   and wait"): the registry hardening below reaches the registry. It landed
   **Pending** with 32 dependencies recorded -- the registry accepted both new
@@ -418,8 +437,10 @@ different proof.
   published text; each is on the A/B list below in the order the panel
   ranked them.
 
-  **Metadata defect to ride the next bump (seen 2026-10-30 in Manager's
-  version picker, not a lever):** pyproject's classifiers declare
+  **Metadata defect, CLOSED in 2.3.46 the other way round** (the frontend's
+  exact-match bug above means no accelerator classifier at all is the only
+  clean picker today; what follows is the diagnosis as first written):
+  pyproject's classifiers declared
   `Environment :: GPU :: NVIDIA CUDA` alone (since 2.3.38), so the registry
   records `supported_accelerators = ['GPU :: NVIDIA CUDA']` and Manager tells
   every Mac, AMD and CPU box "GPU/Accelerator not supported" -- while the pack
