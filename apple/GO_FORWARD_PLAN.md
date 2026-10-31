@@ -285,7 +285,19 @@ different proof.
 
 ### The registry -- his clicks and his word
 
-* **2.3.44 is the latest published version** (`e43e278e7`, cut from the 4060
+* **2.3.45 is the latest published version** (`8b0f26173`, 2026-10-30 17:25
+  PT, at the operator's word "once you're all done, publish your best guess
+  and wait"): the registry hardening below reaches the registry. It landed
+  **Pending** with 32 dependencies recorded -- the registry accepted both new
+  spellings, the `nvidia-vfx` platform marker and the `en_core_web_sm` wheel
+  URL -- and the publish Action (run 41150051568) was green. Release gate as
+  cut: the full suite on the bumped tree, 19,172 passed, 169 skipped, 1
+  xfailed, no failures (a first run on the bumped tree found one test still
+  faking `urlopen` after H's opener; `4dd87d08d` J fixed it); scan replica 0
+  on every commit. What to watch: a clean automated scan auto-Actives; a
+  flagged one comes back `policy-vN: <class>` after `reflag-pending-review`,
+  and the backup plan in the next bullet says which lever that text selects.
+* **2.3.44 was the previous published version** (`e43e278e7`, cut from the 4060
   on 2026-10-29 at the operator's word, "Release tonight"): the AnimateDiff
   rip reaches the registry. It landed **Pending**, and
   `/nodes/comfyui-old-time-radio/install` serves it already, with the same 31
@@ -322,9 +334,13 @@ different proof.
   clean automated scan auto-Actives (22 packs did in October); a flagged one
   waits for the reviewer, whose last pass over OTR stopped at 2.3.35.
 * **2.3.45 is the registry-hardening release -- what it carries, and the
-  backup plan if it is flagged again (2026-10-30).** Ten commits on `main`
-  since 2.3.44, `68d0a1417..d2cc6a027`: the run-time pip is gone
-  (`68d0a1417`, `9112ef498`), then "Registry sinks" A-H, where H folds the
+  backup plan if it is flagged again (2026-10-30).** Twelve commits on `main`
+  between 2.3.44 and the release, `68d0a1417..4dd87d08d`: the run-time pip is
+  gone (`68d0a1417`, `9112ef498`), then "Registry sinks" A-J, where I
+  (`74c4deada`) folds the four Codex items that held (the still-cache probe
+  refuses by text, a receipt's confined spelling is the one used, the card is
+  named even when the SDK imports, a relative `..` run is scrubbed), J
+  (`4dd87d08d`) names the result GET's transport so tests fake it, and H folds the
   Sonnet refutation of the pushed diff (the ledger route's scrubber stopped
   at a space and served a user name, the result download followed a redirect
   off https, the Google POST path carried the key across a redirect; Codex's
