@@ -305,6 +305,37 @@ different proof.
   got a human reviewed-safe, 363 have nothing Active. And what a flag costs
   users: Manager installs a Flagged version anyway when ComfyUI listens on
   127.0.0.1 (Desktop and portable do), and Pending has no status gate.
+
+  **Fresh-install receipt, the 4060, 2026-10-30 22:17-22:58 PT** (operator:
+  "run it", then "nuke all models and such so it's fresh" -- done as a
+  separate scratch install on D:, not by deleting the box's own models).
+  Same ComfyUI 0.43.2 code copied without models, custom_nodes or user data;
+  a new venv from the same Python 3.13.12; torch 2.12.1+cu130, the core
+  requirements and comfyui-manager 4.2.2 downloaded fresh (10 minutes); every
+  cache pointed at an empty folder. Then the user's path, in the browser:
+  Extensions > search "old time radio" > version picker "Latest (2.3.47)" >
+  Install. Manager downloaded the registry zip, unpacked 714 files and, on
+  Windows, QUEUED the 31 requirement lines (one `uv pip install` each) for the
+  next start; "Apply Changes" restart ran them all: 30 of 30 applicable
+  packages present, kokoro skipped by its marker on 3.13, nvidia-vfx built
+  from NVIDIA's index in 24 s; the pack's boot fetched the Kokoro ONNX model
+  (326 MB) and 54 voices; `OK - All 23 nodes loaded successfully`. The shipped
+  canonical at one act: the validator planned three pinned, hashed files
+  (Stable Audio 3 music 2.27 GB, its text encoder 1.19 GB, the Gemma 4 E2B
+  int8 writer 5.20 GB = 8.66 GB) and skipped the image model the lane does
+  not use; `Prompt executed in 00:17:44` including the downloads,
+  `obs_publish OK`, a 53 MB episode
+  (`registry_install_20261030_225059__cart__vcam__none__koko__pubd__cg4e2__sa3_final.mp4`,
+  kept in the 4060 Desktop install's obs). Models land as hard links shared
+  with the HF cache, so nothing is stored twice. Scratch install removed
+  afterwards; logs kept at `C:\Temp\otr_fresh_2347_logs` on the 4060.
+  **Two Manager behaviours a user meets, neither a pack defect:** (1) with no
+  Active release the card's version reads "nightly", so the card's plain
+  Install clones GitHub main; choosing "Latest (2.3.47)" in the picker gets
+  the registry release -- this goes away once a version is Active; (2) Manager
+  refuses installs ("security_level must be normal or below, and network_mode
+  must be personal_cloud") when ComfyUI listens on a network address; a
+  local Desktop or portable install is unaffected.
 * **2.3.46 was published earlier that night** (`bdebb3512`, 2026-10-30 20:19
   PT): the same code as 2.3.45; the one change is pyproject's classifiers,
   which now declare NO accelerator. ComfyUI-Manager's version picker compares
