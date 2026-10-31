@@ -1,0 +1,57 @@
+schema: comfy-build/1
+id: 971bd986-c1ef-4b2f-a91f-96659b0755c6
+name: otr-24gb-foley
+description: ComfyUI-OldTimeRadio at main fa6f469e, for workflows/otr_24gb_foley.json
+syncedRevision: '2026-10-31T08:24:23.469333Z'
+definition:
+  schema: distribution-definition/0
+  baseComfyVersion: v0.43.2
+  models:
+    - filename: stable_audio_3_small_music_base.safetensors
+      sha256: 79691fac2a08a99a229b98963f8377ddc78c16f5c63f7e3a022375c311093ab4
+      sourceUri: https://huggingface.co/Comfy-Org/stable-audio-3/resolve/main/checkpoints/stable_audio_3_small_music_base.safetensors
+      type: checkpoints
+    - filename: LTX25-distilled-DiT-comfy-int8.safetensors
+      sha256: a9adb1c33604ea90c2023f7855bc5b5300b5156b257a6aa3756a2b34ba8d0326
+      sourceUri: https://huggingface.co/joeygambino/LTX-2.5-Quantized/resolve/00f505424717d526f7b00f51c415de789c3f661c/LTX25-distilled-DiT-comfy-int8.safetensors
+      type: diffusion_models
+    - filename: flux3-image-klein-int8-convrot.safetensors
+      sha256: 847d8933548afd93df4af2cac2498e70891bf28d9dae06d695f536992e168fe2
+      sourceUri: https://huggingface.co/ml-resources/flux-3-image-klein-comfy/resolve/3ba0f7064cbb1666a71e2820d3cc5c2273bb6cd0/diffusion_models/flux3-image-klein-int8-convrot.safetensors
+      type: diffusion_models
+    - filename: ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors
+      sha256: eb5a71fe4068ee87ccdb1c3aa635e547ca76bd2d30ae20ae889f2c325c0677e8
+      sourceUri: https://huggingface.co/yuvraj108c/LTX-2.5/resolve/9a165b41a60dd72000d756c71c32ff30a52e6ffa/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors
+      type: latent_upscale_models
+    - filename: gemma4-12b-ltx25-comfy-w4a8.safetensors
+      sha256: bdd2d205d795b9692d2beea357dd28f3c530cccadcdf88ce64f5d978e3573a68
+      sourceUri: https://huggingface.co/joeygambino/LTX-2.5-Quantized/resolve/00f505424717d526f7b00f51c415de789c3f661c/gemma4-12b-ltx25-comfy-w4a8.safetensors
+      type: text_encoders
+    - filename: gemma4_12b_int8_convrot.safetensors
+      sha256: bf77dc0b435c487a638909d8f2ccf5a7e4c9838e7bc56545ea6e251a603c5793
+      sourceUri: https://huggingface.co/Comfy-Org/gemma-4/resolve/63d0f7c476756b88910170c1df75e2384ea1af31/text_encoders/gemma4_12b_int8_convrot.safetensors
+      type: text_encoders
+    - filename: qwen3vl_4b_int8_convrot.safetensors
+      sha256: 32de113cbf8282b02cbff0794b637b9d6676da09314a1db5a30bcea9bf4ee01c
+      sourceUri: https://huggingface.co/ml-resources/flux-3-image-klein-comfy/resolve/3ba0f7064cbb1666a71e2820d3cc5c2273bb6cd0/text_encoders/qwen3vl_4b_int8_convrot.safetensors
+      type: text_encoders
+    - filename: t5gemma_b_b_ul2.safetensors
+      sha256: 1e1eba25be8872edb0d3c6335c6658fd6388e7b14b60da6e454e404cfcd8150e
+      sourceUri: https://huggingface.co/Comfy-Org/stable-audio-3/resolve/main/text_encoders/t5gemma_b_b_ul2.safetensors
+      type: text_encoders
+    - filename: flux2-vae.safetensors
+      sha256: 868fe7b343cc8f3a19dbcfcafbc3d5f888802be3f89bd81b65b3621a066ce8f3
+      sourceUri: https://huggingface.co/Comfy-Org/Ideogram-4/resolve/2aa6c75ce6d5fabded0ca4d0f76abbfaf8edc87d/vae/flux2-vae.safetensors
+      type: vae
+    - filename: ltx-2.5-audio-vae-bf16.safetensors
+      sha256: c52733d37f6a7fb7949c3dc0fb468c6cb2169e4d836983a73babb9f0d54837a5
+      sourceUri: https://huggingface.co/yuvraj108c/LTX-2.5/resolve/9a165b41a60dd72000d756c71c32ff30a52e6ffa/ltx-2.5-audio-vae-bf16.safetensors
+      type: vae
+    - filename: ltx-2.5-video-vae-bf16.safetensors
+      sha256: 847e14ca7f3355debca0cea4eaa24ac0fbcdf0061da054ac89ca638a869ddba3
+      sourceUri: https://huggingface.co/yuvraj108c/LTX-2.5/resolve/9a165b41a60dd72000d756c71c32ff30a52e6ffa/ltx-2.5-video-vae-bf16.safetensors
+      type: vae
+  customNodes:
+    - gitRef: fa6f469e090e8682a42e4b19d6269fa3585b0af0
+      name: ComfyUI-OldTimeRadio
+      repository: https://github.com/jbrick2070/ComfyUI-OldTimeRadio
