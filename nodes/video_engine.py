@@ -2516,26 +2516,12 @@ class SignalLostVideoRenderer:
         except Exception as _e:  # noqa: BLE001
             log.warning("[Ledger] SignalLostVideo finalize failed: %s", _e)
 
-        # Build the ComfyUI 'gifs' subfolder hint from the actual
-        # post-rename location. ComfyUI expects subfolder relative to
-        # `output/`, so strip the leading `output/` prefix from the
-        # absolute path's parent. Falls back to `otr/audio` if the
-        # path doesn't have an `output/` segment (legacy / test).
-        try:
-            _abs_parent = os.path.abspath(os.path.dirname(out_path))
-            _abs_parent_norm = _abs_parent.replace("\\", "/")
-            if "/output/" in _abs_parent_norm:
-                _subfolder = _abs_parent_norm.split("/output/", 1)[1]
-            else:
-                _subfolder = "otr/audio"
-        except Exception:  # noqa: BLE001
-            _subfolder = "otr/audio"
-
-        # Return using the standard ComfyUI 'gifs' key so the canvas
-        # spawns an HTML5 video player widget automatically.
-        return {
-            "ui": {"gifs": [{"filename": os.path.basename(out_path),
-                             "subfolder": _subfolder,
-                             "type": "output"}]},
-            "result": (out_path, _title_plan_json),
-        }
+        # NO FILE IN "ui" (PBUG-20261031-01). This silent cut is an
+        # intermediate inside the episode folder, and the mux's asset
+        # cleanup deletes that folder by design ("full" and "partial"
+        # alike) once the episode is published. A file reported here is a
+        # file the run promises to its caller: Comfy Cloud deployments
+        # fetch every reported output when the job ends, found this one
+        # gone, and failed two finished episodes on 2026-10-31. The mux
+        # (node 85) reports the published obs copy, which is the episode.
+        return {"ui": {}, "result": (out_path, _title_plan_json)}

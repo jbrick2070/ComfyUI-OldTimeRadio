@@ -17466,3 +17466,27 @@ not promote it to the Bug Bible on this evidence alone.
   became `pip_dependency` (the matrix says **pip**); the refusal hint stays for
   a git clone that skipped the requirements. Operator: declare it now; if the
   next verdict flags, the declaration is the first A/B lever.
+
+## PBUG-20261031-01 -- Comfy Cloud failed two finished episodes: node 12 reported a file the cleanup deletes
+- evidence: Comfy Cloud deployment `dep-3b611093` (build `971bd986`, release v1,
+  workflow `otr_24gb_foley`, RTX PRO 6000 MIG 48 GB), 2026-10-31. Jobs
+  `2f5e694b` (73 min) and `579ab5ea` (82 min) both ended `failed`, "a problem on
+  our side", AFTER node 85 had published: each job record still listed node 85's
+  `_final.mp4` (83.6 MB and 84.2 MB, 1920x1080, full 48 kHz audio, 103.8 s and
+  122.6 s) and both are in `otr/obs`. Comfy support (Vinh Trinh) traced it in the
+  worker logs: node 12 (`OTR_SignalLostVideo`) reported its silent CRT cut under
+  `output/otr/episodes/<ep>/audio/` as a `ui.gifs` output; the mux's asset
+  cleanup (`full`, the shipped setting) deleted that folder; at job end the
+  platform fetched every reported output, found that one gone, and failed the job.
+- cause: node 12 advertised an intermediate that the same run deletes by design
+  (`partial` deletes it too). PBUG-20260830-24 already named that `gifs` entry
+  the INTERMEDIATE the API wrongly advertised; this is the same entry breaking a
+  caller that fetches every reported file. No consumer read it: not the
+  frontend JS, app mode (`linearData.outputs == [85]`), the canonical harness, or
+  the contest runner (Fable contrarian, grounded, 2026-10-31).
+- fix: `SignalLostVideoRenderer.render_video` returns `{"ui": {}, "result": ...}`;
+  the mux is the one node that reports a video, the published obs copy.
+  `tests/test_reported_outputs_survive_cleanup.py` holds node 12 to no file in
+  `ui`.
+- status: FIXED in code; live proof is the next Comfy Cloud job on a rebuilt
+  release coming back `succeeded`.

@@ -215,8 +215,9 @@ def _canvas_preview(final_path: str, obs_copy) -> dict:
             # talks to) turns a history entry into a downloadable output only
             # for the keys "images", "gifs" and "audio"; "video" is invisible
             # to it, so an SDK caller's job.get_outputs("85") saw the poster
-            # frame and not the episode. "gifs" is what OTR_SignalLostVideo
-            # already uses for its silent cut and what the frontend plays.
+            # frame and not the episode. "gifs" is also what the frontend
+            # plays. This is the only node that reports a video file: the
+            # published copy survives the asset cleanup (PBUG-20261031-01).
             ui["gifs"] = [dict(playable)]
         try:
             import folder_paths  # ComfyUI's own; absent under bare pytest
