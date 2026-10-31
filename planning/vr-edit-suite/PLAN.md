@@ -44,9 +44,25 @@ What exists today (checked in r1):
 ## The decisions still open
 
 1. **How are the alternatives painted?** A card holds one `picture_text`. Two ways:
-   - **Sequential Stills runs**, one per alternative (A's framings, then B's, then C's), then a final run that sets each pick. If the dispatcher's cache finds the earlier paintings, the pick costs nothing. The cache index is built from the current ledger's image rows plus superseded rows (`otr_image_gen_dispatcher.py` ~2314), so **whether a painting from two bundles back is still a hit has to be measured** before this is the plan. No schema change.
-   - **A new `options` field per card** that paints several framings in one run. Cleaner and faster, but a schema change to the direction, the freezer and `cards.json`.
-   Lean: measure the sequential path on one scene first.
+   - **Sequential Stills runs**, one per alternative (A's framings, then B's, then C's), then a final run that sets each pick. The pick costs nothing, because the dispatcher's cache finds the earlier paintings. **Measured 2026-10-30, settled** (below). No schema change.
+   - **A new `options` field per card** that paints several framings in one run. Cleaner, and it saves the fixed cost of each extra run, but it is a schema change to the direction, the freezer and `cards.json`.
+   Decision: sequential runs for the first version. `options` only if the fixed cost per run starts to matter.
+
+   **The measurement.** Project `c80906f6f093` (My Story, `otr_16gb_foley_open_flux3_ref.json`), shot `shot_shot_000_b3` (`flux3_klein`), through Radio Play Studio's own API, on one ComfyUI boot (0.43.2, booted after the last change to the dispatcher and direction code). Five Stills runs:
+
+   | Run | Bundle | Picture text | Result | Run time |
+   |---|---|---|---|---|
+   | 1 | 12-stills | framing A (low angle) | painted, `8d2b05da` | 95 s |
+   | 2 | 13-stills | framing B (wide, doorway) | painted, `b9876c08` | 79 s |
+   | 3 | 14-stills | A again | **reused** `8d2b05da` from two bundles back | 66 s |
+   | 4 | 15-stills | edit removed | stayed on A (see below) | 71 s |
+   | 5 | 16-stills | original text typed back | **reused** `d0bf59bc` from bundle 11, five back | 72 s |
+
+   The reuse is a cache hit, not an identical repaint. On runs 3 and 5 the server log goes from resolving the shot to the next object in about 20 ms, with no `portrait_ledger` line for a new picture, and the ledger's `cache_index` did not grow (30 entries after run 2, 30 after run 3). Every other shot was reused on every run. So **a run where nothing new is painted costs about 65-70 s** of fixed work (graph, replay import, freeze), and each newly painted still adds about 10-30 s on the 5080.
+
+   **What run 4 taught.** An edit is cumulative: each bundle freezes the text it painted, and a direction with no edit for a card keeps the latest bundle's text, not the writer's first one. To go back, the room sends the old text explicitly. The VR pass always sends each pick's full text, so this costs nothing, but "undo" means restoring the text, not deleting the edit.
+
+   For the Dragon's Lair pass, three alternatives on 8 decision points is three runs of about 70 s each plus 24 new stills, roughly 6-10 minutes of GPU before the headset goes on, and a free final run for the picks.
 2. **Who picks the decision points?** Rules (first shot of each scene, repeated framing, the camera crossing sides) or the assistant reading the shot list. Rules first: they are checkable and cheap.
 3. **Words, or a layout picture?** Words (path A) work today, but the engine may not obey exactly. A grey-box layout picture used as a Klein reference (path B) is an experiment, not a free feature: Klein takes at most three references, one primary plus two extras (`flux3_klein.py:93`), and today those are the speaker's and other cast portraits (`otr_image_gen_dispatcher.py` ~2265). A layout picture would push out a face, and enters the same reference chain with no "this is layout" role. There is no direction field to carry it either. A depth or pose control (path C) exists in no shipped engine.
 4. **Style and look after the first run.** A Producer replay cannot change `visual_style`: the writer returns from its replay branch before style is chosen or stamped (`OTR_LedgerScriptWriter.py` ~3346-3439, stamp at ~4179), and the direction has no style field. There are ten choices, not nine: nine style packs plus `visual_storybased` (`_otr_rolls.py:428`). Options: choose style in a pre-pass (one shot painted in each style, pick in the headset, then the real first run), or a new direction field that overrides the frozen style and repaints every still. The procedural video lanes show no visible style change at all (writer tooltip ~2278), so style matters most on the still-driven lanes.
