@@ -1,79 +1,93 @@
-# OTR VR Staging Room - concept brief
+# OTR VR Director's Pass - concept brief
 
-Status: idea, 2026-10-30. Nothing built. Baseline `main` ff78c374. This design has more than one defensible answer, so it goes through review before any code (CLAUDE.md, 2026-08-17 amendment).
+Status: idea, 2026-10-30. Nothing built. Reviewed once (r1, below). Baseline `main` 396f8920. This design has more than one defensible answer, so it goes through review before any code (CLAUDE.md, 2026-08-17 amendment).
 
 ## What it is
 
-A VR room for making **the big staging calls** on an episode's shots **before the final OTR render**: where the camera stands, the angle, how wide or tight the shot is, where each character stands and faces, and whether a shot should be a different shot entirely. You walk around the scene, grab the camera, move a character, say "lower, looking up at him, she's in the doorway behind", and an AI assistant turns that into the next take of that shot.
+A **short VR session for directing an episode before the final OTR render**: put the headset on for about four minutes, make the big calls, take it off. Think Dragon's Lair: mostly watching, with a handful of moments where you make a quick call and the episode goes that way.
 
-Operator, 2026-10-30: not a colorist's tool. Fine work (color, small fixes) is out of scope. The suite is for the decisions that change what the picture *is*.
+Operator, 2026-10-30: headsets hurt, and even a normal person is worn out after an hour on a flight. So the session is a **brief pop-in to direct**, not a place to work. Not a colorist's tool either: the calls are the big ones.
 
-**The big choices, in the operator's words (2026-10-30):** choosing the starting object (what the shot is *of*), the perspective angle, the image mode or style (anime, cinematic and the rest of the nine in `nodes/_otr_visual_styles.py`), and the overall color craft or cinematic look. The first two are per shot. Style and look are per episode, and every style must craft the whole episode, stills and video alike.
+**The big calls, in the operator's words:** choosing the starting object (what the shot is *of*), the perspective angle, the image mode or style (anime, cinematic and the rest), and the overall color craft or cinematic look. Subject and angle are per shot. Style and look are per episode.
 
-"Strategic" means it works on a **whole scene**, not one picture: the shots of a scene sit around you in order, so you can see that three shots in a row are the same medium two-shot, or that the camera jumps sides between two shots of the same conversation, and fix the pattern instead of one frame.
+## How a session goes
 
-## Where it sits: a VR front end for the Scene Producer
+1. **Before you put it on** (no one waiting): the system picks the decision points worth your time, about 6 to 10 per episode. Good candidates: the first shot of each scene, a run of shots with the same framing, a place the camera jumps sides in a conversation. For each one it **paints two or three alternatives in advance** (wide from the doorway / low on him / over her shoulder), so nothing in the session waits on the GPU.
+2. **In the headset** (about four minutes): the episode's stills play in order with the dialogue. At each decision point it pauses and shows the alternatives side by side. You pick one, and it moves on.
+3. **Afterward** (headset off): your picks become the Producer direction, and Studio submits the next stage. Anything you asked for that was not already painted is rendered now and waits for the next pass or the flat Studio page.
 
-The Scene Producer (`planning/scene-producer/PLAN.md`, schema in `nodes/_otr_producer_direction.py`) already does the hard part. A producer run writes, voices and paints the episode, then **stops before video** (`ExecutionBlocker`). It leaves a bundle with `cards.json`, one card per shot. The next run carries a `direction_json` saying which cards to paint again, keep, or change, and only what changed is rendered again. Audio, cast, voices and timing never move.
+## Three ways to make a call
 
-The suite reads the same bundle and writes the same direction:
+All three work at every decision point, and you can mix them:
 
-```
-write + voice + paint    VR staging        film          VR review        publish
-  (stills stage)    -->  of the stills --> (video stage) --> of the clips --> (publish)
-                         -> direction_json                  -> direction_json
-```
+- **Pick.** Look at an alternative and confirm, or point and pull the trigger.
+- **Speak or type a direction.** An AI assistant is built in: say "lower, looking up at him, she's in the doorway behind" or type it like a prompt. It turns that into framing words for the shot (`picture_text`). If a painted alternative already matches, it picks that one; otherwise it queues a new take for after the session, so you never wait in the headset. The same assistant handles episode-level calls: "make the whole thing cinematic", "storybook".
+- **Physical inputs.** The headset's controllers (thumbstick to move between alternatives, trigger to pick, a button for "keep as is"), a gamepad, or a hardware control surface. The browser's Web MIDI API reads a MIDI controller such as the APC40 (the FaderFace side project already maps one): pads pick an alternative, a fader sweeps between framings, a knob sets how much the assistant may change. Physical buttons mean no hunting for menus with your eyes while the headset is on.
 
-| VR action | What it becomes | Exists today? |
+## Where it sits: a front end for the Scene Producer
+
+The Scene Producer (`planning/scene-producer/PLAN.md`, schema in `nodes/_otr_producer_direction.py`) already does the hard part. A producer run writes, voices and paints the episode, then stops before video. It leaves a bundle with `cards.json`, one card per shot, and the next run carries a `direction_json`. Only what changed is rendered again. Audio, cast, voices and timing never move.
+
+What exists today (checked in r1):
+
+| Call | What it becomes | Status |
 |---|---|---|
-| "Paint this again" / pick take 2 | `takes.stills` | Yes |
-| New framing, angle or blocking, described | `cards.<shot>.picture_text` | Yes |
-| New camera move for the clip | `cards.<shot>.motion_text` | Yes |
-| "This one is fine" | `kept.stills` / `kept.clips` | Yes |
-| Note on a whole scene | `scenes.<id>.note` | Yes |
-| Exact camera position and character marks | **new `staging` per shot** | No - schema change |
+| New framing, subject or angle, in words | `cards.<shot>.picture_text` on a **Stills** run | Works. A changed text rebuilds the prompt and its hash, which misses the still cache and repaints (`_otr_producer_direction.py:718`, `otr_image_gen_dispatcher.py:147`). A Video or Publish run with unpainted text is refused by design (`:1254`). |
+| Paint again, same words | `takes.stills` | Works |
+| Keep | `kept.stills` / `kept.clips` | Works |
+| Scene note | `scenes.<id>.note` | Works |
+| Change the *action* in the clip | `cards.<shot>.motion_text` | Works, but it is the action, not the camera. It replaces `creative["motion"]` and leaves the frozen `creative["camera"]` alone (`otr_shot_lock.py:2420`). |
+| Camera move for the clip | none | Not today. No video engine takes a camera path (`_otr_video_engines/registry.py:70`). |
+| Two or three alternatives per shot | none as such | See decision 1 |
+| Episode style or look | none | A replay cannot change it (decision 4) |
 
-Framing today lives only in prompt words: the image engines (`nodes/_otr_image_engines/`) take text and, for Klein, reference pictures; none takes a depth or pose control image. So the first five rows are buildable now. The last row is the real new idea.
+## The decisions still open
 
-## The interface: an HTML page, never the node canvas
-
-Operator, 2026-10-30: tuning by wiring nodes is not fun. The person in the headset never sees a node.
-
-- The page is WebXR, opened in the headset's browser, and served by **Radio Play Studio's own server** (`contest/radio-play-studio/radio_play_studio/server.py`, port 8765), which already reads Producer bundles (`producer.py`) and submits stages to ComfyUI through the Comfy SDK (`runner.py`). The VR room becomes another view of Studio, not a second app that mirrors the schema again.
-- Progress already reaches Studio through its runner (ComfyUI `/history`, SDK jobs). The room shows "painting shot 4..." and swaps the picture in when it lands.
-- Graphs stay hidden: Studio fills `direction_json` on `workflows/otr_canonical.json` as it does today (CLAUDE.md section 0).
-
-## The decisions the review has to settle
-
-1. **How does a staging change reach the picture?** Three ways, in rising cost:
-   - **A. Words.** The room turns your moves into framing words in `picture_text` ("low angle, wide, she stands in the doorway behind him"). Works today, but the engine may not obey, so the result is approximate.
-   - **B. A rough layout picture.** The room renders a grey-box view from the camera you placed (stand-in figures, the set as blocks) and Klein uses it as a reference picture along with the cast portraits. No new engine type, but untested whether Klein follows a layout reference rather than copying it.
-   - **C. A depth or pose control.** The grey-box view becomes a depth or pose map driving a ControlNet-style input. Most exact, but it is a new engine input that no shipped engine has, and it collides with the rule below.
-   Lean: A first (free), then measure B on a handful of shots before anyone builds C.
-2. **The same-engine rule.** `admit_prompt_direction` refuses a later run whose image engines differ from the bundle's (`producer_image_engines`), to avoid two looks in one episode. Path C, or any separate "staging" engine, breaks that rule on purpose. Either the rule learns about a staging layer or staging stays inside the same engine. Faces are the risk throughout: Klein-ref holds identity, the MOSS edit LoRA does not.
-3. **What are the characters in the room?** Flat cut-outs of each shot's still (cheap, shows the current picture), or 3D stand-ins. `eng_mesh_stage.py` already turns each character's portrait into a cached GLB (Hunyuan3D-2mv) and drives Blender, so real 3D stand-ins are closer than they look, but that engine is opt-in (`OTR_ENABLE_MESH_STAGE`) and unproven as a staging tool.
-4. **Where does the set come from?** Without a 3D set, "stand in the doorway" has no doorway. Options: a blank stage with marks, a set guessed from the still (depth estimate), or a few stock rooms. This decides how much of the room is real.
-5. **Does staging carry to the video stage?** A camera move set in VR becomes `motion_text` words today. A real camera path would need the video engines to take a path, which none do.
-6. **Can the style change after the first run?** `visual_style` is a writer widget, resolved once and written to the ledger meta (`OTR_LedgerScriptWriter.py` ~4179). A Producer replay passes the writer through, so today a later stage cannot switch anime to cinematic. Options: pick style in the room *before* the first paint (a style preview wall of one shot in each of the nine), or make style a Producer field that repaints every still. The second is a whole-episode repaint plus the same-engine rule again.
-7. **Voice.** Headset browser speech input, or local Whisper on the 5080. Cloud is optional and off by default; the suite works offline.
+1. **How are the alternatives painted?** A card holds one `picture_text`. Two ways:
+   - **Sequential Stills runs**, one per alternative (A's framings, then B's, then C's), then a final run that sets each pick. If the dispatcher's cache finds the earlier paintings, the pick costs nothing. The cache index is built from the current ledger's image rows plus superseded rows (`otr_image_gen_dispatcher.py` ~2314), so **whether a painting from two bundles back is still a hit has to be measured** before this is the plan. No schema change.
+   - **A new `options` field per card** that paints several framings in one run. Cleaner and faster, but a schema change to the direction, the freezer and `cards.json`.
+   Lean: measure the sequential path on one scene first.
+2. **Who picks the decision points?** Rules (first shot of each scene, repeated framing, the camera crossing sides) or the assistant reading the shot list. Rules first: they are checkable and cheap.
+3. **Words, or a layout picture?** Words (path A) work today, but the engine may not obey exactly. A grey-box layout picture used as a Klein reference (path B) is an experiment, not a free feature: Klein takes at most three references, one primary plus two extras (`flux3_klein.py:93`), and today those are the speaker's and other cast portraits (`otr_image_gen_dispatcher.py` ~2265). A layout picture would push out a face, and enters the same reference chain with no "this is layout" role. There is no direction field to carry it either. A depth or pose control (path C) exists in no shipped engine.
+4. **Style and look after the first run.** A Producer replay cannot change `visual_style`: the writer returns from its replay branch before style is chosen or stamped (`OTR_LedgerScriptWriter.py` ~3346-3439, stamp at ~4179), and the direction has no style field. There are ten choices, not nine: nine style packs plus `visual_storybased` (`_otr_rolls.py:428`). Options: choose style in a pre-pass (one shot painted in each style, pick in the headset, then the real first run), or a new direction field that overrides the frozen style and repaints every still. The procedural video lanes show no visible style change at all (writer tooltip ~2278), so style matters most on the still-driven lanes.
+5. **How does the headset reach Studio?** Studio only answers on loopback: the CLI refuses any other bind (`cli.py:67`), and the server refuses any other Host header (`server.py:299`). That boundary is deliberate, since Studio has no login. WebXR also needs a secure context, and plain HTTP on a LAN address is not one.
+   - **Tethered (recommended first):** the headset runs as a PC headset (Link or Air Link), and the browser on the PC opens Studio at `localhost`. Localhost counts as secure, and nothing about Studio's security changes.
+   - **Standalone headset over Wi-Fi:** needs HTTPS, a login, and lifting the loopback rule. That is a security decision for the operator, not a default.
+6. **Voice, offline.** Nothing exists yet. The browser's built-in speech input in Chrome sends audio to a cloud service, so it does not meet the offline default. Local Whisper on the 5080 does, but cannot run while a render holds the GPU; during a four-minute session nothing else is rendering, so that is fine. Typed prompts and physical inputs need no speech at all.
+7. **Which workflow?** Studio submits its selected workflow (default `otr_16gb_foley_open.json`, `config.py`), a generated variant of `workflows/otr_canonical.json`. The suite changes no workflow; it only fills `direction_json` the way Studio does today.
 
 ## Limits that already apply
 
-- 16 GB, one job at a time. A repaint waits in the ComfyUI queue; nothing runs beside an episode render.
-- The room itself (moving stand-ins, flying the camera) runs in the headset and costs the 5080 nothing; only "paint it" does.
-- An edit never changes audio, cast or timing, and a partial result never publishes (both Producer rules).
-- Generated content is not filtered; the assistant applies what you ask.
+- 16 GB, one job at a time; Studio runs one stage at a time (`server.py:108`). Alternatives are painted before the session, never during it.
+- An edit never changes audio, cast or timing, and Publish refuses a card that is not filmed as it stands (both Producer rules, confirmed in r1).
+- We add no content filter. Cloud engines can still refuse a prompt on their own, and the Producer already shows a refused still as a failed card.
 
-## Smallest useful first version
+## First version
 
-The stills of one scene in a curved row around you, in order, in the headset browser via Studio. For each shot you can say or tap **keep**, **paint again**, or describe a new framing; the assistant writes the `picture_text` (path A) and Studio submits the next stage. No schema change and no new node. It answers the first question cheaply: is planning shots in VR better than on the flat Studio page?
+One scene, tethered, in the headset browser through Studio:
+
+- two alternatives for each of that scene's decision points, painted by sequential Stills runs (decision 1), with the cache measured;
+- pick with a glance or a controller, or type a direction that becomes `picture_text`;
+- the picks submit as one Stills direction, and the episode continues on the flat Studio page.
+
+This tests the operator's actual question: is a four-minute Dragon's Lair pass a faster, better way to make the big calls than the flat page? Speech, MIDI, style choice and any layout picture come after, each as its own step.
+
+**The spatial version comes later**, and only if the first one earns it. r1's recommendation, kept: one camera, two stand-ins, and a small versioned `staging` payload, proving that moving them produces a predictably different still (through a measured Klein layout reference, or by falling back to words) before any scene-wide room is built. `eng_mesh_stage.py` is not a ready source of stand-ins: it renders a turntable clip of one figure, not posable characters in a shared set, and its result is a clip, not a GLB that Studio can see.
 
 ## Not in scope
 
 - Fine retouching (operator, 2026-10-30).
+- Reopening story or music quality (both closed by operator directive).
+- Changing any shipped workflow. The suite is opt-in, like the Producer.
 
 ## Side quest: color looks
 
-Operator, 2026-10-30: color shifts can be a side quest. Not part of the staging room's first version. When it comes back, the open question is the same one as before: grade the still before filming (the video model films the look; changing it costs a re-film) or grade the clip at publish (cheap to change; the video model never sees it). The earlier lean was grading at publish. Color runs in the headset as a live preview, so it costs the 5080 nothing until it is applied.
-- Reopening story or music quality (both closed by operator directive).
-- Changing the shipped default workflow. The suite is opt-in, like the Producer.
+Operator, 2026-10-30: color shifts can be a side quest. Same open question as before: grade the still before filming (the video model films the look; changing it costs a re-film) or grade the clip at publish (cheap to change; the video model never sees it). Earlier lean: at publish.
+
+## Review receipt
+
+- **r1, 2026-10-30.** Driver: Claude Opus 5.5, which wrote its own grounding first (Studio localhost-only, Klein three-reference cap, `visual_style` frozen on replay). Contrarian: Codex `gpt-5.6-sol`, reasoning high, read-only, briefed to refute; tree unchanged. Verdicts: decisions 2 and 6 held; 1, 3, 5 and 7 refuted, plus the "first five rows" and the "served by Studio" claims; 4 unverifiable. Overall: the concept is worth building with changes; the curved-wall V1 was not, because it reproduced the Studio board without testing anything new. Every claim above was checked against the files before it went in.
+- **Folded in:** loopback and secure-context limits, the Klein reference cap, `motion_text` being the action and not the camera, ten style choices and the replay freeze, Studio's default workflow being a variant, the mesh stage not being a stand-in source, the absence of any voice code, and the spatial slice as the later step.
+- **Driver's call against r1:** Codex's spatial slice as the *first* version predates the operator's pop-in and Dragon's Lair direction. The first version is the short picking pass instead, because that is the question the operator asked; the spatial slice stays as the next step.
+- **Struck from the earlier draft:** "Klein-ref holds identity" (Klein's own file says references anchor content and do not lock structure), and the `OTR_ENABLE_MESH_STAGE` gate (stale: it gates nothing).
+- **Depth:** one round. Every r1 row turned into a fact, a measurement to make (decision 1's cache) or an operator call (decision 5). A second round would only confirm.
