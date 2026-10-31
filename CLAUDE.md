@@ -759,6 +759,19 @@ The pack is published to registry.comfy.org as **`comfyui-old-time-radio`** unde
   status Active, and node `status` NodeStatusActive -- so a Manager install WORKS while a
   version is pending and simply serves the last Active one. If Manager reports "not a CNR node",
   look for another cause; it is still NOT a torch/dependency ghost.
+  **CORRECTED 2026-10-30: "serves the last Active one" is FALSE for the install
+  endpoint.** With 2.3.45 Pending, `GET /nodes/comfyui-old-time-radio/install`
+  returned `version: 2.3.45, status: NodeVersionStatusPending` and its zip URL,
+  and `latest_version` on the node record was 2.3.43 (Flagged). The registry
+  hands out the NEWEST version whatever its status; Manager's version picker
+  lists it as "Latest" with a warning triangle (unscanned) and separately offers
+  "Latest stable" (the newest version with the passed-scan badge AND Active --
+  2.3.16 that night, not 2.3.19, because the list endpoint serves different
+  rows from different replicas). A Flagged version can carry the scan badge
+  too (2.3.36, 2.3.37): the badge is the automated layer, Flagged is the human
+  one. So a new user on defaults installs whatever was pushed last, scanned or
+  not -- one more reason a tree with an unexplained regression is never pushed
+  with a bump.
   **There is no telemetry to read.** Three endpoints were checked --
   `/nodes/<id>`, `/nodes/<id>/versions`, `/nodes/<id>/versions/<v>` -- and NONE returns a
   `status_reason`, a scan result, or a queue position, not even for the Banned versions;
