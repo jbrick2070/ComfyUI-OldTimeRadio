@@ -151,6 +151,19 @@ _SCOPE_FACES = {
 _SCOPE_FACES_DEFAULT = ["DejaVuSans.ttf", "LiberationSans-Regular.ttf"]
 
 
+def _shipped_sans():
+    """[the pack's DejaVu Sans] when this install carries it, else []."""
+    try:
+        from .. import _otr_script_fonts as _SF
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        try:
+            import _otr_script_fonts as _SF  # type: ignore
+        except ImportError:
+            return []
+    path = _SF.bundled_path("latin_sans")
+    return [path] if path else []
+
+
 def _small_font(h):
     """A small chrome font at the REQUESTED SIZE, or PIL's default with a warning.
 
@@ -171,7 +184,9 @@ def _small_font(h):
     """
     global _WARNED_SCOPE_BITMAP
     size = max(9, h // 72)
-    for name in _SCOPE_FACES.get(sys.platform, _SCOPE_FACES_DEFAULT):
+    # LAST: the pack's own DejaVu Sans, for a box with no fonts at all (Comfy
+    # Cloud, 2026-10-31); every machine with a face of its own stops above.
+    for name in _SCOPE_FACES.get(sys.platform, _SCOPE_FACES_DEFAULT) + _shipped_sans():
         try:
             return ImageFont.truetype(name, size)
         except Exception:  # noqa: BLE001 -- absent face; try the next one

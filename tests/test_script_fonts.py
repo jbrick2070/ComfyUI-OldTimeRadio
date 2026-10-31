@@ -174,3 +174,12 @@ def test_fontless_linux_measures_the_title_in_the_shipped_mono(monkeypatch):
     family, paths, _names = VE._mono_font_families()[-1]
     assert family == "DejaVu Sans Mono" == CAP._MONO_FALLBACK
     assert paths == [SF.bundled_path("latin_mono")]
+
+
+def test_fontless_scope_chrome_draws_in_the_shipped_sans(monkeypatch, tmp_path):
+    from nodes._otr_shared import scope_draw as SD
+    _fontless(monkeypatch, tmp_path)
+    monkeypatch.setattr(SD.sys, "platform", "linux")
+    monkeypatch.setattr(SD, "_SCOPE_FACES_DEFAULT", ["NoSuchFace-Regular.ttf"])
+    font = SD._small_font(1080)
+    assert font.path == SF.bundled_path("latin_sans") and font.size == 15

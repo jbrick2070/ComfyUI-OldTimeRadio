@@ -696,7 +696,10 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
         # all. The pack's DejaVu Sans stands in only there; the monospace
         # styles already name DejaVu Sans Mono off Windows and macOS, which
         # the burn hands libass the same way (``_shipped_fonts_option``).
-        st["font"] = _shipped_family_if_no_os_face("latin_sans") or "Arial"
+        try:
+            st["font"] = _shipped_family_if_no_os_face("latin_sans") or "Arial"
+        except Exception as exc:  # noqa: BLE001 -- a face lookup never costs the captions
+            log.warning("[captions] Latin face lookup failed (%s); naming Arial", exc)
     mv = int(margin_v) if margin_v is not None else int(st["margin_v"])
 
     try:
