@@ -304,6 +304,42 @@ different proof.
   is Pending or `reflag-pending-review`; bump only on a signed
   `policy-vN: <class>`, one lever per verdict; the "Security verification
   pending" line in the picker clears only when the scan passes.
+
+  **Registry-install receipt, the 4060, 2026-10-30 20:30-21:00 PT** (the box
+  that owns the fresh-install path; ComfyUI 0.43.2, Python 3.13.12, frontend
+  1.57.4, comfyui-manager 4.2.2 as a pip package, RTX 4060 Laptop 8 GB, torch
+  2.12.1+cu130). Installed 2.3.46 the way Manager's `cnr_install` does it:
+  the registry zip (11.7 MB) flattened into `custom_nodes\comfyui-old-time-radio`
+  with a `.tracking` of 714 files, the git checkout renamed aside, then
+  `pip install <line>` for each of the 32 requirement lines with the venv's
+  interpreter, Manager's order: 59 s, 0 failures. `nvidia-vfx` was uninstalled
+  first so the stub was measured for real: it built
+  `nvidia_vfx-0.2.0.0-cp312-abi3-win_amd64.whl` (436 MB) in 25 s; the
+  `en_core_web_sm` line answered "Ignoring ... markers don't match" on 3.13 as
+  designed, kokoro likewise, kokoro-onnx 0.6.1 and the phonemizers were
+  already there; imageio-ffmpeg 0.6.0 and av 18.1.0 present. Boot: 23 `OTR_`
+  classes in `/object_info`; with Manager enabled the console printed
+  `[OldTimeRadio] OK - All 23 nodes loaded successfully` and registered
+  `GET /otr/latest_ledger` (under `--disable-all-custom-nodes` the print is
+  absent from the log, the count is not). Run: the shipped
+  `workflows/otr_canonical.json` (sha256 identical to the repo's) at one act
+  through `scripts/otr_canonical_api_run.py` over an ssh tunnel: RESULT
+  SUCCESS, "Prompt executed in 332.21 seconds", `obs_publish OK` ->
+  `registry_check_20261030_204304__pori__vcam__none__koko__marc__cg4e2__sa3_final.mp4`
+  (66 MB) in that install's `output\otr\obs`. Manager's picker on that
+  frontend, read through the tunnel: the card says `2.3.46 > Oct 30, 2026,
+  fluxus, 79 downloads` with a triangle beside Enabled; the picker's rows are
+  "Latest (2.3.46)" carrying "Security verification pending - compatibility
+  cannot be verified" and "Latest stable" greyed with "This pack has no
+  Active releases."; the words "GPU/Accelerator" and "not supported" appear
+  nowhere (the classifier change verified on a second machine and frontend);
+  Node Pack Info shows Status "Conflicting", which is that frontend's word for
+  an unverified version (the left nav counts it as "Conflicting 1"). What a
+  new user gets today: a working pack after one extra click on "Latest",
+  with a triangle that says the scan is pending. Restored afterwards: the
+  test copy removed, the git checkout re-enabled (still at `1e5e0af94`, that
+  box's own business), the four test tasks deleted; the venv holds
+  `nvidia-vfx 0.2.0.0` as it did before.
 * **2.3.45 was published first that night** (`8b0f26173`, 2026-10-30 17:25
   PT, at the operator's word "once you're all done, publish your best guess
   and wait"): the registry hardening below reaches the registry. It landed
