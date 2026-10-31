@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-old-time-radio"
-version = "2.3.45"
+version = "2.3.46"
 description = "Press Run once: ComfyUI writes or adapts a radio play, casts and performs it with neural voices, composes the score, and cuts a finished episode video -- all locally. No account, no API key, nothing paid. Needs an NVIDIA card with 8 GB or more, a 16 GB Apple Silicon Mac, or a CPU (start ComfyUI with --cpu), plus about 25 GB of free disk; the first run fetches several GB of models."
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -156,12 +156,21 @@ classifiers = [
     "Topic :: Multimedia :: Sound/Audio :: Speech",
     "Topic :: Multimedia :: Video",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    # The registry reads OS and GPU classifiers to help people find a pack
-    # that fits their machine (registry specification).
+    # The registry reads OS classifiers to help people find a pack that fits
+    # their machine (registry specification). NO ACCELERATOR CLASSIFIER, ON
+    # PURPOSE (operator, 2026-10-30): ComfyUI-Manager's version picker compares
+    # the machine's short device name ("CUDA", "Metal", "ROCm", "CPU") against
+    # the registry's string ("GPU :: NVIDIA CUDA") as an exact match -- open
+    # frontend issue 15364, fix PR 15468 unmerged, frontend 1.59 has the bug --
+    # so ANY declared accelerator made every machine, CUDA boxes included, read
+    # "GPU/Accelerator not supported" (2.3.38 to 2.3.45 declared CUDA alone).
+    # An empty list is treated as unrestricted. The pack runs on CUDA, Apple
+    # Metal, AMD ROCm and CPU; put `Environment :: GPU :: NVIDIA CUDA`,
+    # `:: Apple Metal` and `:: AMD ROCm` back the day that fix ships, for the
+    # registry's search tags.
     "Operating System :: Microsoft :: Windows",
     "Operating System :: MacOS",
     "Operating System :: POSIX :: Linux",
-    "Environment :: GPU :: NVIDIA CUDA",
 ]
 
 [project.urls]
