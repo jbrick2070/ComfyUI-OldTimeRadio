@@ -1,8 +1,8 @@
 schema: comfy-build/1
 id: 971bd986-c1ef-4b2f-a91f-96659b0755c6
 name: otr-24gb-foley
-description: ComfyUI-OldTimeRadio at main fa6f469e, for workflows/otr_24gb_foley.json
-syncedRevision: '2026-10-31T08:24:23.469333Z'
+description: ComfyUI-OldTimeRadio at main e3885726 (2.3.49), for workflows/otr_24gb_foley.json
+syncedRevision: '2026-10-31T16:57:45.46736Z'
 definition:
   schema: distribution-definition/0
   baseComfyVersion: v0.43.2
@@ -52,6 +52,6 @@ definition:
       sourceUri: https://huggingface.co/yuvraj108c/LTX-2.5/resolve/9a165b41a60dd72000d756c71c32ff30a52e6ffa/ltx-2.5-video-vae-bf16.safetensors
       type: vae
   customNodes:
-    - gitRef: fa6f469e090e8682a42e4b19d6269fa3585b0af0
+    - gitRef: e3885726e752481eb87558f1732532e7e0c7161d
       name: ComfyUI-OldTimeRadio
       repository: https://github.com/jbrick2070/ComfyUI-OldTimeRadio

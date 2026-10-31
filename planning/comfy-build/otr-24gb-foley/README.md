@@ -7,9 +7,11 @@ working copy: every later `comfy build` / `comfy deploy` command reads it.
 | | |
 |---|---|
 | Build | `971bd986-c1ef-4b2f-a91f-96659b0755c6` |
-| Release v1 | `7f0bcc94-9acd-49f2-a6e7-30dedf728e1c`, linux/nvidia, deployable |
+| Release v1 | `7f0bcc94-9acd-49f2-a6e7-30dedf728e1c`, linux/nvidia, deployable (pack at `fa6f469e`) |
+| Release v2 | `d908f8bb-fb8c-4fc6-bff4-34764137557d`, linux/nvidia, deployable (pack at `e3885726`, 2.3.49) |
+| Deployment | `dep-3b611093-3d7f-4047-87c5-00fc632663bf` "production", rtx-pro-6000-mig-2g-48gb, min 0 / max 1, on release v2 since 2026-10-31 |
 | Cut | 2026-10-31, first cut green, about 4 minutes of build |
-| Pack | ComfyUI-OldTimeRadio at main `fa6f469e` (git pin, not the registry) |
+| Pack | ComfyUI-OldTimeRadio at main `e3885726` = 2.3.49 (git pin, not the registry) |
 | ComfyUI | v0.43.2, base image cuda130-py312 (torch 2.12.1) |
 | pip pins | none; the pack's requirements.txt resolves on its own |
 | Models | 11 weights, 61.5 GB, fetched by the builder from Hugging Face by pinned revision and sha256 |
@@ -38,8 +40,18 @@ Stable Audio 3 carries no pin in the fetcher, so its sha256 is the one
 * Not carried in the image: Kokoro voices and Bark weights live in the HF
   cache, outside `models/`, so a cold worker downloads them.
 
+## What the endpoint proved (2026-10-31, release v1)
+
+Four episodes rendered end to end on the MIG 48 GB worker with Bark voices
+(Kokoro refused for the missing `en_core_web_sm`): three one-acts at 73, 82
+and 183 minutes and a five-character three-act at 132 minutes, all published.
+The three one-acts came back `failed` because node 12 reported a file the
+mux's asset cleanup deletes (PBUG-20261031-01); the three-act, run with
+cleanup off, came back `succeeded`. Release v2 carries the fix.
+
 ## Next
 
-Deploying is `comfy deploy up planning/comfy-build/otr-24gb-foley --gpu <class>
---region <region> --min 0 --max 1`, which bills continuously. Read
-`comfy deploy refs compute` first and get the operator's yes.
+* Prove release v2 with cleanup on: a job should now end `succeeded`.
+* Kokoro on the endpoint needs `en_core_web_sm` in the image.
+* `comfy deploy stop planning/comfy-build/otr-24gb-foley` when idle time
+  should not hold compute; storage still bills while stopped.
