@@ -17488,5 +17488,10 @@ not promote it to the Bug Bible on this evidence alone.
   the mux is the one node that reports a video, the published obs copy.
   `tests/test_reported_outputs_survive_cleanup.py` holds node 12 to no file in
   `ui`.
-- status: FIXED in code; live proof is the next Comfy Cloud job on a rebuilt
-  release coming back `succeeded`.
+- status: FIXED and PROVEN LIVE 2026-10-31. Comfy Build release v2
+  (`d908f8bb`, pack at e3885726 / 2.3.49) on deployment `dep-3b611093`: job
+  `d9e8a234` ran a one-act with asset_cleanup "full" from 10:10 to 12:17 PT and
+  ended `succeeded` -- the same setting that failed all three v1 one-acts.
+  Episode "The Double Cherry, Severed", 3:02, 1920x1080, in `otr/obs`. The v1
+  three-act run with cleanup off also ended `succeeded`, so the cleanup was the
+  whole cause and the folder rename was not.
