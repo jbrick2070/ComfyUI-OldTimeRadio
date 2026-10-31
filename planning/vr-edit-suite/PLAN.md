@@ -8,6 +8,8 @@ A VR room for making **the big staging calls** on an episode's shots **before th
 
 Operator, 2026-10-30: not a colorist's tool. Fine work (color, small fixes) is out of scope. The suite is for the decisions that change what the picture *is*.
 
+**The big choices, in the operator's words (2026-10-30):** choosing the starting object (what the shot is *of*), the perspective angle, the image mode or style (anime, cinematic and the rest of the nine in `nodes/_otr_visual_styles.py`), and the overall color craft or cinematic look. The first two are per shot. Style and look are per episode, and every style must craft the whole episode, stills and video alike.
+
 "Strategic" means it works on a **whole scene**, not one picture: the shots of a scene sit around you in order, so you can see that three shots in a row are the same medium two-shot, or that the camera jumps sides between two shots of the same conversation, and fix the pattern instead of one frame.
 
 ## Where it sits: a VR front end for the Scene Producer
@@ -52,7 +54,8 @@ Operator, 2026-10-30: tuning by wiring nodes is not fun. The person in the heads
 3. **What are the characters in the room?** Flat cut-outs of each shot's still (cheap, shows the current picture), or 3D stand-ins. `eng_mesh_stage.py` already turns each character's portrait into a cached GLB (Hunyuan3D-2mv) and drives Blender, so real 3D stand-ins are closer than they look, but that engine is opt-in (`OTR_ENABLE_MESH_STAGE`) and unproven as a staging tool.
 4. **Where does the set come from?** Without a 3D set, "stand in the doorway" has no doorway. Options: a blank stage with marks, a set guessed from the still (depth estimate), or a few stock rooms. This decides how much of the room is real.
 5. **Does staging carry to the video stage?** A camera move set in VR becomes `motion_text` words today. A real camera path would need the video engines to take a path, which none do.
-6. **Voice.** Headset browser speech input, or local Whisper on the 5080. Cloud is optional and off by default; the suite works offline.
+6. **Can the style change after the first run?** `visual_style` is a writer widget, resolved once and written to the ledger meta (`OTR_LedgerScriptWriter.py` ~4179). A Producer replay passes the writer through, so today a later stage cannot switch anime to cinematic. Options: pick style in the room *before* the first paint (a style preview wall of one shot in each of the nine), or make style a Producer field that repaints every still. The second is a whole-episode repaint plus the same-engine rule again.
+7. **Voice.** Headset browser speech input, or local Whisper on the 5080. Cloud is optional and off by default; the suite works offline.
 
 ## Limits that already apply
 
