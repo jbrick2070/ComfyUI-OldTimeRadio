@@ -42,3 +42,8 @@
 2026-10-30 | Video | trydrama DRAMA (closed weights) | SKIP | https://huggingface.co/trydrama-neuralgarage/DRAMA
 2026-10-30 | Writer | GPT-1900 / GPT-1905 (mhla) | WATCH | https://huggingface.co/mhla/gpt1900-instruct-v3-sft
 2026-10-31 | Video | DMAD (4/8-step MiniMax-H3 distillation LoRAs) | WATCH | https://huggingface.co/ZhengmingYu/DMAD
+2026-11-01 | Voice | MOSS-TTS family + ComfyUI-MOSS-TTS | WATCH | https://github.com/OpenMOSS/MOSS-TTS
+2026-11-01 | Voice | Paradee-8M v1.2 | SKIP | https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.2
+2026-11-01 | Video | Pika-H3-Flex-Turbo-LoRA (akhaliq) | WATCH | https://huggingface.co/akhaliq/Pika-H3-Flex-Turbo-LoRA
+2026-11-01 | Image | MOSS-Image-IDM-2-Steps | WATCH | https://huggingface.co/akhaliq/MOSS-Image-IDM-2-Steps
+2026-11-01 | Upscale | ComfyUI-MambaIR | WATCH | https://github.com/mariofilipasic/ComfyUI-MambaIR
