@@ -64,6 +64,22 @@ no Latin face of its own. Job `af276e53` on release v3 (one-act, 88 s,
 cleanup on) came back `succeeded`, with burned captions, the hero title and
 the credits drawn in DejaVu Sans Mono.
 
+## Languages on the endpoint (2026-11-01, release v3)
+
+Job `eaef5ad2`, a Hindi one-act with both voice engines on Kokoro, came back
+`succeeded` (211 s, 2.5 hours on the worker): Kokoro voiced every line
+(hf_alpha, hm_psi, hm_omega) through the espeak phonemizer, which needs no
+spaCy model, and the shipped Devanagari face drew the title, the caption
+speaker names and the credits headings. So Kokoro works on the endpoint for
+Spanish, French, Italian, Portuguese and Hindi; only English needs
+`en_core_web_sm`. Mandarin and Japanese cannot voice here: their phonemizer
+libraries carry a Python 3.13 marker and the image is 3.12.
+
+Seen in that episode, not cloud-specific: the credits draw Devanagari
+without shaping (the i-matra lands after its consonant) because Pillow has
+no raqm on this box or the endpoint, and some dialogue lines came back from
+the writer in romanized Hindi.
+
 ## Next
 
 * Kokoro on the endpoint needs `en_core_web_sm` in the image.
