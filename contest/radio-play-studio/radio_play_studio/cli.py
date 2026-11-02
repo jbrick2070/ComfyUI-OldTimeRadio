@@ -226,11 +226,22 @@ def start_bridge(settings: Settings, *, run=subprocess.run, reachable=_bridge_re
     parts = urlsplit(settings.api_url)
     if parts.hostname not in ("127.0.0.1", "localhost", "::1"):
         return f"comfy-api-proxy is not answering on {settings.api_url}, and it is not on this machine to start"
+    try:
+        port = parts.port
+    except ValueError:
+        port = None
+    if port is None:
+        return f"comfy-api-proxy is not answering on {settings.api_url}; name its port to start it here"
     exe = command()
     if exe is None:
         return "comfy-api-proxy is not installed: pip install -r requirements.txt"
-    cmd = exe + ["start", "--comfyui", settings.comfyui_url, "--port", str(parts.port or 80)]
-    result = run(cmd, capture_output=True, text=True, timeout=60)
+    # Bound to the address the app will call, so a [::1] bridge answers on [::1].
+    cmd = exe + ["start", "--comfyui", settings.comfyui_url, "--host", parts.hostname,
+                 "--port", str(port)]
+    try:
+        result = run(cmd, capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return f"comfy-api-proxy did not start: {exc}"
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip().splitlines()
         return "comfy-api-proxy did not start" + (f": {detail[-1]}" if detail else "")

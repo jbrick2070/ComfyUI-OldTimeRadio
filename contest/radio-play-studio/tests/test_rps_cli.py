@@ -55,8 +55,39 @@ def test_start_starts_the_bridge_for_this_comfyui_and_waits_for_it(settings):
                             run=lambda cmd, **k: ran.append(cmd) or _Result(),
                             reachable=lambda url, timeout: next(looks),
                             sleep=lambda s: None, command=lambda: ["proxy"])
-    assert ran == [["proxy", "start", "--comfyui", "http://127.0.0.1:8188", "--port", "8189"]]
+    assert ran == [["proxy", "start", "--comfyui", "http://127.0.0.1:8188",
+                    "--host", "127.0.0.1", "--port", "8189"]]
     assert said.startswith("started comfy-api-proxy")
+
+
+def test_start_binds_the_bridge_to_the_address_the_app_calls(settings):
+    import dataclasses
+    ran, looks = [], iter([False, True])
+    local = dataclasses.replace(_local(settings), api_url="http://[::1]:8189")
+    cli.start_bridge(local, run=lambda cmd, **k: ran.append(cmd) or _Result(),
+                     reachable=lambda url, timeout: next(looks),
+                     sleep=lambda s: None, command=lambda: ["proxy"])
+    assert ran[0][ran[0].index("--host") + 1] == "::1"
+
+
+@pytest.mark.parametrize("api_url", ["http://127.0.0.1", "http://127.0.0.1:99999"])
+def test_start_never_guesses_the_bridge_port(settings, api_url):
+    import dataclasses
+    ran = []
+    local = dataclasses.replace(_local(settings), api_url=api_url)
+    said = cli.start_bridge(local, run=lambda *a, **k: ran.append(a),
+                            reachable=lambda url, timeout: False, command=lambda: ["proxy"])
+    assert ran == [] and "name its port" in said
+
+
+@pytest.mark.parametrize("failure", [FileNotFoundError("no such file"), PermissionError("denied"),
+                                     __import__("subprocess").TimeoutExpired("proxy", 60)])
+def test_a_bridge_that_cannot_be_launched_is_reported_not_raised(settings, failure):
+    def run(cmd, **kwargs):
+        raise failure
+    said = cli.start_bridge(_local(settings), run=run, reachable=lambda url, timeout: False,
+                            command=lambda: ["proxy"])
+    assert said.startswith("comfy-api-proxy did not start:")
 
 
 def test_start_never_starts_a_bridge_on_another_machine(settings):
