@@ -10,9 +10,10 @@ working copy: every later `comfy build` / `comfy deploy` command reads it.
 | Release v1 | `7f0bcc94-9acd-49f2-a6e7-30dedf728e1c`, linux/nvidia, deployable (pack at `fa6f469e`) |
 | Release v2 | `d908f8bb-fb8c-4fc6-bff4-34764137557d`, linux/nvidia, deployable (pack at `e3885726`, 2.3.49) |
 | Release v3 | `33213b10-a779-442c-b199-a31fc9570801`, linux/nvidia, deployable (pack at `a31f954f`, 2.3.49 + fontless-host fonts) |
-| Deployment | `dep-3b611093-3d7f-4047-87c5-00fc632663bf` "production", rtx-pro-6000-mig-2g-48gb, min 0 / max 1, on release v3 since 2026-10-31 |
+| Release v4 | `458e559a-3e5f-4b80-85d0-72008ec81024`, linux/nvidia (pack at `d55f912c`, 2.3.50 + Kokoro English spaCy prefetch) |
+| Deployment | `dep-3b611093-3d7f-4047-87c5-00fc632663bf` "production", rtx-pro-6000-mig-2g-48gb, min 0 / max 1, moving to release v4 on 2026-11-02 |
 | Cut | 2026-10-31, first cut green, about 4 minutes of build |
-| Pack | ComfyUI-OldTimeRadio at main `a31f954f` (git pin, not the registry) |
+| Pack | ComfyUI-OldTimeRadio at main `d55f912c` (git pin, not the registry) |
 | ComfyUI | v0.43.2, base image cuda130-py312 (torch 2.12.1) |
 | pip pins | none; the pack's requirements.txt resolves on its own |
 | Models | 11 weights, 61.5 GB, fetched by the builder from Hugging Face by pinned revision and sha256 |
@@ -79,6 +80,15 @@ Seen in that episode, not cloud-specific: the credits draw Devanagari
 without shaping (the i-matra lands after its consonant) because Pillow has
 no raqm on this box or the endpoint, and some dialogue lines came back from
 the writer in romanized Hindi.
+
+## What release v4 changes (2026-11-02)
+
+English Kokoro on the endpoint. The image has no `en_core_web_sm` and the
+build spec cannot add one, so at prestartup the pack now fetches spaCy's own
+Hugging Face mirror of it (3.7.1, pinned commit and sha256) beside the Kokoro
+voices, and the torch backend loads it when the model is not installed
+(planning/kokoro-english-cloud/PLAN.md). The test: an English one-act with
+both voice engines on Kokoro. Result: pending.
 
 ## Next
 
