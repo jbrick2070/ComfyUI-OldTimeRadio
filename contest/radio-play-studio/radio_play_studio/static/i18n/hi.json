@@ -282,6 +282,8 @@
  "writer.summary_model": "लेखक: {name} -- {model}",
  "way.time_min": "{acts} अंक के लिए लगभग {n} मिनट, {gpu} पर मापा गया",
  "way.time_h": "{acts} अंक के लिए लगभग {n} घंटे, {gpu} पर मापा गया",
+ "way.time_min_short": "लगभग {n} मिनट",
+ "way.time_h_short": "लगभग {n} घंटे",
  "keys.missing": "कुंजी चाहिए: {names}",
  "uses.video": "वीडियो",
  "uses.stills": "चित्र",

@@ -282,6 +282,8 @@
  "writer.summary_model": "Auteur : {name} -- {model}",
  "way.time_min": "Environ {n} min pour {acts} acte(s), mesuré sur {gpu}",
  "way.time_h": "Environ {n} h pour {acts} acte(s), mesuré sur {gpu}",
+ "way.time_min_short": "Environ {n} min",
+ "way.time_h_short": "Environ {n} h",
  "keys.missing": "Il manque une clé : {names}",
  "uses.video": "Vidéo",
  "uses.stills": "Images",

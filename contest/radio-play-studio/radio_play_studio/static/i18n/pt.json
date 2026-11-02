@@ -282,6 +282,8 @@
  "writer.summary_model": "Roteirista: {name} -- {model}",
  "way.time_min": "Cerca de {n} min para {acts} ato(s), medido em {gpu}",
  "way.time_h": "Cerca de {n} h para {acts} ato(s), medido em {gpu}",
+ "way.time_min_short": "Cerca de {n} min",
+ "way.time_h_short": "Cerca de {n} h",
  "keys.missing": "Falta uma chave: {names}",
  "uses.video": "Vídeo",
  "uses.stills": "Imagens",

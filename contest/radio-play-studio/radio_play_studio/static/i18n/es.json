@@ -282,6 +282,8 @@
  "writer.summary_model": "Escritor: {name} -- {model}",
  "way.time_min": "Unos {n} min para {acts} acto(s), medido en {gpu}",
  "way.time_h": "Unas {n} h para {acts} acto(s), medido en {gpu}",
+ "way.time_min_short": "Unos {n} min",
+ "way.time_h_short": "Unas {n} h",
  "keys.missing": "Falta una clave: {names}",
  "uses.video": "Vídeo",
  "uses.stills": "Imágenes",

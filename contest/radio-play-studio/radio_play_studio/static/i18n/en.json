@@ -282,6 +282,8 @@
  "writer.summary_model": "Writer: {name} -- {model}",
  "way.time_min": "About {n} min for {acts} act(s), measured on {gpu}",
  "way.time_h": "About {n} h for {acts} act(s), measured on {gpu}",
+ "way.time_min_short": "About {n} min",
+ "way.time_h_short": "About {n} h",
  "keys.missing": "Needs a key: {names}",
  "uses.video": "Video",
  "uses.stills": "Stills",

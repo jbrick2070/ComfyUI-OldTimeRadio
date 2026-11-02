@@ -149,7 +149,7 @@ def test_script_owned_containers_hold_no_static_children():
     """The script clears these (textContent = "") and fills them; a static child
     put inside one would vanish on the first draw."""
     for owner in ("form", "result", "published", "projects", "summary_text", "castrow", "scenes", "hint",
-                  "ticket_list"):
+                  "ticket_list", "ticket_uses"):
         assert _children(BY_ID[owner]) == [], owner
         assert NODES[BY_ID[owner]]["text"] == "", owner
 

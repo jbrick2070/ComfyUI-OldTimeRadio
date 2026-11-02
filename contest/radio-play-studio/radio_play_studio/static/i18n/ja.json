@@ -282,6 +282,8 @@
  "writer.summary_model": "脚本家：{name}（{model}）",
  "way.time_min": "{acts}幕で約{n}分（{gpu}で計測）",
  "way.time_h": "{acts}幕で約{n}時間（{gpu}で計測）",
+ "way.time_min_short": "約{n}分",
+ "way.time_h_short": "約{n}時間",
  "keys.missing": "キーが必要です：{names}",
  "uses.video": "動画",
  "uses.stills": "静止画",

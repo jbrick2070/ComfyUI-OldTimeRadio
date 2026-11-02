@@ -131,8 +131,15 @@
           padding: 12px 18px; margin: 0 0 12px; }
   #keys_note { color: var(--bad); font: 600 .9rem var(--sans); white-space: nowrap; }
   /* Seven machines fit one row on a wide screen. */
-  .machines { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
-  .machines .pick { padding: 8px 10px; }
+  .machines { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .machines .pick { padding: 6px 10px; }
+  .machines .pick span { display: inline; margin-left: 6px; font-size: .8rem; }
+  /* A way card is its name, one line on what it makes, and its time; the
+     models it runs are listed once, in the ticket, for the way picked. */
+  .ways .pick .uses { display: none; }
+  #ticket_uses .uses { display: flex; flex-wrap: wrap; gap: 2px 12px; margin: 0 0 12px;
+                  font: .85rem/1.45 var(--sans); color: var(--ink); }
+  #ticket_uses .uses b { font-weight: 600; color: var(--muted); }
   .pick strong { font: 600 1rem/1.3 var(--sans); display: inline; }
   .pick span { display: block; }
   .pick .time { color: var(--accent-text); font-size: .85rem; margin-top: 2px; }
@@ -414,7 +421,7 @@
   @media (min-width: 1280px) {
     main:not(:has(#board:not([hidden]))) { max-width: min(1760px, 100%); padding-top: 18px; }
     h1 { font-size: 1.8rem; }
-    .tag { margin-bottom: 12px; }
+    .tag { margin-bottom: 12px; max-width: none; }
     .modes { margin-bottom: 14px; }
     .mode { padding: 12px 16px; }
     #form { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
@@ -423,7 +430,11 @@
     #form > #group_Writer { grid-column: 2; }
     #form:has(#group_My_story[hidden]) > #group_Writer,
     #form:not(:has(#group_My_story)) > #group_Writer { grid-column: 1 / -1; }
-    #group_setup { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 0 18px; }
+    /* Machines a row of chips on top, the ways a wide grid under them: one
+       short screen instead of a tall column (operator, 2026-11-02: "fit it all
+       on the page with minimal scrolling"). */
+    #group_setup { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px 0; }
+    .ways { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
 
     #form > fieldset { margin-bottom: 12px; }
     /* My story on the left, the show beside it; a classic story has only the show. */
@@ -432,15 +443,15 @@
                               grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
     #form:has(#group_My_story[hidden]) > #group_The_show,
     #form:not(:has(#group_My_story)) > #group_The_show {
-      grid-column: 1 / -1; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+      grid-column: 1 / -1; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
     #group_The_show > [id^="row_"] { min-width: 0; }
     /* Long pickers and the still model take the whole row of their box. */
     #row_stills { grid-column: 1 / -1; }
     label { margin-top: 10px; }
-    /* The help keeps two lines and opens in full on the field it explains. */
+    /* The help keeps one line and opens in full on the field it explains. */
     /* Only the landing's own field help: the board and the upload messages keep theirs whole. */
     #form [id^="row_"] > .help, #cast_editor > .help {
-      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
     /* Opened by focus, not by the pointer passing over: no reflow while reading. */
     #form [id^="row_"]:focus-within > .help,
     #cast_editor:focus-within > .help { -webkit-line-clamp: unset; overflow: visible; }
@@ -506,6 +517,7 @@
     <aside class="ticket" id="ticket" data-i18n-aria-label="ticket.label" data-fb-aria-label="Your episode">
       <p class="air"><i></i><span id="air"></span></p>
       <dl id="ticket_list" hidden></dl>
+      <div id="ticket_uses" hidden></div>
       <p id="ticket_time" hidden></p>
       <p id="notice" hidden></p>
       <p id="ticket_steps" class="help" hidden data-i18n="ticket.steps">Start ComfyUI, then press Try again. Your choices appear on the left.</p>
@@ -990,8 +1002,12 @@ function timesView() {
   for (const el of document.querySelectorAll(".pick .time[data-workflow]")) {
     const [secs, gpu] = ONE_ACT_SECONDS[el.dataset.workflow];
     const total = secs * acts;
-    if (total >= 5400) say(el, "way.time_h", {n: (total / 3600).toFixed(1), acts, gpu});
-    else say(el, "way.time_min", {n: Math.round(total / 60), acts, gpu});
+    // The card says it short; the full sentence, with the card it was measured
+    // on, is its tooltip and the ticket's time line.
+    const hours = total >= 5400, n = hours ? (total / 3600).toFixed(1) : Math.round(total / 60);
+    const vars = {n, acts, gpu};
+    say(el, hours ? "way.time_h_short" : "way.time_min_short", vars);
+    tx(el, hours ? "way.time_h" : "way.time_min", "", "title", vars);
   }
 }
 
@@ -1498,7 +1514,7 @@ function ticketView() {
   $("ticket_steps").hidden = formTrouble !== "offline" || loadingForm;
   $("retry").hidden = !formTrouble || loadingForm;
   $("ticket_list").hidden = $("ticket_time").hidden = !ready;
-  if (ready) ticketSummary();
+  if (ready) ticketSummary(); else $("ticket_uses").hidden = true;
 }
 // What the press will make, read from the form as it stands.
 function ticketSummary() {
@@ -1523,6 +1539,13 @@ function ticketSummary() {
     dd.textContent = value;
     list.append(tx(document.createElement("dt"), key, fallback), dd);
   }
+  // The models the picked way runs: the cards no longer list them, so they are said here.
+  const usesBox = $("ticket_uses");
+  usesBox.textContent = "";
+  const machine = menu && menu.machines.find((m) => m.key === menu.current.machine);
+  const way = machine && machine.ways.find((w) => w.workflow === workflowName);
+  if (way && way.uses) usesBox.appendChild(usesLine(way.uses));
+  usesBox.hidden = !usesBox.childNodes.length;
   // The same measured figure the filming cards show, for the acts asked for.
   const acts = Math.max(1, parseInt($("f_acts") ? $("f_acts").value : "1", 10) || 1);
   const timed = ONE_ACT_SECONDS[workflowName];
