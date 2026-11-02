@@ -47,3 +47,8 @@
 2026-11-01 | Video | Pika-H3-Flex-Turbo-LoRA (akhaliq) | WATCH | https://huggingface.co/akhaliq/Pika-H3-Flex-Turbo-LoRA
 2026-11-01 | Image | MOSS-Image-IDM-2-Steps | WATCH | https://huggingface.co/akhaliq/MOSS-Image-IDM-2-Steps
 2026-11-01 | Upscale | ComfyUI-MambaIR | WATCH | https://github.com/mariofilipasic/ComfyUI-MambaIR
+2026-11-02 | Video | HyperFlow (8-step H3 LoRA) | WATCH | https://huggingface.co/VideoRebirthAI/hyperflow
+2026-11-02 | Video | lsdub / ironleo78-mtv packs | WATCH | https://api.comfy.org/nodes/search?search=video
+2026-11-02 | Image | JoyAI-Image-Edit-Plus (Comfy-Org repack, int8_convrot) | WATCH | https://huggingface.co/Comfy-Org/JoyAI-Image-Edit
+2026-11-02 | Upscale | Tessera (H3 tiled upscaler, news only) | WATCH | https://comfyui-wiki.com/en/news
+2026-11-02 | Writer | MonadGPT (1400-1700 fine-tune) | WATCH | https://huggingface.co/Pclanglais/MonadGPT
