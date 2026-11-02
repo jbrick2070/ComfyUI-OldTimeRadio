@@ -143,10 +143,50 @@
   .card .tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
   .castbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 
-  /* ---- the press ---- */
-  .gobar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
-  .gobar #go { font-size: 1.05rem; padding: 12px 26px; }
+  /* ---- the studio: numbered steps, and the ticket beside them ---- */
+  .studio { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (min-width: 1000px) { .studio { grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; } }
+  /* Each box of choices is a numbered step; a hidden one is not counted. */
+  #form { counter-reset: step; }
+  #form > fieldset:not([hidden]) > legend::before {
+    counter-increment: step; content: counter(step);
+    display: inline-grid; place-items: center; width: 26px; height: 26px; margin-right: 8px;
+    border: 2px solid var(--lamp); border-radius: 50%; color: var(--lamp); font: 700 .85rem var(--sans); }
+  #skeleton { display: grid; gap: 12px; }
+  .ghost { border: 1px dashed var(--line); border-radius: 12px; padding: 14px 18px; opacity: .6;
+           font-family: var(--sans); }
+  .ghost b { display: block; font-weight: 600; }
+  .ghost span { color: var(--muted); font-size: .875rem; }
+  #skeleton { counter-reset: ghost; }
+  .ghost b::before { counter-increment: ghost; content: counter(ghost);
+    display: inline-grid; place-items: center; width: 26px; height: 26px; margin-right: 8px;
+    border: 2px solid var(--line); border-radius: 50%; font: 700 .85rem var(--sans); }
+
+  /* The ticket: a program card with an on-air lamp. */
+  .ticket { border: 1px solid var(--field-line); border-radius: 14px; background: var(--strip);
+            padding: 16px 18px; font-family: var(--sans); }
+  @media (min-width: 1000px) { .ticket { position: sticky; top: 16px; } }
+  .air { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; color: var(--muted);
+         font: 700 .8rem var(--sans); letter-spacing: .14em; text-transform: uppercase; }
+  .air i { width: 14px; height: 14px; border-radius: 50%; background: var(--bar); border: 2px solid var(--line); flex: none; }
+  .ticket.ready .air, .ticket.live .air { color: var(--lamp); }
+  .ticket.ready .air i, .ticket.live .air i { background: var(--lamp); border-color: var(--lamp);
+                                              box-shadow: 0 0 12px var(--lamp-glow); }
+  #ticket_list { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 0 0 12px; }
+  #ticket_list dt { color: var(--muted); }
+  #ticket_list dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+  #ticket_time { border-top: 1px dashed var(--line); padding-top: 10px; margin: 0 0 14px; color: var(--accent-text); }
+  #ticket #notice { margin: 0 0 6px; }
+  #ticket_steps { margin: 0 0 10px; }
+  #retry { width: 100%; margin: 0 0 12px; }
+  .gobar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .gobar #go { flex: 1 1 100%; font-size: 1.05rem; padding: 12px 20px; }
+  .gobar #direct { flex: 1 1 100%; }
+  #why:empty { display: none; }
+  #why { flex-basis: 100%; }
   #direct_help { flex-basis: 100%; }
+  /* Off reads as off, not as a dimmed press; #why beside it says why. */
+  #go:disabled { background: transparent; border-color: var(--line); color: var(--muted); opacity: 1; }
   #projects { margin-top: 14px; }
   #projects a { color: var(--accent-text); margin-right: 10px; }
 
@@ -379,11 +419,8 @@
     .card .face { width: 72px; height: 72px; }
     .card .thumb { width: 36px; height: 36px; }
     .card { grid-template-columns: 72px minmax(0, 1fr); }
-    /* The press stays on screen however long the story is. */
-    .gobar { position: sticky; bottom: 0; z-index: 2; background: var(--bg);
-             padding: 10px 0; border-top: 1px solid var(--line); flex-wrap: nowrap; }
-    .gobar button { flex: none; white-space: nowrap; }
-    .gobar #direct_help { flex: 1 1 auto; margin: 0; }
+    /* The press stays on screen however long the story is: it rides in the
+       ticket, which is sticky beside the steps from 1000px up. */
   }
   @media (min-width: 1600px) {
     /* The cast two cards across, then the plot, setting and author side by side. */
@@ -417,20 +454,40 @@
     <a href="https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/main/contest/radio-play-studio" target="_blank" rel="noopener" data-i18n="links.source">Source on GitHub</a>
   </nav>
 
-  <!-- Hidden with the form when the Direct the shots board takes over (folded). -->
-  <div id="plan">
-    <h2 class="plan" data-i18n="plan.title">Configure your episode</h2>
-    <p class="help plan-help" data-i18n="plan.help">It starts on your card's defaults; change anything you like. Nothing renders until you press Make the episode.</p>
-  </div>
-  <p id="notice" hidden></p>
-  <details id="notice_more" hidden><summary data-i18n="notice.details">Details</summary><code id="notice_detail"></code></details>
-  <form id="form"></form>
-  <div id="keys" hidden></div>
-  <div class="gobar" id="gobar">
-    <button id="go" type="submit" form="form" disabled data-i18n="go.make">Make the episode</button>
-    <a id="keys_note" href="#keys" hidden></a>
-    <button id="direct" type="button" class="quiet" hidden disabled data-i18n="go.direct">Direct the shots first</button>
-    <p id="direct_help" class="help" hidden data-i18n="go.direct_help">The play is written, cast and voiced as usual, then it stops after the stills: one picture for every line. Change any picture, try one again, keep the ones you like, then film. Filming is the slow part, so it only films what changed.</p>
+  <!-- The studio: the choices as numbered steps, and beside them the ticket that
+       says what will be made, why it cannot be yet, and holds the press. Hidden
+       whole when the Direct the shots board takes over (folded). -->
+  <div class="studio" id="studio">
+    <div class="steps">
+      <div id="plan">
+        <h2 class="plan" data-i18n="plan.title">Configure your episode</h2>
+        <p class="help plan-help" id="plan_help" data-i18n="plan.help">It starts on your card's defaults; change anything you like. Nothing renders until you press Make the episode.</p>
+      </div>
+      <!-- Until ComfyUI says what it can make: the steps to come, greyed. -->
+      <div id="skeleton" aria-hidden="true">
+        <div class="ghost"><b data-i18n="setup.legend">Your machine and how it's filmed</b><span data-i18n="skeleton.wait">Appears once ComfyUI is running.</span></div>
+        <div class="ghost"><b data-i18n="mode.aria">What story?</b><span data-i18n="skeleton.wait">Appears once ComfyUI is running.</span></div>
+        <div class="ghost"><b data-i18n="group.the_show">The show</b><span data-i18n="skeleton.wait">Appears once ComfyUI is running.</span></div>
+      </div>
+      <form id="form"></form>
+      <div id="keys" hidden></div>
+    </div>
+    <aside class="ticket" id="ticket" data-i18n-aria-label="ticket.label" data-fb-aria-label="Your episode">
+      <p class="air"><i></i><span id="air"></span></p>
+      <dl id="ticket_list" hidden></dl>
+      <p id="ticket_time" hidden></p>
+      <p id="notice" hidden></p>
+      <p id="ticket_steps" class="help" hidden data-i18n="ticket.steps">Start ComfyUI, then press Try again. Your choices appear on the left.</p>
+      <details id="notice_more" hidden><summary data-i18n="notice.details">Details</summary><code id="notice_detail"></code></details>
+      <button type="button" id="retry" class="quiet" hidden data-i18n="ticket.retry">Try again</button>
+      <div class="gobar" id="gobar">
+        <button id="go" type="submit" form="form" disabled data-i18n="go.make">Make the episode</button>
+        <span id="why" class="help" role="status"></span>
+        <a id="keys_note" href="#keys" hidden></a>
+        <button id="direct" type="button" class="quiet" hidden disabled data-i18n="go.direct">Direct the shots first</button>
+        <p id="direct_help" class="help" hidden data-i18n="go.direct_help">The play is written, cast and voiced as usual, then it stops after the stills: one picture for every line. Change any picture, try one again, keep the ones you like, then film. Filming is the slow part, so it only films what changed.</p>
+      </div>
+    </aside>
   </div>
   <p id="projects" class="help" hidden></p>
 
@@ -621,6 +678,7 @@ async function setLang(code, picked) {
   $("lang").value = lang;
   paintAll();
   if (shelf.length) drawShelf();   // its dates are written in the page's language
+  ticketView();                     // and the ticket's values are the form's shown names
 }
 // A browser language tag ("zh-TW", "ja-JP", "pt-BR") -> the language file that
 // serves it, or null. Chinese is split by script: Traditional for Hant, Taiwan,
@@ -892,6 +950,7 @@ function setupView() {
   writerView();
   keysView();
   timesView();
+  ticketView();
 }
 
 // Each way's time, for the acts the form asks for, on the card it was measured on.
@@ -1308,6 +1367,7 @@ function setMode(mode) {
   // Directing the shots is a My Story path (planning/scene-producer/PLAN.md).
   $("direct").hidden = $("direct_help").hidden = !own;
   photoWarn();
+  ticketView();   // the ticket's Story line follows the mode
 }
 
 function collect() {
@@ -1371,10 +1431,65 @@ function noticeOff() {
   $("notice").hidden = $("notice_more").hidden = true;
 }
 
+// THE TICKET (operator, 2026-11-02): you configure before you make, you see what
+// you are about to make before you press, and when you cannot press, it says why.
+// `formTrouble` is why the last form request failed: "offline" (ComfyUI did not
+// answer), "form" (it answered, the workflow does not fit it), "other", or null.
+let formTrouble = null;
+function ticketView() {
+  const ready = fields.length > 0 && !loadingForm, live = running || stageBusy;
+  const ticket = $("ticket");
+  ticket.classList.toggle("ready", ready && !live);
+  ticket.classList.toggle("live", live);
+  say($("air"), live ? "ticket.live" : loadingForm ? "ticket.checking" : ready ? "ticket.ready" : "ticket.off");
+  $("skeleton").hidden = fields.length > 0;
+  $("plan_help").hidden = !fields.length;
+  $("ticket_steps").hidden = formTrouble !== "offline" || loadingForm;
+  $("retry").hidden = !formTrouble || loadingForm;
+  $("ticket_list").hidden = $("ticket_time").hidden = !ready;
+  if (ready) ticketSummary();
+}
+// What the press will make, read from the form as it stands.
+function ticketSummary() {
+  const shown = (id) => { const el = $(id); return el && el.selectedOptions ? el.selectedOptions[0].textContent : null; };
+  const rows = [];
+  if (menu) {
+    rows.push(["ticket.machine", "Machine", t("machine." + menu.current.machine, null, menu.current.machine)]);
+    rows.push(["ticket.filmed", "Filmed", t("way." + menu.current.way, null, menu.current.way)]);
+  }
+  const own = $("mode_own") && $("mode_own").checked;
+  rows.push(["ticket.story", "Story", own ? t("mode.own.title", null, "Tell my own story") : shown("f_bank")]);
+  rows.push(["ticket.language", "Language", shown("f_language")]);
+  rows.push(["ticket.acts", "Acts", $("f_acts") ? $("f_acts").value : null]);
+  const list = $("ticket_list");
+  list.textContent = "";
+  for (const [key, fallback, value] of rows) {
+    if (value == null || value === "") continue;
+    const dd = document.createElement("dd");
+    dd.textContent = value;
+    list.append(tx(document.createElement("dt"), key, fallback), dd);
+  }
+  // The same measured figure the filming cards show, for the acts asked for.
+  const acts = Math.max(1, parseInt($("f_acts") ? $("f_acts").value : "1", 10) || 1);
+  const timed = ONE_ACT_SECONDS[workflowName];
+  if (!timed) return say($("ticket_time"), "ticket.time_none");
+  const total = timed[0] * acts, gpu = timed[1];
+  if (total >= 5400) say($("ticket_time"), "way.time_h", {n: (total / 3600).toFixed(1), acts, gpu});
+  else say($("ticket_time"), "way.time_min", {n: Math.round(total / 60), acts, gpu});
+}
+// Why the press is off, said beside it; nothing when it is on.
+function whyView() {
+  const key = running || stageBusy ? "ticket.why_running" : loadingForm ? "ticket.why_loading"
+            : !fields.length ? "ticket.why_off" : null;
+  if (key) say($("why"), key); else plain($("why"), "");
+}
+$("retry").addEventListener("click", () => loadOptions(workflowName || undefined));
+
 async function loadOptions(workflow) {
   // A ComfyUI that is busy rendering takes about 40 s to list its nodes.
   const mine = ++formRequest;
   loadingForm = true;
+  formTrouble = null;
   buttons();
   notice("notice.asking");
   try {
@@ -1402,6 +1517,7 @@ async function loadOptions(workflow) {
   } catch (err) {
     if (mine !== formRequest) return;
     loadingForm = false;
+    formTrouble = err.comfyui ? "offline" : err.formError ? "form" : "other";
     buttons();
     // ComfyUI not answering at all says so in one line; the socket error is under Details.
     if (err.comfyui) notice("notice.offline", {url: err.comfyui}, err.message);
@@ -1625,7 +1741,7 @@ let cardEls = {}, sceneEls = {}, personEls = {};
 let drawnFor = null;   // the project the board was last drawn for
 
 function folded(on) {
-  $("form").hidden = $("gobar").hidden = $("plan").hidden = on;
+  $("studio").hidden = on;
   $("summary").hidden = $("board").hidden = !on;
   $("projects").hidden = true;
   $("shelf").hidden = on || !shelf.length;
@@ -2168,6 +2284,8 @@ function refreshBoard() {
 // thing at a time.
 function buttons() {
   go.disabled = $("direct").disabled = running || stageBusy || loadingForm || !fields.length;
+  whyView();
+  ticketView();
 }
 
 function showStage(name, done, key, vars) {
