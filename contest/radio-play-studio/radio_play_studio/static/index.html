@@ -17,6 +17,10 @@
     --bg: #12092f; --panel: #1c1240; --strip: #24184c; --ink: #f4edfb; --muted: #b9acdc;
     --line: #3b2b70; --field-line: #7a64b8; --accent: #7c3aed; --accent-ink: #ffffff;
     --accent-text: #b794ff;
+    /* What you pick and what you press, on the landing: the amber of the tubes
+       in the episodes' own title cards, so a choice never reads purple on purple
+       (operator, 2026-11-02). Ink on amber is the night indigo. */
+    --pick: #ffc94d; --pick-ink: #12092f; --pick-tint: rgba(255, 201, 77, .10);
     --ok: #50f898; --bad: #ff8a7a; --bar: #2e2060; --kept: #9a8cc4;
     --lamp: #50f898; --lamp-glow: rgba(80, 248, 152, .35); --focus: #50f898;
     --grid: rgba(72, 48, 136, .18);
@@ -82,16 +86,41 @@
             overflow-wrap: anywhere; margin-top: 6px; }
 
   /* ---- the two ways in ---- */
-  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 18px; }
-  @media (max-width: 560px) { .modes { grid-template-columns: 1fr; } }
-  .mode { display: block; margin: 0; padding: 16px 18px; border: 2px solid var(--line);
+  /* Two cards with an either/or badge between them: one choice, two answers. */
+  .modes { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px;
+           align-items: center; margin: 0 0 18px; }
+  .or { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+        border: 2px solid var(--pick); background: var(--bg); color: var(--pick); }
+  .or::before { content: "\2194"; font: 700 1.15rem/1 var(--sans); }
+  .or span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  @media (max-width: 560px) {
+    .modes { grid-template-columns: 1fr; }
+    .or { justify-self: center; }
+    .or::before { content: "\2195"; }
+  }
+  .mode { position: relative; display: block; margin: 0; padding: 16px 18px; border: 2px solid var(--line);
           border-radius: 12px; background: var(--panel); cursor: pointer; font: inherit; }
+  .mode:hover { border-color: var(--field-line); }
   .mode strong { display: block; font: 600 1.2rem/1.3 var(--serif); }
   .mode strong .mt { color: inherit; font-size: inherit; }
   .mode span { color: var(--muted); font: .9rem/1.45 var(--sans); }
-  .mode input { width: auto; min-height: 0; margin: 0 8px 0 0; accent-color: var(--accent); }
-  .mode:has(input:checked) { border-color: var(--accent); }
+  .mode input { width: auto; min-height: 0; margin: 0 8px 0 0; accent-color: var(--pick); }
+  /* Selected reads at a glance: the amber edge, a faint amber wash, and on the
+     story cards a check in the corner. Amber is the selection colour only. */
+  .mode:has(input:checked) { border-color: var(--pick);
+                             background: linear-gradient(var(--pick-tint), var(--pick-tint)), var(--panel); }
+  .modes .mode:has(input:checked)::after {
+    content: "\2713"; position: absolute; top: 10px; right: 12px; display: grid; place-items: center;
+    width: 24px; height: 24px; border-radius: 50%; background: var(--pick); color: var(--pick-ink);
+    font: 700 .85rem var(--sans); }
+  .modes .mode { padding-right: 44px; }
   .mode:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+  /* The story step's heading, numbered with the form's other steps. */
+  .stephead { margin: 0 0 8px; font: 600 1rem var(--sans); }
+  #form > .stephead::before {
+    counter-increment: step; content: counter(step);
+    display: inline-grid; place-items: center; width: 26px; height: 26px; margin-right: 8px;
+    border: 2px solid var(--pick); border-radius: 50%; color: var(--pick); font: 700 .85rem var(--sans); }
 
   /* ---- your machine, how it's filmed, the writer panel and the key box ---- */
   .picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px;
@@ -151,7 +180,7 @@
   #form > fieldset:not([hidden]) > legend::before {
     counter-increment: step; content: counter(step);
     display: inline-grid; place-items: center; width: 26px; height: 26px; margin-right: 8px;
-    border: 2px solid var(--lamp); border-radius: 50%; color: var(--lamp); font: 700 .85rem var(--sans); }
+    border: 2px solid var(--pick); border-radius: 50%; color: var(--pick); font: 700 .85rem var(--sans); }
   #skeleton { display: grid; gap: 12px; }
   .ghost { border: 1px dashed var(--line); border-radius: 12px; padding: 14px 18px; opacity: .6;
            font-family: var(--sans); }
@@ -180,7 +209,9 @@
   #ticket_steps { margin: 0 0 10px; }
   #retry { width: 100%; margin: 0 0 12px; }
   .gobar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .gobar #go { flex: 1 1 100%; font-size: 1.05rem; padding: 12px 20px; }
+  .gobar #go { flex: 1 1 100%; font-size: 1.05rem; padding: 12px 20px;
+              background: var(--pick); border-color: var(--pick); color: var(--pick-ink); }
+  .gobar #go:hover:enabled { filter: brightness(1.08); }
   .gobar #direct { flex: 1 1 100%; }
   #why:empty { display: none; }
   #why { flex-basis: 100%; }
@@ -388,7 +419,7 @@
     .mode { padding: 12px 16px; }
     #form { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
             gap: 0 18px; align-items: start; }
-    #form > .modes, #form > #group_setup { grid-column: 1 / -1; }
+    #form > .modes, #form > .stephead, #form > #group_setup { grid-column: 1 / -1; }
     #form > #group_Writer { grid-column: 2; }
     #form:has(#group_My_story[hidden]) > #group_Writer,
     #form:not(:has(#group_My_story)) > #group_Writer { grid-column: 1 / -1; }
@@ -809,7 +840,7 @@ function build(list) {
   }
   const bank = list.find((f) => f.key === "bank");
   const ownStory = boxes[MY_STORY_GROUP] && bank && bank.choices.includes(MY_STORY_BANK);
-  if (ownStory) form.appendChild(modeSwitch());
+  if (ownStory) form.append(storyHead(), modeSwitch());
   if (ownStory) form.appendChild(boxes[MY_STORY_GROUP]);
   for (const [name, box] of Object.entries(boxes)) if (!(ownStory && name === MY_STORY_GROUP)) form.appendChild(box);
   if (ownStory) {
@@ -1352,9 +1383,23 @@ function modeSwitch() {
     strong.append(radio, mt);
     const span = tx(document.createElement("span"), "mode." + mode + ".text", text);
     card.append(strong, span);
+    // Between the two cards, an either/or badge (operator, 2026-11-02: "a <->
+    // in between"); a screen reader hears "or".
+    if (mode === "own") {
+      const or = document.createElement("div");
+      or.className = "or";
+      or.appendChild(tx(document.createElement("span"), "mode.or", "or"));
+      wrap.appendChild(or);
+    }
     wrap.appendChild(card);
   }
   return wrap;
+}
+// The story step's visible heading: the two cards answer it.
+function storyHead() {
+  const head = tx(document.createElement("p"), "mode.aria", "What story?");
+  head.className = "stephead";
+  return head;
 }
 
 function setMode(mode) {
