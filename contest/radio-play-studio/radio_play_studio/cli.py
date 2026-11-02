@@ -21,7 +21,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from . import __version__
-from .config import DEFAULT_API_URL, DEFAULT_COMFYUI_URL, Settings, WorkflowNotFound, load_settings
+from .config import (DEFAULT_API_URL, DEFAULT_COMFYUI_URL, DESKTOP_COMFYUI_URL, Settings, WorkflowNotFound,
+                     load_settings)
 from .form import FIELDS, describe_form, locate_nodes
 from .graph import NOTE_NODE_TYPES, GraphError, ServerUnreachable, fetch_object_info, load_workflow
 from .runner import Studio
@@ -29,7 +30,7 @@ from .server import make_server
 
 
 def _add_common(p: argparse.ArgumentParser) -> None:
-    p.add_argument("--comfyui", help=f"your ComfyUI (default {DEFAULT_COMFYUI_URL})")
+    p.add_argument("--comfyui", help=f"your ComfyUI (default: {DEFAULT_COMFYUI_URL}, or Desktop's {DESKTOP_COMFYUI_URL} if only that answers)")
     p.add_argument("--api", help=f"comfy-api-proxy, the bridge the Comfy SDK uses (default {DEFAULT_API_URL})")
     p.add_argument("--workflow", help="path to a shipped workflow (default: otr_16gb_foley_open.json, found from OTR_PACK_DIR / COMFYUI_DIR)")
     p.add_argument("--out", help="folder finished episodes are saved to (default ./episodes)")

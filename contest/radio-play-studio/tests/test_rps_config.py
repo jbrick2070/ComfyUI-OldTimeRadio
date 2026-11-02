@@ -66,3 +66,37 @@ def test_a_configured_pack_dir_wins_over_the_checkout(monkeypatch, tmp_path):
     target.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("OTR_PACK_DIR", str(tmp_path))
     assert find_workflow() == target
+
+
+def test_with_no_comfyui_named_the_app_finds_desktop_on_8000():
+    """Desktop serves on 8000, a portable install on 8188: the one that answers
+    is used, 8188 first, and 8188 when neither does."""
+    from radio_play_studio.config import DEFAULT_COMFYUI_URL, DESKTOP_COMFYUI_URL, default_comfyui_url
+    assert default_comfyui_url(lambda url: url == DESKTOP_COMFYUI_URL) == DESKTOP_COMFYUI_URL
+    assert default_comfyui_url(lambda url: True) == DEFAULT_COMFYUI_URL
+    assert default_comfyui_url(lambda url: False) == DEFAULT_COMFYUI_URL
+
+
+def test_a_named_comfyui_is_never_second_guessed(monkeypatch, tmp_path):
+    from radio_play_studio import config
+    monkeypatch.setattr(config, "default_comfyui_url", lambda: pytest.fail("probed a named ComfyUI"))
+    wf = tmp_path / "w.json"
+    wf.write_text("{}", encoding="utf-8")
+    assert config.load_settings(comfyui_url="http://127.0.0.1:9999", workflow=str(wf)).comfyui_url \
+        == "http://127.0.0.1:9999"
+
+
+def test_only_a_real_comfyui_counts_as_answering(monkeypatch):
+    """Something else on port 8000 is not taken for ComfyUI."""
+    import io
+    from radio_play_studio import config
+
+    class Reply(io.BytesIO):
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+    monkeypatch.setattr(config.urllib.request, "urlopen", lambda url, timeout: Reply(b'{"system": {"os": "win32"}}'))
+    assert config.comfyui_answers("http://127.0.0.1:8000")
+    monkeypatch.setattr(config.urllib.request, "urlopen", lambda url, timeout: Reply(b"<html>not comfy</html>"))
+    assert not config.comfyui_answers("http://127.0.0.1:8000")
+    monkeypatch.setattr(config.urllib.request, "urlopen", lambda url, timeout: Reply(b'["a list"]'))
+    assert not config.comfyui_answers("http://127.0.0.1:8000")

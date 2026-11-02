@@ -7,12 +7,18 @@ that lets the Comfy SDK drive a self-hosted ComfyUI.
 """
 from __future__ import annotations
 
+import json
 import os
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
 
 DEFAULT_COMFYUI_URL = "http://127.0.0.1:8188"
+#: ComfyUI Desktop serves on 8000; a portable or manual install on 8188. With no
+#: address named, the app looks at both (operator, 2026-11-02: the page said it
+#: could not reach a ComfyUI that was running all along, on Desktop's port).
+DESKTOP_COMFYUI_URL = "http://127.0.0.1:8000"
 DEFAULT_API_URL = "http://127.0.0.1:8189"
 #: The contest default: the 16 GB NVIDIA foley lane, where LTX 2.5 films each beat
 #: with its own sound under the voices (operator, 2026-10-19: "i like foley
@@ -240,11 +246,31 @@ def _first_set(*candidates: str | None) -> str | None:
     return None
 
 
+def comfyui_answers(url: str, timeout: float = 1.5) -> bool:
+    """True when a ComfyUI answers at ``url``: its ``/system_stats`` names a
+    ``system``. Anything else listening on that port is not mistaken for one."""
+    try:
+        with urllib.request.urlopen(url.rstrip("/") + "/system_stats", timeout=timeout) as resp:
+            return isinstance(json.loads(resp.read().decode("utf-8")).get("system"), dict)
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+def default_comfyui_url(answers=comfyui_answers) -> str:
+    """The ComfyUI to use when none is named: 8188 if one answers there, else
+    Desktop's 8000 if one answers there, else 8188 (where the page then says it
+    found nothing)."""
+    for url in (DEFAULT_COMFYUI_URL, DESKTOP_COMFYUI_URL):
+        if answers(url):
+            return url
+    return DEFAULT_COMFYUI_URL
+
+
 def load_settings(*, comfyui_url: str | None = None, api_url: str | None = None,
                   workflow: str | None = None, out_dir: str | None = None) -> Settings:
     return Settings(
         comfyui_url=validate_url("--comfyui / COMFYUI_URL", _first_set(
-            comfyui_url, os.environ.get("COMFYUI_URL")) or DEFAULT_COMFYUI_URL),
+            comfyui_url, os.environ.get("COMFYUI_URL")) or default_comfyui_url()),
         api_url=validate_url("--api / COMFY_BASE_URL", _first_set(
             api_url, os.environ.get("COMFY_BASE_URL")) or DEFAULT_API_URL),
         workflow_path=find_workflow(workflow),
