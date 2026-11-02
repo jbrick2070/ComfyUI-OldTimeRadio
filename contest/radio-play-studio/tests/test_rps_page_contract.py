@@ -148,7 +148,8 @@ def test_the_board_is_not_one_live_region():
 def test_script_owned_containers_hold_no_static_children():
     """The script clears these (textContent = "") and fills them; a static child
     put inside one would vanish on the first draw."""
-    for owner in ("form", "result", "published", "projects", "summary_text", "castrow", "scenes", "hint"):
+    for owner in ("form", "result", "published", "projects", "summary_text", "castrow", "scenes", "hint",
+                  "ticket_list"):
         assert _children(BY_ID[owner]) == [], owner
         assert NODES[BY_ID[owner]]["text"] == "", owner
 
@@ -220,3 +221,20 @@ def test_the_deck_has_a_word_for_every_way_and_only_those():
     block = deck[deck.index("export const WAY_WORDS"):]
     words = set(re.findall(r"^\s*(\w+):", block[:block.index("};")], re.M))
     assert words == set(WAYS)
+
+
+def test_the_ticket_holds_the_press_the_reason_and_the_notice_beside_the_steps():
+    """The operator's three rules (2026-11-02): the choices come first, and the
+    ticket beside them says what will be made, why the press is off, and holds
+    the press. The whole studio folds away when the board opens."""
+    studio, ticket = BY_ID["studio"], BY_ID["ticket"]
+    for inside_ticket in ("go", "why", "direct", "notice", "notice_more", "retry", "ticket_list", "air"):
+        assert ticket in _ancestors(BY_ID[inside_ticket]), inside_ticket
+    for inside_steps in ("plan", "skeleton", "form", "keys"):
+        assert studio in _ancestors(BY_ID[inside_steps]) and ticket not in _ancestors(BY_ID[inside_steps])
+    assert studio in _ancestors(ticket)
+    assert BY_ID["form"] < ticket, "the choices come before the press"
+    assert NODES[BY_ID["why"]]["attrs"].get("role") == "status"
+    assert '$("studio").hidden = on' in CODE
+    # Try again asks for the pick that failed, not the form still on the page.
+    assert 'loadOptions(askedWorkflow)' in CODE

@@ -1436,8 +1436,14 @@ function noticeOff() {
 // `formTrouble` is why the last form request failed: "offline" (ComfyUI did not
 // answer), "form" (it answered, the workflow does not fit it), "other", or null.
 let formTrouble = null;
+// The workflow last asked for, so Try again asks for the pick that failed, not
+// the one whose form is still showing (Sonnet QA, 2026-11-02).
+let askedWorkflow;
+// Ready only with a form that is the one asked for: after a failed pick the old
+// form is still on the page, and it is not what the cards now say.
+const formReady = () => fields.length > 0 && !loadingForm && !formTrouble;
 function ticketView() {
-  const ready = fields.length > 0 && !loadingForm, live = running || stageBusy;
+  const ready = formReady(), live = running || stageBusy;
   const ticket = $("ticket");
   ticket.classList.toggle("ready", ready && !live);
   ticket.classList.toggle("live", live);
@@ -1451,7 +1457,10 @@ function ticketView() {
 }
 // What the press will make, read from the form as it stands.
 function ticketSummary() {
-  const shown = (id) => { const el = $(id); return el && el.selectedOptions ? el.selectedOptions[0].textContent : null; };
+  const shown = (id) => {
+    const el = $(id), picked = el && el.selectedOptions ? el.selectedOptions[0] : null;
+    return picked ? picked.textContent : null;   // a dropdown with no choices names nothing
+  };
   const rows = [];
   if (menu) {
     rows.push(["ticket.machine", "Machine", t("machine." + menu.current.machine, null, menu.current.machine)]);
@@ -1480,14 +1489,19 @@ function ticketSummary() {
 // Why the press is off, said beside it; nothing when it is on.
 function whyView() {
   const key = running || stageBusy ? "ticket.why_running" : loadingForm ? "ticket.why_loading"
-            : !fields.length ? "ticket.why_off" : null;
-  if (key) say($("why"), key); else plain($("why"), "");
+            : formTrouble && formTrouble !== "offline" ? "ticket.why_trouble"
+            : !fields.length || formTrouble ? "ticket.why_off" : null;
+  const why = $("why");
+  // A status region: rewritten only when the reason changes, so it is said once.
+  if ((why._msg && why._msg.key) === key || (!key && !why.textContent)) return;
+  if (key) say(why, key); else plain(why, "");
 }
-$("retry").addEventListener("click", () => loadOptions(workflowName || undefined));
+$("retry").addEventListener("click", () => loadOptions(askedWorkflow));
 
 async function loadOptions(workflow) {
   // A ComfyUI that is busy rendering takes about 40 s to list its nodes.
   const mine = ++formRequest;
+  askedWorkflow = workflow;
   loadingForm = true;
   formTrouble = null;
   buttons();
@@ -2283,7 +2297,7 @@ function refreshBoard() {
 // stage of any project -- and until the form has loaded: the app makes one
 // thing at a time.
 function buttons() {
-  go.disabled = $("direct").disabled = running || stageBusy || loadingForm || !fields.length;
+  go.disabled = $("direct").disabled = running || stageBusy || !formReady();
   whyView();
   ticketView();
 }

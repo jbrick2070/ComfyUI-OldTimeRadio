@@ -30,6 +30,7 @@
  "ticket.why_off": "Esperando o ComfyUI",
  "ticket.why_loading": "Verificando o que o seu ComfyUI pode fazer",
  "ticket.why_running": "Um episódio está sendo feito; um de cada vez.",
+ "ticket.why_trouble": "Corrija o que o bilhete indica e aperte Tentar de novo.",
  "ticket.retry": "Tentar de novo",
  "ticket.steps": "Inicie o ComfyUI e aperte Tentar de novo. Suas escolhas aparecem à esquerda.",
  "group.the_show": "O programa",

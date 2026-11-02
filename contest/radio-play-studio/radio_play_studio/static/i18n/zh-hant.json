@@ -30,6 +30,7 @@
  "ticket.why_off": "等待 ComfyUI",
  "ticket.why_loading": "正在查看你的 ComfyUI 能做什麼",
  "ticket.why_running": "正在製作一集；一次只做一集。",
+ "ticket.why_trouble": "先解決票面上提示的問題，再按「重試」。",
  "ticket.retry": "重試",
  "ticket.steps": "先啟動 ComfyUI，再按「重試」。你的選項會出現在左邊。",
  "group.the_show": "節目",

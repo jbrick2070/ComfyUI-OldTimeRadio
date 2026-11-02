@@ -30,6 +30,7 @@
  "ticket.why_off": "ComfyUIを待っています",
  "ticket.why_loading": "ComfyUIで何が作れるか確認しています",
  "ticket.why_running": "エピソードを制作中です。一度にひとつずつ。",
+ "ticket.why_trouble": "チケットに書かれた問題を直してから「もう一度試す」を押してください。",
  "ticket.retry": "もう一度試す",
  "ticket.steps": "ComfyUIを起動してから「もう一度試す」を押してください。選択肢は左に表示されます。",
  "group.the_show": "番組",

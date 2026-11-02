@@ -30,6 +30,7 @@
  "ticket.why_off": "Waiting for ComfyUI",
  "ticket.why_loading": "Checking what your ComfyUI can make",
  "ticket.why_running": "An episode is being made; one at a time.",
+ "ticket.why_trouble": "Fix what the ticket says, then press Try again.",
  "ticket.retry": "Try again",
  "ticket.steps": "Start ComfyUI, then press Try again. Your choices appear on the left.",
  "group.the_show": "The show",

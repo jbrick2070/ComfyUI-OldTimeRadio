@@ -30,6 +30,7 @@
  "ticket.why_off": "In attesa di ComfyUI",
  "ticket.why_loading": "Verifica di cosa può fare il tuo ComfyUI",
  "ticket.why_running": "Si sta facendo un episodio; uno alla volta.",
+ "ticket.why_trouble": "Risolvi ciò che indica il biglietto, poi premi Riprova.",
  "ticket.retry": "Riprova",
  "ticket.steps": "Avvia ComfyUI, poi premi Riprova. Le tue scelte compaiono a sinistra.",
  "group.the_show": "Lo spettacolo",

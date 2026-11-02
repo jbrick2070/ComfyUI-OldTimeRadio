@@ -30,6 +30,7 @@
  "ticket.why_off": "ComfyUI का इंतज़ार",
  "ticket.why_loading": "देख रहे हैं कि आपका ComfyUI क्या बना सकता है",
  "ticket.why_running": "एक एपिसोड बन रहा है; एक बार में एक।",
+ "ticket.why_trouble": "टिकट में जो लिखा है उसे ठीक कीजिए, फिर 'फिर कोशिश करें' दबाइए।",
  "ticket.retry": "फिर कोशिश करें",
  "ticket.steps": "ComfyUI शुरू कीजिए, फिर 'फिर कोशिश करें' दबाइए। आपके विकल्प बाईं ओर दिखेंगे।",
  "group.the_show": "कार्यक्रम",
