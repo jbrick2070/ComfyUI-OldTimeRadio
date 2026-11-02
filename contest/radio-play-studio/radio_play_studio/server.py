@@ -25,7 +25,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from . import producer
 from .graph import GraphError, ServerUnreachable
 from .photos import MAX_PHOTO_BYTES, PhotoError, upload_photo
-from .runner import Studio
+from .runner import Studio, saved_episodes
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 #: One JSON file per language the page can speak: `{"_name": "Espanol", "key": "text", ...}`.
@@ -372,6 +372,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_file(I18N_DIR / name, "application/json; charset=utf-8")
         if path == "/api/episodes":
             return self._send_json(HTTPStatus.OK, {"episodes": self.runs.listing()})
+        if path == "/api/library":
+            # Every finished episode on disk, from any session: the page's shelf.
+            return self._send_json(HTTPStatus.OK, {"episodes": saved_episodes(
+                self.runs.studio.settings.out_dir)})
         if path == "/api/projects":
             return self._send_json(HTTPStatus.OK, {"projects": producer.list_projects(
                 self.runs.studio.settings.out_dir)})

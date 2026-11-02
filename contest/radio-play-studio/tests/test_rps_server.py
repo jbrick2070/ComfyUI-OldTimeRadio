@@ -259,3 +259,39 @@ def test_a_client_that_stops_mid_body_does_not_hold_a_handler(app, monkeypatch):
     stalled.close()
     status, _, _ = _request(port, "GET", "/api/episodes")
     assert status == 200
+
+
+def test_the_library_lists_every_saved_episode_newest_first(app):
+    import os
+    port, settings = app
+    out = settings.out_dir
+    older = out / "aaaaaaaaaaaa"
+    newer = out / "bbbbbbbbbbbb"
+    for folder in (older, newer, out / "timing", out / "cccccccccccc"):
+        folder.mkdir(parents=True, exist_ok=True)
+    (older / "last_loop_20261020_173322__shst__n16f_final.mp4").write_bytes(b"old")
+    (newer / "three_dimensions_20261021_150516__vart_final.mp4").write_bytes(b"new!")
+    (newer / "notes.json").write_text("{}", encoding="utf-8")
+    (out / "timing" / "x.mp4").write_bytes(b"not a run folder")
+    (out / "cccccccccccc" / "empty.mp4").write_bytes(b"")
+    os.utime(older / "last_loop_20261020_173322__shst__n16f_final.mp4", (1_000, 1_000))
+    status, _, body = _request(port, "GET", "/api/library")
+    episodes = json.loads(body)["episodes"]
+    assert status == 200
+    assert [(e["run"], e["title"], e["bytes"]) for e in episodes] == [
+        ("bbbbbbbbbbbb", "Three Dimensions", 4), ("aaaaaaaaaaaa", "Last Loop", 3)]
+    first = episodes[0]
+    status, _, data = _request(port, "GET", f"/episodes/{first['run']}/{first['file']}")
+    assert status == 200 and data == b"new!"
+
+
+def test_the_library_is_empty_before_anything_is_saved(app):
+    port, _ = app
+    status, _, body = _request(port, "GET", "/api/library")
+    assert status == 200 and json.loads(body) == {"episodes": []}
+
+
+def test_an_episode_title_reads_from_the_pack_file_name():
+    from radio_play_studio.runner import episode_title
+    assert episode_title("seoul_duet_20261020_004436__vart__stmo_final.mp4") == "Seoul Duet"
+    assert episode_title("my_upload.mp4") == "My Upload"

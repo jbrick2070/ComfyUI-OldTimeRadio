@@ -104,6 +104,8 @@
  "phase.sound": "正在混音",
  "phase.finishing": "正在收尾並發佈",
  "result.download": "下載 {file}",
+ "shelf.title": "你的劇集",
+ "shelf.more": "顯示更多",
  "error.lost": "與應用程式的連線已中斷。重新整理頁面可繼續這一集；如果應用程式被重新啟動過，這裡將不再追蹤它，但它可能仍在你的 ComfyUI 上渲染，完成後的這一集會出現在 otr/obs 中。",
  "error.untracked": "這一集已不再被追蹤（應用程式被重新啟動過）。如果它當時仍在渲染，完成後會出現在你的 ComfyUI 輸出資料夾的 otr/obs 中。",
  "choice.style.roll_any_style": "給我個驚喜（任意風格）",

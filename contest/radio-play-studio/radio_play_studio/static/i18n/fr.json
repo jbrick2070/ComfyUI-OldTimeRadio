@@ -104,6 +104,8 @@
  "phase.sound": "mixage du son",
  "phase.finishing": "finition et publication",
  "result.download": "Télécharger {file}",
+ "shelf.title": "Vos épisodes",
+ "shelf.more": "Voir plus",
  "error.lost": "Connexion à l'application perdue. Rechargez pour reprendre l'épisode ; si l'application a été redémarrée, il n'est plus suivi ici, mais il peut encore être en cours de rendu sur votre ComfyUI, et son épisode arrive dans otr/obs.",
  "error.untracked": "Cet épisode n'est plus suivi (l'application a été redémarrée). S'il était encore en cours de rendu, il arrive dans le dossier de sortie de votre ComfyUI, sous otr/obs.",
  "choice.style.roll_any_style": "Surprenez-moi (n'importe quel style)",

@@ -75,7 +75,18 @@ Manager install.)
 
 ## Run
 
+**One click.** Start ComfyUI, then double-click **`Start Radio Play Studio.bat`** (Windows) or run
+`./start-radio-play-studio.sh` (macOS, Linux). The launcher installs the two packages the
+first time, starts `comfy-api-proxy` in the background for your ComfyUI if nothing answers on
+:8189, prints the setup check, and opens the app in your browser. It uses `RPS_PYTHON` if you set
+it, else a `.venv` in this folder, else your system Python. A failed check is printed and the
+app starts anyway, so starting ComfyUI a minute later is fine. The bridge keeps running after the
+app closes; `comfy-api-proxy stop` ends it.
+
+The same steps by hand:
+
 ```
+python -m radio_play_studio start      # what the launcher runs: bridge, check, serve, open the browser
 python -m radio_play_studio doctor     # checks ComfyUI, the pack, the SDK and the bridge; says what is missing
 python -m radio_play_studio serve      # open http://127.0.0.1:8765
 ```
@@ -86,6 +97,9 @@ bar. The form starts on the chosen workflow's own settings (three acts on the 16
 The finished video plays in the page, is saved under `./episodes/<id>/`, and ComfyUI also
 publishes it to its own `output/otr/obs/` folder.
 
+- **Your episodes.** Below the button, every episode saved under `./episodes/`, from this session
+  or any before it, newest first, with a frame of each. Press one to play it there; the episode
+  being made keeps its own player.
 - **Reload-proof.** A reload, or a second tab, picks the episode back up where it is.
 - **One at a time.** A second episode while one is being made is refused, not queued behind it.
 - **The GPU goes back.** Within seconds of the last tab closing (two and a half minutes if the

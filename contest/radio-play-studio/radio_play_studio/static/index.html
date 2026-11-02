@@ -141,6 +141,20 @@
   #projects { margin-top: 14px; }
   #projects a { color: var(--accent-text); margin-right: 10px; }
 
+  /* ---- the shelf: every finished episode on disk ---- */
+  #shelf { margin-top: 28px; }
+  #shelf h2 { font: 600 1.1rem var(--sans); margin: 0 0 10px; }
+  .shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .ep { display: flex; flex-direction: column; gap: 6px; padding: 0 0 10px; overflow: hidden; text-align: start;
+        background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 10px;
+        font: inherit; min-height: 0; }
+  .ep video { margin: 0; border-radius: 0; aspect-ratio: 16 / 9; object-fit: cover; pointer-events: none; }
+  .ep b { font: 600 .95rem/1.3 var(--sans); padding: 0 10px; overflow-wrap: anywhere; }
+  .ep span { color: var(--muted); font: .8rem var(--sans); padding: 0 10px; }
+  .ep[aria-current="true"] { border-color: var(--ok); }
+  #shelf_player { margin-bottom: 16px; }
+  #shelf_more { margin-top: 12px; }
+
   /* ---- the single run ---- */
   #run { max-width: 760px; margin-top: 18px; }
   #bar, .bar { height: 8px; background: var(--bar); border-radius: 4px; overflow: hidden; margin: 12px 0 6px; }
@@ -404,6 +418,14 @@
     <div id="result" class="done" hidden></div>
   </section>
 
+  <!-- Every finished episode on disk, newest first; a card plays it in #result. -->
+  <section id="shelf" hidden>
+    <h2 data-i18n="shelf.title">Your episodes</h2>
+    <div id="shelf_player" class="done" hidden></div>
+    <div class="shelf" id="shelf_list"></div>
+    <button type="button" id="shelf_more" class="quiet small" hidden data-i18n="shelf.more">Show more</button>
+  </section>
+
   <div class="summary" id="summary" hidden>
     <strong data-i18n="producer.summary">Directing the shots</strong>
     <span id="summary_text"></span>
@@ -575,6 +597,7 @@ async function setLang(code, picked) {
   }
   $("lang").value = lang;
   paintAll();
+  if (shelf.length) drawShelf();   // its dates are written in the page's language
 }
 // A browser language tag ("zh-TW", "ja-JP", "pt-BR") -> the language file that
 // serves it, or null. Chinese is split by script: Traditional for Hant, Taiwan,
@@ -1423,6 +1446,7 @@ function watch(id) {
       titleEnded(true);
       showVideo($("result"), ev.run, ev.file);
       running = false; buttons(); refreshBoard();
+      loadShelf();
     } else if (ev.type === "error") {
       finished = true;
       es.close();
@@ -1445,7 +1469,51 @@ function showVideo(box, run, file) {
   box.textContent = "";
   box.append(v, a);
   box.hidden = false;
+  return v;
 }
+
+// The shelf: every finished episode the app has saved, from this session or
+// any before it. Its own player, so a past episode never covers the one being made.
+const SHELF_PAGE = 12;
+let shelf = [], shelfShown = SHELF_PAGE;
+async function loadShelf() {
+  try {
+    const res = await fetch("/api/library");
+    if (!res.ok) return;
+    shelf = (await res.json()).episodes || [];
+  } catch (err) { return; }   // no shelf is not worth a message
+  drawShelf();
+}
+function drawShelf() {
+  const list = $("shelf_list"), playing = $("shelf_player").dataset.run;
+  list.textContent = "";
+  for (const ep of shelf.slice(0, shelfShown)) {
+    const card = document.createElement("button");
+    card.type = "button"; card.className = "ep"; card.dataset.run = ep.run;
+    if (ep.run === playing) card.setAttribute("aria-current", "true");
+    // A frame a few seconds in stands in for a poster; only its metadata loads until played.
+    const v = document.createElement("video");
+    v.preload = "metadata"; v.muted = true; v.tabIndex = -1;
+    v.src = "/episodes/" + ep.run + "/" + encodeURIComponent(ep.file) + "#t=4";
+    const title = document.createElement("b");
+    title.textContent = ep.title;
+    const when = document.createElement("span");
+    when.textContent = new Date(ep.saved * 1000).toLocaleString(lang, {dateStyle: "medium", timeStyle: "short"});
+    card.append(v, title, when);
+    card.addEventListener("click", () => {
+      const box = $("shelf_player");
+      showVideo(box, ep.run, ep.file).play().catch(() => {});
+      box.dataset.run = ep.run;
+      list.querySelectorAll(".ep").forEach((c) => c.removeAttribute("aria-current"));
+      card.setAttribute("aria-current", "true");
+      box.scrollIntoView({behavior: "smooth", block: "nearest"});
+    });
+    list.append(card);
+  }
+  $("shelf_more").hidden = shelf.length <= shelfShown;
+  $("shelf").hidden = !shelf.length || !$("board").hidden;
+}
+$("shelf_more").addEventListener("click", () => { shelfShown += SHELF_PAGE; drawShelf(); });
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -1500,6 +1568,7 @@ function folded(on) {
   $("form").hidden = $("gobar").hidden = on;
   $("summary").hidden = $("board").hidden = !on;
   $("projects").hidden = true;
+  $("shelf").hidden = on || !shelf.length;
 }
 
 async function openProject(pid) {
@@ -2264,7 +2333,7 @@ presence(false);
 setInterval(() => presence(false), 20000);
 addEventListener("pagehide", () => { if (saveTimer) saveDraft(); presence(true); });
 
-initLang().then(() => { resume(); loadOptions(); });
+initLang().then(() => { resume(); loadOptions(); loadShelf(); });
 </script>
 </body>
 </html>

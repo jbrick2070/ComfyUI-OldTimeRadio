@@ -104,6 +104,8 @@
  "phase.sound": "音声をミキシング中",
  "phase.finishing": "仕上げと公開中",
  "result.download": "{file} をダウンロード",
+ "shelf.title": "あなたのエピソード",
+ "shelf.more": "もっと見る",
  "error.lost": "アプリとの接続が切れました。ページを再読み込みするとエピソードの続きを取得できます。アプリが再起動された場合は、ここでは追跡されなくなりますが、ComfyUIでレンダリングが続いている可能性があり、完成したエピソードは otr/obs に保存されます。",
  "error.untracked": "そのエピソードはもう追跡されていません（アプリが再起動されました）。レンダリングが続いていた場合は、ComfyUIの出力フォルダの otr/obs に保存されます。",
  "choice.style.roll_any_style": "おまかせ（どのスタイルでも）",

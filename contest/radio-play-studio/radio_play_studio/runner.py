@@ -10,6 +10,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 import time
 import urllib.parse
 import uuid
@@ -236,6 +237,52 @@ def save_episode_output(job: Any, node_id: str, out_dir: Path) -> Path:
     if not dest.is_file() or dest.stat().st_size == 0:
         raise EpisodeMissing(f"the episode was not saved to {dest}")
     return dest
+
+
+#: A saved episode's folder: the 12-hex name save_episode_output gives it.
+_RUN_DIR = re.compile(r"[0-9a-f]{12}")
+#: The pack names an episode `<title>_<YYYYMMDD>_<HHMMSS>__<tags>_final.mp4`.
+_EPISODE_NAME = re.compile(r"(?P<title>.+?)_(?P<date>\d{8})_(?P<time>\d{6})(?:_|\.|$)")
+#: The most saved episodes the page lists, newest first.
+LIBRARY_LIMIT = 60
+
+
+def saved_episodes(out_dir: Path, limit: int = LIBRARY_LIMIT) -> list:
+    """Every finished episode saved under ``out_dir``, newest first, as
+    ``{"run", "file", "title", "saved", "bytes"}``: the run folder and file
+    the page plays through ``/episodes/<run>/<file>``, a title read from the
+    pack's file name, and when it was saved (seconds since the epoch). A
+    folder with no video in it, or that cannot be read, is left out."""
+    found = []
+    try:
+        folders = [p for p in Path(out_dir).iterdir() if p.is_dir() and _RUN_DIR.fullmatch(p.name)]
+    except OSError:
+        return []
+    for folder in folders:
+        try:
+            videos = [p for p in folder.iterdir()
+                      if p.is_file() and p.suffix.lower() in VIDEO_SUFFIXES]
+            if not videos:
+                continue
+            video = max(videos, key=lambda p: p.stat().st_mtime)
+            stat = video.stat()
+        except OSError:
+            continue
+        if stat.st_size == 0:
+            continue
+        found.append({"run": folder.name, "file": video.name, "title": episode_title(video.name),
+                      "saved": stat.st_mtime, "bytes": stat.st_size})
+    found.sort(key=lambda e: e["saved"], reverse=True)
+    return found[:limit]
+
+
+def episode_title(file_name: str) -> str:
+    """`three_dimensions_20261021_150516__vart_final.mp4` -> `Three Dimensions`;
+    a name the pack did not make reads as its own stem."""
+    stem = Path(file_name).stem
+    match = _EPISODE_NAME.match(stem)
+    words = (match.group("title") if match else stem).replace("_", " ").split()
+    return " ".join(w[:1].upper() + w[1:] for w in words) or stem
 
 
 def submit_was_refused(exc: BaseException) -> bool:
