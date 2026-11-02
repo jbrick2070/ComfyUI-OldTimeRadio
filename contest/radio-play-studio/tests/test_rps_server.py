@@ -295,3 +295,42 @@ def test_an_episode_title_reads_from_the_pack_file_name():
     from radio_play_studio.runner import episode_title
     assert episode_title("seoul_duet_20261020_004436__vart__stmo_final.mp4") == "Seoul Duet"
     assert episode_title("my_upload.mp4") == "My Upload"
+
+
+def test_an_unreachable_comfyui_is_named_so_the_page_can_say_it_plainly(settings):
+    """The page shows one plain line naming the ComfyUI that did not answer and
+    folds the socket error under Details; the 503 carries both."""
+    from radio_play_studio.graph import ServerUnreachable
+
+    def down(url):
+        raise ServerUnreachable(f"could not read {url}/object_info (refused)")
+    studio = Studio(settings, client_factory=lambda url: FakeClient(_good_job()), fetch=down)
+    server = make_server(studio, "127.0.0.1", 0)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        status, _, body = _request(server.server_address[1], "GET", "/api/options")
+    finally:
+        server.shutdown()
+        server.server_close()
+    reply = json.loads(body)
+    assert status == 503 and reply["comfyui"] == settings.comfyui_url
+    assert "refused" in reply["error"]
+
+
+def test_a_workflow_that_does_not_fit_comfyui_is_not_called_unreachable(settings):
+    """ComfyUI answered but the workflow does not fit it: the page must not tell
+    the person to start ComfyUI, so the 503 says it is a form error instead."""
+    from radio_play_studio.graph import GraphError
+
+    def mismatched(url):
+        raise GraphError("node OTR_CastLock is missing")
+    studio = Studio(settings, client_factory=lambda url: FakeClient(_good_job()), fetch=mismatched)
+    server = make_server(studio, "127.0.0.1", 0)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        status, _, body = _request(server.server_address[1], "GET", "/api/options")
+    finally:
+        server.shutdown()
+        server.server_close()
+    reply = json.loads(body)
+    assert status == 503 and reply["form_error"] is True and "comfyui" not in reply

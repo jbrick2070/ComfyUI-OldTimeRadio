@@ -67,6 +67,15 @@
   .quiet[aria-pressed="true"] { border-color: var(--ok); color: var(--ok); }
   #error, .error { color: var(--bad); white-space: pre-wrap; }
   #notice { color: var(--bad); font-family: var(--sans); }
+  #notice_more { margin: -6px 0 14px; font: .8rem var(--sans); color: var(--muted); }
+  #notice_more summary { cursor: pointer; }
+  #notice_more code { display: block; margin-top: 4px; font: .8rem/1.4 var(--mono); overflow-wrap: anywhere; }
+  /* ---- the links under the tagline, and the form's heading ---- */
+  .links { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: -10px 0 26px; font: .9rem var(--sans); }
+  .links a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+  .links a:hover { color: var(--accent-text); }
+  h2.plan { font: 600 1.2rem var(--sans); margin: 0; }
+  .plan-help { margin: 2px 0 14px; }
   video { width: 100%; border-radius: 8px; background: #000; margin-top: 12px; }
   /* The download link is the episode's long file name: it wraps rather than widen a phone's page. */
   .done a { color: var(--ok); font-family: var(--sans); display: inline-block; max-width: 100%;
@@ -398,9 +407,23 @@
     <h1>Radio Play Studio</h1>
     <select id="lang" data-i18n-aria-label="lang.label" data-fb-aria-label="Language of this page"></select>
   </header>
-  <p class="tag" data-i18n="app.tagline">Press the button. Your own ComfyUI writes, casts, performs and films a radio play.</p>
+  <p class="tag" data-i18n="app.tagline">Press one button and your own ComfyUI writes, casts, voices, scores and films a whole radio play.</p>
+  <!-- Where a visitor learns more without rendering anything: the app's demo, a
+       finished episode, the README, and this app's own source folder. -->
+  <nav class="links" data-i18n-aria-label="links.label" data-fb-aria-label="About this app">
+    <a href="https://youtu.be/UeQQeVMaMVs" target="_blank" rel="noopener" data-i18n="links.demo">Watch the demo (1:53)</a>
+    <a href="https://youtu.be/AOn21EG9u-U" target="_blank" rel="noopener" data-i18n="links.episode">Hear a finished episode (1:30)</a>
+    <a href="https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/contest/radio-play-studio/README.md" target="_blank" rel="noopener" data-i18n="links.how">How it works</a>
+    <a href="https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/main/contest/radio-play-studio" target="_blank" rel="noopener" data-i18n="links.source">Source on GitHub</a>
+  </nav>
 
+  <!-- Hidden with the form when the Direct the shots board takes over (folded). -->
+  <div id="plan">
+    <h2 class="plan" data-i18n="plan.title">Configure my episode choices</h2>
+    <p class="help plan-help" data-i18n="plan.help">It starts on your card's defaults; change anything you like. Nothing renders until you press Make the episode.</p>
+  </div>
   <p id="notice" hidden></p>
+  <details id="notice_more" hidden><summary data-i18n="notice.details">Details</summary><code id="notice_detail"></code></details>
   <form id="form"></form>
   <div id="keys" hidden></div>
   <div class="gobar" id="gobar">
@@ -1335,18 +1358,31 @@ function restore(saved) {
   setupView();
 }
 
+// The line under the heading that says what is wrong, with the technical text,
+// when there is any, folded away under Details. Every notice goes through here,
+// so the details never outlive the message they belong to.
+function notice(key, vars, detail) {
+  say($("notice"), key, vars);
+  $("notice").hidden = false;
+  $("notice_detail").textContent = detail || "";
+  $("notice_more").hidden = !detail;
+}
+function noticeOff() {
+  $("notice").hidden = $("notice_more").hidden = true;
+}
+
 async function loadOptions(workflow) {
   // A ComfyUI that is busy rendering takes about 40 s to list its nodes.
   const mine = ++formRequest;
   loadingForm = true;
   buttons();
-  say($("notice"), "notice.asking");
-  $("notice").hidden = false;
+  notice("notice.asking");
   try {
     const res = await fetch("/api/options" + (workflow ? "?workflow=" + encodeURIComponent(workflow) : ""));
     const body = await res.json();
     if (mine !== formRequest) return;            // a later pick is on its way
-    if (!res.ok) throw new Error(body.error || res.statusText);
+    if (!res.ok) throw Object.assign(new Error(body.error || res.statusText),
+                                     {comfyui: body.comfyui, formError: body.form_error});
     const saved = fields.length ? remember() : null;
     photoStills = Array.isArray(body.photo_stills) ? body.photo_stills : null;
     menu = body.menu || null;
@@ -1355,7 +1391,7 @@ async function loadOptions(workflow) {
     build(body.fields);
     restore(saved);
     refreshKeys();
-    $("notice").hidden = true;
+    noticeOff();
     // The first form is the server's default; a page on another card starts on
     // that card's own workflow (Codex: an 8 GB card must not open on 16 GB).
     if (!saved && menu && menu.detected && menu.detected !== menu.current.machine) {
@@ -1367,8 +1403,10 @@ async function loadOptions(workflow) {
     if (mine !== formRequest) return;
     loadingForm = false;
     buttons();
-    say($("notice"), "notice.unreachable", {error: err.message});
-    $("notice").hidden = false;
+    // ComfyUI not answering at all says so in one line; the socket error is under Details.
+    if (err.comfyui) notice("notice.offline", {url: err.comfyui}, err.message);
+    else if (err.formError) notice("notice.form", null, err.message);
+    else notice("notice.unreachable", {error: err.message});
   }
 }
 
@@ -1476,6 +1514,9 @@ function showVideo(box, run, file) {
 // any before it. Its own player, so a past episode never covers the one being made.
 const SHELF_PAGE = 12;
 let shelf = [], shelfShown = SHELF_PAGE;
+// One card per saved episode, made once and kept, so a redraw (a wider window,
+// Show more, another language) never reloads a poster.
+const shelfCards = new Map();
 async function loadShelf() {
   try {
     const res = await fetch("/api/library");
@@ -1484,36 +1525,55 @@ async function loadShelf() {
   } catch (err) { return; }   // no shelf is not worth a message
   drawShelf();
 }
+function shelfCard(ep) {
+  const key = ep.run + "/" + ep.file;
+  if (shelfCards.has(key)) return shelfCards.get(key);
+  const card = document.createElement("button");
+  card.type = "button"; card.className = "ep"; card.dataset.run = ep.run;
+  // A frame a few seconds in stands in for a poster; only its metadata loads until played.
+  const v = document.createElement("video");
+  v.preload = "metadata"; v.muted = true; v.tabIndex = -1;
+  v.src = "/episodes/" + ep.run + "/" + encodeURIComponent(ep.file) + "#t=4";
+  const title = document.createElement("b");
+  title.textContent = ep.title;
+  card.append(v, title, document.createElement("span"));
+  card.addEventListener("click", () => {
+    const box = $("shelf_player");
+    showVideo(box, ep.run, ep.file).play().catch(() => {});
+    box.dataset.run = ep.run;
+    $("shelf_list").querySelectorAll(".ep").forEach((c) => c.removeAttribute("aria-current"));
+    card.setAttribute("aria-current", "true");
+    box.scrollIntoView({behavior: "smooth", block: "nearest"});
+  });
+  shelfCards.set(key, card);
+  return card;
+}
 function drawShelf() {
   const list = $("shelf_list"), playing = $("shelf_player").dataset.run;
-  list.textContent = "";
-  for (const ep of shelf.slice(0, shelfShown)) {
-    const card = document.createElement("button");
-    card.type = "button"; card.className = "ep"; card.dataset.run = ep.run;
-    if (ep.run === playing) card.setAttribute("aria-current", "true");
-    // A frame a few seconds in stands in for a poster; only its metadata loads until played.
-    const v = document.createElement("video");
-    v.preload = "metadata"; v.muted = true; v.tabIndex = -1;
-    v.src = "/episodes/" + ep.run + "/" + encodeURIComponent(ep.file) + "#t=4";
-    const title = document.createElement("b");
-    title.textContent = ep.title;
-    const when = document.createElement("span");
-    when.textContent = new Date(ep.saved * 1000).toLocaleString(lang, {dateStyle: "medium", timeStyle: "short"});
-    card.append(v, title, when);
-    card.addEventListener("click", () => {
-      const box = $("shelf_player");
-      showVideo(box, ep.run, ep.file).play().catch(() => {});
-      box.dataset.run = ep.run;
-      list.querySelectorAll(".ep").forEach((c) => c.removeAttribute("aria-current"));
-      card.setAttribute("aria-current", "true");
-      box.scrollIntoView({behavior: "smooth", block: "nearest"});
-    });
-    list.append(card);
-  }
-  $("shelf_more").hidden = shelf.length <= shelfShown;
   $("shelf").hidden = !shelf.length || !$("board").hidden;
+  if ($("shelf").hidden) return;
+  // Whole rows: the batch is rounded up to the columns this width fits, so the
+  // last row is never three cards under a row of nine.
+  const columns = getComputedStyle(list).gridTemplateColumns.split(" ").filter(Boolean).length || 1;
+  const count = Math.min(shelf.length, Math.ceil(shelfShown / columns) * columns);
+  const cards = shelf.slice(0, count).map((ep) => {
+    const card = shelfCard(ep);
+    card.lastChild.textContent = new Date(ep.saved * 1000).toLocaleString(lang, {dateStyle: "medium", timeStyle: "short"});
+    card.toggleAttribute("aria-current", false);
+    if (ep.run === playing) card.setAttribute("aria-current", "true");
+    return card;
+  });
+  if (cards.length !== list.children.length || cards.some((c, i) => list.children[i] !== c)) {
+    list.replaceChildren(...cards);
+  }
+  $("shelf_more").hidden = shelf.length <= count;
 }
 $("shelf_more").addEventListener("click", () => { shelfShown += SHELF_PAGE; drawShelf(); });
+let shelfResize = 0;
+addEventListener("resize", () => {
+  cancelAnimationFrame(shelfResize);
+  shelfResize = requestAnimationFrame(() => { if (shelf.length) drawShelf(); });
+});
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -1565,7 +1625,7 @@ let cardEls = {}, sceneEls = {}, personEls = {};
 let drawnFor = null;   // the project the board was last drawn for
 
 function folded(on) {
-  $("form").hidden = $("gobar").hidden = on;
+  $("form").hidden = $("gobar").hidden = $("plan").hidden = on;
   $("summary").hidden = $("board").hidden = !on;
   $("projects").hidden = true;
   $("shelf").hidden = on || !shelf.length;
@@ -1640,7 +1700,7 @@ async function listProjects() {
     a.addEventListener("click", (e) => {
       e.preventDefault();
       openProject(p.project_id).catch((err) => {
-        say($("notice"), "pstatus.missing", {error: err.message}); $("notice").hidden = false;
+        notice("pstatus.missing", {error: err.message});
       });
     });
     box.appendChild(a);
@@ -2257,7 +2317,7 @@ $("direct").addEventListener("click", async () => {
     // replays a run's events from the start).
     stageBusy = true; watching = "stills"; stagePid = body.project_id; buttons();
     try { await openProject(body.project_id); }
-    catch (err) { say($("notice"), "pstatus.missing", {error: err.message}); $("notice").hidden = false; }
+    catch (err) { notice("pstatus.missing", {error: err.message}); }
     watchStage(body.id, "stills", body.project_id);
   } catch (err) {
     $("run").hidden = false; plain($("error"), err.message); $("error").hidden = false;
@@ -2285,7 +2345,7 @@ async function resume() {
   for (const pid of [wantedProject, stageRun && stageRun.project_id]) {
     if (!pid || project) continue;
     try { await openProject(pid); }
-    catch (err) { say($("notice"), "pstatus.missing", {error: err.message}); $("notice").hidden = false; }
+    catch (err) { notice("pstatus.missing", {error: err.message}); }
   }
   // Anything being made keeps the buttons off until it ends, whichever board is open.
   if (stageRun) watchStage(stageRun.id, stageRun.stage, stageRun.project_id);

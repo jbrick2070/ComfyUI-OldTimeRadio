@@ -585,10 +585,17 @@ class Handler(BaseHTTPRequestHandler):
             query = parse_qs(urlsplit(self.path).query)
             workflow = (query.get("workflow") or [None])[0]
             self._send_json(HTTPStatus.OK, self.runs.studio.form(workflow))
+        except GraphError as exc:
+            # ComfyUI answered, but the workflow does not fit it (a missing node,
+            # an input it no longer takes): starting ComfyUI again would not help.
+            # Caught before ValueError, which GraphError is a kind of.
+            self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(exc), "form_error": True})
         except ValueError as exc:   # a workflow the page does not offer
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-        except (ServerUnreachable, GraphError) as exc:
-            self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(exc)})
+        except ServerUnreachable as exc:
+            # Which ComfyUI did not answer, so the page can say it in one plain line.
+            self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {
+                "error": str(exc), "comfyui": self.runs.studio.settings.comfyui_url})
 
     def _events(self, run_id: str) -> None:
         run = self.runs.get(run_id)
