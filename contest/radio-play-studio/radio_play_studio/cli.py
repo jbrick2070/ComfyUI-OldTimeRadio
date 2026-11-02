@@ -184,7 +184,7 @@ def doctor_report(settings: Settings) -> list:
     except ImportError:
         add(False, "Comfy SDK installed", "pip install -r requirements.txt")
     add(_bridge_reachable(settings.api_url), "comfy-api-proxy answers",
-        settings.api_url + "  (start it with: comfy-api-proxy)")
+        settings.api_url + "  (start it with: comfy-api-proxy start, or the Start Radio Play Studio launcher)")
     return rows
 
 

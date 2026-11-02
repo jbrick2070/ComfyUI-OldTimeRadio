@@ -14,6 +14,18 @@ and each model keeps its own license (see License).
 >
 > **LogBlaster demo (0:48):** [`media/comfyui_logblaster_demo.mp4`](media/comfyui_logblaster_demo.mp4), the clip shown at the LA ComfyUI Build Night on 2026-10-29: [LogBlaster](https://github.com/jbrick2070/ComfyUI-LogBlaster), the companion pack that plays ComfyUI's live log as a GPU shader HUD while an episode renders.
 
+## Quick start
+
+1. Install the [Old-Time Radio](https://github.com/jbrick2070/ComfyUI-OldTimeRadio) pack into
+   ComfyUI (`git clone` it into `custom_nodes/`) and start ComfyUI.
+2. Double-click **`Start Radio Play Studio.bat`** in this folder (`./start-radio-play-studio.sh`
+   on macOS or Linux). It installs the app's two packages the first time, starts the
+   `comfy-api-proxy` bridge, checks your setup, and opens the app in your browser.
+3. Press **Make the episode**. Every finished episode lands on the **Your episodes** shelf under
+   the button, ready to play again.
+
+Details, other cards and the manual steps are below ("What you need", "Set up", "Run").
+
 ```
 browser  ->  Radio Play Studio  ->  Comfy SDK  ->  comfy-api-proxy  ->  your ComfyUI + Old-Time Radio pack
  (form,        (this repo:          (v2 API,        (bridge, :8189)      (:8188; writes, casts, voices,
@@ -57,7 +69,7 @@ cloud still model or a cloud writer is always something a person picked (see "Ke
 ```
 cd contest/radio-play-studio
 pip install -r requirements.txt     # comfy-sdk and comfy-api-proxy
-comfy-api-proxy                     # leave running: serves the Comfy API v2 on :8189 for your ComfyUI on :8188
+comfy-api-proxy start               # runs in the background: serves the Comfy API v2 on :8189 for your ComfyUI on :8188
 ```
 
 Tell the app where the pack is, by any one of:
