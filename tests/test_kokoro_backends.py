@@ -515,6 +515,133 @@ def test_onnx_prefetch_receipts(monkeypatch, tmp_path):
     assert r["present"] is True and r["attempted"] == 0          # second boot: nothing to do
 
 
+# --------------------------------------------------------------------------- #
+# prestartup prefetch of spaCy's English model (torch backend, 2026-11-02)
+# --------------------------------------------------------------------------- #
+def _spacy_wheel(path, *, sentinel=True, extra=None):
+    import zipfile
+
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("en_core_web_sm/__init__.py", "")
+        if sentinel:
+            archive.writestr(prefetch.SPACY_EN_SENTINEL.replace(os.sep, "/"), "{}")
+        archive.writestr("en_core_web_sm-3.7.1.dist-info/METADATA",
+                         "Name: en_core_web_sm\nVersion: 3.7.1\n")
+        for name in extra or ():
+            archive.writestr(name, "x")
+    return str(path)
+
+
+def _hub_returning(monkeypatch, wheel, seen):
+    def _fake_download(repo_id, filename, revision):
+        seen.append((repo_id, filename, revision))
+        return wheel
+    monkeypatch.setitem(sys.modules, "huggingface_hub",
+                        types.SimpleNamespace(hf_hub_download=_fake_download))
+
+
+def test_torch_backend_wanted_gate(monkeypatch):
+    monkeypatch.setenv("OTR_KOKORO_BACKEND", "onnx")
+    monkeypatch.setattr(prefetch, "_spec_exists", lambda n: True)
+    assert prefetch.torch_backend_wanted() is False      # a kokoro-onnx box never loads spaCy
+    monkeypatch.delenv("OTR_KOKORO_BACKEND")
+    assert prefetch.torch_backend_wanted() is True
+    monkeypatch.setattr(prefetch, "_spec_exists", lambda n: n == "kokoro_onnx")
+    assert prefetch.torch_backend_wanted() is False      # neither backend: nothing to feed
+
+
+def test_spacy_prefetch_receipts(monkeypatch, tmp_path):
+    models = tmp_path / "models"
+    models.mkdir()
+    monkeypatch.setattr(prefetch, "_models_dir", lambda: str(models))
+    monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+    monkeypatch.delenv("OTR_SKIP_KOKORO_PREFETCH", raising=False)
+    wheel = _spacy_wheel(tmp_path / "en.whl")
+    seen = []
+    _hub_returning(monkeypatch, wheel, seen)
+    dest = models / "TTS" / "KokoroTTS" / prefetch.SPACY_EN_REL_DIR
+
+    monkeypatch.setattr(prefetch, "torch_backend_wanted", lambda: False)
+    r = prefetch.prefetch_spacy_english_model()
+    assert r["attempted"] == 0 and "not selected" in r["reason"]
+
+    monkeypatch.setattr(prefetch, "torch_backend_wanted", lambda: True)
+    monkeypatch.setattr(prefetch, "_spec_exists", lambda n: n == "en_core_web_sm")
+    r = prefetch.prefetch_spacy_english_model()
+    assert r["attempted"] == 0 and "already installed" in r["reason"]   # an installed model wins
+
+    monkeypatch.setattr(prefetch, "_spec_exists", lambda n: False)
+    monkeypatch.setenv("HF_HUB_OFFLINE", "1")
+    r = prefetch.prefetch_spacy_english_model()
+    assert r["skipped_offline"] and r["attempted"] == 0 and seen == []
+    monkeypatch.delenv("HF_HUB_OFFLINE")
+
+    r = prefetch.prefetch_spacy_english_model()           # the real pin: these bytes fail it
+    assert r["fetched"] == 0 and "sha256" in r["reason"] and not dest.exists()
+
+    monkeypatch.setattr(prefetch, "SPACY_EN_SHA256", prefetch._sha256_of(wheel))
+    r = prefetch.prefetch_spacy_english_model()
+    assert r["fetched"] == 1 and (dest / prefetch.SPACY_EN_SENTINEL).is_file()
+    assert seen[-1] == (prefetch.SPACY_EN_REPO_ID, prefetch.SPACY_EN_FILENAME,
+                        prefetch.SPACY_EN_REVISION)
+    assert [p.name for p in dest.parent.iterdir()] == [dest.name]   # no staging folder left
+    r = prefetch.prefetch_spacy_english_model()
+    assert r["present"] is True and r["attempted"] == 0   # second boot: nothing to do
+
+
+def test_spacy_unpack_refuses_a_member_outside_the_folder_and_a_wheel_without_the_model(tmp_path):
+    dest = tmp_path / "out" / "en"
+    dest.parent.mkdir()
+    with pytest.raises(ValueError, match="leaves the target folder"):
+        prefetch._unpack_wheel(_spacy_wheel(tmp_path / "a.whl", extra=["../escape.txt"]), str(dest))
+    with pytest.raises(ValueError, match="has no"):
+        prefetch._unpack_wheel(_spacy_wheel(tmp_path / "b.whl", sentinel=False), str(dest))
+    assert not dest.exists() and not (tmp_path / "out" / "escape.txt").exists()
+    assert list(dest.parent.iterdir()) == []
+
+
+def test_boot_calls_the_spacy_prefetch_and_both_files_agree_on_its_folder():
+    assert prefetch.SPACY_EN_REL_DIR == kb.SPACY_EN_REL_DIR
+    assert prefetch.SPACY_EN_SENTINEL == kb.SPACY_EN_SENTINEL
+    assert "prefetch_spacy_english_model()" in inspect.getsource(prefetch.prefetch_at_boot)
+
+
+def test_english_torch_kokoro_speaks_from_the_prefetched_copy(monkeypatch, tmp_path):
+    import importlib.util
+    import warnings
+
+    voices = tmp_path / "KokoroTTS" / "voices"
+    voices.mkdir(parents=True)
+    unpacked = voices.parent / kb.SPACY_EN_REL_DIR
+    (unpacked / os.path.dirname(kb.SPACY_EN_SENTINEL)).mkdir(parents=True)
+    (unpacked / kb.SPACY_EN_SENTINEL).write_text("{}")
+    real = importlib.util.find_spec
+    monkeypatch.setattr(importlib.util, "find_spec",
+                        lambda name, *a, **k: None if name == "en_core_web_sm"
+                        else real(name, *a, **k))
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    built = []
+
+    class KPipeline:  # noqa: N801 -- the real class name
+        def __init__(self, **kw):
+            warnings.warn("[W095] Model 'en_core_web_sm' (3.7.1) was trained with "
+                          "spaCy v3.7.2 and may not be 100% compatible", UserWarning)
+            built.append(kw)
+    monkeypatch.setitem(sys.modules, "kokoro", types.SimpleNamespace(KPipeline=KPipeline))
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for _ in range(2):
+            kb.TorchKokoroBackend("cpu", lang_code="b", voices_dir=str(voices)).load()
+    assert [kw["lang_code"] for kw in built] == ["b", "b"]
+    assert sys.path.count(str(unpacked)) == 1             # appended once, after the installed paths
+    assert not [w for w in caught if "W095" in str(w.message)]
+
+    (unpacked / kb.SPACY_EN_SENTINEL).unlink()            # a half folder is never trusted
+    with pytest.raises(kb.BackendUnavailable, match="spacy download en_core_web_sm"):
+        kb.TorchKokoroBackend("cpu", lang_code="b", voices_dir=str(voices)).load()
+
+
 def test_prefetch_and_engine_agree_on_the_onnx_path_and_boot_stays_light():
     assert prefetch._KOKORO_ONNX_REL_PATH == eng_kokoro._KOKORO_ONNX_REL_PATH
     assert prefetch._KOKORO_MODEL_SUBDIR == eng_kokoro._KOKORO_MODEL_SUBDIR

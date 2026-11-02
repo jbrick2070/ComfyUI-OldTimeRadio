@@ -1,6 +1,6 @@
 # Kokoro English on a box without spaCy's model (Comfy Cloud first)
 
-Status: PLAN, 2026-11-02. Not built.
+Status: BUILT 2026-11-02. Proven locally (real fetch, model hidden, English line voiced from the 3.7.1 copy); cloud leg pending.
 
 ## The defect
 

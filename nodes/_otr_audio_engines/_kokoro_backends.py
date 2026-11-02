@@ -64,6 +64,7 @@ import logging
 import os
 import re
 import unicodedata
+import warnings
 
 log = logging.getLogger("OTR")
 
@@ -105,6 +106,22 @@ UNSPEAKABLE_LINE_S = 0.25
 #: three is here: this is exactly the set the ONNX backend voices through
 #: ``EspeakPhonemizer``.
 ESPEAK_LANGUAGES = {"e": "es", "f": "fr-fr", "h": "hi", "i": "it", "p": "pt-br"}
+
+#: spaCy's English model as the boot prefetch unpacks it, relative to the Kokoro
+#: model dir (the parent of ``voices_dir``). Duplicated from
+#: ``_otr_kokoro_voice_prefetch`` on purpose -- that file loads flat at
+#: prestartup -- and pinned equal by a test. Trusted only with the sentinel in it.
+SPACY_EN_REL_DIR = os.path.join("spacy", "en_core_web_sm-3.7.1")
+SPACY_EN_SENTINEL = os.path.join("en_core_web_sm", "en_core_web_sm-3.7.1", "meta.json")
+
+
+def unpacked_spacy_english(voices_dir) -> "str | None":
+    """The boot prefetch's unpacked ``en_core_web_sm`` folder beside the Kokoro
+    voices, or None when it is absent or incomplete."""
+    if not voices_dir:
+        return None
+    folder = os.path.join(os.path.dirname(os.path.normpath(voices_dir)), SPACY_EN_REL_DIR)
+    return folder if os.path.isfile(os.path.join(folder, SPACY_EN_SENTINEL)) else None
 
 #: The rows the ONNX backend phonemizes with the pack's own copy of misaki
 #: (``_misaki``), because misaki does not install on Python 3.13: lang_code ->
@@ -810,6 +827,7 @@ class TorchKokoroBackend:
         self.lang_code = str(lang_code or "b").strip() or "b"
         self.voices_dir = voices_dir
         self._pipeline = None
+        self._spacy_from_prefetch = False
 
     def load(self) -> None:
         if self._pipeline is not None:
@@ -836,13 +854,28 @@ class TorchKokoroBackend:
             # flags a direct-URL requirement (contains_custom_url_dependency),
             # so the pack does not declare it: this refusal is how a Python
             # 3.12 install learns the one line to run.
+            #
+            # OR THE BOOT PREFETCH'S COPY (2026-11-02): a box where nobody can
+            # run that line (Comfy Cloud) gets spaCy's 3.7.1 wheel unpacked
+            # beside the voices at prestartup. Appended, never inserted, so an
+            # installed model always wins; misaki then finds it the way it
+            # finds an installed one (find_spec and importlib.metadata).
             import importlib.util
             if importlib.util.find_spec("en_core_web_sm") is None:
-                raise BackendUnavailable(
-                    "Kokoro's English phonemizer (misaki) needs spaCy's en_core_web_sm "
-                    "model, which is not installed in ComfyUI's Python. Install it once, "
-                    "outside the render, with ComfyUI's own interpreter: "
-                    "python -m spacy download en_core_web_sm")
+                unpacked = unpacked_spacy_english(self.voices_dir)
+                if unpacked is None:
+                    raise BackendUnavailable(
+                        "Kokoro's English phonemizer (misaki) needs spaCy's "
+                        "en_core_web_sm model, which is not installed in ComfyUI's "
+                        "Python. Restart ComfyUI with internet once so the boot "
+                        "fetch can place it, or install it outside the render with "
+                        "ComfyUI's own interpreter: python -m spacy download "
+                        "en_core_web_sm")
+                import sys
+                if unpacked not in sys.path:
+                    sys.path.append(unpacked)
+                importlib.invalidate_caches()
+                self._spacy_from_prefetch = True
         from kokoro import KPipeline
 
         kwargs = {"lang_code": self.lang_code, "device": self.device}
@@ -852,7 +885,13 @@ class TorchKokoroBackend:
         except (TypeError, ValueError):
             kwargs["repo_id"] = "hexgrad/Kokoro-82M"
         try:
-            self._pipeline = KPipeline(**kwargs)
+            with warnings.catch_warnings():
+                if self._spacy_from_prefetch:
+                    # spaCy 3.8 warns W095 (model built for 3.7) on every load
+                    # of the prefetched 3.7.1 copy; the boot log already named
+                    # the version, so the render log stays clean.
+                    warnings.filterwarnings("ignore", message=r".*\[W095\]")
+                self._pipeline = KPipeline(**kwargs)
         except RuntimeError as error:
             reworded = _mecab_dictionary_error(error, self.lang_code)
             if reworded is error:

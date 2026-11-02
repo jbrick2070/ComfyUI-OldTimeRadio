@@ -74,6 +74,26 @@ KOKORO_ONNX_FILENAME = "onnx/model.onnx"
 #: prefetch test pins the two equal.
 _KOKORO_ONNX_REL_PATH = os.path.join("onnx", "model.onnx")
 
+#: spaCy's English model for the torch backend's English G2P (misaki), from
+#: spaCy's own Hugging Face mirror. PINNED to a commit and a sha256, unlike the
+#: voices: this is code-adjacent (a wheel misaki imports), so the exact bytes
+#: matter. The mirror carries 3.7.1, where `python -m spacy download` would give
+#: 3.8.0; on eight script lines the two phonemized identically on seven and
+#: stressed one heteronym differently (2026-11-02, planning/kokoro-english-cloud).
+#: The pack cannot declare this model -- it is not on PyPI, and a direct-URL
+#: requirement is what the registry's scan flags -- so a box that never ran the
+#: download (Comfy Cloud, where nobody can) gets it here, at boot.
+SPACY_EN_REPO_ID = "spacy/en_core_web_sm"
+SPACY_EN_FILENAME = "en_core_web_sm-any-py3-none-any.whl"
+SPACY_EN_REVISION = "8fb6f8155286360bf5486fe399e2738d1df7ded2"
+SPACY_EN_SHA256 = "86cc141f63942d4b2c5fcee06630fd6f904788d2f0ab005cce45aadb8fb73889"
+#: Where the unpacked wheel lives, relative to the Kokoro model dir. Duplicated
+#: in `_kokoro_backends.SPACY_EN_REL_DIR` ON PURPOSE (this file loads flat at
+#: prestartup and by path in tests, the backends as a package module); a test
+#: pins the two equal. The folder is trusted only when SPACY_EN_SENTINEL is in it.
+SPACY_EN_REL_DIR = os.path.join("spacy", "en_core_web_sm-3.7.1")
+SPACY_EN_SENTINEL = os.path.join("en_core_web_sm", "en_core_web_sm-3.7.1", "meta.json")
+
 #: ENGLISH FIRST -- the 28 British+American ids the show has always fetched.
 #: 2026-09-18: admitted non-English Kokoro rows add their .pt list beside
 #: these. ``admitted_kokoro_voices()`` is the fetch set; ENGLISH_VOICES stays
@@ -224,6 +244,107 @@ def prefetch_kokoro_onnx_model(*, force: bool = False) -> "dict":
     return receipt
 
 
+def torch_backend_wanted() -> bool:
+    """Could `eng_kokoro` select the torch backend here? Not when forced to ONNX,
+    and only when the `kokoro` package is installed -- the same preference
+    `_kokoro_backends.select_backend_name` applies. A kokoro-onnx box (Python
+    3.13, every Mac install) answers False: its English never loads spaCy."""
+    if otr_env.get("OTR_KOKORO_BACKEND", "auto").strip().lower() == "onnx":
+        return False
+    return _spec_exists("kokoro")
+
+
+def _sha256_of(path: str) -> str:
+    import hashlib
+
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _unpack_wheel(wheel: str, dest: str) -> None:
+    """Unpack ``wheel`` to ``dest`` all at once: into a sibling temp folder,
+    checked, then renamed into place, so a crash mid-unpack never leaves a
+    folder the backend would trust. Every member must land inside the folder."""
+    import shutil
+    import zipfile
+
+    staging = "%s.partial-%d" % (dest, os.getpid())
+    shutil.rmtree(staging, ignore_errors=True)
+    os.makedirs(staging)
+    root = os.path.realpath(staging) + os.sep
+    with zipfile.ZipFile(wheel) as archive:
+        for member in archive.namelist():
+            if not os.path.realpath(os.path.join(staging, member)).startswith(root):
+                raise ValueError("wheel member %r leaves the target folder" % member)
+        archive.extractall(staging)
+    if not os.path.isfile(os.path.join(staging, SPACY_EN_SENTINEL)):
+        shutil.rmtree(staging, ignore_errors=True)
+        raise ValueError("wheel has no %s" % SPACY_EN_SENTINEL)
+    shutil.rmtree(dest, ignore_errors=True)       # a half folder from an older crash
+    os.replace(staging, dest)
+
+
+def prefetch_spacy_english_model(*, force: bool = False) -> "dict":
+    """Fetch and unpack spaCy's English model once, at boot, when the torch
+    backend could voice English and the model is not installed.
+
+    Same contract as the other two fetches: returns a receipt, never raises,
+    honours HF_HUB_OFFLINE / OTR_SKIP_KOKORO_PREFETCH. A box that already has
+    `en_core_web_sm` installed never fetches, and the backend prefers the
+    installed copy over this one.
+    """
+    receipt = {"attempted": 0, "fetched": 0, "skipped_offline": False,
+               "present": False, "reason": "", "path": ""}
+    models = _models_dir()
+    if not models:
+        receipt["reason"] = "could not locate ComfyUI models/ directory"
+        return receipt
+    dest = os.path.join(models, _KOKORO_MODEL_SUBDIR, SPACY_EN_REL_DIR)
+    receipt["path"] = dest
+    if os.path.isfile(os.path.join(dest, SPACY_EN_SENTINEL)) and not force:
+        receipt["present"] = True
+        return receipt
+    if not force and not torch_backend_wanted():
+        receipt["reason"] = "torch kokoro not selected on this interpreter"
+        return receipt
+    if not force and _spec_exists("en_core_web_sm"):
+        receipt["reason"] = "en_core_web_sm is already installed"
+        return receipt
+    if not force and otr_env.get("HF_HUB_OFFLINE") == "1":
+        receipt["skipped_offline"] = True
+        receipt["reason"] = "HF_HUB_OFFLINE=1"
+        return receipt
+    if otr_env.get("OTR_SKIP_KOKORO_PREFETCH") == "1":
+        receipt["skipped_offline"] = True
+        receipt["reason"] = "OTR_SKIP_KOKORO_PREFETCH=1"
+        return receipt
+    try:
+        from huggingface_hub import hf_hub_download
+    except Exception as exc:  # noqa: BLE001
+        receipt["reason"] = f"huggingface_hub unavailable: {exc}"
+        return receipt
+    receipt["attempted"] = 1
+    log.info(
+        "OldTimeRadio: fetching spaCy's English model (%s 3.7.1, ~13 MB, one-time) "
+        "for Kokoro's English voices into %s", SPACY_EN_REPO_ID, dest)
+    try:
+        wheel = hf_hub_download(repo_id=SPACY_EN_REPO_ID, filename=SPACY_EN_FILENAME,
+                                revision=SPACY_EN_REVISION)
+        got = _sha256_of(wheel)
+        if got != SPACY_EN_SHA256:
+            receipt["reason"] = "%s sha256 %s, expected %s" % (
+                SPACY_EN_FILENAME, got, SPACY_EN_SHA256)
+            return receipt
+        _unpack_wheel(wheel, dest)
+        receipt["fetched"] = 1
+    except Exception as exc:  # noqa: BLE001 -- no internet, a 404, a full disk
+        receipt["reason"] = f"{SPACY_EN_FILENAME}: {exc}"
+    return receipt
+
+
 def admitted_kokoro_voices() -> "tuple[str, ...]":
     """English ids plus every admitted language row's kokoro.voices list."""
     wanted = list(ENGLISH_VOICES)
@@ -324,8 +445,7 @@ def prefetch_kokoro_voices(*, force: bool = False) -> "dict":
 
 def prefetch_at_boot() -> None:
     """The prestartup entry point. Logs, never raises, never prints non-ASCII."""
-    # The two fetches are independent: a voice-prefetch failure must not skip
-    # the ONNX model, and vice versa.
+    # The three fetches are independent: one failing must never skip another.
     try:
         onnx_receipt = prefetch_kokoro_onnx_model()
         if onnx_receipt.get("fetched"):
@@ -338,6 +458,18 @@ def prefetch_at_boot() -> None:
                 "needs nothing.", onnx_receipt["reason"])
     except Exception as exc:  # noqa: BLE001 -- belt and braces
         log.info("OldTimeRadio kokoro ONNX model prefetch skipped: %s", exc)
+    try:
+        spacy_receipt = prefetch_spacy_english_model()
+        if spacy_receipt.get("fetched"):
+            log.info("OldTimeRadio: unpacked spaCy's English model into %s (one-time)",
+                     spacy_receipt.get("path"))
+        elif spacy_receipt.get("attempted") and spacy_receipt.get("reason"):
+            log.info(
+                "OldTimeRadio: spaCy English model prefetch incomplete (%s). Kokoro "
+                "English names the install line at the first voice line; Bark needs "
+                "nothing.", spacy_receipt["reason"])
+    except Exception as exc:  # noqa: BLE001 -- belt and braces
+        log.info("OldTimeRadio spaCy English model prefetch skipped: %s", exc)
     try:
         receipt = prefetch_kokoro_voices()
     except Exception as exc:  # noqa: BLE001 -- belt and braces
