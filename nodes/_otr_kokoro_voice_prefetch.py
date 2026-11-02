@@ -274,17 +274,21 @@ def _unpack_wheel(wheel: str, dest: str) -> None:
     staging = "%s.partial-%d" % (dest, os.getpid())
     shutil.rmtree(staging, ignore_errors=True)
     os.makedirs(staging)
-    root = os.path.realpath(staging) + os.sep
-    with zipfile.ZipFile(wheel) as archive:
-        for member in archive.namelist():
-            if not os.path.realpath(os.path.join(staging, member)).startswith(root):
-                raise ValueError("wheel member %r leaves the target folder" % member)
-        archive.extractall(staging)
-    if not os.path.isfile(os.path.join(staging, SPACY_EN_SENTINEL)):
+    try:
+        root = os.path.realpath(staging) + os.sep
+        with zipfile.ZipFile(wheel) as archive:
+            for member in archive.namelist():
+                if not os.path.realpath(os.path.join(staging, member)).startswith(root):
+                    raise ValueError("wheel member %r leaves the target folder" % member)
+            archive.extractall(staging)
+        if not os.path.isfile(os.path.join(staging, SPACY_EN_SENTINEL)):
+            raise ValueError("wheel has no %s" % SPACY_EN_SENTINEL)
+        shutil.rmtree(dest, ignore_errors=True)   # a half folder from an older crash
+        os.replace(staging, dest)
+    finally:
+        # Gone after a rename; on any failure, never left for a later boot
+        # (whose pid differs, so it would not find this folder to clear).
         shutil.rmtree(staging, ignore_errors=True)
-        raise ValueError("wheel has no %s" % SPACY_EN_SENTINEL)
-    shutil.rmtree(dest, ignore_errors=True)       # a half folder from an older crash
-    os.replace(staging, dest)
 
 
 def prefetch_spacy_english_model(*, force: bool = False) -> "dict":

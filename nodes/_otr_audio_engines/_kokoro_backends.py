@@ -885,12 +885,15 @@ class TorchKokoroBackend:
         except (TypeError, ValueError):
             kwargs["repo_id"] = "hexgrad/Kokoro-82M"
         try:
-            with warnings.catch_warnings():
-                if self._spacy_from_prefetch:
-                    # spaCy 3.8 warns W095 (model built for 3.7) on every load
-                    # of the prefetched 3.7.1 copy; the boot log already named
-                    # the version, so the render log stays clean.
+            if self._spacy_from_prefetch:
+                # spaCy 3.8 warns W095 (model built for 3.7) on every load of
+                # the prefetched 3.7.1 copy; the boot log already named the
+                # version, so the render log stays clean. Only on this path:
+                # every other load stays the verbatim KPipeline call.
+                with warnings.catch_warnings():
                     warnings.filterwarnings("ignore", message=r".*\[W095\]")
+                    self._pipeline = KPipeline(**kwargs)
+            else:
                 self._pipeline = KPipeline(**kwargs)
         except RuntimeError as error:
             reworded = _mecab_dictionary_error(error, self.lang_code)
