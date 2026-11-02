@@ -294,6 +294,14 @@ different proof.
   Registry: Pending, 31 dependencies, none a URL; installs serve it. The
   reviewers' "no bump while Pending" stopping rule below is superseded for
   logical steps; the scheduled check judges whichever version is newest.
+  **Scheduled check 2026-11-01 21:08 PT:** the list (read twice, identical)
+  now holds only 2.3.50 (Pending, 18.8 h, `status_reason` "") and 2.3.49
+  (Pending, 38.7 h, ""); 2.3.46, 2.3.47 and 2.3.48 answer Deleted.
+  `latest_version` is null and `/install` serves 2.3.50 Pending. Registry-wide
+  62 versions Pending, the oldest 97 h. Newest is Pending, so nothing changed
+  and nothing was bumped. LogBlaster 1.1.2 is Active ("Passed automated
+  checks"); 1.1.1 stays Flagged on the two respelled literals only
+  (`$socket4` js/log_blaster.js:442, `$socket3` web_app/index.html:606).
 * **2.3.47 was published before it** (`6cf093da5`, 2026-10-30 21:50
   PT, at the operator's "i say asap"): 2.3.46 plus K (`17c820333`, the spaCy
   URL line out of both dependency files) and L (`c9cd41fac`, the two October
