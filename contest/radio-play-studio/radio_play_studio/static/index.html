@@ -1696,7 +1696,7 @@ function blasterOff() {
   blasterHidden = false;
 }
 $("blaster_pop").addEventListener("click", () => {
-  window.open(blasterUrl, "logblaster", "popup,width=1280,height=720");
+  window.open(blasterUrl, "logblaster", "popup,noopener,width=1280,height=720");
   blasterHidden = true;
   $("blaster").hidden = true;
   $("blaster_frame").src = "about:blank";
@@ -1746,22 +1746,22 @@ function watch(id) {
     } else if (ev.type === "done") {
       finished = true;
       es.close();
+      blasterOff();   // first, so nothing below can leave its shader drawing
       $("fill").style.width = "100%";
       say($("status"), "status.finished");
       titleEnded(true);
       showVideo($("result"), ev.run, ev.file);
       running = false; buttons(); refreshBoard();
       loadShelf();
-      blasterOff();
     } else if (ev.type === "error") {
       finished = true;
       es.close();
+      blasterOff();
       plain($("error"), ev.message);
       $("error").hidden = false;
       say($("status"), "status.stopped");
       titleEnded(false);
       running = false; buttons(); refreshBoard();
-      blasterOff();
     }
   };
 }

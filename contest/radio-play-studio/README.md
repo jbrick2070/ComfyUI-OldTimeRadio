@@ -115,8 +115,8 @@ publishes it to its own `output/otr/obs/` folder.
 - **LogBlaster while it renders.** With the [LogBlaster](https://github.com/jbrick2070/ComfyUI-LogBlaster)
   pack installed in your ComfyUI (its own install, from the Manager as `comfyui-logblaster`), a
   panel under the progress bar plays ComfyUI's live log as a light show while an episode is made;
-  **Pop out** moves it to its own window. It closes when the run ends. Without the pack there is
-  no panel, only a link to it.
+  **Pop out** moves it to its own window, which stays open until you close it. The panel closes
+  when the run ends. Without the pack there is no panel, only a link to it.
 - **From a Stream Deck.** The ticket beside the button links the Stream Deck plugin (below).
 - **Reload-proof.** A reload, or a second tab, picks the episode back up where it is.
 - **One at a time.** A second episode while one is being made is refused, not queued behind it.
