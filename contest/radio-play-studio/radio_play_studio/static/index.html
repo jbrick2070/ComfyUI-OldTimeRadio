@@ -1581,6 +1581,7 @@ function ticketView() {
   const summary = ready && !live;
   $("ticket_list").hidden = $("ticket_time").hidden = !summary;
   $("tbar").hidden = $("tstatus").hidden = !running;   // an episode run has the bar; a stage has the board's
+  if (!running) $("tsubbar").hidden = $("tsubstatus").hidden = true;
   if (running) mirrorRun();
   if (summary) ticketSummary(); else $("ticket_uses").hidden = true;
 }
@@ -1785,6 +1786,7 @@ function watch(id) {
     titleEnded(false);
     running = false; buttons(); refreshBoard();
     blasterOff();
+    stageBarOff();
   };
   es.onmessage = (m) => {
     const ev = JSON.parse(m.data);

@@ -839,3 +839,27 @@ def test_the_stream_says_overrun_and_names_the_phase(settings, schemas):
     assert notes[0]["overrun"] is False
     # 60 s into a node that took 10 s last time, with no bar to read: the line changes.
     assert notes[1]["overrun"] is True and notes[1]["phase"] == "phase.writing"
+
+
+def test_a_progress_note_says_how_far_the_running_stage_is():
+    """Filming is one stage of an hour: the note carries that stage's own share
+    (ComfyUI's per-node step/steps, the video walk's frames) so the page can
+    draw it apart from the episode's share. A one-step node says nothing."""
+    frame = Progress(0.0)
+    frame.nodes_total, frame.nodes_done, frame.step, frame.steps = 23, 18, 3060, 3600
+    note = normalize_event(frame, graph_size=23)
+    assert note["stage"] == 0.85
+    assert abs(note["value"] - (18 + 0.85) / 23) < 1e-9       # the page's fallback reads the same
+    frame.step, frame.steps = 1, 1
+    assert "stage" not in normalize_event(frame, graph_size=23)
+    frame.step, frame.steps = None, None
+    assert "stage" not in normalize_event(frame, graph_size=23)
+
+
+def test_the_page_draws_the_stage_bar_and_clears_it_however_a_run_ends():
+    """The stage bar is set from each progress note and cleared on done, on
+    error and on a dropped connection, so it never freezes on screen."""
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "radio_play_studio" / "static" / "index.html").read_text(encoding="utf-8")
+    watch = page[page.index("function watch(id) {"):page.index("// A finished episode, playing")]
+    assert watch.count("stageBarOff();") >= 3 and "stageBar(ev);" in watch
