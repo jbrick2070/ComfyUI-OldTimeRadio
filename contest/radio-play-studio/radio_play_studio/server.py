@@ -9,6 +9,7 @@ posts (a cross-site form cannot send those without a preflight).
 """
 from __future__ import annotations
 
+import http.client
 import json
 import mimetypes
 import re
@@ -364,6 +365,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._options()
         if path == "/api/languages":
             return self._send_json(HTTPStatus.OK, {"languages": available_languages()})
+        if path == "/api/logblaster":
+            # Whether the ComfyUI in use serves LogBlaster, and where (the page embeds it).
+            return self._send_json(HTTPStatus.OK, {"url": logblaster_url(
+                self.runs.studio.settings.comfyui_url)})
         if path == "/api/keys":
             return self._send_json(HTTPStatus.OK, self.runs.studio.key_status())
         if path.startswith("/i18n/"):
@@ -683,6 +688,18 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Range", f"bytes */{size}")
         self.send_header("Content-Length", "0")
         self.end_headers()
+
+
+def logblaster_url(comfyui_url: str, timeout: float = 3.0) -> str | None:
+    """The LogBlaster page this ComfyUI serves (the comfyui-logblaster pack adds
+    GET /logblaster), or None when it does not answer with a page."""
+    url = comfyui_url.rstrip("/") + "/logblaster"
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            kind = resp.headers.get("Content-Type", "")
+            return url if resp.status == 200 and kind.startswith("text/html") else None
+    except (OSError, ValueError, http.client.HTTPException):
+        return None
 
 
 def free_comfyui_models(comfyui_url: str) -> None:

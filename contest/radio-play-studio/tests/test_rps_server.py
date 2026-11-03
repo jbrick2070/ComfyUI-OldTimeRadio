@@ -334,3 +334,23 @@ def test_a_workflow_that_does_not_fit_comfyui_is_not_called_unreachable(settings
         server.server_close()
     reply = json.loads(body)
     assert status == 503 and reply["form_error"] is True and "comfyui" not in reply
+
+
+def test_logblaster_is_offered_only_when_comfyui_serves_its_page(app, monkeypatch):
+    """The page embeds LogBlaster only when the ComfyUI in use answers
+    /logblaster with a page; with none (the fixture's comfy.invalid), no url."""
+    import io
+    from radio_play_studio import server
+    port, settings = app
+    status, _, body = _request(port, "GET", "/api/logblaster")
+    assert status == 200 and json.loads(body) == {"url": None}
+
+    class Page(io.BytesIO):
+        status = 200
+        headers = {"Content-Type": "text/html; charset=utf-8"}
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+    monkeypatch.setattr(server.urllib.request, "urlopen", lambda url, timeout: Page(b"<html>"))
+    assert server.logblaster_url("http://127.0.0.1:8000/") == "http://127.0.0.1:8000/logblaster"
+    Page.headers = {"Content-Type": "application/json"}
+    assert server.logblaster_url("http://127.0.0.1:8000") is None

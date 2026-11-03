@@ -112,6 +112,12 @@ publishes it to its own `output/otr/obs/` folder.
 - **Your episodes.** Below the button, every episode saved under `./episodes/`, from this session
   or any before it, newest first, with a frame of each. Press one to play it there; the episode
   being made keeps its own player.
+- **LogBlaster while it renders.** With the [LogBlaster](https://github.com/jbrick2070/ComfyUI-LogBlaster)
+  pack installed in your ComfyUI (its own install, from the Manager as `comfyui-logblaster`), a
+  panel under the progress bar plays ComfyUI's live log as a light show while an episode is made;
+  **Pop out** moves it to its own window. It closes when the run ends. Without the pack there is
+  no panel, only a link to it.
+- **From a Stream Deck.** The ticket beside the button links the Stream Deck plugin (below).
 - **Reload-proof.** A reload, or a second tab, picks the episode back up where it is.
 - **One at a time.** A second episode while one is being made is refused, not queued behind it.
 - **The GPU goes back.** Within seconds of the last tab closing (two and a half minutes if the

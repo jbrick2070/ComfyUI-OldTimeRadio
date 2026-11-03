@@ -215,6 +215,12 @@
   #ticket #notice { margin: 0 0 6px; }
   #ticket_steps { margin: 0 0 10px; }
   #retry { width: 100%; margin: 0 0 12px; }
+  #blaster { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+             background: #000; }
+  .blaster-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 12px;
+                 background: var(--strip); font-family: var(--sans); }
+  .blaster-bar .help { margin: 0; flex: 1 1 12rem; }
+  #blaster_frame { display: block; width: 100%; height: min(60vh, 520px); border: 0; }
   .deck + .deck { margin-top: 6px; padding-top: 0; border-top: 0; }
   .deck { margin: 14px 0 0; padding-top: 10px; border-top: 1px dashed var(--line);
           color: var(--muted); font: .82rem/1.45 var(--sans); }
@@ -550,6 +556,20 @@
     <p id="status"></p>
     <p id="error" hidden></p>
     <div id="result" class="done" hidden></div>
+  </section>
+
+  <!-- LogBlaster (its own node pack): ComfyUI's live log as a light show, in a
+       panel while an episode is made, or in its own window. Shown only when the
+       ComfyUI being used serves /logblaster; closed when the run ends, so its
+       shader stops drawing on the card that renders (operator, 2026-11-02). -->
+  <section id="blaster" hidden>
+    <div class="blaster-bar">
+      <b>LogBlaster</b>
+      <span class="help" data-i18n="blaster.help">ComfyUI's live log, while it renders.</span>
+      <button type="button" id="blaster_pop" class="quiet small" data-i18n="blaster.pop">Pop out</button>
+      <button type="button" id="blaster_hide" class="quiet small" data-i18n="blaster.hide">Hide</button>
+    </div>
+    <iframe id="blaster_frame" title="LogBlaster" data-i18n-title="blaster.help"></iframe>
   </section>
 
   <!-- Every finished episode on disk, newest first; a card plays it in #result. -->
@@ -1655,8 +1675,41 @@ function phaseText(ev) {
   return name ? t("phase.wrap", {phase: name}, " (" + name + ")") : "";
 }
 
+// LogBlaster beside a run: the panel opens when an episode is being made, if
+// the ComfyUI in use serves it, and closes (blank frame, so the shader stops)
+// when the run ends. Pop out moves it to its own window.
+let blasterUrl;              // undefined: not asked yet; null: not installed
+let blasterHidden = false;   // the person hid it for this run
+async function blasterOn() {
+  if (blasterUrl === undefined) {
+    try { blasterUrl = (await (await fetch("/api/logblaster")).json()).url || null; }
+    catch (err) { blasterUrl = null; }
+  }
+  if (!blasterUrl || blasterHidden || !running) return;
+  if ($("blaster_frame").getAttribute("src") !== blasterUrl) $("blaster_frame").src = blasterUrl;
+  $("blaster").hidden = false;
+}
+function blasterOff() {
+  $("blaster").hidden = true;
+  $("blaster_frame").removeAttribute("src");
+  $("blaster_frame").src = "about:blank";
+  blasterHidden = false;
+}
+$("blaster_pop").addEventListener("click", () => {
+  window.open(blasterUrl, "logblaster", "popup,width=1280,height=720");
+  blasterHidden = true;
+  $("blaster").hidden = true;
+  $("blaster_frame").src = "about:blank";
+});
+$("blaster_hide").addEventListener("click", () => {
+  blasterHidden = true;
+  $("blaster").hidden = true;
+  $("blaster_frame").src = "about:blank";
+});
+
 function watch(id) {
   const es = new EventSource("/api/episodes/" + id + "/events");
+  blasterOn();
   let finished = false, high = 0;   // the bar only moves forward
   es.onerror = () => {
     if (finished || es.readyState !== EventSource.CLOSED) return;   // otherwise the browser is reconnecting
@@ -1666,6 +1719,7 @@ function watch(id) {
     say($("status"), "status.disconnected");
     titleEnded(false);
     running = false; buttons(); refreshBoard();
+    blasterOff();
   };
   es.onmessage = (m) => {
     const ev = JSON.parse(m.data);
@@ -1698,6 +1752,7 @@ function watch(id) {
       showVideo($("result"), ev.run, ev.file);
       running = false; buttons(); refreshBoard();
       loadShelf();
+      blasterOff();
     } else if (ev.type === "error") {
       finished = true;
       es.close();
@@ -1706,6 +1761,7 @@ function watch(id) {
       say($("status"), "status.stopped");
       titleEnded(false);
       running = false; buttons(); refreshBoard();
+      blasterOff();
     }
   };
 }
