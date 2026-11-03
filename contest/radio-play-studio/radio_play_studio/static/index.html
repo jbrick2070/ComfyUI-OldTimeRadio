@@ -215,6 +215,11 @@
   #ticket #notice { margin: 0 0 6px; }
   #ticket_steps { margin: 0 0 10px; }
   #retry { width: 100%; margin: 0 0 12px; }
+  .deck + .deck { margin-top: 6px; padding-top: 0; border-top: 0; }
+  .deck { margin: 14px 0 0; padding-top: 10px; border-top: 1px dashed var(--line);
+          color: var(--muted); font: .82rem/1.45 var(--sans); }
+  .deck a { color: var(--pick); white-space: nowrap; }
+  .deck a::after { content: " \2192"; }
   .gobar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .gobar #go { flex: 1 1 100%; font-size: 1.05rem; padding: 12px 20px;
               background: var(--pick); border-color: var(--pick); color: var(--pick-ink); }
@@ -530,6 +535,12 @@
         <button id="direct" type="button" class="quiet" hidden disabled data-i18n="go.direct">Direct the shots first</button>
         <p id="direct_help" class="help" hidden data-i18n="go.direct_help">The play is written, cast and voiced as usual, then it stops after the stills: one picture for every line. Change any picture, try one again, keep the ones you like, then film. Filming is the slow part, so it only films what changed.</p>
       </div>
+      <!-- The same picks and the press, from a Stream Deck (streamdeck/, operator 2026-11-02). -->
+      <p class="deck"><span data-i18n="deck.line">Have a Stream Deck? Pick and make from its dials and keys.</span>
+        <a href="https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/contest/radio-play-studio/streamdeck/README.md#install" target="_blank" rel="noopener" data-i18n="deck.link">Get the plugin</a></p>
+      <!-- LogBlaster is its own node pack (registry: comfyui-logblaster): a light show of ComfyUI's live log. -->
+      <p class="deck"><span data-i18n="blaster.line">While it renders, watch ComfyUI's log as a light show.</span>
+        <a href="https://github.com/jbrick2070/ComfyUI-LogBlaster" target="_blank" rel="noopener">LogBlaster</a></p>
     </aside>
   </div>
   <p id="projects" class="help" hidden></p>
@@ -1513,8 +1524,12 @@ function ticketView() {
   $("plan_help").hidden = !fields.length;
   $("ticket_steps").hidden = formTrouble !== "offline" || loadingForm;
   $("retry").hidden = !formTrouble || loadingForm;
-  $("ticket_list").hidden = $("ticket_time").hidden = !ready;
-  if (ready) ticketSummary(); else $("ticket_uses").hidden = true;
+  // While an episode is shooting, the form may not be what it was made from (a
+  // reload puts the form back on its defaults): the summary steps aside and the
+  // progress bar speaks for the run (operator's own run, 2026-11-02).
+  const summary = ready && !live;
+  $("ticket_list").hidden = $("ticket_time").hidden = !summary;
+  if (summary) ticketSummary(); else $("ticket_uses").hidden = true;
 }
 // What the press will make, read from the form as it stands.
 function ticketSummary() {
