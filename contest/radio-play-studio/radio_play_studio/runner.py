@@ -143,6 +143,11 @@ def normalize_event(event: Any, graph_size: int = 0) -> dict | None:
             return {"type": "step", "value": value, "step": step, "steps": steps}
         note = {"type": "progress", "value": value,
                 "message": str(getattr(event, "message", "") or "")}
+        if step is not None and steps and steps > 1:
+            # The stage now running, on its own: the video walk reports its
+            # frames, so an hour of filming moves this while the episode's
+            # share moves one stage's worth (operator, 2026-11-02).
+            note["stage"] = round(max(0.0, min(1.0, step / steps)), 4)
         if nodes_total and graph_size:
             done = int(getattr(event, "nodes_done", 0) or 0)
             running = (step / steps) if step is not None and steps else 0.0
@@ -648,7 +653,7 @@ class Studio:
                             note = {"type": "progress", "value": clock.share(),
                                     "message": note.get("message", ""),
                                     "minutes_left": round(clock.seconds_left() / 60.0),
-                                    "overrun": clock.overrun()}
+                                    "overrun": clock.overrun(), "stage": note.get("stage")}
                         phase = phase_for(graph, clock.current)
                         if phase:
                             note["phase"] = phase

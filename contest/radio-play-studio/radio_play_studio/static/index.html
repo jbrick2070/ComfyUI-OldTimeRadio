@@ -234,6 +234,9 @@
   #why:empty { display: none; }
   #why { flex-basis: 100%; }
   #direct_help { flex-basis: 100%; }
+  /* While an episode is shooting the press steps aside: the lamp, the two bars
+     and the reason say what is happening (operator, 2026-11-02). */
+  .ticket.live #go, .ticket.live #direct, .ticket.live #direct_help { display: none; }
   /* Off reads as off, not as a dimmed press; #why beside it says why. */
   #go:disabled { background: transparent; border-color: var(--line); color: var(--muted); opacity: 1; }
   #projects { margin-top: 14px; }
@@ -256,6 +259,9 @@
   /* ---- the single run ---- */
   #run { max-width: none; margin: 0 0 18px; }
   #tbar { margin: 0 0 6px; }
+  .bar.sub { height: 4px; margin: 2px 0 4px; max-width: 520px; }
+  .bar.sub .fill { background: var(--pick); }
+  #substatus, #tsubstatus { margin: 0 0 10px; font-variant-numeric: tabular-nums; }
   #tstatus { margin: 0 0 12px; font-variant-numeric: tabular-nums; }
   #bar, .bar { height: 8px; background: var(--bar); border-radius: 4px; overflow: hidden; margin: 12px 0 6px; }
   #fill, .fill { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
@@ -514,6 +520,9 @@
   <section id="run" hidden aria-live="polite">
     <div id="bar"><div id="fill"></div></div>
     <p id="status"></p>
+    <!-- The stage now running, on its own bar: filming is one stage of an hour. -->
+    <div class="bar sub" id="subbar" hidden><div class="fill" id="subfill"></div></div>
+    <p id="substatus" class="help" hidden></p>
     <p id="error" hidden></p>
     <div id="result" class="done" hidden></div>
   </section>
@@ -554,6 +563,8 @@
       <p class="air"><i></i><span id="air"></span></p>
       <div class="bar" id="tbar" hidden><div class="fill" id="tfill"></div></div>
       <p id="tstatus" class="help" hidden></p>
+      <div class="bar sub" id="tsubbar" hidden><div class="fill" id="tsubfill"></div></div>
+      <p id="tsubstatus" class="help" hidden></p>
       <dl id="ticket_list" hidden></dl>
       <div id="ticket_uses" hidden></div>
       <p id="ticket_time" hidden></p>
@@ -572,8 +583,8 @@
       <p class="deck"><span data-i18n="deck.line">Have a Stream Deck? Pick and make from its dials and keys.</span>
         <a href="https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/contest/radio-play-studio/streamdeck/README.md#install" target="_blank" rel="noopener" data-i18n="deck.link">Get the plugin</a></p>
       <!-- LogBlaster is its own node pack (registry: comfyui-logblaster): a light show of ComfyUI's live log. -->
-      <p class="deck"><span data-i18n="blaster.line">While it renders, watch ComfyUI's log as a light show.</span>
-        <a href="https://github.com/jbrick2070/ComfyUI-LogBlaster" target="_blank" rel="noopener">LogBlaster</a></p>
+      <p class="deck" id="blaster_line"><span id="blaster_say" data-i18n="blaster.install">Want ComfyUI's log as a light show while it renders? Install LogBlaster before you press Make the episode, then restart ComfyUI.</span>
+        <a href="https://github.com/jbrick2070/ComfyUI-LogBlaster#installation-zero-pip-dependencies" target="_blank" rel="noopener">LogBlaster</a></p>
     </aside>
   </div>
   <p id="projects" class="help" hidden></p>
@@ -1545,7 +1556,13 @@ const formReady = () => fields.length > 0 && !loadingForm && !formTrouble;
 function mirrorRun() {
   $("tfill").style.width = $("fill").style.width;
   $("tstatus").textContent = $("status").textContent;
+  $("tsubfill").style.width = $("subfill").style.width;
+  $("tsubstatus").textContent = $("substatus").textContent;
+  $("tsubbar").hidden = $("tsubstatus").hidden = !running || $("subbar").hidden;
 }
+new MutationObserver(mirrorRun).observe($("subfill"), {attributes: true, attributeFilter: ["style"]});
+new MutationObserver(mirrorRun).observe($("substatus"), {childList: true, characterData: true, subtree: true});
+new MutationObserver(mirrorRun).observe($("subbar"), {attributes: true, attributeFilter: ["hidden"]});
 new MutationObserver(mirrorRun).observe($("fill"), {attributes: true, attributeFilter: ["style"]});
 new MutationObserver(mirrorRun).observe($("status"), {childList: true, characterData: true, subtree: true});
 function ticketView() {
@@ -1696,11 +1713,19 @@ function phaseText(ev) {
 // when the run ends. Pop out moves it to its own window.
 let blasterUrl;              // undefined: not asked yet; null: not installed
 let blasterHidden = false;   // the person hid it for this run
-async function blasterOn() {
+async function blasterCheck() {
   if (blasterUrl === undefined) {
-    try { blasterUrl = (await (await fetch("/api/logblaster")).json()).url || null; }
-    catch (err) { blasterUrl = null; }
+    try {
+      const res = await fetch("/api/logblaster");
+      blasterUrl = res.ok ? ((await res.json()).url || null) : null;
+    } catch (err) { blasterUrl = null; }
   }
+  // Installed: it opens on its own. Not: say so before a run, when it can still be added.
+  tx($("blaster_say"), blasterUrl ? "blaster.ready" : "blaster.install");
+  return blasterUrl;
+}
+async function blasterOn() {
+  await blasterCheck();
   if (!blasterUrl || blasterHidden || !running) return;
   if ($("blaster_frame").getAttribute("src") !== blasterUrl) $("blaster_frame").src = blasterUrl;
   $("blaster").hidden = false;
@@ -1723,6 +1748,30 @@ $("blaster_hide").addEventListener("click", () => {
   $("blaster_frame").src = "about:blank";
 });
 
+// How far the stage now running is, 0..1, or null. The runner says it
+// (ev.stage); a server from before that is read from the share it sends,
+// which is (stages done + the running stage's part) / stages.
+function stageShare(ev) {
+  if (ev.type === "step") return ev.steps > 1 ? ev.step / ev.steps : null;
+  if (typeof ev.stage === "number") return ev.stage;
+  if (ev.nodes_total && ev.nodes_done != null && ev.minutes_left == null) {
+    return ev.value * ev.nodes_total - ev.nodes_done;
+  }
+  return null;
+}
+function stageBar(ev) {
+  const share = stageShare(ev);
+  const show = share != null && share > 0.005 && share < 0.999;
+  $("subbar").hidden = $("substatus").hidden = !show;
+  if (!show) return;
+  const pct = Math.round(share * 100);
+  $("subfill").style.width = pct + "%";
+  const name = ev.phase ? t(ev.phase) : null;
+  if (name) say($("substatus"), "progress.substage", {phase: name, pct});
+  else say($("substatus"), "progress.substage_plain", {pct});
+}
+function stageBarOff() { $("subbar").hidden = $("substatus").hidden = true; }
+
 function watch(id) {
   const es = new EventSource("/api/episodes/" + id + "/events");
   blasterOn();
@@ -1743,6 +1792,7 @@ function watch(id) {
       high = Math.max(high, Math.round(ev.value * 100));
       $("fill").style.width = high + "%";
       titleRunning(high);
+      stageBar(ev);
       // minutes_left comes from this machine's last run of the same workflow
       const msg = phaseText(ev) || (ev.message ? " " + ev.message : "");
       // Past last run's time with no pace to read, the minutes would stand
@@ -1753,6 +1803,7 @@ function watch(id) {
       else say($("status"), "progress.pct", {pct: high, msg});
     } else if (ev.type === "step") {
       // one stage's own steps; the bar is the whole episode, so it stays put
+      stageBar(ev);
       if (ev.steps) say($("status"), "progress.step", {pct: high, step: ev.step, steps: ev.steps});
       else say($("status"), "progress.pct", {pct: high, msg: ""});
     } else if (ev.type === "submitted") {
@@ -1763,6 +1814,7 @@ function watch(id) {
       finished = true;
       es.close();
       blasterOff();   // first, so nothing below can leave its shader drawing
+      stageBarOff();
       $("fill").style.width = "100%";
       say($("status"), "status.finished");
       titleEnded(true);
@@ -1773,6 +1825,7 @@ function watch(id) {
       finished = true;
       es.close();
       blasterOff();
+      stageBarOff();
       plain($("error"), ev.message);
       $("error").hidden = false;
       say($("status"), "status.stopped");
@@ -1866,7 +1919,7 @@ form.addEventListener("submit", async (e) => {
   // must not turn anything back on (Sonnet QA, 2026-10-23).
   running = true; buttons(); refreshBoard();
   $("run").hidden = false; $("error").hidden = true; $("result").hidden = true;
-  $("fill").style.width = "0"; say($("status"), "status.checking");
+  $("fill").style.width = "0"; say($("status"), "status.checking"); stageBarOff();
   try {
     const res = await fetch("/api/episodes", {
       method: "POST", headers: {"Content-Type": "application/json"},
@@ -2680,7 +2733,7 @@ presence(false);
 setInterval(() => presence(false), 20000);
 addEventListener("pagehide", () => { if (saveTimer) saveDraft(); presence(true); });
 
-initLang().then(() => { resume(); loadOptions(); loadShelf(); });
+initLang().then(() => { resume(); loadOptions(); loadShelf(); blasterCheck(); });
 </script>
 </body>
 </html>
