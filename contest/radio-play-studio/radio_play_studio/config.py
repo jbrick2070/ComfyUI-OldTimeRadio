@@ -72,8 +72,11 @@ def reference_twin(workflow_path: Path) -> Path:
 #: the 1-act the_extra_bowl_20260915_233340 (PBUG-20260916-01) and as the 5-act
 #: (commit 6b0a0665b), the 3-act being the same graph at three acts; deluxe
 #: Foley -- the_fourth_bowl_20260916_174517, obs_publish OK, 213 MB
-#: (PBUG-20260916-04; degraded by a local spend cap since removed). Deluxe
-#: audio-in has no published episode on record: its 5-act wrote every act and
+#: (PBUG-20260916-04; degraded by a local spend cap since removed). The cloud
+#: proofs are the same graph at another act count, not the offered 3-act file
+#: run on its own. The episodes themselves are in the operator's archive on the
+#: Seagate drive (5 Google stills, 8 cheap, 1 deluxe Foley). Deluxe audio-in
+#: has no published episode there or on record: its 5-act wrote every act and
 #: died on a Credits 401 (PBUG-20260916-01).
 MACHINES: tuple = (
     ("nvidia8", (("foley", "otr_8gb_ltx25_foley.json"), ("video", "otr_8gb_video.json"),
