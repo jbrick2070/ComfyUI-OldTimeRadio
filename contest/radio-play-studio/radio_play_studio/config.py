@@ -7,6 +7,7 @@ that lets the Comfy SDK drive a self-hosted ComfyUI.
 """
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import urllib.request
@@ -174,6 +175,9 @@ class Settings:
     api_url: str
     workflow_path: Path
     out_dir: Path
+    #: True when no ComfyUI was named and `comfyui_url` is the one found by
+    #: looking (default_comfyui_url): the app may look again if it stops answering.
+    comfyui_found: bool = False
 
 
 def _checkout_workflow() -> Path:
@@ -252,7 +256,9 @@ def comfyui_answers(url: str, timeout: float = 1.5) -> bool:
     try:
         with urllib.request.urlopen(url.rstrip("/") + "/system_stats", timeout=timeout) as resp:
             return isinstance(json.loads(resp.read().decode("utf-8")).get("system"), dict)
-    except (OSError, ValueError, AttributeError):
+    # A port that answers with something that is not HTTP raises HTTPException,
+    # which is not an OSError (Sonnet QA, 2026-11-02).
+    except (OSError, ValueError, AttributeError, http.client.HTTPException):
         return False
 
 
@@ -268,9 +274,10 @@ def default_comfyui_url(answers=comfyui_answers) -> str:
 
 def load_settings(*, comfyui_url: str | None = None, api_url: str | None = None,
                   workflow: str | None = None, out_dir: str | None = None) -> Settings:
+    named = _first_set(comfyui_url, os.environ.get("COMFYUI_URL"))
     return Settings(
-        comfyui_url=validate_url("--comfyui / COMFYUI_URL", _first_set(
-            comfyui_url, os.environ.get("COMFYUI_URL")) or default_comfyui_url()),
+        comfyui_url=validate_url("--comfyui / COMFYUI_URL", named or default_comfyui_url()),
+        comfyui_found=not named,
         api_url=validate_url("--api / COMFY_BASE_URL", _first_set(
             api_url, os.environ.get("COMFY_BASE_URL")) or DEFAULT_API_URL),
         workflow_path=find_workflow(workflow),

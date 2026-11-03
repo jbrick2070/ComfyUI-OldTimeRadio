@@ -65,6 +65,16 @@ def director_schema() -> dict:
                                    "music_image_model": pick()}}}
 
 
+@pytest.fixture(autouse=True)
+def no_comfyui_probe(monkeypatch):
+    """No test looks for a real ComfyUI on this machine: with none named, the
+    app would probe 8188 and 8000, and a test would then depend on what happens
+    to be running on the box (Sonnet QA, 2026-11-02)."""
+    from radio_play_studio import config, runner
+    monkeypatch.setattr(config, "default_comfyui_url", lambda answers=None: config.DEFAULT_COMFYUI_URL)
+    monkeypatch.setattr(runner, "default_comfyui_url", lambda answers=None: config.DEFAULT_COMFYUI_URL)
+
+
 @pytest.fixture
 def schemas() -> dict:
     return {WRITER: writer_schema(), EPISODE_NODE_TYPE: {"input": {"required": {}}},

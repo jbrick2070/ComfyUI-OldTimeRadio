@@ -4,7 +4,8 @@ from __future__ import annotations
 import pytest
 
 from radio_play_studio import config
-from radio_play_studio.config import WorkflowNotFound, find_workflow, load_settings, validate_url
+from radio_play_studio.config import (DEFAULT_COMFYUI_URL, DESKTOP_COMFYUI_URL, WorkflowNotFound,
+                                      default_comfyui_url, find_workflow, load_settings, validate_url)
 
 
 @pytest.fixture(autouse=True)
@@ -71,7 +72,6 @@ def test_a_configured_pack_dir_wins_over_the_checkout(monkeypatch, tmp_path):
 def test_with_no_comfyui_named_the_app_finds_desktop_on_8000():
     """Desktop serves on 8000, a portable install on 8188: the one that answers
     is used, 8188 first, and 8188 when neither does."""
-    from radio_play_studio.config import DEFAULT_COMFYUI_URL, DESKTOP_COMFYUI_URL, default_comfyui_url
     assert default_comfyui_url(lambda url: url == DESKTOP_COMFYUI_URL) == DESKTOP_COMFYUI_URL
     assert default_comfyui_url(lambda url: True) == DEFAULT_COMFYUI_URL
     assert default_comfyui_url(lambda url: False) == DEFAULT_COMFYUI_URL
@@ -100,3 +100,36 @@ def test_only_a_real_comfyui_counts_as_answering(monkeypatch):
     assert not config.comfyui_answers("http://127.0.0.1:8000")
     monkeypatch.setattr(config.urllib.request, "urlopen", lambda url, timeout: Reply(b'["a list"]'))
     assert not config.comfyui_answers("http://127.0.0.1:8000")
+
+
+def test_a_port_that_does_not_speak_http_is_not_a_comfyui(monkeypatch):
+    """Something on 8000 that answers with bytes that are not HTTP raises
+    http.client.HTTPException, which is not an OSError: it must read as "no"."""
+    import http.client
+    from radio_play_studio import config
+
+    def bad_status(url, timeout):
+        raise http.client.BadStatusLine("not http")
+    monkeypatch.setattr(config.urllib.request, "urlopen", bad_status)
+    assert config.comfyui_answers("http://127.0.0.1:8000") is False
+
+
+def test_a_found_comfyui_is_looked_for_again_when_it_stops_answering(settings, schemas, monkeypatch):
+    """The app settled on 8188 before Desktop came up on 8000: the next look at
+    the node definitions finds Desktop. A named ComfyUI is never replaced."""
+    import dataclasses
+    from radio_play_studio import runner
+    from radio_play_studio.graph import ServerUnreachable
+    from radio_play_studio.runner import Studio
+
+    def fetch(url):
+        if url != DESKTOP_COMFYUI_URL:
+            raise ServerUnreachable(f"could not read {url}")
+        return schemas
+    monkeypatch.setattr(runner, "default_comfyui_url", lambda answers=None: DESKTOP_COMFYUI_URL)
+    found = Studio(dataclasses.replace(settings, comfyui_url=DEFAULT_COMFYUI_URL, comfyui_found=True), fetch=fetch)
+    assert found._schemas() is schemas and found.settings.comfyui_url == DESKTOP_COMFYUI_URL
+    named = Studio(dataclasses.replace(settings, comfyui_url=DEFAULT_COMFYUI_URL), fetch=fetch)
+    with pytest.raises(ServerUnreachable):
+        named._schemas()
+    assert named.settings.comfyui_url == DEFAULT_COMFYUI_URL

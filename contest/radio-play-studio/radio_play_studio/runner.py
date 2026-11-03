@@ -7,6 +7,7 @@ bridge address first: a missing setting must never turn into a cloud run.
 from __future__ import annotations
 
 import copy
+import dataclasses
 import hashlib
 import json
 import os
@@ -19,11 +20,12 @@ from typing import Any, Callable, Iterator
 
 from . import producer
 from .config import (CLOUD_MACHINES, MACHINE_CHOICES, MACHINES, MATRIX_COLUMN, NOT_FOR_THIS_MACHINE,
-                     REFERENCE_TWIN_SUFFIX, UNPROVEN, Settings, detect_machine, menu_lookup,
+                     REFERENCE_TWIN_SUFFIX, UNPROVEN, Settings, default_comfyui_url, detect_machine,
+                     menu_lookup,
                      reference_twin, validate_url)
 from .form import (CLOUD_WRITERS, EPISODE_NODE_TYPE, FIELDS_BY_KEY, MY_STORY_BANK, WRITER, apply_choices,
                    describe_form, locate_nodes)
-from .graph import fetch_object_info, load_workflow, workflow_to_api_prompt
+from .graph import ServerUnreachable, fetch_object_info, load_workflow, workflow_to_api_prompt
 
 #: The still-engine dropdown the Still pictures field sets for the characters.
 DIRECTOR = FIELDS_BY_KEY["stills"].node_type
@@ -345,10 +347,10 @@ class Studio:
         self._now = now
         #: ``read_output(subfolder, name)``: a file from ComfyUI's output folder.
         self._read_output = read_output or (
-            lambda subfolder, name: producer.read_output(settings.comfyui_url, subfolder, name))
+            lambda subfolder, name: producer.read_output(self.settings.comfyui_url, subfolder, name))
         #: ``comfy_json(path)``: ComfyUI's own answer for ``/queue``, ``/history``.
         self._comfy_json = comfy_json or (
-            lambda path: producer.read_json(settings.comfyui_url, path))
+            lambda path: producer.read_json(self.settings.comfyui_url, path))
         self._sleep = sleep
         #: The Comfy API key runs are submitted with: from the page, or the
         #: OTR_COMFY_API_KEY the command line passes in. Held in memory only --
@@ -358,6 +360,21 @@ class Studio:
         self._machine: str | None = None
         #: What each menu workflow uses, by (path, modification time).
         self._uses: dict = {}
+
+    def _schemas(self) -> dict:
+        """ComfyUI's node definitions. A ComfyUI the app found by looking (none
+        was named) is looked for again when it stops answering: Desktop may have
+        come up on 8000 after the app started and settled on 8188."""
+        try:
+            return self._fetch(self.settings.comfyui_url)
+        except ServerUnreachable:
+            if not self.settings.comfyui_found:
+                raise
+            url = default_comfyui_url()
+            if url == self.settings.comfyui_url:
+                raise
+            self.settings = dataclasses.replace(self.settings, comfyui_url=url)
+            return self._fetch(url)
 
     def key_status(self) -> dict:
         """Which keys the cloud picks can find, never the keys themselves. The
@@ -421,7 +438,7 @@ class Studio:
     def options(self, schemas: dict | None = None, workflow_path: Path | None = None) -> list:
         workflow = load_workflow(workflow_path or self.settings.workflow_path)
         if schemas is None:
-            schemas = self._fetch(self.settings.comfyui_url)
+            schemas = self._schemas()
         graph = workflow_to_api_prompt(workflow, schemas)
         return describe_form(schemas, graph, locate_nodes(workflow))
 
@@ -506,7 +523,7 @@ class Studio:
         read of the node definitions serves it all; on a ComfyUI that is
         rendering, that read is the slow part of opening the page."""
         path = self.resolve_workflow(workflow)
-        schemas = self._fetch(self.settings.comfyui_url)
+        schemas = self._schemas()
         fields = self.options(schemas, path)
         on_menu = menu_lookup(path.name)
         if on_menu is not None:
@@ -537,7 +554,7 @@ class Studio:
         path = self.workflow_for({"bank": MY_STORY_BANK, WORKFLOW_CHOICE: workflow})
         workflow = load_workflow(path)
         if schemas is None:
-            schemas = self._fetch(self.settings.comfyui_url)
+            schemas = self._schemas()
         graph = workflow_to_api_prompt(workflow, schemas)
         director = graph.get(locate_nodes(workflow).get(DIRECTOR, ""), {}).get("inputs", {})
         if NO_SCENE_IMAGE in str(director.get(VIDEO_INPUT) or ""):
@@ -569,7 +586,7 @@ class Studio:
         """`(api_graph, node_ids)` for these choices on a named workflow -- the
         one a Scene Producer project recorded on its first run."""
         workflow = load_workflow(workflow_path)
-        schemas = self._fetch(self.settings.comfyui_url)
+        schemas = self._schemas()
         graph = workflow_to_api_prompt(workflow, schemas)
         node_ids = locate_nodes(workflow)
         director = graph.get(node_ids.get(DIRECTOR, ""), {}).get("inputs", {})
