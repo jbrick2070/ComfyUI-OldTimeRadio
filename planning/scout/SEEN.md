@@ -52,3 +52,7 @@
 2026-11-02 | Image | JoyAI-Image-Edit-Plus (Comfy-Org repack, int8_convrot) | WATCH | https://huggingface.co/Comfy-Org/JoyAI-Image-Edit
 2026-11-02 | Upscale | Tessera (H3 tiled upscaler, news only) | WATCH | https://comfyui-wiki.com/en/news
 2026-11-02 | Writer | MonadGPT (1400-1700 fine-tune) | WATCH | https://huggingface.co/Pclanglais/MonadGPT
+2026-11-03 | Voice | Silencio-2 | WATCH | https://huggingface.co/BlueRoseLabs/Silencio-2
+2026-11-03 | Image | Anima-Role-Ref-KV v2.0 | SKIP | https://huggingface.co/AnticPan/Anima-Role-Ref-KV
+2026-11-03 | Upscale | MiniMax-H3 X2 Detail VAE | WATCH | https://huggingface.co/speach1sdef178/MiniMax-H3-X2-Detail-VAE
+2026-11-03 | Writer | Gemma-31b-1800s | SKIP | https://huggingface.co/AGCobra/Gemma-31b-1800s
