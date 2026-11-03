@@ -1310,6 +1310,24 @@ per-cell holds, the markup lessons and the open cell list -- is in git at
 `d167f0ab:apple/GO_FORWARD_PLAN.md` (section 1 and section 2 row 1). Rights
 are not a gate (standing rulings).
 
+**Possible to-do: review the stills before filming (operator 2026-11-03: "I
+kind of like the idea of reviewing the stills, though, before it renders").**
+Not scheduled, his call when. Start from what exists: Scene Producer already
+stops a My Story run after the stills, one card per shot, with paint again,
+edit and keep (`planning/scene-producer/PLAN.md`). The open questions are
+whether that stop should reach the other banks and the plain workflows, and
+whether an optional Gemma 4 vision pass should flag suspect stills (wrong
+cast, changed face) so he looks at those first. It flags and never blocks. The
+idea comes from Open Cinema Studio (github.com/afj176/open-cinema-studio, MIT;
+README read, code not), which separates a confirmed defect, an unsure result
+and a failed reviewer, and keeps a flagged shot in a playable draft. Anything
+that touches the canonical workflow gets a design review first.
+
+Also from that README, ideas only: per-shot prop and state tracking for Scene
+Producer, in-world titles painted into the opening shot, a "how it was made"
+record on each take, a trailer cut to a generated score, and a check against
+repeated words in episode titles.
+
 Not tracked further here: unqualified installed-family combinations, H3
 policy receipts, cfg promotion
 comparisons, the AMD scoped pod and platform acceptance, cloud billing opt-in
