@@ -247,7 +247,7 @@
  "setup.way": "拍攝方式",
  "machine.nvidia8": "NVIDIA，8 GB",
  "machine.nvidia16": "NVIDIA，16 GB 以上",
- "machine.mac16": "Mac，16 GB",
+ "machine.mac16": "Mac，16 GB 以上",
  "machine.amd": "AMD（ROCm）",
  "machine.comfy_cloud": "Comfy Cloud",
  "machine.google_cloud": "Google Cloud",

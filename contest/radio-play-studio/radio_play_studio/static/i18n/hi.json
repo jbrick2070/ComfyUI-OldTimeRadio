@@ -247,7 +247,7 @@
  "setup.way": "फ़िल्मांकन का तरीका",
  "machine.nvidia8": "NVIDIA, 8 GB",
  "machine.nvidia16": "NVIDIA, 16 GB या अधिक",
- "machine.mac16": "Mac, 16 GB",
+ "machine.mac16": "Mac, 16 GB या अधिक",
  "machine.amd": "AMD (ROCm)",
  "machine.comfy_cloud": "Comfy Cloud",
  "machine.google_cloud": "Google Cloud",

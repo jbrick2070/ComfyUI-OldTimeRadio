@@ -247,7 +247,7 @@
  "setup.way": "Façon de filmer",
  "machine.nvidia8": "NVIDIA, 8 Go",
  "machine.nvidia16": "NVIDIA, 16 Go ou plus",
- "machine.mac16": "Mac, 16 Go",
+ "machine.mac16": "Mac, 16 Go ou plus",
  "machine.amd": "AMD (ROCm)",
  "machine.comfy_cloud": "Comfy Cloud",
  "machine.google_cloud": "Google Cloud",
