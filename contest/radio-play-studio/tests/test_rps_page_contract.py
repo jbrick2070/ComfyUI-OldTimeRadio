@@ -228,7 +228,8 @@ def test_the_ticket_holds_the_press_the_reason_and_the_notice_beside_the_steps()
     ticket beside them says what will be made, why the press is off, and holds
     the press. The whole studio folds away when the board opens."""
     studio, ticket = BY_ID["studio"], BY_ID["ticket"]
-    for inside_ticket in ("go", "why", "direct", "notice", "notice_more", "retry", "ticket_list", "air"):
+    for inside_ticket in ("go", "why", "direct", "notice", "notice_more", "retry", "ticket_list", "air",
+                          "tbar", "tstatus"):
         assert ticket in _ancestors(BY_ID[inside_ticket]), inside_ticket
     for inside_steps in ("plan", "skeleton", "form", "keys"):
         assert studio in _ancestors(BY_ID[inside_steps]) and ticket not in _ancestors(BY_ID[inside_steps])
@@ -238,3 +239,9 @@ def test_the_ticket_holds_the_press_the_reason_and_the_notice_beside_the_steps()
     assert '$("studio").hidden = on' in CODE
     # Try again asks for the pick that failed, not the form still on the page.
     assert 'loadOptions(askedWorkflow)' in CODE
+
+
+def test_the_run_being_made_sits_above_the_choices():
+    """Progress is seen without scrolling: the run (bar, status, finished video)
+    and the LogBlaster panel come before the studio."""
+    assert BY_ID["run"] < BY_ID["studio"] and BY_ID["blaster"] < BY_ID["studio"]

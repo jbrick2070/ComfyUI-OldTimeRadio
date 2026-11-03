@@ -254,7 +254,9 @@
   #shelf_more { margin-top: 12px; }
 
   /* ---- the single run ---- */
-  #run { max-width: 760px; margin-top: 18px; }
+  #run { max-width: none; margin: 0 0 18px; }
+  #tbar { margin: 0 0 6px; }
+  #tstatus { margin: 0 0 12px; font-variant-numeric: tabular-nums; }
   #bar, .bar { height: 8px; background: var(--bar); border-radius: 4px; overflow: hidden; margin: 12px 0 6px; }
   #fill, .fill { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
   #status { color: var(--muted); min-height: 1.5em; font-family: var(--sans); font-variant-numeric: tabular-nums; }
@@ -507,6 +509,29 @@
     <a href="https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/main/contest/radio-play-studio" target="_blank" rel="noopener" data-i18n="links.source">Source on GitHub</a>
   </nav>
 
+  <!-- The run being made sits above the choices, where it is seen (operator,
+       2026-11-02: "shouldn't there be a status indicator?"). -->
+  <section id="run" hidden aria-live="polite">
+    <div id="bar"><div id="fill"></div></div>
+    <p id="status"></p>
+    <p id="error" hidden></p>
+    <div id="result" class="done" hidden></div>
+  </section>
+
+  <!-- LogBlaster (its own node pack): ComfyUI's live log as a light show, in a
+       panel while an episode is made, or in its own window. Shown only when the
+       ComfyUI being used serves /logblaster; closed when the run ends, so its
+       shader stops drawing on the card that renders (operator, 2026-11-02). -->
+  <section id="blaster" hidden>
+    <div class="blaster-bar">
+      <b>LogBlaster</b>
+      <span class="help" data-i18n="blaster.help">ComfyUI's live log, while it renders.</span>
+      <button type="button" id="blaster_pop" class="quiet small" data-i18n="blaster.pop">Pop out</button>
+      <button type="button" id="blaster_hide" class="quiet small" data-i18n="blaster.hide">Hide</button>
+    </div>
+    <iframe id="blaster_frame" title="LogBlaster" data-i18n-title="blaster.help"></iframe>
+  </section>
+
   <!-- The studio: the choices as numbered steps, and beside them the ticket that
        says what will be made, why it cannot be yet, and holds the press. Hidden
        whole when the Direct the shots board takes over (folded). -->
@@ -527,6 +552,8 @@
     </div>
     <aside class="ticket" id="ticket" data-i18n-aria-label="ticket.label" data-fb-aria-label="Your episode">
       <p class="air"><i></i><span id="air"></span></p>
+      <div class="bar" id="tbar" hidden><div class="fill" id="tfill"></div></div>
+      <p id="tstatus" class="help" hidden></p>
       <dl id="ticket_list" hidden></dl>
       <div id="ticket_uses" hidden></div>
       <p id="ticket_time" hidden></p>
@@ -551,26 +578,6 @@
   </div>
   <p id="projects" class="help" hidden></p>
 
-  <section id="run" hidden aria-live="polite">
-    <div id="bar"><div id="fill"></div></div>
-    <p id="status"></p>
-    <p id="error" hidden></p>
-    <div id="result" class="done" hidden></div>
-  </section>
-
-  <!-- LogBlaster (its own node pack): ComfyUI's live log as a light show, in a
-       panel while an episode is made, or in its own window. Shown only when the
-       ComfyUI being used serves /logblaster; closed when the run ends, so its
-       shader stops drawing on the card that renders (operator, 2026-11-02). -->
-  <section id="blaster" hidden>
-    <div class="blaster-bar">
-      <b>LogBlaster</b>
-      <span class="help" data-i18n="blaster.help">ComfyUI's live log, while it renders.</span>
-      <button type="button" id="blaster_pop" class="quiet small" data-i18n="blaster.pop">Pop out</button>
-      <button type="button" id="blaster_hide" class="quiet small" data-i18n="blaster.hide">Hide</button>
-    </div>
-    <iframe id="blaster_frame" title="LogBlaster" data-i18n-title="blaster.help"></iframe>
-  </section>
 
   <!-- Every finished episode on disk, newest first; a card plays it in #result. -->
   <section id="shelf" hidden>
@@ -1534,6 +1541,13 @@ let askedWorkflow;
 // Ready only with a form that is the one asked for: after a failed pick the old
 // form is still on the page, and it is not what the cards now say.
 const formReady = () => fields.length > 0 && !loadingForm && !formTrouble;
+// The ticket's bar and line mirror the run's own while an episode is made.
+function mirrorRun() {
+  $("tfill").style.width = $("fill").style.width;
+  $("tstatus").textContent = $("status").textContent;
+}
+new MutationObserver(mirrorRun).observe($("fill"), {attributes: true, attributeFilter: ["style"]});
+new MutationObserver(mirrorRun).observe($("status"), {childList: true, characterData: true, subtree: true});
 function ticketView() {
   const ready = formReady(), live = running || stageBusy;
   const ticket = $("ticket");
@@ -1549,6 +1563,8 @@ function ticketView() {
   // progress bar speaks for the run (operator's own run, 2026-11-02).
   const summary = ready && !live;
   $("ticket_list").hidden = $("ticket_time").hidden = !summary;
+  $("tbar").hidden = $("tstatus").hidden = !running;   // an episode run has the bar; a stage has the board's
+  if (running) mirrorRun();
   if (summary) ticketSummary(); else $("ticket_uses").hidden = true;
 }
 // What the press will make, read from the form as it stands.
