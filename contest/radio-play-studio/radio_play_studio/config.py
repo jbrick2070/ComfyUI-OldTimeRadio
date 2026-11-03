@@ -61,7 +61,20 @@ def reference_twin(workflow_path: Path) -> Path:
 #: video weights. The 8 GB four published in both 4060 rounds (ROUNDS.md); the
 #: 16 GB visualiser in the 5080 round there, and the 16 GB AnimateDiff in the
 #: 16 GB+ column of apple/MACHINES.md (that round did not run it); the Mac's
-#: AnimateDiff Lightning and visualiser in the Mac 16 GB column.
+#: AnimateDiff Lightning and visualiser in the Mac 16 GB column. The 16 GB mime
+#: lane: the operator's own Studio run on the 5080 on 2026-11-02, one act in 64
+#: minutes, published to otr/obs/ as Foam Signs
+#: (foam_signs_20261102_162031__vstb__n16m__fk3i__koko__pubd__cg412__sa3_final.mp4).
+#: The cloud ways, from the records (operator, 2026-11-02: "we did cloud, check
+#: the docs"): Google stills -- three published legs on the 5080 on 2026-09-25,
+#: refined_metal (EN), canvas_firewood_es (ES) and grey_reef (my_story)
+#: (apple/HANDOFF_LOG.md); cheap Comfy Cloud -- its partner set published as
+#: the 1-act the_extra_bowl_20260915_233340 (PBUG-20260916-01) and as the 5-act
+#: (commit 6b0a0665b), the 3-act being the same graph at three acts; deluxe
+#: Foley -- the_fourth_bowl_20260916_174517, obs_publish OK, 213 MB
+#: (PBUG-20260916-04; degraded by a local spend cap since removed). Deluxe
+#: audio-in has no published episode on record: its 5-act wrote every act and
+#: died on a Credits 401 (PBUG-20260916-01).
 MACHINES: tuple = (
     ("nvidia8", (("foley", "otr_8gb_ltx25_foley.json"), ("video", "otr_8gb_video.json"),
                  ("stills", "otr_8gb_still.json"), ("animatediff", "otr_8gb_animatediff.json"),
@@ -120,12 +133,8 @@ CLOUD_MACHINES = ("comfy_cloud", "google_cloud")
 #: engines on its machine (apple/MACHINES.md). Take a name off when an episode
 #: from it reaches otr/obs/.
 UNPROVEN: dict = {
-    "otr_cloud_deluxe_3act.json": "no published episode yet",
-    "otr_cloud_low.json": "two live runs died at assembly (PBUG-20260915-01, -03); "
-                          "fixed, not yet published since",
-    "otr_google_still.json": "no published episode yet",
-    "otr_16gb_mime.json": "not run in the 5080 round of 2026-10-23; no published episode yet",
-    "otr_cloud_deluxe_audio_in_3act.json": "no published episode yet",
+    "otr_cloud_deluxe_audio_in_3act.json": "no published episode yet; its one run, a 5-act, "
+                                           "died on a Credits 401 after writing every act",
 }
 
 

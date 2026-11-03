@@ -237,7 +237,7 @@ def test_each_way_names_what_its_workflow_uses_and_whether_it_is_proven(menu_set
     """Operator, 2026-10-23: the cards call out the video model, still model and
     the rest, and an unproven path is not passed off as a proven one."""
     folder = menu_settings.workflow_path.parent
-    (folder / "otr_google_still.json").write_text(json.dumps(workflow), encoding="utf-8")
+    (folder / "otr_cloud_deluxe_audio_in_3act.json").write_text(json.dumps(workflow), encoding="utf-8")
     studio = _menu_studio(menu_settings, schemas)
     ways = {w["workflow"]: w for m in studio.menu(schemas) for w in m["ways"]}
     uses = ways["otr_16gb_still.json"]["uses"]
@@ -246,7 +246,7 @@ def test_each_way_names_what_its_workflow_uses_and_whether_it_is_proven(menu_set
     assert uses["stills"] == "flux3_klein" and uses["writer"] == "comfy_native:gemma4-12b-int8-convrot"
     assert "video" not in uses and "voices" not in uses
     assert ways["otr_16gb_still.json"]["proven"] is True
-    assert ways["otr_google_still.json"]["proven"] is False
+    assert ways["otr_cloud_deluxe_audio_in_3act.json"]["proven"] is False
     assert "uses" not in studio.menu()[0]["ways"][0], "no node definitions, no model names"
 
 
