@@ -11,7 +11,7 @@ working copy: every later `comfy build` / `comfy deploy` command reads it.
 | Release v2 | `d908f8bb-fb8c-4fc6-bff4-34764137557d`, linux/nvidia, deployable (pack at `e3885726`, 2.3.49) |
 | Release v3 | `33213b10-a779-442c-b199-a31fc9570801`, linux/nvidia, deployable (pack at `a31f954f`, 2.3.49 + fontless-host fonts) |
 | Release v4 | `458e559a-3e5f-4b80-85d0-72008ec81024`, linux/nvidia (pack at `d55f912c`, 2.3.50 + Kokoro English spaCy prefetch) |
-| Deployment | `dep-3b611093-3d7f-4047-87c5-00fc632663bf` "production", rtx-pro-6000-mig-2g-48gb, min 0 / max 1, moving to release v4 on 2026-11-02 |
+| Deployment | `dep-3b611093-3d7f-4047-87c5-00fc632663bf` "production", rtx-pro-6000-mig-2g-48gb, min 0 / max 1, on release v4 since 2026-11-02 (revision 4) |
 | Cut | 2026-10-31, first cut green, about 4 minutes of build |
 | Pack | ComfyUI-OldTimeRadio at main `d55f912c` (git pin, not the registry) |
 | ComfyUI | v0.43.2, base image cuda130-py312 (torch 2.12.1) |
@@ -88,10 +88,13 @@ build spec cannot add one, so at prestartup the pack now fetches spaCy's own
 Hugging Face mirror of it (3.7.1, pinned commit and sha256) beside the Kokoro
 voices, and the torch backend loads it when the model is not installed
 (planning/kokoro-english-cloud/PLAN.md). The test: an English one-act with
-both voice engines on Kokoro. Result: pending.
+both voice engines on Kokoro. Result: proven. Job `8618721c` succeeded on
+release v4 in 2 h 13 min (cold worker): "The Final Duet", 177 s, every
+speaker delivered by Kokoro (bf_lily, bm_george, af_nova, am_adam per the
+CastLock credits), commit stamp d55f912c. Published to obs as
+`final_duet_20261102_223442__anim__n24f__fk3i__koko__myst__cg412__sa3_final.mp4`.
 
 ## Next
 
-* Kokoro on the endpoint needs `en_core_web_sm` in the image.
 * `comfy deploy stop planning/comfy-build/otr-24gb-foley` when idle time
   should not hold compute; storage still bills while stopped.

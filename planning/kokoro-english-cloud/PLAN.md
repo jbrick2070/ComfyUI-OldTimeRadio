@@ -1,6 +1,6 @@
 # Kokoro English on a box without spaCy's model (Comfy Cloud first)
 
-Status: BUILT 2026-11-02. Proven locally (real fetch, model hidden, English line voiced from the 3.7.1 copy); cloud leg pending.
+Status: DONE 2026-11-02. Proven locally (real fetch, model hidden, English line voiced from the 3.7.1 copy) and on Comfy Cloud (release v4, job 8618721c: an English one-act voiced entirely by Kokoro, published to obs).
 
 ## The defect
 
