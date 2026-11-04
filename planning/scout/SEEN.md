@@ -56,3 +56,6 @@
 2026-11-03 | Image | Anima-Role-Ref-KV v2.0 | SKIP | https://huggingface.co/AnticPan/Anima-Role-Ref-KV
 2026-11-03 | Upscale | MiniMax-H3 X2 Detail VAE | WATCH | https://huggingface.co/speach1sdef178/MiniMax-H3-X2-Detail-VAE
 2026-11-03 | Writer | Gemma-31b-1800s | SKIP | https://huggingface.co/AGCobra/Gemma-31b-1800s
+2026-11-04 | Image | P-H3-Image (PrunaAI, core v0.44.0, int8_convrot 21.2 GB) | TEST | https://huggingface.co/PrunaAI/P-H3-Image-Comfy
+2026-11-04 | Image | chroma-h3 (H3 stills LoRA) | WATCH | https://huggingface.co/lodestones/chroma-h3
+2026-11-04 | Upscale | RelayVSR X2 (lightx2v) | WATCH | https://huggingface.co/lightx2v/RelayVSR_X2
