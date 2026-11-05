@@ -59,3 +59,8 @@
 2026-11-04 | Image | P-H3-Image (PrunaAI, core v0.44.0, int8_convrot 21.2 GB) | TEST | https://huggingface.co/PrunaAI/P-H3-Image-Comfy
 2026-11-04 | Image | chroma-h3 (H3 stills LoRA) | WATCH | https://huggingface.co/lodestones/chroma-h3
 2026-11-04 | Upscale | RelayVSR X2 (lightx2v) | WATCH | https://huggingface.co/lightx2v/RelayVSR_X2
+2026-11-05 | Voice | Higgs TTS 3 (bosonai, 4B, 100+ languages) | WATCH | https://huggingface.co/bosonai/higgs-tts-3-4b
+2026-11-05 | Video | H3 Continuity Studio (news only) | WATCH | https://github.com/KadoBOT/ComfyUI-H3-Continuity-Studio
+2026-11-05 | Image | Mage-Flow / Mage-Flow-Edit (Comfy-Org repack, int8_convrot 4.16 GB, core v0.44.0) | WATCH | https://huggingface.co/Comfy-Org/Mage-Flow
+2026-11-05 | Image | BluePixel-Turbo (vivo) | WATCH | https://huggingface.co/openvivo/BluePixel-Turbo
+2026-11-05 | Writer | rwkv7-147m-early-modern-english | WATCH | https://huggingface.co/geoppls/rwkv7-147m-early-modern-english
