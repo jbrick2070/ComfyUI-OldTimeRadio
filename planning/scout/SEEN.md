@@ -64,3 +64,8 @@
 2026-11-05 | Image | Mage-Flow / Mage-Flow-Edit (Comfy-Org repack, int8_convrot 4.16 GB, core v0.44.0) | WATCH | https://huggingface.co/Comfy-Org/Mage-Flow
 2026-11-05 | Image | BluePixel-Turbo (vivo) | WATCH | https://huggingface.co/openvivo/BluePixel-Turbo
 2026-11-05 | Writer | rwkv7-147m-early-modern-english | WATCH | https://huggingface.co/geoppls/rwkv7-147m-early-modern-english
+2026-11-06 | Upscale | RelayVSR (Comfy-Org int8_convrot 5.16 GB, core master-only) | TEST | https://huggingface.co/Comfy-Org/RelayVSR
+2026-11-06 | Video | TurboH3-FL2VA-I2VA (TurboDiffusion 4-step) | WATCH | https://huggingface.co/TurboDiffusion/TurboH3-FL2VA-I2VA
+2026-11-06 | Video | Viggle-Remake | SKIP | https://huggingface.co/Viggle/Viggle-Remake
+2026-11-06 | Image | MOSS-Image-heal (community int8_convrot 5.4 GB) | WATCH | https://huggingface.co/KBlueLeaf/MOSS-Image-heal
+2026-11-06 | Writer | Qwen3.5-9B-PULP-DAPT (chip design, not pulp fiction) | SKIP | https://huggingface.co/AgentNativeResearchLab/Qwen3.5-9B-PULP-DAPT
