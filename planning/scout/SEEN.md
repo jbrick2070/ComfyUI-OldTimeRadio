@@ -69,3 +69,5 @@
 2026-11-06 | Video | Viggle-Remake | SKIP | https://huggingface.co/Viggle/Viggle-Remake
 2026-11-06 | Image | MOSS-Image-heal (community int8_convrot 5.4 GB) | WATCH | https://huggingface.co/KBlueLeaf/MOSS-Image-heal
 2026-11-06 | Writer | Qwen3.5-9B-PULP-DAPT (chip design, not pulp fiction) | SKIP | https://huggingface.co/AgentNativeResearchLab/Qwen3.5-9B-PULP-DAPT
+2026-11-07 | Video | HyperFlow H3 Flash (14B, GGUF Q4_K_M 9.1 GB, int8_convrot own repo) | WATCH | https://huggingface.co/VideoRebirthAI/hyperflow-h3-flash
+2026-11-07 | Video | Kandinsky S2V 1.0 (speech-to-video avatar, Lite 2B / Pro 21B) | WATCH | https://huggingface.co/kandinskylab/Kandinsky-S2V-1.0-Pro-distill-Diffusers
