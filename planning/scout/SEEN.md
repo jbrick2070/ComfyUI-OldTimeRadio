@@ -71,3 +71,9 @@
 2026-11-06 | Writer | Qwen3.5-9B-PULP-DAPT (chip design, not pulp fiction) | SKIP | https://huggingface.co/AgentNativeResearchLab/Qwen3.5-9B-PULP-DAPT
 2026-11-07 | Video | HyperFlow H3 Flash (14B, GGUF Q4_K_M 9.1 GB, int8_convrot own repo) | WATCH | https://huggingface.co/VideoRebirthAI/hyperflow-h3-flash
 2026-11-07 | Video | Kandinsky S2V 1.0 (speech-to-video avatar, Lite 2B / Pro 21B) | WATCH | https://huggingface.co/kandinskylab/Kandinsky-S2V-1.0-Pro-distill-Diffusers
+2026-11-08 | Video | H3 Dials (MATLOWAI) | WATCH | https://huggingface.co/MATLOWAI/H3-Dials
+2026-11-08 | Image | NitroFusion2 (ChenDY) | WATCH | https://huggingface.co/ChenDY/NitroFusion2
+2026-11-08 | Image | Krea 3 (API only, CLOUD) | SKIP | https://comfyui-wiki.com/en/news
+2026-11-08 | Upscale | ComfyUI-FL-RelayVSR (pack; core still master-only) | TEST | https://github.com/filliptm/ComfyUI-FL-RelayVSR
+2026-11-08 | Upscale | MiniMax-H3-Upscaler (SOLRICKS) | WATCH | https://huggingface.co/SOLRICKS/MiniMax-H3-Upscaler
+2026-11-08 | Writer | TimeCapsuleLLM-ja v3 (trtd56) | WATCH | https://huggingface.co/trtd56/TimeCapsuleLLM-ja-v3
