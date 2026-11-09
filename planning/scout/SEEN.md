@@ -77,3 +77,4 @@
 2026-11-08 | Upscale | ComfyUI-FL-RelayVSR (pack; core still master-only) | TEST | https://github.com/filliptm/ComfyUI-FL-RelayVSR
 2026-11-08 | Upscale | MiniMax-H3-Upscaler (SOLRICKS) | WATCH | https://huggingface.co/SOLRICKS/MiniMax-H3-Upscaler
 2026-11-08 | Writer | TimeCapsuleLLM-ja v3 (trtd56) | WATCH | https://huggingface.co/trtd56/TimeCapsuleLLM-ja-v3
+2026-11-09 | Image | WeVisOne-VL (Comfy-Org repack, int8_convrot 2.89/5.29 GB, perception/matting) | WATCH | https://huggingface.co/Comfy-Org/WeVisOne-VL
