@@ -78,3 +78,10 @@
 2026-11-08 | Upscale | MiniMax-H3-Upscaler (SOLRICKS) | WATCH | https://huggingface.co/SOLRICKS/MiniMax-H3-Upscaler
 2026-11-08 | Writer | TimeCapsuleLLM-ja v3 (trtd56) | WATCH | https://huggingface.co/trtd56/TimeCapsuleLLM-ja-v3
 2026-11-09 | Image | WeVisOne-VL (Comfy-Org repack, int8_convrot 2.89/5.29 GB, perception/matting) | WATCH | https://huggingface.co/Comfy-Org/WeVisOne-VL
+2026-11-10 | Voice | ZONOS3-Mini (Zyphra, ~100M active, cloning, GGUF) | TEST | https://huggingface.co/Zyphra/ZONOS3-Mini
+2026-11-10 | Voice | VoxCPM2 (2B, 30 languages incl. all 8 OTR) | WATCH | https://huggingface.co/openbmb/VoxCPM2
+2026-11-10 | Voice | Mithi v1 Flash (Indic only) | SKIP | https://huggingface.co/Oomni/mithi-v1-flash
+2026-11-10 | Video | HyperFlow H3 Flash INT8 repack (BennyDaBall, 15.9 GB, 23.6 GiB peak) | WATCH | https://huggingface.co/BennyDaBall/HyperFlow-H3-Flash-INT8-ComfyUI
+2026-11-10 | Image | UltraTex (Comfy-Org, 3D texture, core master-only) | SKIP | https://huggingface.co/Comfy-Org/UltraTex
+2026-11-10 | Writer | ArchaicLLM-v0 (no corpus documented) | SKIP | https://huggingface.co/DebadityaMalakar/ArchaicLLM-v0
+2026-11-10 | Writer | Gemma4-Gutenberg-26B-A4B (creative LoRA, not period) | SKIP | https://huggingface.co/spiritfather/Gemma4-Gutenberg-26B-A4B-GGUF
