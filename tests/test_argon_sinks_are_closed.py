@@ -8,8 +8,7 @@ pip-install spaCy's model mid-render on a fresh install; a control character
 in a filename injected a line into an ffmpeg concat list; a ledger's ElevenLabs
 voice id was interpolated into the Comfy proxy's URL path; a repository could
 ship the pack's own download receipt and its keys were stat'ed unconfined; the
-unauthenticated ledger route scrubbed only whole-string paths; the chatterbox
-sidecar used tempfile.mktemp; and the tokenizer allow prefix with a deny list
+chatterbox sidecar used tempfile.mktemp; and the tokenizer allow prefix with a deny list
 beneath it was case-sensitive and never complete.
 """
 from __future__ import annotations
@@ -139,54 +138,6 @@ def test_the_still_cache_probe_refuses_by_text_before_it_reads(tmp_path):
     assert RD._trusted_still_source(str(png), str(stills)) is True
     assert RD._trusted_still_source(str(stills / ".." / "stills" / "x.png"), str(stills)) is False
     assert RD._trusted_still_source(str(png) + ":stream", str(stills)) is False
-
-
-# --- RANK 8 ---------------------------------------------------------------- #
-
-def _scrub():
-    src = (REPO / "__init__.py").read_text(encoding="utf-8")
-    start = src.index("    import re as _otr_re")
-    end = src.index('    @_otr_PromptServer.instance.routes.get("/otr/latest_ledger")')
-    body = src[start:end].split("\n")
-    block = "\n".join(line[4:] if line.startswith("    ") else line for line in body)
-    ns: dict = {}
-    exec(block, ns)  # noqa: S102 -- shipped code, as test_widget_cannot_name_the_binary loads it
-    return ns["_otr_scrub_paths"]
-
-
-def test_the_ledger_route_scrubs_a_path_wherever_it_sits():
-    scrub = _scrub()
-    b = chr(92)
-    win = "C:" + b + "Users" + b + "jeffr" + b + "a.wav"
-    assert "Users" not in scrub("warning: could not open " + win + " (errno 2)")
-    assert scrub("warning: could not open " + win + " (errno 2)").endswith("a.wav (errno 2)")
-    assert "Users" not in scrub("file:///C:/Users/jeffr/a.wav")
-    assert "Users" not in scrub("line one\nsee " + win + "\nline three")
-    assert "Users" not in scrub("No such file or directory: '/home/jeffr/x/a.wav'")
-    assert "Users" not in scrub(r"\\host\share\Users\jeffr\a.wav")
-    assert scrub({win: 1}) == {"a.wav": 1}                      # keys too
-    deep = {"k": "v"}
-    for _ in range(26):
-        deep = {"n": deep}
-    assert "v" not in json.dumps(scrub(deep)) and "<redacted>" in json.dumps(scrub(deep))
-    # prose and URLs are left alone
-    assert scrub("https://example.com/path/to/thing") == "https://example.com/path/to/thing"
-    assert scrub("the fraction 3/4 and a /dev word") == "the fraction 3/4 and a /dev word"
-    # a path with a space is one token (Sonnet review of 438e98081: the first
-    # substring version stopped at the space and served the user name)
-    assert scrub("C:" + b + "Users" + b + "Jeffrey Brick" + b + "ComfyUI" + b + "x.wav") == "x.wav"
-    assert scrub("C:" + b + "Program Files" + b + "ComfyUI" + b + "x.wav") == "x.wav"
-    assert scrub("/Users/Jeffrey Brick/Documents/x.wav") == "x.wav"
-    assert "Brien" not in scrub("C:" + b + "Users" + b + "O'Brien" + b + "x.wav")
-    # the spellings the same review found verbatim
-    assert scrub("file:///home/jeffr/ComfyUI/output/x.wav") == "x.wav"
-    assert scrub("Wrote:/Users/jeffr/x.wav") == "Wrote:x.wav"
-    assert scrub("9C:" + b + "Users" + b + "jeffr" + b + "x.wav") == "9x.wav"
-    assert scrub(b + "Users" + b + "jeffr" + b + "x.wav") == "x.wav"
-    assert scrub("from C:" + b + "a" + b + "b.wav to D:" + b + "c" + b + "d.wav") == "from b.wav to d.wav"
-    # a relative run of `..` is a path too (Codex review of 8667ab55c)
-    assert scrub(".." + b + ".." + b + "Users" + b + "jeffr" + b + "secret.wav") == "secret.wav"
-    assert scrub("see ../../Users/jeffr/x.wav now") == "see x.wav now"
 
 
 # --- RANK 10 --------------------------------------------------------------- #

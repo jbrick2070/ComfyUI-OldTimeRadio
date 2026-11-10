@@ -60,8 +60,32 @@ def test_broken_pointer_fails_closed(monkeypatch, tmp_path):
     (tmp_path / "google_api_key.location").write_text(
         str(tmp_path / "missing.txt") + "\n", encoding="utf-8"
     )
-    with pytest.raises(GoogleAPIKeyMissingError, match="not a file"):
+    with pytest.raises(GoogleAPIKeyMissingError, match="not a file") as raised:
         resolve_api_key()
+    # The text reaches ComfyUI's /history (no login): the secret is named by
+    # file name, never by the folder it sits in (2026-11-10, registry
+    # information-disclosure on 2.3.51).
+    assert "missing.txt" in str(raised.value)
+    assert str(tmp_path) not in str(raised.value)
+
+
+def test_key_file_errors_name_the_file_not_its_folder(monkeypatch, tmp_path):
+    _enable_files(monkeypatch, tmp_path)
+    for name in ("OPENROUTER_API_KEY", "OTR_OPENROUTER_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    held = tmp_path / "private-folder" / "or-key.txt"
+    held.parent.mkdir()
+    held.write_text("\n", encoding="utf-8")
+    (tmp_path / "openrouter_api_key.location").write_text("%s\n" % held, encoding="utf-8")
+    with pytest.raises(keys.KeyFileError, match="is empty") as raised:
+        keys.file_key("openrouter")
+    assert "or-key.txt" in str(raised.value)
+    assert "private-folder" not in str(raised.value)
+    held.write_bytes("sk-or-key\r\n".encode("utf-16"))
+    with pytest.raises(keys.KeyFileError, match="not UTF-8") as raised:
+        keys.file_key("openrouter")
+    assert "or-key.txt" in str(raised.value)
+    assert "private-folder" not in str(raised.value)
 
 
 def test_missing_key_names_both_files(monkeypatch, tmp_path):

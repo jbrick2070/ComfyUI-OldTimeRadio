@@ -14,8 +14,22 @@ from nodes._otr_sys_specs import collect_system_specs
 
 _EXPECTED_KEYS = {
     "os", "cpu", "cpu_cores", "ram", "ram_peak",
-    "gpu", "vram", "cuda", "python", "torch", "hostname",
+    "gpu", "vram", "cuda", "python", "torch",
 }
+
+
+def test_collect_never_reads_the_machine_name(monkeypatch):
+    """The credits burn these specs into a video made to be shared, and a
+    computer's network name often carries its owner's name (2026-11-10,
+    registry information-disclosure on 2.3.51). Probed with a sentinel so the
+    test cannot pass by luck on a box whose name happens to be unusual."""
+    import platform
+    import socket
+    monkeypatch.setattr(platform, "node", lambda: "SENTINEL-MACHINE-NAME")
+    monkeypatch.setattr(socket, "gethostname", lambda: "SENTINEL-MACHINE-NAME")
+    specs = collect_system_specs()
+    assert "hostname" not in specs
+    assert not any("SENTINEL-MACHINE-NAME" in v for v in specs.values())
 
 
 def test_collect_returns_all_keys_as_strings():

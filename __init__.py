@@ -117,14 +117,16 @@ NODE_DISPLAY_NAME_MAPPINGS = {}
 
 # DUPLICATE PACK GUARD (2026-09-14). ComfyUI loads every folder under
 # custom_nodes. A git clone plus a Manager install, or a leftover .bak
-# folder, used to decorate GET /otr/latest_ledger twice. aiohttp then
-# raised "method HEAD is already registered" in add_routes and the
-# server never came up.
+# folder, is two copies of this pack: both register the same node ids
+# and the folder ComfyUI reads last silently wins, so a stale copy can
+# shadow the one just updated. (Until 2026-11-10 the pack also registered an HTTP
+# route, and the second copy crashed boot with aiohttp's "method HEAD is
+# already registered"; no route ships now.)
 #
 # A registry zip is one folder. First install and later Manager update
 # both hit this branch with _otr_dup is None and load exactly as before.
 # Fail OPEN if the helper cannot import: a missing guard must not skip
-# the nodes or the HTTP route for a normal single-folder install.
+# the nodes for a normal single-folder install.
 _otr_dup = None
 try:
     from .nodes._otr_pack_singleton import (
@@ -157,10 +159,8 @@ if _otr_dup is not None:
         "  Keep ONE OldTimeRadio folder under custom_nodes (git clone "
         "OR Manager install, not both). Do not leave a .bak next to "
         "the live pack -- ComfyUI only skips names ending in "
-        ".disabled. A second copy used to crash boot: GET "
-        "/otr/latest_ledger registered twice, aiohttp raised "
-        "'method HEAD is already registered', and the server never "
-        "came up."
+        ".disabled. Two copies register the same nodes, and the "
+        "folder ComfyUI reads last silently wins."
     )
 
 _NODE_MODULES = {
@@ -350,186 +350,21 @@ if _otr_dup is None:
         pass
 
 # =====================================================================
-# HTTP route: GET /otr/latest_ledger
-# Exposes the in-flight ledger (else the freshest per-episode *_ledger.json)
-# as plain JSON over ComfyUI's existing
-# HTTP server. Lets the live-run-tail Cowork artifact poll a single URL
-# without needing Desktop Commander or any MCP transport.
-# Wrapped in try/except so a server import failure cannot break node load.
-# A single-folder install (first time or a later update) always enters
-# this try: _otr_dup is None. Only a second custom_nodes folder skips.
-# =====================================================================
-class _OTRDuplicateRoute(Exception):
-    """Internal: extra pack folder; do not decorate GET /otr/latest_ledger."""
-
-
-try:
-    if _otr_dup is not None:
-        raise _OTRDuplicateRoute()
-    import json as _otr_json
-    import os as _otr_os
-    from server import PromptServer as _otr_PromptServer  # type: ignore
-    from aiohttp import web as _otr_web  # type: ignore
-
-    _OTR_CORS_HEADERS = {
-        # NO WILDCARD (2026-09-04). This route is registered on EVERY
-        # install and needs no authentication, and it answers with the
-        # whole ledger plus `fullpath` -- an absolute path that names the
-        # operator. `*` is what makes that response READABLE cross-origin,
-        # so any site visited while ComfyUI is running could take it.
-        # Nothing shipped consumes this endpoint cross-origin. Same-origin
-        # callers (the ComfyUI front end) are unaffected -- they never
-        # needed the header.
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Cache-Control": "no-store",
-    }
-
-    import re as _otr_re
-
-    #: An absolute local path TOKEN wherever it sits in a string: a `file:`
-    #: URI, `C:\...` / `C:/...`, the UNC `\\host\share\...`, a drive-less
-    #: `\Users\...`, a `..\x` run, and a POSIX `/a/b`. Matched as a SUBSTRING (registry
-    #: review, 2026-10-30): the earlier whole-value match left a path verbatim
-    #: whenever prose, an exception message, a file: URI or a second line
-    #: carried it, and this route is unauthenticated. A token ends at
-    #: whitespace or a double quote -- but it CONTINUES across spaces while
-    #: the next word carries a separator, so `C:\Users\Jeffrey Brick\x.wav`
-    #: and `/Users/Jeffrey Brick/x.wav` are one token: the first substring
-    #: version stopped at the space and served the user name (Sonnet review
-    #: of 438e98081). A drive letter must not follow a letter (the `s:`
-    #: inside `https:` is not a drive); a POSIX token needs a second segment,
-    #: must not follow `/` or a word and must not start `//`, so a URL's
-    #: `//host/path` and a lone `/` in prose are left alone while
-    #: `Wrote:/Users/x` is scrubbed.
-    _OTR_PATH_TOKEN = _otr_re.compile(
-        r"(?:file:/+[^\s\"<>|]*"
-        r"|(?<![A-Za-z])[A-Za-z]:[\\/][^\s\"<>|]*"
-        r"|\\\\[^\s\"<>|]+"
-        r"|(?<![A-Za-z0-9\\])\\(?!\\)[^\s\"<>|\\/]+[\\/][^\s\"<>|]*"
-        r"|(?<![A-Za-z0-9_.\\/])(?:\.\.[\\/])+[^\s\"<>|]*"
-        r"|(?<![/\w])/(?!/)(?:[^\s\"<>|/]+/)+[^\s\"<>|/]*)"
-        r"(?:[ \t]+[^\s\"<>|\\/]*[\\/][^\s\"<>|]*)*")
-
-    def _otr_scrub_one(text):
-        def _base(match):
-            token = match.group(0)
-            # `basename` on a Windows path under POSIX returns the whole string,
-            # so split on both separators rather than trusting os.path here.
-            return token.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1] or token
-        return _OTR_PATH_TOKEN.sub(_base, text)
-
-    def _otr_scrub_paths(value, _depth=0):
-        """Return ``value`` with every absolute-path TOKEN in every string --
-        values AND dict keys -- reduced to its basename. Recursive over dicts
-        and lists; never mutates the input.
-
-        Depth-bounded because this walks a document that arrived from disk, and
-        an unbounded recursion in an HTTP handler is a denial of service the
-        route would hand out for free. A ledger nests ~6 deep; 24 is slack,
-        and what lies deeper is withheld rather than served raw.
-        """
-        if _depth > 24:
-            return "<redacted>"
-        if isinstance(value, dict):
-            return {(_otr_scrub_one(k) if isinstance(k, str) else k):
-                    _otr_scrub_paths(v, _depth + 1) for k, v in value.items()}
-        if isinstance(value, list):
-            return [_otr_scrub_paths(v, _depth + 1) for v in value]
-        if isinstance(value, str):
-            return _otr_scrub_one(value)
-        return value
-
-    @_otr_PromptServer.instance.routes.get("/otr/latest_ledger")
-    async def _otr_latest_ledger(request):
-        try:
-            # Delegate to the canonical resolver in_flight_ledger_path() -- it
-            # returns the in-flight Ledger singleton's path during a run and
-            # falls back to the per-episode mtime walker headless. Same resolver
-            # every node uses, so the endpoint cannot desync from the real
-            # on-disk layout.
-            try:
-                from .nodes._otr_ledger import in_flight_ledger_path
-            except Exception:  # noqa: BLE001
-                import _otr_ledger as _otr_led_mod  # type: ignore
-                in_flight_ledger_path = _otr_led_mod.in_flight_ledger_path
-            latest_p = in_flight_ledger_path()
-            if latest_p is None:
-                return _otr_web.json_response({
-                    "ok": False,
-                    "reason": "no ledger found: no in-flight singleton "
-                              "and no ledger under output/otr/episodes/",
-                }, headers=_OTR_CORS_HEADERS)
-            latest = str(latest_p)
-            # ONLY A LEDGER INSIDE THE APPROVED FOLDERS (2026-10-18): the walker
-            # follows a linked candidate, and this route needs no login --
-            # registry review flagged "arbitrary-file-read".
-            try:
-                from .nodes._otr_paths import is_readable_in_roots
-            except Exception:  # noqa: BLE001
-                from _otr_paths import is_readable_in_roots  # type: ignore
-            if not is_readable_in_roots(latest):
-                return _otr_web.json_response({
-                    "ok": False,
-                    "reason": "no ledger found inside the approved folders",
-                }, headers=_OTR_CORS_HEADERS)
-            with open(latest, "r", encoding="utf-8") as f:
-                ledger = _otr_json.load(f)
-            # NO ABSOLUTE PATH IN THE RESPONSE (2026-09-05). This route is
-            # registered on every install and needs no authentication, and it
-            # named the operator's own directory tree -- their Windows username
-            # included -- to anyone who could reach it.
-            #
-            # REMOVING THE TOP-LEVEL `fullpath` WAS NOT ENOUGH, and the first
-            # pass at this stopped there. The response returns the whole ledger
-            # DOCUMENT, and that document is full of absolute paths: the
-            # keys `_otr_ledger` writes under `meta.paths` (ledger_path,
-            # episode_root, audio_dir, stills/portraits/videos dirs,
-            # obs_dir, obs_final), plus every still's `path` and cache
-            # `pool_path`, the music-cue WAVs, and the final audio/video/publish
-            # targets. One live episode ledger measured 75 of them. So the
-            # scrub happens on the SERIALIZED RESPONSE, recursively, by value:
-            # any string that looks like an absolute local path becomes its
-            # basename. The on-disk ledger is untouched -- this is a projection
-            # for one HTTP reader, not a change to the record.
-            return _otr_web.json_response({
-                "ok": True,
-                "filename": _otr_os.path.basename(latest),
-                "mtime": _otr_os.path.getmtime(latest),
-                "size": _otr_os.path.getsize(latest),
-                "ledger": _otr_scrub_paths(ledger),
-            }, headers=_OTR_CORS_HEADERS)
-        except Exception as exc:
-            # The exception TEXT carries paths too (a FileNotFoundError names
-            # the file it could not open), so it goes to the server log, where
-            # the operator reads it, and never into the HTTP body.
-            print(f"[OldTimeRadio] latest_ledger failed: {exc}")
-            return _otr_web.json_response(
-                {"ok": False, "reason": "ledger could not be read; see the "
-                                        "ComfyUI console for the reason"},
-                status=500,
-                headers=_OTR_CORS_HEADERS,
-            )
-
-    @_otr_PromptServer.instance.routes.options("/otr/latest_ledger")
-    async def _otr_latest_ledger_options(request):
-        return _otr_web.Response(status=204, headers=_OTR_CORS_HEADERS)
-
-    print("[OldTimeRadio] HTTP route registered: GET /otr/latest_ledger (with CORS)")
-except _OTRDuplicateRoute:
-    print("[OldTimeRadio] HTTP route skipped (duplicate pack folder)")
-except Exception as _otr_route_err:
-    print(f"[OldTimeRadio] HTTP route registration skipped: {_otr_route_err}")
-
-# =====================================================================
-# NO POST ROUTE HERE MAY START WORK FROM A CALLER-SUPPLIED PATH. An
-# unauthenticated route with a side effect is the Comfy Registry ban class
-# `policy-v0.2: UNAUTHENTICATED_SIDE_EFFECT`, and no reviewer verdict says an
-# env gate around a ROUTE REGISTRATION discharges it, so the answer is not
-# to ship the construct rather than to argue about it. The real render path
-# is the canonical workflow through `/prompt`; a development render harness
-# belongs in `scripts/` (excluded from the published zip), not in the module
-# every install imports.
+# NO HTTP ROUTE SHIPS. ComfyUI serves every route a pack registers to
+# anything that can reach its port, with no login. Registry version
+# 2.3.51 was Flagged `policy-v0.7: information-disclosure` while this
+# file still registered `GET /otr/latest_ledger`, which handed the whole
+# episode ledger -- story, cast, prompts, model ids, the run's settings
+# and its environment fingerprint -- to any caller. Nothing shipped read
+# it; its one reader was an internal live-tail page. It was removed on
+# 2026-11-10 rather than gated: an env switch around a route
+# registration is still the same construct to a reviewer.
+#
+# The real render path is the canonical workflow through ComfyUI's own
+# `/prompt`. A development reader for a ledger opens the file on disk,
+# from `scripts/` (excluded from the published zip).
+# `tests/test_pack_registers_no_http_route.py` keeps the shipped set
+# route-free.
 # =====================================================================
 
 

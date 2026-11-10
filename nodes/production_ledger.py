@@ -206,8 +206,8 @@ def _default_out_dir(episode_id: Optional[str] = None) -> str:
     # BUG-LOCAL-292: route through the shared resolver. comfy_output_dir()
     # resolves OTR_OUTPUT_DIR env, else ComfyUI folder_paths, else a
     # node-relative walk-up -- so the ledger lands under the SAME
-    # output/otr/episodes/<ep>/audio tree as portraits, the latest_ledger
-    # route, and every other _otr_paths consumer. Lazy import: _otr_paths is
+    # output/otr/episodes/<ep>/audio tree as portraits and every other
+    # _otr_paths consumer. Lazy import: _otr_paths is
     # pure (no back-dep on this module), and importing at call time avoids
     # any load-order risk.
     from ._otr_paths import otr_audio_dir

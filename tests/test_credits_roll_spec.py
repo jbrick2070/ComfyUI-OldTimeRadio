@@ -495,10 +495,14 @@ def test_system_left_col1_static_dashboard():
 
 
 def test_system_block_carries_full_detail_and_correct_sysd_keys(monkeypatch):
-    """kibitz R3: the scroll SYSTEM block must carry ALL the detail (host / cpu +
+    """kibitz R3: the scroll SYSTEM block must carry ALL the detail (os / cpu +
     cores / ram + peak / gpu + vram / cuda / torch / python) and read the RIGHT
-    collect_system_specs keys (hostname, vram, cpu_cores, ram_peak) -- a
-    regression back to host / gpu_vram or dropped fields fails here."""
+    collect_system_specs keys (os, vram, cpu_cores, ram_peak) -- a regression
+    back to gpu_vram or dropped fields fails here.
+
+    It never shows a machine name (2026-11-10, registry information-disclosure
+    on 2.3.51): the credits are burned into a video made to be shared, so a
+    `hostname` handed in by any caller is still not rendered."""
     monkeypatch.setattr(cr, "_sys_specs", lambda: {
         "hostname": "SENTINEL_HOST", "os": "SENTINEL_OS",
         "cpu": "SENTINEL_CPU", "cpu_cores": "SENTINEL_CORES",
@@ -507,9 +511,11 @@ def test_system_block_carries_full_detail_and_correct_sysd_keys(monkeypatch):
         "cuda": "13.0", "torch": "2.10", "python": "3.12"})
     lay = _layout()
     sysblock = _flat(dict(lay["col3_flow"])["system"])
-    for s in ("SENTINEL_HOST", "SENTINEL_CPU", "SENTINEL_CORES", "SENTINEL_RAM",
+    for s in ("SENTINEL_OS", "SENTINEL_CPU", "SENTINEL_CORES", "SENTINEL_RAM",
               "SENTINEL_PEAK", "SENTINEL_GPU", "SENTINEL_VRAM"):
         assert s in sysblock, s
+    assert "SENTINEL_HOST" not in sysblock
+    assert "SENTINEL_HOST" not in str(lay)
     # the PRODUCTION LEDGER VRAM total reads the "vram" key (not "gpu_vram")
     grids = [b for k, b in lay["col1"] if k == "grid"]
     led_block = next(g for g in grids if "PRODUCTION LEDGER" in g["header"])

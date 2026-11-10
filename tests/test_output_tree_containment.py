@@ -280,18 +280,6 @@ def test_the_voice_stamp_prefers_the_in_flight_ledger():
     assert "confine_to_output_tree" in window
 
 
-# --------------------------------------------------------------------------
-# the routes
-# --------------------------------------------------------------------------
-def test_no_post_route_ships():
-    """Both POST render-harness routes are removed. They read caller-supplied
-    paths from an unauthenticated body and started a background GPU render --
-    the registry's second-largest ban class -- and nothing shipped called them."""
-    src = (Path(__file__).resolve().parents[1] / "__init__.py").read_text(encoding="utf-8")
-    assert "routes.post" not in src
-    assert src.count("routes.get") == 1, "only the read-only ledger GET should remain"
-
-
 def test_the_composite_fingerprint_hook_checks_every_step():
     """Steps 1 and 2 got the remote check when the hook was fixed; step 3 (the
     sibling master WAV listdir) did not, on the very file that commit named.

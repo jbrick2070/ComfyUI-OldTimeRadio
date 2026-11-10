@@ -3,17 +3,18 @@
 ComfyUI imports every directory under custom_nodes. It skips names that
 end with ``.disabled`` and ``__pycache__``; a ``.bak`` suffix is still a
 live pack. Two copies (git clone ``ComfyUI-OldTimeRadio`` plus Manager
-``comfyui-old-time-radio``, or a leftover backup folder) each ran
-``__init__.py`` and each decorated ``GET /otr/latest_ledger``. aiohttp
-then raised ``RuntimeError: method HEAD is already registered`` during
-``add_routes`` and the server never came up.
+``comfyui-old-time-radio``, or a leftover backup folder) each run
+``__init__.py`` and register the same node ids, and whichever folder
+ComfyUI reads last silently wins. Until 2026-11-10 the second copy also
+re-decorated the pack's HTTP route and aiohttp crashed boot with
+``RuntimeError: method HEAD is already registered``; no route ships now.
 
 ``sys.modules`` is shared across those two different package names, so a
 sentinel there is the one claim both copies can see.
 
 A first-time registry install and a later Manager update are ONE folder.
-``claim`` must return None in those cases so nodes and the HTTP route
-load exactly as they did before this guard existed.
+``claim`` must return None in those cases so the nodes load exactly as
+they did before this guard existed.
 """
 from __future__ import annotations
 

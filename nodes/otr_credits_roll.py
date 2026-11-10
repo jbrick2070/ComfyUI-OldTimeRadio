@@ -431,9 +431,10 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     _gpu = sysd.get("gpu") or "(unknown)"
     if sysd.get("vram"):
         _gpu += " (%s)" % sysd["vram"]
+    # No machine name: the credits are burned into a video made to be shared
+    # (2026-11-10, registry information-disclosure; see _otr_sys_specs).
     sys_grid = [
-        ("Host:", "%s · %s" % (sysd.get("hostname") or "?",
-                               sysd.get("os") or "(unknown)")),
+        ("OS:", sysd.get("os") or "(unknown)"),
         ("CPU:", _cpu),
         ("RAM:", _ram),
         ("GPU:", _gpu),

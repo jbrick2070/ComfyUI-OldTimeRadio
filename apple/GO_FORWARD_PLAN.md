@@ -285,6 +285,21 @@ different proof.
 
 ### The registry -- his clicks and his word
 
+* **2.3.51 came back Flagged, signed (read 2026-11-10):**
+  `policy-v0.7: information-disclosure, too-many-findings`, the only live
+  version, so Manager reads "no Active releases". PBUG-20261110-01: the
+  no-login `GET /otr/latest_ledger` route (whole ledger to any caller) and
+  the machine name the credits burned into every episode, plus two
+  absolute paths in exception text. All fixed on main; the shipped set now
+  registers no HTTP route at all. The registry's precedent is
+  deno-custom-nodes 0.7.127: same class, deleted its no-login route, went
+  Active on "Passed automated checks" with no human. Next: 2.3.52 carries
+  the fix; once it shows on `/versions`, 2.3.51 is his to delete (one
+  version live). If 2.3.52 is flagged again on a signed class, read the
+  class before touching anything -- `too-many-findings` means the reviewer
+  stopped listing, so the next lever is whatever else a no-login caller or
+  a shared episode can see.
+
 * **2.3.48 is the latest published version** (`f5545e5ff`, 2026-10-30 23:57
   PT): cut at the operator's new rule, "bumps should be done at every
   logical step" (CLAUDE.md 7A, amended 2026-10-31). The step: Studio /direct

@@ -110,13 +110,20 @@ def test_a_dead_ffmpeg_surfaces_its_own_reason_and_keeps_the_log(
         harness, make, cause, caplog):
     """ComfyUI's error panel shows str(exception), not notes: a broken pipe
     means ffmpeg died, so the error the user sees quotes ffmpeg's stderr,
-    chained to the pipe error, and names the kept log."""
+    chained to the pipe error, and names the kept log.
+
+    By file name only: the exception text reaches ComfyUI's /history, which
+    needs no login, so its directory stays out of it (2026-11-10, registry
+    information-disclosure on 2.3.51). The console carries the full path."""
     harness["make"] = make
     gen = _frames(4)     # held here, so only an EXPLICIT close can close it
     with pytest.raises(RuntimeError, match="ffmpeg stopped mid-encode .*something") as raised:
         _encode(harness, gen)
     assert isinstance(raised.value.__cause__, cause)
-    assert harness["logs"][0] in str(raised.value)
+    log_path = harness["logs"][0]
+    assert os.path.basename(log_path) in str(raised.value)
+    assert os.path.dirname(log_path) not in str(raised.value)
+    assert any(log_path in r.getMessage() for r in caplog.records)
     proc = harness["procs"][0]
     assert proc.waited and (proc.killed or proc.returncode is not None)
     assert inspect.getgeneratorstate(gen) == inspect.GEN_CLOSED, \
@@ -183,12 +190,15 @@ def test_a_spawn_failure_keeps_its_log_and_raises_the_cause(harness, monkeypatch
     assert seen
 
 
-def test_a_nonzero_exit_quotes_stderr_and_names_the_kept_log(harness):
+def test_a_nonzero_exit_quotes_stderr_and_names_the_kept_log(harness, caplog):
     harness["make"] = lambda: _Proc(_Stdin(), returncode=1)
     with pytest.raises(RuntimeError, match="ffmpeg exited with code 1 :: .*something") as raised:
         _encode(harness, _frames(2))
-    assert harness["logs"][0] in str(raised.value)
-    assert os.path.exists(harness["logs"][0])
+    log_path = harness["logs"][0]
+    assert os.path.basename(log_path) in str(raised.value)
+    assert os.path.dirname(log_path) not in str(raised.value)
+    assert any(log_path in r.getMessage() for r in caplog.records)
+    assert os.path.exists(log_path)
 
 
 def test_each_encode_gets_its_own_wav_and_it_is_removed_on_every_exit():

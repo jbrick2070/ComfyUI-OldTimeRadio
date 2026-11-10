@@ -1577,15 +1577,21 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
         # the pipe error. Anything else -- a frame-source failure (even an
         # OSError such as a missing overlay file), a cancel -- propagates
         # untouched, with the tail attached as a note.
+        # The exception text reaches ComfyUI's /history and websocket, which
+        # need no login, so it names the log by file name only; the console
+        # line above carries the full path for the operator.
         if pipe_died:
             raise RuntimeError(
-                "ffmpeg stopped mid-encode (%s) :: %s (full log: %s)"
+                "ffmpeg stopped mid-encode (%s) :: %s (full log: %s in the "
+                "OTR scratch folder)"
                 % (type(exc).__name__, _tail or "no stderr captured",
-                   stderr_file.name)) from exc
+                   os.path.basename(stderr_file.name))) from exc
         if hasattr(exc, "add_note"):
             try:
-                exc.add_note("ffmpeg stderr tail: %s (full log: %s)"
-                             % (_tail or "(none captured)", stderr_file.name))
+                exc.add_note("ffmpeg stderr tail: %s (full log: %s in the "
+                             "OTR scratch folder)"
+                             % (_tail or "(none captured)",
+                                os.path.basename(stderr_file.name)))
             except Exception:  # noqa: BLE001 -- never mask the cause
                 pass
         raise
@@ -1595,15 +1601,18 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
                 stderr_file, keep=proc is None or proc.returncode != 0)
 
     if proc.returncode != 0:
-        log.error("[Video] ffmpeg failed:\n%s", stderr_text[-2000:])
+        log.error("[Video] ffmpeg failed (full log: %s):\n%s",
+                  stderr_file.name, stderr_text[-2000:])
         # QUOTE THE CAUSE, DO NOT REPLACE IT. ComfyUI shows the EXCEPTION, not
         # the log, so a bare exit code hands a user a red bubble with nothing
         # to act on and an issue with nothing to read. Caption burn and the mux
         # already put stderr in the raise; this was the outlier.
         _tail = (stderr_text or "").strip().replace("\n", " ")[-400:]
         raise RuntimeError(
-            "ffmpeg exited with code %d :: %s (full log: %s)"
-            % (proc.returncode, _tail or "no stderr captured", stderr_file.name))
+            "ffmpeg exited with code %d :: %s (full log: %s in the OTR "
+            "scratch folder)"
+            % (proc.returncode, _tail or "no stderr captured",
+               os.path.basename(stderr_file.name)))
 
     elapsed = _time.time() - t0
     log.info("[Video] Encode complete: %d frames in %.1fs (%.1f fps)",
@@ -2084,7 +2093,6 @@ def _write_story_treatment(out_path, episode_title, led,
             _sys = {}
             log.warning("[Video] system-spec collection skipped: %s", _sys_exc)
         _sg = lambda k: _sys.get(k) or "(unknown)"
-        W_(f"  Host     :  {_sg('hostname')}")
         W_(f"  OS       :  {_sg('os')}")
         W_(f"  CPU      :  {_sg('cpu')}  ({_sg('cpu_cores')})")
         W_(f"  RAM      :  {_sg('ram')}  (peak {_sg('ram_peak')})")

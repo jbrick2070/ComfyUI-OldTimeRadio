@@ -17495,3 +17495,50 @@ not promote it to the Bug Bible on this evidence alone.
   Episode "The Double Cherry, Severed", 3:02, 1920x1080, in `otr/obs`. The v1
   three-act run with cleanup off also ended `succeeded`, so the cleanup was the
   whole cause and the folder rename was not.
+
+## PBUG-20261110-01 -- the registry flagged 2.3.51 "information-disclosure, too-many-findings": a no-login ledger route and the machine name on every episode
+- evidence: registry version 2.3.51 (release commit `1f4f4a6a1`, published
+  2026-11-03), read 2026-11-10 from
+  `GET /nodes/comfyui-old-time-radio/versions?include_status_reason=true`:
+  `{"message": "policy-v0.7: information-disclosure, too-many-findings",
+  "by": "drltdata@comfy.org", "statusHistory": [reflag-pending-review]}`. It
+  was the only live version, so Manager showed "This pack has no Active
+  releases". The scan replica read 0 findings on the same tree, so this was
+  the policy layer, not the lexical one. Shipped files at HEAD equal the
+  2.3.51 zip (only `planning/scout/` changed since, which does not ship).
+- cause, two sinks (agy / Gemini 3.8 Flash, file-grounded second opinion,
+  agreed on both and added the third):
+  1. `GET /otr/latest_ledger` in `__init__.py`: registered on every install,
+     no login, and it answered with the whole episode ledger -- story, cast,
+     prompts, model ids, the run's settings and `meta.env` (every installed
+     pack and its commit, driver, OS). Paths were scrubbed to basenames, the
+     document was not. Nothing shipped called it; its one reader was an
+     internal live-tail page.
+  2. `_otr_sys_specs.collect_system_specs()` read `platform.node()`, and the
+     credits roll burned `Host: <machine name> · <OS>` into every published
+     video (the `_treatment.txt` beside it carried the same line). A
+     computer's network name often carries its owner's name.
+  3. Smaller: ffmpeg failures quoted the absolute path of their stderr log,
+     and key-file errors the absolute path of the secret, in exception text
+     that ComfyUI echoes to `/history` and the websocket (no login).
+- the registry's own record of the fix shape: deno-custom-nodes carried
+  `information-disclosure` on 0.7.123-0.7.126; 0.7.127 deleted only its
+  unauthenticated resource-monitor GET route and its psutil/nvidia-ml-py
+  dependencies, and went Active with "Passed automated checks", no human
+  review. Its 0.7.122 had the same route and passed BEFORE the October
+  policy layer, so a route that once passed is no evidence it still will.
+- fix: the route is deleted, not gated (an env switch around a route
+  registration is the same construct to a reviewer), with its CORS headers,
+  scrubber and duplicate-route exception; the duplicate-pack guard stays
+  (two folders still register the same node ids). The machine name is no
+  longer read: credits show `OS:`, the treatment drops `Host`. Exception text
+  names the ffmpeg log and the key file by file name; the console keeps the
+  full path. The installed-pack census in `meta.env` stays: it is local, its
+  docstring forbids paths and names, `scripts/otr_env_drift.py` reads it, and
+  the route was its only outside exposure.
+  `tests/test_pack_registers_no_http_route.py` holds the shipped set (AST,
+  `.comfyignore`-derived) to no route; `test_sys_specs` probes a sentinel
+  machine name; `test_credits_roll_spec` and the encoder and key-file tests
+  pin the new text.
+- status: FIXED in code; live proof is the next version's status_reason
+  ("Passed automated checks" or a `reviewed-safe`).

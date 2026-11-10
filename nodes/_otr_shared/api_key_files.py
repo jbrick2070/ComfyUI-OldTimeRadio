@@ -70,9 +70,10 @@ def _first_real_line(path: Path) -> str | None:
     except UnicodeDecodeError as exc:
         # Most often a file PowerShell 5.1's `>` wrote as UTF-16. A broken key
         # file is a KeyFileError, the one error every caller already handles.
+        # File name only: this text reaches ComfyUI's /history (no login).
         raise KeyFileError(
             "%s is not UTF-8 text (%s); save it as UTF-8 with the key on one "
-            "line" % (path, exc.reason)) from exc
+            "line" % (path.name, exc.reason)) from exc
     # A UTF-8 BOM (Notepad's "UTF-8 with BOM") is valid UTF-8 but would ride
     # along as an invisible first character of the key; strip() keeps it.
     for raw in text.lstrip("﻿").splitlines():
@@ -105,16 +106,20 @@ def file_key(lane: str) -> str | None:
     if not pointer:
         return None
     target = Path(pointer).expanduser()
+    # The error text reaches ComfyUI's /history, which needs no login, so it
+    # names the secret by file name only; the full path is in the location
+    # file the operator wrote.
     if not target.is_file():
         raise KeyFileError(
-            "%s key location %s names %s, which is not a file. No request "
-            "was sent." % (spec["label"], spec["location"], target)
+            "%s key location %s names a file called %s, which is not a file "
+            "at the path written there. No request was sent."
+            % (spec["label"], spec["location"], target.name)
         )
     key = _first_real_line(target)
     if not key:
         raise KeyFileError(
-            "%s key file %s is empty. No request was sent."
-            % (spec["label"], target)
+            "%s key file %s (named in %s) is empty. No request was sent."
+            % (spec["label"], target.name, spec["location"])
         )
     return key
 

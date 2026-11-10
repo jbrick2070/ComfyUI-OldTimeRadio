@@ -5,6 +5,13 @@ forensic SYSTEM block so anyone watching an episode can see exactly what
 machine + software stack produced it -- CPU, RAM, GPU/VRAM, OS, and the
 Python / torch / CUDA versions.
 
+NO MACHINE NAME (2026-11-10). It used to read ``platform.node()`` and the
+credits burned ``Host: <name>`` into every published video. A computer's
+network name often carries its owner's name, and an episode is made to be
+shared, so that was information disclosure (registry 2.3.51 was Flagged
+``information-disclosure``). The hardware model and software versions stay:
+they identify a class of machine, not a person or a network.
+
 Hard contract: ``collect_system_specs`` is BEST-EFFORT and NEVER raises.
 Every probe is individually guarded; a missing dependency (psutil, torch)
 or an absent GPU degrades to a ``"(unknown)"`` string rather than failing
@@ -196,7 +203,6 @@ def collect_system_specs() -> dict:
 
     specs["python"] = platform.python_version() or _UNKNOWN
     specs["torch"] = _torch_version()
-    specs["hostname"] = (platform.node() or _UNKNOWN)
     return specs
 
 
