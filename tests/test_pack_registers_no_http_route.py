@@ -36,20 +36,40 @@ def _shipped_python_files():
     return [p for p in oracle._shipped_files(False) if p.endswith(".py")]
 
 
+#: aiohttp's router and application methods that hang a handler on a path.
+_ROUTER_METHODS = frozenset((
+    "add_routes", "add_route", "add_get", "add_post", "add_put", "add_patch",
+    "add_delete", "add_head", "add_options", "add_view", "add_static",
+    "add_resource",
+))
+
+
 def _route_sites(tree: ast.AST) -> list:
-    """Every ``<x>.instance.routes`` reach and every ``add_routes`` /
-    ``add_route`` call -- the two ways a pack hangs a handler on aiohttp."""
+    """Every way a pack hangs a handler on aiohttp: any ``.routes`` reach,
+    whatever the receiver (``PromptServer.instance.routes``, or
+    ``ps = PromptServer.instance`` then ``ps.routes``), ``getattr(x,
+    "routes")``, a ``RouteTableDef``, and a router or app ``add_*`` call
+    (Sonnet review of adf158352). Nothing in the shipped set names
+    ``.routes`` for any other reason, so the wide net costs no false hit."""
     sites = []
     for node in ast.walk(tree):
-        if (isinstance(node, ast.Attribute) and node.attr == "routes"
-                and isinstance(node.value, ast.Attribute)
-                and node.value.attr == "instance"):
+        if isinstance(node, ast.Attribute) and node.attr in ("routes", "RouteTableDef"):
             sites.append(node.lineno)
-        elif (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-                and node.func.attr in ("add_routes", "add_route", "add_get",
-                                       "add_post", "add_static")):
+        elif isinstance(node, ast.Name) and node.id == "RouteTableDef":
             sites.append(node.lineno)
-    return sites
+        elif isinstance(node, ast.Call):
+            fn = node.func
+            if isinstance(fn, ast.Attribute) and fn.attr in _ROUTER_METHODS:
+                sites.append(node.lineno)
+            elif (isinstance(fn, ast.Name) and fn.id == "getattr"
+                    and len(node.args) >= 2
+                    and isinstance(node.args[1], ast.Constant)
+                    and node.args[1].value == "routes"):
+                sites.append(node.lineno)
+        elif isinstance(node, ast.ImportFrom):
+            if any(a.name == "RouteTableDef" for a in node.names):
+                sites.append(node.lineno)
+    return sorted(set(sites))
 
 
 def test_the_shipped_set_is_read_by_this_test():
@@ -84,4 +104,21 @@ def test_the_finder_sees_a_decorated_route():
         "    return None\n"
         "app.router.add_routes([])\n"
     )
-    assert sorted(_route_sites(ast.parse(probe))) == [2, 5]
+    assert _route_sites(ast.parse(probe)) == [2, 5]
+
+
+def test_the_finder_sees_every_other_registration_spelling():
+    """Each line below registers a route a different way; each must be seen,
+    and an unrelated ``add_*`` call must not be."""
+    probe = (
+        "ps = PromptServer.instance\n"                 # 1: no hit by itself
+        "@ps.routes.post('/a')\n"                      # 2
+        "async def a(r): pass\n"                       # 3
+        "r = getattr(ps, 'routes')\n"                  # 4
+        "from aiohttp.web import RouteTableDef\n"      # 5
+        "t = web.RouteTableDef()\n"                    # 6
+        "app.router.add_put('/b', a)\n"                # 7
+        "app.router.add_view('/c', a)\n"               # 8
+        "parser.add_argument('--x')\n"                 # 9: not a route
+    )
+    assert _route_sites(ast.parse(probe)) == [2, 4, 5, 6, 7, 8]

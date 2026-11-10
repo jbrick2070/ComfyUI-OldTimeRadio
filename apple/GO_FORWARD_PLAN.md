@@ -298,7 +298,12 @@ different proof.
   version live). If 2.3.52 is flagged again on a signed class, read the
   class before touching anything -- `too-many-findings` means the reviewer
   stopped listing, so the next lever is whatever else a no-login caller or
-  a shared episode can see.
+  a shared episode can see. **Accepted residual, named so it is the first
+  lever if the class repeats:** about 320 `raise` sites in 74 shipped files
+  interpolate a path-like name into exception text, which ComfyUI echoes to
+  `/history` (Sonnet QA of adf158352). Only the ffmpeg-log and key-file
+  sites were basenamed; the rest follow ComfyUI core's own practice and were
+  left rather than rewritten blind.
 
 * **2.3.48 is the latest published version** (`f5545e5ff`, 2026-10-30 23:57
   PT): cut at the operator's new rule, "bumps should be done at every
