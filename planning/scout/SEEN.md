@@ -88,3 +88,9 @@
 2026-11-11 | Upscale | RelayVSR (now in tagged core v0.45.0; int8_convrot 5.16 GB; Comfy-Org template) | TEST | https://huggingface.co/Comfy-Org/RelayVSR
 2026-11-11 | Upscale | ReCaVSR (Wan2.2-5B one-step VSR, int8_convrot 6.27 GB, pack comfyui-recavsr) | TEST | https://huggingface.co/PedroMarinhoDev/ReCaVSR-ComfyUI
 2026-11-11 | Image | MiniMax-H3-Image (Comfy-Org repack, int8_convrot 20.98 GB, core v0.45.0) | WATCH | https://huggingface.co/Comfy-Org/MiniMax-H3-Image
+2026-11-12 | Upscale | Open-H3-Regenerate-2K-IC (NVlabs; slmonker bf16 5.87 GB repack) | WATCH | https://huggingface.co/Efficient-Large-Model/Open-H3-Regenerate-2K-IC
+2026-11-12 | Voice | Underdog Woof (English only, 40.6 MB) | SKIP | https://huggingface.co/ConwayResearch/Underdog-Woof
+2026-11-12 | Voice | Mach-Boom (Phonon 31m 3.5 bit, English only) | SKIP | https://huggingface.co/SyzygyResearch/Mach-Boom
+2026-11-12 | Voice | Inflect Mini v3 (English only) | SKIP | https://huggingface.co/owensong/Inflect-Mini-v3
+2026-11-12 | Video | PAN2 (IFM, 29B world model, bf16) | SKIP | https://huggingface.co/IFM/PAN2
+2026-11-12 | Video | Vimoo-1.0 (11.7B, bf16 23.4 GB, no int8) | SKIP | https://huggingface.co/Vimoo-AI/Vimoo-1.0-ComfyUI
