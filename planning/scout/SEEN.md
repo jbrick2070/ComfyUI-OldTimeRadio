@@ -94,3 +94,10 @@
 2026-11-12 | Voice | Inflect Mini v3 (English only) | SKIP | https://huggingface.co/owensong/Inflect-Mini-v3
 2026-11-12 | Video | PAN2 (IFM, 29B world model, bf16) | SKIP | https://huggingface.co/IFM/PAN2
 2026-11-12 | Video | Vimoo-1.0 (11.7B, bf16 23.4 GB, no int8) | SKIP | https://huggingface.co/Vimoo-AI/Vimoo-1.0-ComfyUI
+2026-11-13 | Video | Kandinsky 6.0 Lite distill int8_convrot (t8star, 3.77 GB, MIT, T8 pack) | TEST | https://huggingface.co/t8star/Kandinsky-Comfy
+2026-11-13 | Writer | noirwrit-base (97.5M, pre-1930 crime/pulp, GGUF) | TEST | https://huggingface.co/tejgokani/noirwrit-base
+2026-11-13 | Writer | Bart 2.8B pre-1930 (jbduran/bartholomew, nanochat .pt) | WATCH | https://huggingface.co/jbduran/bartholomew
+2026-11-13 | Voice | KokoClone (Kokoro-ONNX + Kanade voice conversion, 7 of 8 languages) | WATCH | https://huggingface.co/PatnaikAshish/kokoclone
+2026-11-13 | Image | MOSS-Image pose control LoRA (thedeoxen) | WATCH | https://huggingface.co/thedeoxen/MOSS-Image-pose-controlnet
+2026-11-13 | Upscale | PiD pixel diffusion decoder (NVIDIA, bf16, non-commercial) | WATCH | https://huggingface.co/nvidia/PiD
+2026-11-13 | Upscale | MiniMax H3 latent upscalers (George0667 v2, chenzs) | SKIP | https://huggingface.co/George0667/MiniMax_Temporal_Upscaler
