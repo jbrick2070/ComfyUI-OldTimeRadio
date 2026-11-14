@@ -101,3 +101,5 @@
 2026-11-13 | Image | MOSS-Image pose control LoRA (thedeoxen) | WATCH | https://huggingface.co/thedeoxen/MOSS-Image-pose-controlnet
 2026-11-13 | Upscale | PiD pixel diffusion decoder (NVIDIA, bf16, non-commercial) | WATCH | https://huggingface.co/nvidia/PiD
 2026-11-13 | Upscale | MiniMax H3 latent upscalers (George0667 v2, chenzs) | SKIP | https://huggingface.co/George0667/MiniMax_Temporal_Upscaler
+2026-11-14 | Voice | Audio8-TTS-Realistic-Air (23 languages incl. all 8 OTR; community int8_convrot 1.47 GB, pack ComfyUI-Audio8) | TEST | https://huggingface.co/Edge0/Audio8-TTS-Realistic-Air
+2026-11-14 | Image | Kromoss (now with official int8_convrot 5.41 GB, DMD2 8-step LoRA) | TEST | https://huggingface.co/lodestones/Kromoss
