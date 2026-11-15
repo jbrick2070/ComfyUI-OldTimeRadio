@@ -103,3 +103,8 @@
 2026-11-13 | Upscale | MiniMax H3 latent upscalers (George0667 v2, chenzs) | SKIP | https://huggingface.co/George0667/MiniMax_Temporal_Upscaler
 2026-11-14 | Voice | Audio8-TTS-Realistic-Air (23 languages incl. all 8 OTR; community int8_convrot 1.47 GB, pack ComfyUI-Audio8) | TEST | https://huggingface.co/Edge0/Audio8-TTS-Realistic-Air
 2026-11-14 | Image | Kromoss (now with official int8_convrot 5.41 GB, DMD2 8-step LoRA) | TEST | https://huggingface.co/lodestones/Kromoss
+2026-11-15 | Voice | tiny-voca (4.5M, English only) | SKIP | https://huggingface.co/n4ze3m/tiny-voca
+2026-11-15 | Image | Fibo 2.0 edit-turbo (Comfy-Org int8_convrot 8.41 GB, core tagged, edit templates 11-14) | WATCH | https://huggingface.co/Comfy-Org/Fibo-2.0
+2026-11-15 | Upscale | ComfyUI-VideoFinish (spandrel upscale + RIFE one-encode pack) | WATCH | https://github.com/bno84/ComfyUI-VideoFinish
+2026-11-15 | Writer | slovo-4b-folklore-alpha (Gemma-3-4B LoRA, GGUF Q8 4.14 GB, folklore epics) | WATCH | https://huggingface.co/MarkusMarrei/slovo-4b-folklore-alpha
+2026-11-15 | Video | PAN2 Comfy-Org repack (int8_convrot 26.7 GB, still over 16 GB) | SKIP | https://huggingface.co/Comfy-Org/PAN2
