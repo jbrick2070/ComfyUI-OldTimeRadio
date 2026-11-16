@@ -108,3 +108,7 @@
 2026-11-15 | Upscale | ComfyUI-VideoFinish (spandrel upscale + RIFE one-encode pack) | WATCH | https://github.com/bno84/ComfyUI-VideoFinish
 2026-11-15 | Writer | slovo-4b-folklore-alpha (Gemma-3-4B LoRA, GGUF Q8 4.14 GB, folklore epics) | WATCH | https://huggingface.co/MarkusMarrei/slovo-4b-folklore-alpha
 2026-11-15 | Video | PAN2 Comfy-Org repack (int8_convrot 26.7 GB, still over 16 GB) | SKIP | https://huggingface.co/Comfy-Org/PAN2
+2026-11-16 | Video | LTX-2.5 Stage-1 2-step + Stage-2 1-step distill LoRAs (lvladikov, 1.23/1.89 GB) | WATCH | https://huggingface.co/lvladikov/LTX-2.5-Stage1-Distill-2step-LoRA
+2026-11-16 | Voice | Haru-4B (full-duplex dialogue base, 9 languages, not scripted TTS) | SKIP | https://huggingface.co/higurashi-ai/Haru-4B
+2026-11-16 | Voice | Maya2 Native TTS (Indic + English, pack maya2-native) | SKIP | https://api.comfy.org/nodes/maya2-native
+2026-11-16 | Video | Runway Praxis-1 (robotics world-action model) | SKIP | https://runway.com/news/company-news/praxis-1-is-now-available
