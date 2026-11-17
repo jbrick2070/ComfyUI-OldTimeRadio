@@ -112,3 +112,5 @@
 2026-11-16 | Voice | Haru-4B (full-duplex dialogue base, 9 languages, not scripted TTS) | SKIP | https://huggingface.co/higurashi-ai/Haru-4B
 2026-11-16 | Voice | Maya2 Native TTS (Indic + English, pack maya2-native) | SKIP | https://api.comfy.org/nodes/maya2-native
 2026-11-16 | Video | Runway Praxis-1 (robotics world-action model) | SKIP | https://runway.com/news/company-news/praxis-1-is-now-available
+2026-11-17 | Video | LongCat-Video-Avatar 1.6 (Meituan, audio-driven avatar; TeamAIQ int8_convrot 16.9 GB, over 16 GB) | WATCH | https://huggingface.co/meituan-longcat/LongCat-Video-Avatar-1.6
+2026-11-17 | Voice | ZONOS3-Mini registry pack comfyui-zonos3 (update, verdict unchanged) | WATCH | https://api.comfy.org/nodes/comfyui-zonos3
