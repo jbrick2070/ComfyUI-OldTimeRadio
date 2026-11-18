@@ -114,3 +114,7 @@
 2026-11-16 | Video | Runway Praxis-1 (robotics world-action model) | SKIP | https://runway.com/news/company-news/praxis-1-is-now-available
 2026-11-17 | Video | LongCat-Video-Avatar 1.6 (Meituan, audio-driven avatar; TeamAIQ int8_convrot 16.9 GB, over 16 GB) | WATCH | https://huggingface.co/meituan-longcat/LongCat-Video-Avatar-1.6
 2026-11-17 | Voice | ZONOS3-Mini registry pack comfyui-zonos3 (update, verdict unchanged) | WATCH | https://api.comfy.org/nodes/comfyui-zonos3
+2026-11-18 | Writer | wieszcz-xix-349m (Polish 1800-1918 from scratch, 349M, safetensors) | WATCH | https://huggingface.co/SKocur/wieszcz-xix-349m
+2026-11-18 | Video | FastFrames-S/L (Apple, T2V, L bf16 28.6 GB, no int8) | SKIP | https://huggingface.co/apple/FastFrames-L
+2026-11-18 | Video | SCAIL-2 (Comfy-Org repack Sept, int8_convrot 16.65 GB, motion transfer) | SKIP | https://huggingface.co/Comfy-Org/SCAIL-2
+2026-11-18 | Voice | irodori-tts-nodes / Comfy-IndexTTSLocalAPI (Japanese-only / local API script dubbing) | SKIP | https://api.comfy.org/nodes/irodori-tts-nodes
