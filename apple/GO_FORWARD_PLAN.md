@@ -648,6 +648,7 @@ The report is `C:\Users\jeffr\Documents\ComfyUI\otr_reviews\OTR-final-audit-and-
 **Already true, proven on a live 2-act canonical leg** (obs `desk_ink_20261119_025209_..._final.mp4`):
 - the act-break bridge is L = R (0.195/0.195);
 - SlotContract runs at 29.6 tok/s (22.7 before).
+- His ear, 2026-11-19: the closing line sounds fine under the 500 ms crossfade, so N-A1 is closed with no change.
 
 **Pushed after 2.3.53 and not yet released:**
 - O6 streaming encode, `fd858c5a` + `afe5de74`;
@@ -658,12 +659,11 @@ These ride the next bump, once 2.3.53 is Active or Flagged.
 
 **Left:**
 
-1. **His ear on the closing line (N-A1).** The 500 ms crossfade into the closing theme overlaps the last spoken line's final 0.5 s. If he hears it, pad the scene tail and head by the crossfade length.
-2. **Studio double render (N-S1).** The plain-episode path keeps no attempt record, so a lost submit reply or a settle timeout re-enables MAKE while ComfyUI keeps rendering. This needs a design choice: hold an attempt as the producer path does, or check ComfyUI's queue.
-3. **Mux episode identity.** `_master_wav_owes_a_delivery_gain` and `_obs_basename` read the in-flight ledger without an identity check. The existing stem check cannot be reused, because the master WAV keeps its `pending_` name after the episode is retitled. It needs a rename-proof key.
-4. **Operator decision on the spaCy wheel.** agy rated the 2.3.51 boot-time spaCy wheel fetch a HIGH registry-policy risk. Revisit it only if 2.3.53 is Flagged.
-5. **One Google-writer leg** should log "Build 3 slot drama contracts: N slot(s)" (PBUG-20261119-02).
-6. **IndexTTS2 device and `mktemp`: on purpose, not changed.** `eng_indextts2.py` is byte-fingerprinted for the Lemmy route, so an edit demotes the route.
+1. **Studio double render (N-S1).** The plain-episode path keeps no attempt record, so a lost submit reply or a settle timeout re-enables MAKE while ComfyUI keeps rendering. This needs a design choice: hold an attempt as the producer path does, or check ComfyUI's queue.
+2. **Mux episode identity.** `_master_wav_owes_a_delivery_gain` and `_obs_basename` read the in-flight ledger without an identity check. The existing stem check cannot be reused, because the master WAV keeps its `pending_` name after the episode is retitled. It needs a rename-proof key.
+3. **Operator decision on the spaCy wheel.** agy rated the 2.3.51 boot-time spaCy wheel fetch a HIGH registry-policy risk. Revisit it only if 2.3.53 is Flagged.
+4. **One Google-writer leg** should log "Build 3 slot drama contracts: N slot(s)" (PBUG-20261119-02).
+5. **IndexTTS2 device and `mktemp`: on purpose, not changed.** `eng_indextts2.py` is byte-fingerprinted for the Lemmy route, so an edit demotes the route.
 
 ### 0p. Gemini audit 2026-10-13 -- code landed; three live proofs and one row left
 
