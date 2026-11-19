@@ -243,6 +243,26 @@ def make_constrained_generate_fn(
         return _occ.make_comfy_credits_generate_fn(
             cache_entry, response_format=response_format,
         )
+    # The Google API sibling. Without this branch a Google entry fell through
+    # to the local model/tokenizer check and raised ModelLoaderError, which the
+    # writer's Build 3 pass logged and swallowed: every Google-writer episode
+    # shipped with no slot drama contracts (server logs 2026-07-08 and
+    # 2026-09-25). The schema rides along only for a model OTR's catalog marks
+    # structured-output capable -- the backend refuses a schema for any other
+    # model before sending -- and the same fail-closed validate + repair
+    # ladder downstream checks the reply either way.
+    if cache_entry.get("provider") == "google_api":
+        from . import _otr_openrouter_backend as _orb
+        from ._otr_google_api.llm import make_google_api_generate_fn
+        from ._otr_google_api.models import supports_structured_output
+        response_format = None
+        if supports_structured_output(str(cache_entry.get("google_model") or "")):
+            response_format = _orb.schema_to_response_format(
+                schema_model, name=getattr(schema_model, "__name__", "otr_schema"),
+            )
+        return make_google_api_generate_fn(
+            cache_entry, response_format=response_format,
+        )
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
     if missing:

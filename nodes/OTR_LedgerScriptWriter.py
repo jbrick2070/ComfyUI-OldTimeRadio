@@ -553,6 +553,19 @@ def _preflight_llm_selection(
     )
 
 
+def _google_slot_supports_json(repo_id: str) -> bool:
+    """True when a Google API slot is bound to a model OTR's catalog marks
+    structured-output capable. An unbound slot, a lookup fault or a model
+    without the capability answers False -- the behaviour before the marker
+    learned about Google, so a wrong answer can only cost a repair retry."""
+    try:
+        from ._otr_google_api.models import (
+            resolve_model_for_slot, supports_structured_output)
+        return bool(supports_structured_output(resolve_model_for_slot(str(repo_id))))
+    except Exception:  # noqa: BLE001 -- capability is a safe false default
+        return False
+
+
 class _SlotScheduler:
     """Writer-side slot scheduler for the S30 two-model selector.
 
@@ -746,7 +759,14 @@ class _SlotScheduler:
             # structured pass on these. OpenRouter is the one that does
             # (frontier prose->JSON); the local transformers lane is excluded
             # because it has no json_object mode.
-            "_otr_supports_json_object": provider == "openrouter",
+            # Google's backend implements json_object too, but only for a
+            # model the catalog marks structured-output capable (it refuses
+            # the request otherwise), so the marker follows that capability.
+            "_otr_supports_json_object": (
+                provider == "openrouter"
+                or (provider == "google_api"
+                    and _google_slot_supports_json(self.ids.get(slot, "")))
+            ),
             # The plain scheduler closure does not bind a schema itself.
             # Local-transformers closures expose `_otr_bind_schema`; the SciFi
             # structured invoker uses it to bind each pass's exact Pydantic

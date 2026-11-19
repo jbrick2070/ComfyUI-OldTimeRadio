@@ -294,3 +294,63 @@ def test_a_call_with_no_requested_size_still_gets_the_context_check(monkeypatch)
         fn([{"role": "user", "content": "x" * 40000}],
            temperature=.2, max_new_tokens=None)
     assert sent == []
+
+
+def test_the_structured_writer_path_dispatches_google(monkeypatch):
+    """Audit B11. make_constrained_generate_fn handled OpenRouter and Comfy
+    Credits but not Google, so a Google entry reached the local
+    model/tokenizer check and raised ModelLoaderError; the writer's Build 3
+    slot-contract pass swallowed it on every Google-writer episode. The
+    structured path must return a Google generate_fn that sends the schema."""
+    from pydantic import BaseModel
+
+    from nodes import _otr_constrained_generate as cg
+
+    class _Fields(BaseModel):
+        line_job: str
+
+    monkeypatch.delenv("OTR_GOOGLE_THINKING_LEVEL", raising=False)
+    captured = {}
+
+    def fake_create(payload):
+        captured["payload"] = payload
+        return {"output_text": '{"line_job": "deflect"}'}
+
+    monkeypatch.setattr(gllm, "create_interaction", fake_create)
+    entry = {
+        "provider": "google_api",
+        "model_id": gmodels.GOOGLE_API_SLOT_B_ID,
+        "google_model": gmodels.GOOGLE_API_RECOMMENDED_TECHNICAL_DEFAULT,
+    }
+    fn = cg.make_constrained_generate_fn(entry, _Fields)
+    out = fn([{"role": "user", "content": "One field."}],
+             temperature=0.2, max_new_tokens=32)
+    assert out == '{"line_job": "deflect"}'
+    rf = captured["payload"]["response_format"]
+    assert rf["mime_type"] == "application/json"
+    assert "line_job" in str(rf.get("schema"))
+
+
+def test_a_google_model_without_structured_output_gets_no_schema(monkeypatch):
+    """The backend refuses a schema for a model the catalog does not mark
+    structured-output capable, so the structured path must not send one."""
+    from pydantic import BaseModel
+
+    from nodes import _otr_constrained_generate as cg
+
+    class _Fields(BaseModel):
+        line_job: str
+
+    captured = {}
+
+    def fake_create(payload):
+        captured["payload"] = payload
+        return {"output_text": "{}"}
+
+    monkeypatch.setattr(gllm, "create_interaction", fake_create)
+    fn = cg.make_constrained_generate_fn(
+        {"provider": "google_api", "model_id": gmodels.GOOGLE_API_SLOT_B_ID,
+         "google_model": "gemini-not-in-the-catalog"}, _Fields)
+    fn([{"role": "user", "content": "x"}], temperature=0.2, max_new_tokens=8)
+    assert "response_format" not in captured["payload"] or not captured[
+        "payload"].get("response_format")
