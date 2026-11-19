@@ -303,8 +303,9 @@ _RAWVIDEO_STDIN_ENCODERS = {
         "the shared STREAMING encoder -- takes a generator, so it cannot "
         "buffer the batch and cannot use communicate()",
     ("wrapper_bridge.py", "encode_frames_to_silent_mp4"):
-        "the shared BATCH encoder -- takes a whole (B,H,W,3) array and pipes "
-        "it through communicate(), which is why it has no stderr deadlock",
+        "the shared BATCH encoder -- takes a whole (B,H,W,3) array and writes "
+        "it frame by frame with stderr in a file, so it holds no second copy "
+        "of the clip and has no stderr deadlock",
     ("wrapper_bridge.py", "ffmpeg_silent_mp4_cmd"):
         "the batch encoder's pure argv builder, not a spawner of its own",
     ("video_engine.py", "_encode_mp4"):

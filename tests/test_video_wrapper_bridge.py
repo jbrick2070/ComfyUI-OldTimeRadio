@@ -479,11 +479,24 @@ def test_the_encoder_returns_what_the_boundary_proved(monkeypatch, tmp_path):
     monkeypatch.setattr(wb, "proven_frame_count", _fake)
     monkeypatch.setattr(wb, "run_ffmpeg", lambda cmd: cmd)
 
-    class _P:
-        returncode = 0
+    class _Stdin:
+        def write(self, _data):
+            pass
 
-        def communicate(self, _data):
-            return b"", b""
+        def close(self):
+            pass
+
+    class _P:
+        # The encoder streams frames to stdin (O6, 2026-11-19), so the stand-in
+        # speaks stdin/wait/poll rather than communicate().
+        returncode = 0
+        stdin = _Stdin()
+
+        def wait(self):
+            return 0
+
+        def poll(self):
+            return 0
 
     out = tmp_path / "clip.mp4"
     out.write_bytes(b"x")

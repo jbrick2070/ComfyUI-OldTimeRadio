@@ -1057,9 +1057,9 @@ def encode_silent_mp4(frames_iter, total, out_path, w, h, fps, ffmpeg):
     # stdin.write() blocks too. That state raises NOTHING, so neither except
     # clause below ever runs and the child is never reaped -- the one exit
     # path where the "ffmpeg left alive holding the output file" defect could
-    # still happen. A file sink has no buffer limit. (The FIRST encoder does
-    # not have this hazard: it uses proc.communicate(), which drains
-    # concurrently. This one must stream, so it cannot.)
+    # still happen. A file sink has no buffer limit. (wrapper_bridge's batch
+    # encoder streams frame by frame too since 2026-11-19, and sends its
+    # stderr to a file for the same reason.)
     err_sink = tempfile.TemporaryFile()
     # otr_proc, never a bare `proc`: the local below IS named proc.
     proc = otr_proc.popen(cmd, stdin=otr_proc.PIPE,

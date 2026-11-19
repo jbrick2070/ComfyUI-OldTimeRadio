@@ -730,10 +730,21 @@ def images_to_uint8(images):
     arr = np.asarray(arr)
     if arr.ndim == 3:                              # a single frame -> a batch of 1
         arr = arr[None, ...]
-    if arr.dtype != np.uint8:
-        arr = np.clip(arr, 0.0, 1.0)
-        arr = (arr * 255.0 + 0.5).astype(np.uint8)
-    return np.ascontiguousarray(arr)
+    if arr.dtype == np.uint8:
+        return np.ascontiguousarray(arr)
+    # ONE FRAME AT A TIME INTO ONE uint8 BUFFER. The whole-batch form built a
+    # clipped float copy and a scaled float copy of the entire clip before the
+    # cast -- two extra full-size float32 arrays (a 97-frame 1280x720 clip is
+    # ~1.07 GB each), on a host that may share its memory with the GPU. Per
+    # frame, the temporaries are one frame's worth; the bytes are identical
+    # (same clip, same *255+0.5, same truncating cast).
+    out = np.empty(arr.shape, dtype=np.uint8)
+    for i in range(arr.shape[0]):
+        frame = np.clip(arr[i], 0.0, 1.0)
+        frame *= 255.0
+        frame += 0.5
+        out[i] = frame.astype(np.uint8)
+    return out
 
 
 # The operator's standing directive: "no mirrors, no ping-pongs -- we need
@@ -1259,12 +1270,40 @@ def encode_frames_to_silent_mp4(frames, out_path, fps, *, ffmpeg="ffmpeg",
             % (w, h, out_path))
     cmd = _with_resolved_ffmpeg(
         ffmpeg_silent_mp4_cmd(out_path, w, h, fps, ffmpeg=ffmpeg, crf=crf))
+    # STREAMED, FRAME BY FRAME. `communicate(frames.tobytes())` first copied the
+    # whole clip into one bytes object (a second full copy of the uint8 clip).
+    # Writing each frame's own buffer sends the same bytes in the same order.
+    # stderr goes to a FILE: a piped stderr that is not drained while we write
+    # stdin can fill its OS buffer, block ffmpeg, and then block us with no
+    # exception (the scope_draw encoder documents the same hazard).
+    import tempfile
+    err_sink = tempfile.TemporaryFile()
+    proc = None
     try:
-        proc = otr_proc.popen(cmd, stdin=otr_proc.PIPE,
-                                stdout=otr_proc.DEVNULL, stderr=otr_proc.PIPE)
-        _, err = proc.communicate(frames.tobytes())
-    except FileNotFoundError as exc:
-        raise GraphExecutionError("ffmpeg not found: %s" % exc)
+        try:
+            proc = otr_proc.popen(cmd, stdin=otr_proc.PIPE,
+                                    stdout=otr_proc.DEVNULL, stderr=err_sink)
+        except FileNotFoundError as exc:
+            raise GraphExecutionError("ffmpeg not found: %s" % exc)
+        try:
+            for i in range(int(b)):
+                proc.stdin.write(memoryview(frames[i]).cast("B"))
+        except BrokenPipeError:
+            pass      # ffmpeg quit early; its stderr below says why
+        try:
+            proc.stdin.close()
+        except OSError:
+            pass
+        proc.wait()
+    except BaseException:
+        if proc is not None and proc.poll() is None:
+            proc.kill()
+            proc.wait()
+        err_sink.close()
+        raise
+    err_sink.seek(0)
+    err = err_sink.read()
+    err_sink.close()
     if proc.returncode != 0 or not os.path.exists(out_path):
         raise GraphExecutionError(
             "ffmpeg frame encode failed rc=%s: %s"
