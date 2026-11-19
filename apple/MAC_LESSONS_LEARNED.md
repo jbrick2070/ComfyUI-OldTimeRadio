@@ -353,3 +353,35 @@ while this host had only 8.5 GB free.  The loader raised
 `InsufficientDiskSpaceError` before downloading anything.  At this point a
 continued local trial requires an explicit storage-cleanup decision; do not
 silently delete model caches merely to make a qualification run proceed.
+
+## 11. int8 / int8_convrot weights do NOT run on the Metal GPU (M6, 2026-11-19)
+
+**Measured on a Mac mini M6 (16 GB unified, macOS 27.3), Comfy Desktop's
+ComfyUI 0.46.0, torch 2.12.1, with Comfy-Org's pinned
+`gemma4_e2b_it_int8_convrot.safetensors` (SHA-256 verified), loaded by
+ComfyUI's own `comfy.sd.load_clip` and generated through `clip.generate`
+-- the same calls the core TextGenerate node and OTR's `comfy_native`
+writer make.**
+
+| placement | result |
+| --- | --- |
+| ComfyUI's default | runs, **on the CPU**: 1.0 tok/s cold (269 tokens, 261.6 s) and warm (295 tokens, 285.3 s, Japanese); Metal memory 0.00 GB. Output sane in English and Japanese. |
+| `model_options={"load_device": mps}` | **fails**: `NotImplementedError: The operator 'aten::_int_mm' is not currently implemented for the MPS device` (comfy_kitchen `int8_linear` -> `torch._int_mm`). |
+| for contrast, `Qwen/Qwen3.5-4B` bf16 on mps (same box, same day) | ~7 tok/s steady |
+
+Why the default is the CPU: on unified memory ComfyUI's `vram_state` is
+SHARED, so `model_management.text_encoder_device()` returns the CPU unless
+ComfyUI runs with `--gpu-only` -- and forcing the GPU hits the missing op
+above. So ComfyUI's choice is correct, and there is nothing in the pack to
+change.
+
+**What this settles:**
+- The Comfy-native Gemma 4 int8 writers (E2B / E4B / 12B) stay off the Mac
+  workflows: about 7x slower than the Qwen bf16 writer there. Qwen3.5-4B
+  bf16 remains the Mac writer.
+- The same holds for every int8_convrot weight the pack ships (FLUX 3 Klein,
+  MOSS-Image, the MiniMax H3 int8 lanes): their `device_backends` of
+  `["cuda"]` is now a measured fact on Apple Silicon, not just "unmeasured".
+- Revisit when PyTorch implements `aten::_int_mm` for MPS
+  (https://github.com/pytorch/pytorch/issues/141287). A bf16 Comfy-native
+  Gemma build would avoid the op, at roughly twice the memory; unmeasured.
