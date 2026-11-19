@@ -1679,11 +1679,14 @@ def load_llm(
         actual_quant = (quant_config is not None)
         _runtime_log(f"LLM loaded: {_stripped_model_id} (quantized={actual_quant}, budget={optimization_profile}) [v1.5]")
 
-        # CUDA kernel warmup -- absorbs the 30-60s JIT compile cost
-        # for SDPA + BitsAndBytes 4-bit on Blackwell.
+        # Kernel warmup -- absorbs the 30-60s JIT compile cost for SDPA +
+        # BitsAndBytes 4-bit on Blackwell, and Metal's first-use shader
+        # compiles on Apple Silicon. The log names the device it really ran
+        # on: a Mac printed "CUDA warmup" while running on mps (2026-11-19).
+        _warm_dev = str(getattr(getattr(model, "device", None), "type", "") or "gpu").upper()
         try:
             _warmup_start = time.time()
-            _runtime_log("WARMUP: Starting 1-token CUDA kernel warmup...")
+            _runtime_log(f"WARMUP: Starting 1-token {_warm_dev} kernel warmup...")
             _warmup_ids = tokenizer("Test.", return_tensors="pt")["input_ids"].to(model.device)
             with torch.no_grad():
                 model.generate(
@@ -1694,10 +1697,10 @@ def load_llm(
             del _warmup_ids
             torch.cuda.empty_cache()
             _warmup_sec = time.time() - _warmup_start
-            _runtime_log(f"WARMUP: CUDA kernels compiled in {_warmup_sec:.1f}s - generation will start instantly")
-            log.info("[StoryOrchestrator] CUDA warmup complete (%.1fs) - first generate will not stall", _warmup_sec)
+            _runtime_log(f"WARMUP: {_warm_dev} kernels compiled in {_warmup_sec:.1f}s")
+            log.info("[StoryOrchestrator] %s warmup complete (%.1fs)", _warm_dev, _warmup_sec)
         except Exception as _warmup_err:
-            log.warning("[StoryOrchestrator] CUDA warmup failed (non-fatal): %s", _warmup_err)
+            log.warning("[StoryOrchestrator] %s warmup failed (non-fatal): %s", _warm_dev, _warmup_err)
             _runtime_log(f"WARMUP: Failed (non-fatal): {_warmup_err}")
 
         # The loaded decoder is the final authority, including a first download
