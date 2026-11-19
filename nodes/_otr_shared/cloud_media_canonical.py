@@ -297,9 +297,18 @@ def canonicalize_audio(raw: PartnerResult, request: dict, session=None) -> Canon
                                      _loudnorm_params)
     mono = audio if ch == 1 else audio.mean(axis=1)
     if mono.size and float(np.abs(mono).max()) > 0.0:
-        leveled = _loudness_normalize_clip(mono, **_loudnorm_params())
+        params = _loudnorm_params()
+        leveled = _loudness_normalize_clip(mono, **params)
         j = int(np.argmax(np.abs(mono)))
         gain = float(leveled[j] / mono[j]) if mono[j] != 0 else 1.0
+        # THE PEAK CAP READS EVERY CHANNEL. The leveler measured the mono
+        # mean, whose peak sits below a wide stereo mix's channel peaks, so
+        # its 0.95 ceiling let L or R past full scale and the pcm_s16le write
+        # below clipped them (audit B15: a 0.9 / -0.8 stereo pair put 69,600
+        # of 96,000 samples on the rails). The loudness target is unchanged.
+        channel_peak = float(np.abs(audio).max())
+        if channel_peak > 0.0:
+            gain = min(gain, float(params["peak_ceiling"]) / channel_peak)
         audio = (audio * gain).astype(np.float32)
 
     # --- +/-250ms tolerance: pad TAIL silence up to the slot (never trim) ---

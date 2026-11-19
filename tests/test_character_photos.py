@@ -527,3 +527,22 @@ def test_the_second_photo_reaches_the_engine_as_one_more_reference(monkeypatch, 
     assert [p.split("\\")[-1].split("/")[-1] for p in seen[0]["reference_images"]] == [
         "otr_cast_cd.png"]
     assert _portrait_row(led)["identity_photo_more"] == ["otr_cast_cd.png"]
+
+
+def test_a_pending_co_character_portrait_flushes_the_cloud_queue():
+    """Audit B12. The speaker's portrait was a cache hit while the person
+    beside them was still queued on the cloud lane: the flush looked for the
+    speaker only, so the co-character was drawn without a reference."""
+    pending = [{"kind": "portrait", "oid": "portrait_c03", "char_id": "c03"}]
+    assert disp._frame_portrait_pending(pending, "c02", ["c03"]) is True
+    assert disp._frame_portrait_pending(pending, "c02", []) is False
+    assert disp._frame_portrait_pending(pending, "c03") is True
+    assert disp._frame_portrait_pending([], "c02", ["c03"]) is False
+
+
+def test_the_dispatch_loop_flushes_on_any_person_in_the_frame():
+    """The wiring: the dispatch loop asks about everyone in the frame."""
+    import inspect
+    src = inspect.getsource(disp)
+    assert '_frame_portrait_pending(pending_cloud, char_id,' in src
+    assert 'obj.get("co_char_ids"))' in src

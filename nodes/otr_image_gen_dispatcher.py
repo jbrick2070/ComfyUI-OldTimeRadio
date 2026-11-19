@@ -1305,6 +1305,15 @@ def _pending_holds_portrait(pending, char_id) -> bool:
     return False
 
 
+def _frame_portrait_pending(pending, char_id, co_char_ids=()) -> bool:
+    """True when the portrait of ANYONE in this frame -- the speaker or a
+    co-character -- is still queued on the cloud lane. Checking the speaker
+    alone let a two-shot whose speaker portrait was a cache hit read the
+    co-character's reference before it existed (audit B12)."""
+    return any(_pending_holds_portrait(pending, cid)
+               for cid in (char_id, *(co_char_ids or ())))
+
+
 def _still_engine_refused(exc, engine_id=None) -> bool:
     """True when the STILL engine declined the card, however it said so.
 
@@ -2139,7 +2148,12 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         # writes portrait_content_hash only on a fresh render, so on a cache HIT
         # the cast lookup returns None -- exactly where the anchor matters most.
         # reversed() so a stale row from an earlier image_revision cannot win.
-        if _pending_holds_portrait(pending_cloud, char_id):
+        # EVERY person in the frame, not just the speaker: a two-shot reads
+        # each co-character's portrait as a reference below, and a portrait
+        # still in flight on the cloud lane must land first or that person is
+        # drawn from text alone and the cache key misses their hash.
+        if _frame_portrait_pending(pending_cloud, char_id,
+                                   obj.get("co_char_ids")):
             _flush_pending_cloud_stills(pending_cloud, ctx)
         portrait_row = None
         if kind in ("scene_character", _cp.JUMP_STILL_KIND) and char_id:
