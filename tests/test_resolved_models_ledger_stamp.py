@@ -87,3 +87,14 @@ def test_backend_still_exposes_the_snapshot_helper():
     from nodes import _otr_openrouter_backend as orb
     assert callable(getattr(orb, "resolved_models_snapshot", None))
     assert callable(getattr(orb, "reset_run_budget", None))
+
+
+def test_the_stamp_precedes_the_emitted_script_json():
+    """Audit B19. The JSON this node emits was serialized BEFORE the stamp, so
+    downstream nodes read a ledger without the provenance the saved file had.
+    The stamp must also precede the lane finalizer, the true last mutation."""
+    src = _writer_source()
+    stamp = src.find('meta["resolved_models"]')
+    finalize = src.find("tail_finalizer.before_save(ctx=ctx)")
+    emit = src.find("script_json = json.dumps(led.data")
+    assert 0 < stamp < finalize < emit

@@ -574,7 +574,10 @@ def create_interaction(
             raise
         except GoogleAPIError as exc:
             last_exc = exc
-            if attempt >= retries:
+            # The classifier already decided (_attach_evidence): an auth,
+            # request-shape or other non-retryable HTTP answer will not change
+            # on a resend, so it is raised at once instead of POSTed again.
+            if attempt >= retries or getattr(exc, "retryable", True) is False:
                 raise
             time.sleep(min(2.0, 0.25 * (2 ** attempt)))
     assert last_exc is not None

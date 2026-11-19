@@ -66,8 +66,13 @@ try:
     hf_logging.set_verbosity_error()
 except Exception:
     pass  # transformers not installed yet — will be caught at node load time
+# huggingface_hub 1.x moved its logger to the public `huggingface_hub.utils.logging`
+# (the private `_logging` path raised ModuleNotFoundError, swallowed here, so the
+# Hub's chatter was never silenced). The env default covers a first import that
+# happens later; the call covers a library ComfyUI core already loaded.
+otr_env.setdefault("HF_HUB_VERBOSITY", "error")
 try:
-    import huggingface_hub.utils._logging as hfh_logging
+    from huggingface_hub.utils import logging as hfh_logging
     hfh_logging.set_verbosity_error()
 except Exception:
     pass

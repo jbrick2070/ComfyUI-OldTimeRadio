@@ -230,3 +230,31 @@ def test_get_json_and_create_interaction_share_the_backoff(_fast):
     assert gc.create_interaction({"model": "m", "input": "x"}, _post=post)["status"] == "completed"
     assert seen == {"get": 2, "post": 2}
     assert _fast == [5.0, 5.0]
+
+
+def test_a_non_retryable_answer_is_not_posted_again(_fast, monkeypatch):
+    """Audit secondary finding. A 405 is classified non-retryable, yet
+    create_interaction POSTed it three times with two retries configured.
+    A transport or 5xx answer is still retried."""
+    monkeypatch.setenv("OTR_GOOGLE_MAX_RETRIES", "2")
+    calls = {"n": 0}
+
+    def post(path, payload, api_key, timeout_s):
+        calls["n"] += 1
+        exc = gc._classify_http_error(405, {"error": {"message": "nope"}})
+        raise gc._attach_evidence(exc, status=405)
+
+    with pytest.raises(gc.GoogleAPIError):
+        gc.create_interaction({"model": "m", "input": "x"}, _post=post)
+    assert calls["n"] == 1
+
+    calls["n"] = 0
+
+    def flaky(path, payload, api_key, timeout_s):
+        calls["n"] += 1
+        exc = gc._classify_http_error(503, {})
+        raise gc._attach_evidence(exc, status=503)
+
+    with pytest.raises(gc.GoogleAPIError):
+        gc.create_interaction({"model": "m", "input": "x"}, _post=flaky)
+    assert calls["n"] == 3

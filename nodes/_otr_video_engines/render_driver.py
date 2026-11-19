@@ -4930,7 +4930,9 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     # checking after the load it exists to prevent: on unified memory the
     # machine would already be gone. Checked in both places on purpose; it is a
     # dictionary lookup and a stat, and being early twice costs nothing.
-    _mc.refuse_if_weights_exceed_unified_memory(engine)
+    # The registry ID, not the engine object: the guard resolves weights by
+    # ID, and an object made its lookup fail silently (audit B4).
+    _mc.refuse_if_weights_exceed_unified_memory(engine_id)
     with _bs.BeatSession(engine, host_caps=host_caps, profile=profile,
                          beat_id=beat_id,
                          segment_count=plan.segment_count,

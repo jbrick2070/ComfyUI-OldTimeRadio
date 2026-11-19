@@ -1080,7 +1080,6 @@ class WriterTailMixin:
                         resolved["technical_model"])),
                 )
             },
-            "act_count":             resolved["act_count"],
             "include_act_breaks":    resolved["include_act_breaks"],
             "optimization_profile":  resolved["optimization_profile"],
             "seed_source":           resolved["seed_source"],
@@ -1802,6 +1801,43 @@ class WriterTailMixin:
                 _source_bank_row, "default_story_pipeline", "") or ""),
             title_source=title_source,
         )
+        # --- M-pre. Resolved remote models (provenance) -----------------
+        # WHY THIS IS HERE AND NOT ONLY IN THE CREDITS SHEET. A `~latest`
+        # OpenRouter alias resolves to a CONCRETE model server-side, and the
+        # entire safety argument for shipping aliases instead of pinned slugs
+        # is "replay is unaffected because we record what actually served the
+        # run". That record existed in exactly ONE place --
+        # video_engine.py's "RESOLVED (OPENROUTER)" credits section -- which is
+        # built on the VIDEO path. Proven live 2026-08-09: a story-only leg on
+        # `~anthropic/claude-opus-latest` made real remote calls and finished
+        # with NO provenance anywhere in its ledger, because no video node ever
+        # ran. Any writer-only or scoring run silently lost the answer to "which
+        # model wrote this".
+        # Stamped after the last model call of the run (every call in the
+        # window opened by reset_run_budget(), including the reflection pass)
+        # and BEFORE the finalizer and the script_json serialization below, so
+        # the JSON this node emits and the ledger it saves carry the same
+        # provenance (audit B19: it was stamped after script_json was built).
+        # Written ONLY when non-empty: a purely local run adds no key, so
+        # today's ledgers stay byte-identical.
+        try:
+            from ._otr_openrouter_backend import (
+                resolved_models_snapshot as _resolved_snapshot)
+            _resolved_now = _resolved_snapshot() or {}
+        except Exception:  # noqa: BLE001 -- provenance must never fail a render
+            _resolved_now = {}
+        if _resolved_now:
+            meta["resolved_models"] = _resolved_now
+            log.info(
+                "[OTR_LedgerScriptWriter] resolved remote model(s): %s",
+                ", ".join(
+                    "%s -> %s (%d call(s))" % (
+                        slug,
+                        (_resolved_now[slug] or {}).get("resolved")
+                        or "(unreported)",
+                        int((_resolved_now[slug] or {}).get("calls") or 0))
+                    for slug in sorted(_resolved_now)))
+
         # The lane finalizer is the true last mutation boundary: every shared
         # writer metadata stamp (including consistency_status) is complete
         # before Phase 10 seals the ledger and authorship receipt.
@@ -1836,40 +1872,6 @@ class WriterTailMixin:
         est_minutes = max(
             1, round(actual_word_count / WORDS_PER_MINUTE_ESTIMATE, 1),
         )
-
-        # --- M-pre. Resolved remote models (provenance) -----------------
-        # WHY THIS IS HERE AND NOT ONLY IN THE CREDITS SHEET. A `~latest`
-        # OpenRouter alias resolves to a CONCRETE model server-side, and the
-        # entire safety argument for shipping aliases instead of pinned slugs
-        # is "replay is unaffected because we record what actually served the
-        # run". That record existed in exactly ONE place --
-        # video_engine.py's "RESOLVED (OPENROUTER)" credits section -- which is
-        # built on the VIDEO path. Proven live 2026-08-09: a story-only leg on
-        # `~anthropic/claude-opus-latest` made real remote calls and finished
-        # with NO provenance anywhere in its ledger, because no video node ever
-        # ran. Any writer-only or scoring run silently lost the answer to "which
-        # model wrote this".
-        # Stamped just before the terminal save so it captures every call in the
-        # window opened by reset_run_budget() earlier in this run, including the
-        # reflection pass. Written ONLY when non-empty: a purely local run adds
-        # no key, so today's ledgers stay byte-identical.
-        try:
-            from ._otr_openrouter_backend import (
-                resolved_models_snapshot as _resolved_snapshot)
-            _resolved_now = _resolved_snapshot() or {}
-        except Exception:  # noqa: BLE001 -- provenance must never fail a render
-            _resolved_now = {}
-        if _resolved_now:
-            meta["resolved_models"] = _resolved_now
-            log.info(
-                "[OTR_LedgerScriptWriter] resolved remote model(s): %s",
-                ", ".join(
-                    "%s -> %s (%d call(s))" % (
-                        slug,
-                        (_resolved_now[slug] or {}).get("resolved")
-                        or "(unreported)",
-                        int((_resolved_now[slug] or {}).get("calls") or 0))
-                    for slug in sorted(_resolved_now)))
 
         # --- M. Save ledger -------------------------------------------
         # Spec r3/final.md section 6: terminal saves MUST be truthy-required.

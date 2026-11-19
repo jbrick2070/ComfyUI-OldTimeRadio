@@ -1184,7 +1184,12 @@ class SceneSequencer:
                     announcer_clip_idx += 1
                     announcer_bus_line_ids.append(item.get("line_id"))
                     render_log.append(f"[{global_idx}] ANNOUNCER: {line[:40]}...")
-                elif tts_clip_idx < len(tts_clips):
+                elif not is_announcer and tts_clip_idx < len(tts_clips):
+                    # The character bus serves character lines only. An
+                    # announcer line with its own bus exhausted used to take
+                    # the next character clip, so the shortfall surfaced
+                    # lines later on the wrong line, or not at all when a
+                    # surplus character clip covered it (audit B20).
                     clip_np, clip_sr = tts_clips[tts_clip_idx]
                     segment_np = _resample_audio(clip_np, clip_sr, sample_rate)
                     segment_np = _level_dialogue_clip(segment_np)

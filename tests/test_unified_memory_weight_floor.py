@@ -567,3 +567,15 @@ def test_a_discrete_card_is_not_refused_even_when_the_weights_are_huge(
     monkeypatch.setattr(mc, "free_vram_mb", lambda: 8000.0)
     monkeypatch.setattr(mc, "resolved_weight_mb", lambda name: 28000.0)
     mc.refuse_if_weights_exceed_unified_memory("some_engine")
+
+
+def test_the_coverage_beat_guard_is_handed_the_engine_id():
+    """Audit B4. The early guard before BeatSession.open() was passed the
+    engine OBJECT; the guard resolves weights by registry ID, so its lookup
+    failed silently and the warning never fired before the load."""
+    import inspect
+
+    from nodes._otr_video_engines import render_driver
+    src = inspect.getsource(render_driver)
+    assert "_mc.refuse_if_weights_exceed_unified_memory(engine)\n" not in src
+    assert "_mc.refuse_if_weights_exceed_unified_memory(engine_id)" in src

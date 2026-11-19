@@ -471,3 +471,37 @@ def test_assembler_title_survives_a_pathological_descriptor():
         "[" * 20000 + "]" * 20000)
     assert source == "timestamp_lastresort"
     assert title.startswith("Signal Lost ")
+
+
+def test_an_announcer_shortfall_never_takes_a_character_clip(patched_sequencer_env):
+    """Audit B20. An announcer line with its own bus exhausted used to take the
+    next CHARACTER clip; with one surplus character clip the episode then
+    finished with the announcer speaking in a character's voice. The failure
+    must name the announcer line, on the announcer bus."""
+    from nodes.scene_sequencer import SceneSequencer
+
+    led_in = {
+        "meta": {"title": "ANNOUNCER SHORT", "news_seed": {"headline": "x"}},
+        "cast": [
+            {"char_id": "c00", "name": "ANNOUNCER", "voice_preset": "v2/en_speaker_6",
+             "line_count": 2, "word_count": 4},
+            {"char_id": "c01", "name": "ALPHA", "voice_preset": "v2/en_speaker_3",
+             "line_count": 1, "word_count": 2},
+        ],
+        "lines": [
+            {"line_id": "A001", "char_id": "c00", "speaker_role": "announcer",
+             "text": "Good evening.", "start_s": None, "dur_s": None},
+            {"line_id": "A002", "char_id": "c00", "speaker_role": "announcer",
+             "text": "Our story.", "start_s": None, "dur_s": None},
+            {"line_id": "C001", "char_id": "c01", "speaker_role": "character",
+             "text": "Hello there.", "start_s": None, "dur_s": None},
+        ],
+    }
+    patched_sequencer_env["led_disk"] = json.loads(json.dumps(led_in))
+    # One announcer clip for two announcer lines; a SURPLUS character clip.
+    with pytest.raises(ValueError, match=r"'A002'.*announcer=True"):
+        SceneSequencer().sequence(
+            script_json=json.dumps(led_in),
+            tts_audio_clips=_make_audio(2),
+            announcer_audio_clips=_make_audio(1),
+        )

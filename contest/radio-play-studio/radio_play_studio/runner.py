@@ -922,7 +922,9 @@ class Studio:
         if not isinstance(entry, dict):
             return "gone", None
         status = entry.get("status") if isinstance(entry.get("status"), dict) else {}
-        ok = status.get("status_str") == "success" and status.get("completed", True)
+        # An explicit completion only (Bug Bible 05.06): a history entry that
+        # does not say it completed is not a finished run.
+        ok = status.get("status_str") == "success" and status.get("completed") is True
         return ("done" if ok else "failed"), entry
 
     def _settle_forgotten(self, plan: dict, job_id: str,

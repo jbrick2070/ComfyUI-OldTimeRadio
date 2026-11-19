@@ -863,3 +863,21 @@ def test_the_page_draws_the_stage_bar_and_clears_it_however_a_run_ends():
     page = (Path(__file__).resolve().parents[1] / "radio_play_studio" / "static" / "index.html").read_text(encoding="utf-8")
     watch = page[page.index("function watch(id) {"):page.index("// A finished episode, playing")]
     assert watch.count("stageBarOff();") >= 3 and "stageBar(ev);" in watch
+
+
+@pytest.mark.parametrize("status, verdict", [
+    ({"status_str": "success", "completed": True}, "done"),
+    ({"status_str": "success"}, "failed"),                 # Bug Bible 05.06
+    ({"status_str": "success", "completed": False}, "failed"),
+    ({"status_str": "error", "completed": True}, "failed"),
+    ({}, "failed"),
+])
+def test_only_an_explicit_completion_is_a_finished_run(settings, schemas, status, verdict):
+    """Audit B17. A history entry that never says it completed is not done;
+    defaulting the missing key to True filed it as a finished run."""
+    replies = {"/queue": {"queue_running": [], "queue_pending": []},
+               "/history/job-1": {"job-1": {"status": status, "outputs": {}}}}
+    studio = Studio(settings, client_factory=lambda url: FakeClient(_good_job()),
+                    fetch=lambda url: schemas, comfy_json=lambda path: replies[path])
+    where, _entry = studio._comfy_knows("job-1")
+    assert where == verdict
