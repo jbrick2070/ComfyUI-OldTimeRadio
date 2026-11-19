@@ -67,9 +67,22 @@ _FETCH_DEFAULT = _CKPT_PREFERENCE[0]
 #: off at.
 _CFG_FOR_BASE = 4.0
 _CFG_FOR_POST_TRAINED = 1.0
-_CKPT = otr_env.get("OTR_SA3_CKPT", "")
-_TENC = otr_env.get("OTR_SA3_TEXT_ENCODER", "t5gemma_b_b_ul2.safetensors")
-_CLIP_TYPE = otr_env.get("OTR_SA3_CLIP_TYPE", "stable_audio")
+# READ PER CALL, NOT AT IMPORT. The three operator pins were captured once when
+# the pack loaded, so setting OTR_SA3_CKPT for an A/B in a running server did
+# nothing until a restart, while every other OTR_* knob is read when used.
+_TENC_DEFAULT = "t5gemma_b_b_ul2.safetensors"
+
+
+def _ckpt_pin() -> str:
+    return otr_env.get("OTR_SA3_CKPT", "")
+
+
+def _text_encoder() -> str:
+    return otr_env.get("OTR_SA3_TEXT_ENCODER", _TENC_DEFAULT)
+
+
+def _clip_type() -> str:
+    return otr_env.get("OTR_SA3_CLIP_TYPE", "stable_audio")
 
 # BUG-408 (2026-06): SA3 wants genre + instrumentation, a real negative
 # prompt, and a multi-second STRUCTURAL context (seconds_total) to sound like
@@ -259,8 +272,9 @@ class StableAudio3Engine:
         file a fresh install should download, never the fallback it should
         merely tolerate -- the preflight fetches whatever name this returns.
         """
-        if _CKPT:
-            return _CKPT, _CKPT.endswith("_base.safetensors")
+        pinned = _ckpt_pin()
+        if pinned:
+            return pinned, pinned.endswith("_base.safetensors")
         try:
             import folder_paths
             for name in _CKPT_PREFERENCE:
@@ -300,7 +314,7 @@ class StableAudio3Engine:
         # SA3 ships t5gemma separately; if the checkpoint did not carry a usable
         # conditioner, load it explicitly. Defensive: prefer the bundled clip.
         if clip is None:
-            clip = comfy_nodes.CLIPLoader().load_clip(_TENC, _CLIP_TYPE)[0]
+            clip = comfy_nodes.CLIPLoader().load_clip(_text_encoder(), _clip_type())[0]
         self._bundle = (model, clip, vae)
 
     def unload(self):

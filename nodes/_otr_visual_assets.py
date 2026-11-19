@@ -824,7 +824,7 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
         # Being in `_COVERED` even suppressed the "coverage unavailable" note
         # that would otherwise have said so out loud.
         #
-        # `resolve_ckpt()` / `_TENC` already honour OTR_SA3_CKPT /
+        # `resolve_ckpt()` / `_text_encoder()` already honour OTR_SA3_CKPT /
         # OTR_SA3_TEXT_ENCODER, so an operator pin is passed through as
         # `explicit` exactly as the Z-Image branch does with its own env keys.
         if sa3 is None:
@@ -836,7 +836,7 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
         # "" and kill every render that does not set OTR_SA3_CKPT.
         add("checkpoints", sa3.StableAudio3Engine.resolve_ckpt()[0],
             explicit=str((env or {}).get("OTR_SA3_CKPT") or ""))
-        add("text_encoders", sa3._TENC,
+        add("text_encoders", sa3._text_encoder(),
             explicit=str((env or {}).get("OTR_SA3_TEXT_ENCODER") or ""))
     if "sd15" in engines:
         # ASK THE ADAPTER, for the same reason the stable_audio_3 branch above

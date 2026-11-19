@@ -275,12 +275,22 @@ class StableAudioTheme:
             n_cues = 0
         else:
             clips = [row["clip"] for row in cue_rows]
-            # Exact per-cue length AFTER channel canonicalization but BEFORE
-            # the batch right-pad, so a consumer's [bi, :, :sample_count]
-            # slice recovers the cue with ZERO padding (MF-G: no silence trim).
-            sample_counts = [
-                int(canon(clip)["waveform"].shape[-1]) for clip in clips
-            ]
+            # Exact per-cue length AFTER channel canonicalization AND the
+            # batch's resample to `sr`, but BEFORE the right-pad, so a
+            # consumer's [bi, :, :sample_count] slice recovers the cue with
+            # ZERO padding (MF-G: no silence trim). Counting before the
+            # resample was wrong for a cue at another rate: a 24 kHz cue packed
+            # at 48 kHz is twice as long, and its old count cut it in half.
+            from ._otr_audio_engines.base import resample_to_rate
+
+            def _packed_length(clip):
+                a = canon(clip)
+                wave, rate = a["waveform"], int(a["sample_rate"])
+                if rate != int(sr):
+                    wave = resample_to_rate(wave, rate, int(sr))
+                return int(wave.shape[-1])
+
+            sample_counts = [_packed_length(clip) for clip in clips]
             cue_audio = pack_audio_batch(clips, sample_rate=int(sr), mono=mono)
             packed = cue_audio["waveform"]  # [B, C, max_T]
 

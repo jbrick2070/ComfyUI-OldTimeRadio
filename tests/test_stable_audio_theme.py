@@ -11,6 +11,8 @@ from __future__ import annotations
 import pathlib
 import re
 
+import math
+
 import pytest
 import torch
 
@@ -451,3 +453,33 @@ def test_source_is_ascii_no_em_dash():
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+def test_a_cue_at_another_rate_keeps_its_whole_length(monkeypatch):
+    """Audit secondary finding. sample_counts were taken before the batch
+    resampled a rate-mismatched cue, so a cue at half the batch rate was
+    recorded at half its packed length and every consumer slice cut it in
+    half. The count must describe the packed (resampled) cue."""
+    from nodes import _otr_cue_manifest as CM
+    from nodes._otr_audio_engines import get_engine
+    from nodes.stable_audio_theme import StableAudioTheme
+
+    musicgen = get_engine("musicgen")
+    rates = iter([32000, 16000])
+
+    def _gen(prompt, duration_s, seed, **kwargs):
+        rate = next(rates)
+        t = torch.arange(rate // 10, dtype=torch.float32) / rate
+        return {"waveform": (0.3 * torch.sin(2 * math.pi * 440.0 * t)).view(1, 1, -1),
+                "sample_rate": rate}
+
+    monkeypatch.setattr(musicgen, "generate_clip", _gen)
+    cue_audio, manifest_json, _log, _done = StableAudioTheme().generate(
+        script_json=_ledger(), engine="musicgen")
+    rate = int(cue_audio["sample_rate"])
+    manifest = CM.parse_manifest(manifest_json, batch_size=2)
+    for row in manifest["cues"]:
+        # every cue is 0.1 s long, whatever rate it was rendered at
+        assert row["sample_count"] == pytest.approx(rate // 10, abs=2), row
+        wave = cue_audio["waveform"][row["batch_index"], :, :row["sample_count"]]
+        assert float(wave[..., -50:].abs().max()) > 0.01   # the tail is audio, not cut

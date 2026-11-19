@@ -273,16 +273,16 @@ def test_a_post_trained_checkpoint_never_gets_a_guidance_it_cannot_answer(monkey
     assert SA3._CFG_FOR_BASE > 1.0, "a base checkpoint can be steered"
 
     # an explicit override always wins -- that is how the A/B harness moves it
-    monkeypatch.setattr(SA3, "_CKPT", "stable_audio_3_medium_base.safetensors")
+    monkeypatch.setenv("OTR_SA3_CKPT", "stable_audio_3_medium_base.safetensors")
     assert engine.resolve_ckpt() == ("stable_audio_3_medium_base.safetensors", True)
-    monkeypatch.setattr(SA3, "_CKPT", "stable_audio_3_small_music.safetensors")
+    monkeypatch.setenv("OTR_SA3_CKPT", "stable_audio_3_small_music.safetensors")
     assert engine.resolve_ckpt() == ("stable_audio_3_small_music.safetensors", False)
 
 
 def test_an_install_with_only_the_post_trained_file_still_renders(monkeypatch):
     """Nobody has to download anything. A box that has only the file it always
     had keeps working and simply gets the quieter guidance."""
-    monkeypatch.setattr(SA3, "_CKPT", "")
+    monkeypatch.delenv("OTR_SA3_CKPT", raising=False)
     import sys
     import types
     fake = types.ModuleType("folder_paths")
@@ -304,7 +304,7 @@ def test_resolution_never_raises_when_comfy_is_absent(monkeypatch):
     fresh install should FETCH -- the base one -- never the post-trained
     fallback: falling through to the fallback is what sent every fresh
     install the wrong download until 2026-09-12."""
-    monkeypatch.setattr(SA3, "_CKPT", "")
+    monkeypatch.delenv("OTR_SA3_CKPT", raising=False)
     import sys
     monkeypatch.setitem(sys.modules, "folder_paths", None)
     name, is_base = SA3.StableAudio3Engine.resolve_ckpt()
@@ -321,7 +321,7 @@ def test_a_fresh_install_is_sent_to_a_file_the_manifest_can_fetch(monkeypatch):
     must be a name the manifest is allowed to download -- otherwise the
     preflight refuses the download and the wrong render becomes a dead one."""
     from nodes import _otr_visual_assets as VA
-    monkeypatch.setattr(SA3, "_CKPT", "")
+    monkeypatch.delenv("OTR_SA3_CKPT", raising=False)
     import sys
     import types
     fake = types.ModuleType("folder_paths")

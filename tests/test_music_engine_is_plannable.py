@@ -157,12 +157,15 @@ class PlannedEngineBecomesADownloadRequestTests(unittest.TestCase):
     class _SA3:
         """The adapter surface the preflight uses: `resolve_ckpt()` -- the
         name it WILL load, which on an empty disk is the BASE fetch default
-        (2026-09-12) -- and the text-encoder constant. `_CKPT` is the
-        operator's override and is empty by default (PBUG-20260912-05); the
-        preflight must never read it as a filename."""
-        _CKPT = ""
+        (2026-09-12) -- and `_text_encoder()`. The operator's checkpoint pin is
+        empty by default (PBUG-20260912-05); the preflight must never read it
+        as a filename."""
         _FETCH_DEFAULT = "stable_audio_3_small_music_base.safetensors"
         _TENC = "t5gemma_b_b_ul2.safetensors"
+
+        @staticmethod
+        def _text_encoder():
+            return "t5gemma_b_b_ul2.safetensors"
 
         class StableAudio3Engine:
             @staticmethod
@@ -211,16 +214,17 @@ class PlannedEngineBecomesADownloadRequestTests(unittest.TestCase):
         from nodes._otr_audio_engines import eng_stable_audio_3 as real_sa3
         fake = types.ModuleType("folder_paths")
         fake.get_full_path = lambda kind, name: None
-        saved_ckpt = real_sa3._CKPT
+        import os
+        saved_ckpt = os.environ.pop("OTR_SA3_CKPT", None)
         saved_module = sys.modules.get("folder_paths")
-        real_sa3._CKPT = ""
         sys.modules["folder_paths"] = fake
         try:
             reqs = VA.native_requests({"stable_audio_3"},
                                       folder_paths=self._FolderPaths(),
                                       sa3=real_sa3, env={})
         finally:
-            real_sa3._CKPT = saved_ckpt
+            if saved_ckpt is not None:
+                os.environ["OTR_SA3_CKPT"] = saved_ckpt
             if saved_module is None:
                 sys.modules.pop("folder_paths", None)
             else:

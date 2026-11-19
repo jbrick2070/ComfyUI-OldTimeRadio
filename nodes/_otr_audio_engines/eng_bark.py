@@ -115,9 +115,14 @@ class BarkEngine:
             pass
 
     def prepare_text(self, text, delivery_vector=None):
-        from .._otr_bark_lib import _clean_text_for_bark
+        # The SAME speech-only rule the renderer applies (generate_voice ->
+        # _generate_single_line). Preparing with the full whitelist let a line
+        # of pure squeal tokens ("[music]", "*gasps*") pass the voice gate's
+        # empty-text check, then render as empty input and burn every re-roll
+        # before failing; now the gate names the line at once.
+        from .._otr_bark_lib import _clean_text_for_bark, _resolve_bark_speech_only
 
-        return _clean_text_for_bark(text)
+        return _clean_text_for_bark(text, speech_only=_resolve_bark_speech_only())
 
     def _resolve_stage_temps(self):
         """(semantic, coarse, fine) temps from the char_bark_v1 /
