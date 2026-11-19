@@ -870,3 +870,31 @@ def test_the_shared_ensure_finds_a_present_weight_without_a_download(comfy_env, 
     import huggingface_hub
     monkeypatch.setattr(huggingface_hub, "get_hf_file_metadata", no_fetch)
     assert va.ensure_writer_weights(native.MODEL_ID) == comfy_env["weight"]
+
+
+# --- O2 (audit 2026-11-19): the grammar mask is built without a Python loop --
+def _masked(allowed, vocab=16):
+    """Run the real _Run's mask step once over zero logits."""
+    from nodes._otr_comfy_textgen_backend import _Run
+    run = _Run([1, 2], 4, stop_ids=[0], allowed_fn=lambda _b, _ids: allowed,
+               criteria=None, streamer=None, loop_stop_id=0)
+    logits = torch.zeros(1, vocab)
+    run._prepare(logits)
+    run._mask(logits)
+    return logits[0]
+
+
+def test_only_the_allowed_tokens_survive_the_mask():
+    out = _masked([3, 7, 7, -1, 99, 15])          # duplicates and out-of-range ids
+    survivors = [i for i in range(16) if out[i] > torch.finfo(out.dtype).min]
+    assert survivors == [3, 7, 15]
+
+
+def test_an_all_allowed_step_leaves_the_logits_untouched():
+    out = _masked(list(range(16)))
+    assert torch.equal(out, torch.zeros(16))
+
+
+def test_a_grammar_that_allows_nothing_still_fails_loud():
+    with pytest.raises(RuntimeError, match="allows no token"):
+        _masked([-5, 40])

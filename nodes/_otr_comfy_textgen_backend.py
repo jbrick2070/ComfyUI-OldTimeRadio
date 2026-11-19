@@ -267,11 +267,20 @@ class _Run:
 
         allowed = self.allowed_fn(0, self.buf[: self.n])
         vocab = self.cpu_mask.shape[0]
-        keep = [int(t) for t in allowed if 0 <= int(t) < vocab]
-        if not keep:
+        # ONE TENSOR CONVERSION, NOT A PYTHON LOOP PER TOKEN. Inside a JSON
+        # string the grammar allows nearly the whole 262,144-token Gemma 4
+        # vocabulary, and `[int(t) for t in allowed if 0 <= int(t) < vocab]`
+        # cost ~35 ms per generated token there (8.6 ms this way, measured
+        # 2026-11-19); the grammar-bound SlotContract pass decoded at ~23
+        # tok/s against ~80-90 for the same model unconstrained.
+        keep = torch.as_tensor(allowed, dtype=torch.long).reshape(-1)
+        keep = keep[(keep >= 0) & (keep < vocab)]
+        if keep.numel() == 0:
             raise RuntimeError("the grammar allows no token at this position")
         self.cpu_mask.fill_(True)
-        self.cpu_mask[torch.as_tensor(keep, dtype=torch.long)] = False
+        self.cpu_mask[keep] = False
+        if not bool(self.cpu_mask.any()):
+            return          # every token allowed: nothing to mask this step
         self.dev_mask.copy_(self.cpu_mask)
         logits.masked_fill_(self.dev_mask.unsqueeze(0), torch.finfo(logits.dtype).min)
 
