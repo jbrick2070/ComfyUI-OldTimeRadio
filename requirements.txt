@@ -246,7 +246,9 @@ pyloudnorm>=0.1.1
 pycairo>=1.24; sys_platform == 'win32'
 # Pillow: image handling in the cloud-image engine and the media canonicaliser.
 pillow>=10.0
-# aiohttp: imported by __init__.py itself, so it is on the pack's load path.
+# aiohttp: ComfyUI's own server dependency. The pack's __init__.py stopped
+# importing it in 2.3.52 (the no-login ledger route was removed); the live-view
+# client in scripts/otr_api.py still uses it, and core always installs it.
 aiohttp>=3.9
 
 # 2026-09-07: ffmpeg itself, as a pip dependency, and it closes the LAST gap

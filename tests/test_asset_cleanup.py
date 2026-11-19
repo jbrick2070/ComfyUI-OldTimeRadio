@@ -462,8 +462,10 @@ def test_the_mux_calls_the_cleanup_last_after_the_preview_and_the_delivery_gate(
     assert src.index("sweep_shared_tmp()") < call
     assert src.index("self._stamp_terminal_paths(") < call
     tail = src[call:]
-    assert tail.index("except _Interrupted:") < tail.index("except Exception")
-    assert "raise" in tail[tail.index("except _Interrupted:"):tail.index("except Exception")]
+    # A Cancel (Comfy's InterruptProcessingException, a BaseException) must
+    # pass the cleanup's broad catch: it catches Exception, never more.
+    assert "except Exception as _cexc" in tail
+    assert "except BaseException" not in tail[:tail.index("except Exception as _cexc")]
     helper = inspect.getsource(M.OTRMasterAudioMux._asset_cleanup)
     assert "plan_asset_cleanup(" in helper and "execute_asset_cleanup(" in helper
     assert "_assert_delivery_binding(intent, stem)" in helper

@@ -101,9 +101,7 @@ def _response_format_payload(response_format: Any | None) -> dict[str, Any] | No
         raise GoogleAPIRequestShapeError("Google response_format must be a dict.")
     if response_format.get("type") == "json_schema":
         schema = (response_format.get("json_schema") or {}).get("schema")
-    elif response_format.get("type") == "json_object":
-        schema = response_format.get("schema")
-    else:
+    else:  # json_object, or a bare {"schema": ...}
         schema = response_format.get("schema")
     if schema is None:
         return {"type": "text", "mime_type": "application/json"}

@@ -902,7 +902,6 @@ except ImportError:  # pragma: no cover -- flat load
     import _otr_cast_gender as _CG  # type: ignore
 
 _name_forms = _CG.name_forms
-_name_tokens = _CG.name_tokens
 
 
 def _match_stated(mark, names: "list[str]") -> "list[str]":

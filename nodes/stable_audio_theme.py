@@ -607,14 +607,12 @@ class StableAudioTheme:
                 line_id = str(line.get("line_id") or "")
                 if role in role_lines and line_id:
                     role_lines[role].append(line_id)
+            # Bookend anchors only: _CUE_SLOTS is opening/closing, and the
+            # music_inter lines become cues in _append_interstitial_specs below.
             anchor_by_slot = {
                 "opening": (
                     role_lines["music_open"][0]
                     if role_lines["music_open"] else None
-                ),
-                "interstitial": (
-                    role_lines["music_inter"][0]
-                    if role_lines["music_inter"] else None
                 ),
                 "closing": (
                     role_lines["music_close"][-1]

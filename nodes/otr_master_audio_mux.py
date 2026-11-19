@@ -378,10 +378,6 @@ def _credits_tail_ceiling() -> float:
         return _MAX_CREDITS_TAIL_S_DEFAULT
 
 
-class _Interrupted(RuntimeError):
-    pass
-
-
 def _poll_interrupt():
     """Honour ComfyUI Cancel (BUG-073). No-op outside ComfyUI.
 
@@ -2519,17 +2515,15 @@ class OTRMasterAudioMux:
             # ASSET CLEANUP AFTER PUBLISH (row 0b) -- THE LAST STEP, after the
             # publish, the ledger stamp, the required-delivery gate and the
             # janitor. The episode is already delivered, so nothing here may
-            # fail it: a cancel is re-raised FIRST (`_Interrupted` is a
-            # RuntimeError, and a bare `except Exception` would swallow it),
-            # and everything else is a report line.
+            # fail it: everything is a report line. A Cancel is ComfyUI's
+            # InterruptProcessingException, a BaseException, so the
+            # `except Exception` below can never swallow it.
             final_removed = False
             try:
                 _cleanup_line, final_removed = self._asset_cleanup(
                     silent_video_path, final, obs_copy, _intent)
                 if _cleanup_line:
                     report.append(_cleanup_line)
-            except _Interrupted:
-                raise
             except Exception as _cexc:  # noqa: BLE001 -- the episode is published
                 report.append("asset_cleanup skipped: %s: %s"
                               % (type(_cexc).__name__, _cexc))
@@ -2539,8 +2533,6 @@ class OTRMasterAudioMux:
                 ui.setdefault("text", []).append(
                     "archival copy removed by asset_cleanup; the published "
                     "copy above is the deliverable")
-        except _Interrupted:
-            raise
         except (ValueError, OSError) as exc:
             # FAIL THE RUN. This node is TERMINAL -- it muxes the master audio
             # and PUBLISHES the episode to obs. If it cannot, there IS no
