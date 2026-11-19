@@ -163,7 +163,10 @@ def test_the_assemble_gates_read_a_negative_count_as_unproven_not_a_mismatch():
     for gate in ("if na > 0:", "if na < 0:", "if got < 0:", "elif got != total:",
                  "if got_frames < 0:", "elif got_frames != int(n_frames):"):
         assert gate in source, gate
-    assert "max(0, count_video_frames(base_video_path))" in source
+    # The floor is counted for PLANNING by count_floor_frames (a packet count
+    # cross-checked against the header, decoding only on disagreement); it
+    # returns -1 for an unmeasurable floor exactly as count_video_frames does.
+    assert "max(0, count_floor_frames(base_video_path))" in source
     assert "A/V sync guard UNPROVEN" in source
 
 

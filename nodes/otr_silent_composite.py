@@ -430,6 +430,34 @@ def count_video_frames(path: str) -> int:
     return int(raw) if raw.isdigit() else -1
 
 
+def count_floor_frames(path: str) -> int:
+    """The floor video's frame count for TIMELINE PLANNING, without decoding
+    it when two cheap readings agree.
+
+    `count_video_frames` decodes every frame, and the floor is the whole
+    episode at 1080p: on a 409 s floor that is 33.3 s, against 0.28 s to count
+    packets (identical answer, 10233, measured 2026-11-19). The packet count
+    is trusted only when the container's own `nb_frames` says the same; any
+    disagreement or missing field falls back to the decoded count. This is a
+    budgeting input read from an existing file -- the A/V gate and the
+    per-segment verification keep the decoded count."""
+    if not os.path.isfile(path):
+        return -1
+    try:
+        doc = _ffp.probe_json(path, "stream=nb_read_packets,nb_frames",
+                              select_streams="v:0",
+                              extra_args=("-count_packets",))
+        streams = doc.get("streams") or []
+        row = streams[0] if streams else {}
+        packets = str(row.get("nb_read_packets") or "").strip()
+        header = str(row.get("nb_frames") or "").strip()
+        if packets.isdigit() and packets == header and int(packets) > 0:
+            return int(packets)
+    except _ffp.FFprobeError:
+        pass
+    return count_video_frames(path)
+
+
 def _probe_duration(path):
     """Container duration in seconds (the master length the assembled video must
     match); 0.0 when unavailable."""
@@ -1020,7 +1048,7 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
     try:
         enc = otr_proc.popen(enc_args, stdin=otr_proc.PIPE,
                                stderr=enc_stderr_fobj, bufsize=0)
-    except Exception:  # noqa: BLE001
+    except BaseException:  # noqa: BLE001 -- reap the decoder on ANY exit, then re-raise
         _kill_and_wait_all([dec], timeout=30)
         _close_stderr(dec_stderr_fobj, enc_stderr_fobj)
         _unlink_if_exists(dec_stderr_path)
@@ -1181,7 +1209,11 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
             raise RuntimeError(
                 "segment frame count mismatch: %d != %d (src=%r seg=%r)"
                 % (got_frames, int(n_frames), src, seg_path))
-    except Exception:
+    except BaseException:
+        # BaseException, not Exception: a KeyboardInterrupt or a Comfy
+        # InterruptProcessingException (both BaseException) must still reap
+        # both ffmpeg children and the partial segment before propagating
+        # (audit B5; nothing in this loop polls Cancel today).
         error_raised = True
         _kill_and_wait_all([dec, enc], timeout=30)
         _unlink_if_exists(seg_path)
@@ -1325,7 +1357,7 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
     w, h, fps = _even(w), _even(h), max(1, int(fps))
     floor_ok = bool(base_video_path) and os.path.isfile(base_video_path)
     # An unmeasurable floor (-1) is no floor: black fill rather than a guess.
-    floor_frames = max(0, count_video_frames(base_video_path)) if floor_ok else 0
+    floor_frames = max(0, count_floor_frames(base_video_path)) if floor_ok else 0
     # The post-audio ledger's accepted timeline boundary is primary. Positioned
     # manifests may overlap full render requests at audio crossfades, so their
     # render-work sum is deliberately NOT the output length. Legacy/sequential
