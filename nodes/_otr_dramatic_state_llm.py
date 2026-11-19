@@ -50,6 +50,7 @@ __all__ = [
     "derive_news_dramatic_state",
     "ARC_SHAPES",
     "pick_arc_shape",
+    "dramatic_lead_names",
 ]
 
 # F8 (story-engine v1): arc-shape variety. A seeded pre-step picks one of these
@@ -227,17 +228,32 @@ _ARC_SHAPE_GUIDANCE = {
 }
 
 
+def dramatic_lead_names(cast_rows) -> List[str]:
+    """The first two CHARACTER names in cast order -- the dramatic leads A
+    and B. The announcer narrates; it is never a lead. CastLock puts the
+    ANNOUNCER row first, so "the first two cast rows" made the narrator lead
+    A and pushed the real second lead out (Beneath the Boxtree's Shadow,
+    2026-10-28: "LEAD CHARACTERS: ANNOUNCER (A) and TOBY (B)"). The rule is
+    the writer's own character-cast rule (OTR_LedgerScriptWriter's
+    char_id_by_name), and BOTH ends -- this prompt and the per-line obstacle
+    mapping -- read it from here so they cannot disagree."""
+    names: List[str] = []
+    for row in (cast_rows or []):
+        if not isinstance(row, dict):
+            continue
+        nm = str(row.get("name") or "").strip()
+        if not nm or nm.upper() == "ANNOUNCER":
+            continue
+        names.append(nm)
+        if len(names) >= 2:
+            break
+    return names
+
+
 def _build_prompt(meta: Any, cast_rows, key_terms: List[str],
                   arc_shape: str = "") -> str:
     script_brief = _script_brief(meta)
-    names = []
-    for row in (cast_rows or []):
-        if isinstance(row, dict):
-            nm = str(row.get("name") or "").strip()
-            if nm:
-                names.append(nm)
-        if len(names) >= 2:
-            break
+    names = dramatic_lead_names(cast_rows)
     a_name = names[0] if names else "the protagonist"
     b_name = names[1] if len(names) > 1 else "the antagonist"
     terms_line = ", ".join(key_terms) if key_terms else "(none provided)"

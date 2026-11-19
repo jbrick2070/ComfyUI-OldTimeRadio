@@ -107,3 +107,38 @@ def test_fallback_is_deterministic_for_same_inputs():
 
     first, second = run(), run()
     assert first.model_dump() == second.model_dump()
+
+
+# --- audit B10 (2026-11-19): the announcer is never a dramatic lead ----------
+_BOXTREE_CAST = [{"name": "ANNOUNCER"}, {"name": "TOBY"}, {"name": "MARIA"},
+                 {"name": "MALVOLIO"}]
+
+
+def test_the_leads_skip_the_announcer():
+    """Beneath the Boxtree's Shadow (2026-10-28) prompted 'LEAD CHARACTERS:
+    ANNOUNCER (A) and TOBY (B)' because CastLock puts the announcer first."""
+    assert B1.dramatic_lead_names(_BOXTREE_CAST) == ["TOBY", "MARIA"]
+    prompt = B1._build_prompt({}, _BOXTREE_CAST, ["boxtree"])
+    assert "LEAD CHARACTERS: TOBY (A) and MARIA (B)" in prompt
+    assert "ANNOUNCER (A)" not in prompt
+
+
+def test_the_obstacle_mapping_reads_the_same_leads():
+    """The writer's per-line obstacle mapping must name the same A and B the
+    prompt did, so each lead's obstacle is the other lead's want."""
+    import inspect
+
+    from nodes import OTR_LedgerScriptWriter as W
+
+    src = inspect.getsource(W)
+    assert "dramatic_lead_names as _a5_leads" in src
+    from nodes._otr_slot_drama_contract import build_line_dramatic_fields
+    a, b = B1.dramatic_lead_names(_BOXTREE_CAST)
+    state = {"character_a_wants": "WANT_A", "character_b_wants": "WANT_B"}
+    contract = {"line_job": "x"}
+    toby = build_line_dramatic_fields(contract, state, speaker="TOBY",
+                                      a_name=a, b_name=b)
+    maria = build_line_dramatic_fields(contract, state, speaker="MARIA",
+                                       a_name=a, b_name=b)
+    assert toby["beat_obstacle"] == "WANT_B"
+    assert maria["beat_obstacle"] == "WANT_A"

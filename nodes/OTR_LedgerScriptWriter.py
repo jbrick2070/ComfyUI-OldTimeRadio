@@ -5735,12 +5735,13 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         if isinstance(_a5_contracts, dict) else None
                     )
                     if _a5_contract:
-                        _a5_cast = led.data.get("cast") or cast_rows or []
-                        _a5_names = [
-                            str(r.get("name") or "").strip()
-                            for r in _a5_cast
-                            if isinstance(r, dict) and str(r.get("name") or "").strip()
-                        ]
+                        from ._otr_dramatic_state_llm import (
+                            dramatic_lead_names as _a5_leads,
+                        )
+                        # The SAME leads the dramatic-state prompt named, so
+                        # each lead's obstacle is the other lead's want.
+                        _a5_names = _a5_leads(
+                            led.data.get("cast") or cast_rows or [])
                         _a5_map = _a5_fields(
                             _a5_contract, _ds_meta,
                             speaker=speaker,
