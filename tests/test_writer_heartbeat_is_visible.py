@@ -170,3 +170,35 @@ def test_every_local_generate_transport_now_attaches_one():
     assert "from ._otr" not in leaf and "from . import _otr" not in leaf, (
         "the heartbeat leaf grew a pack import -- that reintroduces the cycle "
         "that kept two transports blind")
+
+
+def test_a_slow_first_token_does_not_hide_a_healthy_decode(caplog, monkeypatch):
+    """2026-11-19, M6 Mac: the first 64 tokens took 206 s (prompt pass and
+    first-run Metal setup), so the average printed "0.6 tok/s" while the
+    writer was producing 64 tokens every ~9 s. The pulse must carry the
+    steady rate from the first new token, and name the first-token wait."""
+    caplog.set_level(logging.INFO, logger="OTR")
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(HB.time, "monotonic", lambda: clock["t"])
+    s = HB.WriterHeartbeatStreamer(_FakeTokenizer(), "P3", every=64)
+    s.put([list(range(5))])                  # the prompt; the clock starts
+    clock["t"] += 200.0                      # a long wait for the first token
+    for i in range(128):
+        s.put([i])
+        clock["t"] += 9.0 / 64               # then 64 tokens every 9 s
+    msg = [r.getMessage() for r in caplog.records if "heartbeat" in r.getMessage()][-1]
+    assert "steady 7.1 tok/s" in msg, msg
+    assert "first token 200.0s" in msg, msg
+
+
+def test_the_ledger_view_still_parses_a_pulse():
+    """scripts/otr_ledger_view.py reads `N tok | X tok/s | Ys |`; the steady
+    figure is appended after that, so the reader keeps working."""
+    import re
+    from pathlib import Path
+    path = Path(__file__).resolve().parents[1] / "scripts" / "otr_ledger_view.py"
+    src = path.read_text(encoding="utf-8")
+    pattern = re.search(r'r"(heartbeat:[^"]+)"', src).group(1)
+    line = ("[P3] heartbeat: 128 tok | 0.6 tok/s | 218.0s | steady 7.1 tok/s, "
+            "first token 200.0s | ...tail")
+    assert re.search(pattern, line), pattern

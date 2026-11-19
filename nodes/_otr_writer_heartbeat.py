@@ -85,6 +85,8 @@ class WriterHeartbeatStreamer(_BaseStreamer):
         self._count = 0
         self._last_emit = 0
         self._t0: Optional[float] = None
+        self._t_first: Optional[float] = None   # when the first new token arrived
+        self._first_count = 0
         self._prompt_seen = False
 
     def put(self, value: Any) -> None:
@@ -106,6 +108,9 @@ class WriterHeartbeatStreamer(_BaseStreamer):
                 flat.append(item)
         if not flat:
             return
+        if self._t_first is None:
+            self._t_first = time.monotonic()
+            self._first_count = len(flat)
         self._ids.extend(flat)
         self._count += len(flat)
         if self._count - self._last_emit >= self._every:
@@ -113,8 +118,17 @@ class WriterHeartbeatStreamer(_BaseStreamer):
             self._emit()
 
     def _emit(self) -> None:
-        elapsed = (time.monotonic() - self._t0) if self._t0 else 0.0
+        now = time.monotonic()
+        elapsed = (now - self._t0) if self._t0 else 0.0
         tps = (self._count / elapsed) if elapsed > 0 else 0.0
+        # THE STEADY RATE, BESIDE THE AVERAGE. The average starts at the prompt,
+        # so a long prompt pass (or a first run compiling Metal kernels) makes a
+        # healthy decode read as a crawl: an M6 Mac printed "0.6 tok/s" while it
+        # was writing 64 tokens every ~9 s (2026-11-19). The steady figure
+        # counts from the first new token; the first-token wait is named too.
+        first_wait = (self._t_first - self._t0) if (self._t_first and self._t0) else 0.0
+        decode_s = (now - self._t_first) if self._t_first else 0.0
+        steady = ((self._count - self._first_count) / decode_s) if decode_s > 0 else 0.0
         tail = ""
         try:
             text = self._tokenizer.decode(self._ids, skip_special_tokens=True)
@@ -122,8 +136,9 @@ class WriterHeartbeatStreamer(_BaseStreamer):
         except Exception:  # noqa: BLE001
             tail = ""
         log.info(
-            "[%s] heartbeat: %d tok | %.1f tok/s | %.1fs | ...%s",
-            self._label, self._count, tps, elapsed, tail,
+            "[%s] heartbeat: %d tok | %.1f tok/s | %.1fs | steady %.1f tok/s, "
+            "first token %.1fs | ...%s",
+            self._label, self._count, tps, elapsed, steady, first_wait, tail,
         )
 
     def end(self) -> None:
