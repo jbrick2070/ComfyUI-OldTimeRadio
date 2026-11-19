@@ -17542,3 +17542,74 @@ not promote it to the Bug Bible on this evidence alone.
   pin the new text.
 - status: FIXED in code; live proof is the next version's status_reason
   ("Passed automated checks" or a `reviewed-safe`).
+
+## PBUG-20261119-01 -- act-break bridge music played in the left ear only
+- evidence: The Last Circuit, `signal_lost_the_last_circuit_20261020_224235`,
+  master `audio/pending_20261020_223333_master.wav` (ledger SHA-256
+  `4804a2089aec8156768f5fbcbcdcb18b7835f9ad843e996366d2f45dda9ad3c7`). Inside
+  both `music_inter` windows (158.838 s, 292.207 s) the left/right RMS is
+  0.192/0.000 and 0.122/0.000: the right channel is digital silence. The
+  cue files beside it (`music_cue_inter_0*.wav`) are mono. Rendered after
+  `c1ace8cd` (the fix that moved the cue mix before the master write), so
+  this is a second, separate defect.
+- cause: `OTR_StableAudioTheme` emits `mono_safe` cues ([B, 1, T]); its
+  `stereo_policy` is not a widget, so every canonical cue is mono. AudioEnhance
+  hands the assembler a stereo episode, and `_mix_interstitial_cues` sliced to
+  `min(episode_channels, cue_channels)` = 1, adding the bridge to channel 0
+  only. The bookend themes were widened with a first-channel repeat; the
+  bridge never was. `tests/test_interstitial_cue_reaches_master.py` passed
+  because its fixture fed stereo cues.
+- fix: `5f17f57f` -- `_match_cue_channels` widens a mono cue to every channel
+  (the bookend rule); a stereo cue keeps its own left and right. Coverage:
+  `test_a_mono_bridge_cue_plays_in_both_ears` (per-channel RMS, fails on the
+  old code). Bible promotion: pending (verify condition is automatable).
+- status: FIXED in code; live proof is one 2-act canonical leg whose bridge
+  windows read L = R.
+
+## PBUG-20261119-02 -- Google-writer episodes shipped without slot drama contracts
+- evidence: production server logs `comfyui_8000_video_art_local2.log`
+  (2026-07-08, `creative_model='google_api:slot-a'`) and
+  `output/otr/episodes/_shared/server_gpuphase_20260925.*.log` (the 2026-09-25
+  Google lane proofs): "Build 3 slot drama contract pass failed
+  (ModelLoaderError: cache_entry missing required keys: ['model',
+  'tokenizer'])" -- `meta['slot_drama_contracts']` left absent.
+- cause: `make_constrained_generate_fn` dispatched OpenRouter and Comfy
+  Credits entries and sent every other entry to the local model/tokenizer
+  check; the loader had its own Google dispatch (`_otr_model_loader.py:2562`)
+  but the structured path did not. The writer's best-effort pass swallowed it.
+- fix: `4771632b` -- a Google branch (schema only for catalog-marked
+  structured-output models), and the slot JSON-object marker follows the same
+  capability. Coverage: `tests/test_google_api_llm_lane.py`
+  (`test_the_structured_writer_path_dispatches_google`, fails on the old code).
+- status: FIXED in code; live proof is the next Google-writer leg logging
+  "Build 3 slot drama contracts: N slot(s)".
+
+## PBUG-20261119-03 -- the announcer was cast as dramatic lead A
+- evidence: Beneath the Boxtree's Shadow,
+  `signal_lost_beneath_the_boxtrees_shadow_20261028_072625` ledger: cast
+  order `['ANNOUNCER','TOBY','MARIA','MALVOLIO']`; replaying the
+  dramatic-state prompt builder on it yields "LEAD CHARACTERS: ANNOUNCER (A)
+  and TOBY (B)".
+- cause: CastLock puts the announcer row first, and both the dramatic-state
+  prompt (`_otr_dramatic_state_llm._build_prompt`) and the per-line obstacle
+  mapping (`OTR_LedgerScriptWriter` a5 block) took the first two cast rows.
+- fix: `1eaa644f` -- `dramatic_lead_names()` (the writer's own character-cast rule, the
+  announcer excluded) feeds both ends. Ledger correctness only; no prompt
+  wording changed. Coverage: `tests/test_dramatic_state_llm.py`.
+- status: FIXED in code.
+
+## PBUG-20260907-09 (addendum 2026-11-19) -- the MPS NaN mechanism re-proven on the M6, and a race that re-armed it
+- M6 Mac mini (Apple M6, 16 GiB, macOS 27.3, Comfy Desktop ComfyUI 0.46.0,
+  torch 2.12.1): with deterministic algorithms on and
+  `fill_uninitialized_memory` on, MPS `baddbmm(beta=0)` still returns
+  1024/1024 NaN, so the MPS fill guard in `_otr_determinism.py` stays.
+- Two overlapping `deterministic_inference` scopes (the cloud fan-out runs up
+  to four) could leave deterministic mode AND NaN filling on for the rest of
+  the process (a thread switch between `use_deterministic_algorithms(True)`
+  and the fill-off line), after which the same call returned 1024/1024 NaN.
+  On Windows the same race leaked cudnn.deterministic and the math-only SDPA
+  pin. Fix `3a0aebb2`: the outermost entry owns the process state under a
+  lock. Coverage: `tests/test_determinism_overlapping_scopes.py`.
+- `_master_loudness` now silences and counts non-finite samples before
+  measuring (`5f17f57f`): one NaN had made every master sample NaN, one +inf
+  had made the master silent.
