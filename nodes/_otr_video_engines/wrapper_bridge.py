@@ -1288,8 +1288,14 @@ def encode_frames_to_silent_mp4(frames, out_path, fps, *, ffmpeg="ffmpeg",
         try:
             for i in range(int(b)):
                 proc.stdin.write(memoryview(frames[i]).cast("B"))
-        except BrokenPipeError:
-            pass      # ffmpeg quit early; its stderr below says why
+        except OSError as exc:
+            # ffmpeg quit early; its stderr below says why. Windows can report
+            # a closed pipe as EINVAL rather than EPIPE (CPython's own
+            # subprocess._stdin_write tolerates both).
+            import errno
+            if not (isinstance(exc, BrokenPipeError)
+                    or exc.errno in (errno.EPIPE, errno.EINVAL)):
+                raise
         try:
             proc.stdin.close()
         except OSError:
