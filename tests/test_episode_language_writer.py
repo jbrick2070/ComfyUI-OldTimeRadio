@@ -376,3 +376,43 @@ def test_the_writer_hands_the_outline_the_ledgers_language():
     # And the composition header -- the one block every compose pass reads.
     assert "canon_header = _language_prompt_lead" in src
     assert "language_instruction=_language_prompt_lead" in src
+
+
+# --- a native title survives the model's own punctuation (2026-11-19) -------
+_JA_SCRATCHPAD = ("DETAILS:\n木製のテーブル\n教会の聖堂\n粉々に砕ける音\n\n"
+                  "CANDIDATES:\n神官たちの怯える木製のテーブル\n粉々に砕ける声と教会の聖堂\n"
+                  "ベルティーの運命を操る罠と砕ける音\n\n")
+
+
+def _title_of(raw):
+    script = "ANNOUNCER: シグナル・ロストの今夜。\nBERTIE: このテーブルを粉々にする。\n" * 3
+    return _generate_title_from_script(
+        lambda messages, temperature=None, max_new_tokens=None: raw,
+        script, temperature=0.7, premise="", arc_verdict="",
+        title_form_label="radio drama", work_title="The Sermon Handicap",
+        language_instruction="Write the title in Japanese.")
+
+
+@pytest.mark.parametrize("label", [
+    "TITLE: ", "TITLE：", "ＴＩＴＬＥ：", "タイトル：", "标题：",
+])
+def test_a_japanese_or_chinese_title_label_is_read(label):
+    """A Japanese episode (sermon_handicap_ja, M6 Mac) published under the
+    English source title because the title pass came back unparsed; the
+    label's own punctuation or word must not cost the native title."""
+    assert _title_of(_JA_SCRATCHPAD + label + "教会のテーブル") == "教会のテーブル"
+
+
+def test_with_no_title_line_the_first_native_candidate_is_used():
+    """Falling back to the outline title puts the source work's ENGLISH name
+    on a Japanese episode; the model's own first candidate is native."""
+    assert _title_of(_JA_SCRATCHPAD.rstrip()) == "神官たちの怯える木製のテーブル"
+
+
+def test_numbered_candidates_lose_their_numbers():
+    raw = "DETAILS:\n- a\n\nCANDIDATES:\n1. The Brass Key\n2. Low Tide\n"
+    assert _title_of(raw) == "The Brass Key"
+
+
+def test_an_output_with_neither_still_falls_back_to_the_outline():
+    assert _title_of("DETAILS:\nsomething\n") == ""

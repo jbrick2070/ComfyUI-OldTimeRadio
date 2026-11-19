@@ -469,8 +469,13 @@ def _generate_title_from_script(
     # Parse the title from the LAST line that begins with TITLE:. The
     # scratchpad's CANDIDATES block does not use the TITLE: prefix, so
     # the last TITLE: line is unambiguously the model's committed pick.
+    # A model writing in Japanese or Chinese may give the label its own
+    # punctuation (a full-width colon, full-width letters) or its own word, and
+    # each of those used to read as "no title" -- the episode then fell back to
+    # the English outline title (sermon_handicap_ja, M6 Mac, 2026-11-19).
     title_re = re.compile(
-        r'^\s*(?:\*\*)?\s*(?:TITLE|Title|title)\s*:\s*(?:\*\*)?\s*(.+?)\s*$'
+        r'^\s*(?:\*\*)?\s*(?:TITLE|Title|title|ＴＩＴＬＥ|タイトル|题目|标题|標題)'
+        r'\s*[:：]\s*(?:\*\*)?\s*(.+?)\s*$'
     )
     candidate = ""
     for ln in raw.splitlines():
@@ -478,13 +483,21 @@ def _generate_title_from_script(
         if m and m.group(1).strip():
             candidate = m.group(1).strip()
     if not candidate:
-        log.info(
+        # NO COMMITTED TITLE: TAKE THE MODEL'S OWN FIRST CANDIDATE. It was
+        # written in the episode's language from the finished story, so it is
+        # a far better title than the outline's (an adaptation's outline title
+        # is the source work's English name). Only an output with no candidate
+        # either falls through to the caller's outline fallback.
+        candidate = _first_title_candidate(raw)
+        log.warning(
             "[OTR_LedgerScriptWriter] title scratchpad produced no "
-            "parseable TITLE: line; caller will fall back to "
-            "outline.title (raw head: %r)",
-            raw.strip()[:160],
+            "parseable TITLE: line; %s (raw head: %r ... tail: %r)",
+            ("using its first candidate %r" % candidate) if candidate
+            else "caller will fall back to outline.title",
+            raw.strip()[:160], raw.strip()[-240:],
         )
-        return ""
+        if not candidate:
+            return ""
 
     # Iteratively strip ASCII + smart quotes, asterisks, whitespace.
     _wrap_chars = '"“”‘’*\' \t'
@@ -509,6 +522,24 @@ def _generate_title_from_script(
         candidate, len(text),
     )
     return candidate
+
+
+def _first_title_candidate(raw: str) -> str:
+    """The first line under the scratchpad's CANDIDATES heading, or ""."""
+    import re
+    lines = [ln.strip() for ln in (raw or "").splitlines()]
+    heading = re.compile(r'^(?:\*\*)?\s*(?:CANDIDATES|Candidates|candidates|候補)\s*[:：]?\s*(?:\*\*)?$')
+    stop = re.compile(r'^(?:\*\*)?\s*[A-Z]{3,}\s*[:：]')   # the next section label
+    for i, ln in enumerate(lines):
+        if heading.match(ln):
+            for nxt in lines[i + 1:]:
+                if not nxt:
+                    continue
+                if stop.match(nxt):
+                    return ""
+                # "1. Title", "- Title", "* Title" -> "Title"
+                return re.sub(r'^(?:\d+[.)]|[-*•・])\s*', "", nxt).strip()
+    return ""
 
 
 def _resolve_cast_rng_seed() -> tuple[int, str]:

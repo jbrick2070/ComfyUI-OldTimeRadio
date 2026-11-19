@@ -101,15 +101,25 @@ def test_scratchpad_strips_markdown_and_quote_wrappers():
     assert _generate_title_from_script(gen, SAMPLE_SCRIPT) == "Pulse"
 
 
-def test_scratchpad_no_title_line_returns_empty():
-    """No parseable TITLE: line -> "" so the caller falls back to
-    outline.title."""
+def test_scratchpad_no_title_line_takes_the_first_candidate():
+    """No parseable TITLE: line -> the model's own first CANDIDATE, written
+    from the finished story (2026-11-19: falling back to the outline title put
+    an adaptation's English source name on a Japanese episode)."""
     def gen(*_a, **_kw):
         return (
             "DETAILS:\n- a dish\n- a signal\n- static\n"
             "CANDIDATES:\nThe Dish\nThe Signal\nPulse\n"
             "I cannot decide on a single title."
         )
+
+    assert _generate_title_from_script(gen, SAMPLE_SCRIPT) == "The Dish"
+
+
+def test_scratchpad_with_no_title_and_no_candidates_returns_empty():
+    """Neither a TITLE: line nor a candidate -> "" so the caller falls back
+    to outline.title."""
+    def gen(*_a, **_kw):
+        return "DETAILS:\n- a dish\n- a signal\n- static\nI cannot decide."
 
     assert _generate_title_from_script(gen, SAMPLE_SCRIPT) == ""
 
