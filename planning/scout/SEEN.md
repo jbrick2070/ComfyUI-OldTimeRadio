@@ -118,3 +118,7 @@
 2026-11-18 | Video | FastFrames-S/L (Apple, T2V, L bf16 28.6 GB, no int8) | SKIP | https://huggingface.co/apple/FastFrames-L
 2026-11-18 | Video | SCAIL-2 (Comfy-Org repack Sept, int8_convrot 16.65 GB, motion transfer) | SKIP | https://huggingface.co/Comfy-Org/SCAIL-2
 2026-11-18 | Voice | irodori-tts-nodes / Comfy-IndexTTSLocalAPI (Japanese-only / local API script dubbing) | SKIP | https://api.comfy.org/nodes/irodori-tts-nodes
+2026-11-19 | Voice | KittenTTS 2 Mini (16 languages, 7 of 8 OTR, ONNX int8 82.7 MB, CPU) | TEST | https://huggingface.co/KittenML/kitten-tts-2-mini
+2026-11-19 | Video | LongCat-Video-Avatar Comfy-Org repack (int8_convrot 15.97 GB, umt5 int8_convrot 5.69 GB) | WATCH | https://huggingface.co/Comfy-Org/LongCat-Video-Avatar
+2026-11-19 | Video | MovieRoll (gated) / invoker-render-1.0 (33B fp32) | SKIP | https://huggingface.co/inclusionAI/invoker-render-1.0
+2026-11-19 | Upscale | ComfyUI core Video Deflicker + Faster RAFT (v0.46.0) | WATCH | https://github.com/Comfy-Org/ComfyUI/commit/ba546e921
