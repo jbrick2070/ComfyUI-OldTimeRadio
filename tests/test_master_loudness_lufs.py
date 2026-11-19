@@ -195,3 +195,28 @@ def test_the_call_site_passes_ceiling_and_sample_rate_EXPLICITLY():
         "the old call site passed NOTHING and relied on the default, which is "
         "how a -1.0 ceiling became invisible to every reader"
     )
+
+
+# --------------------------------------------------------------------------
+# A non-finite sample costs that sample, never the master (audit B14)
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_one_non_finite_sample_does_not_poison_the_master(bad):
+    """One NaN used to turn every sample NaN (the fallback multiplied by
+    ceiling/NaN); one +inf scaled the whole episode to silence. The rest of
+    the signal must come out finite, measured on the LUFS path, and at the
+    same level as the clean master."""
+    clean = _speechlike()
+    poisoned = clean.clone()
+    poisoned[0, 0, 1000] = bad
+    out_clean, _ = _master_loudness(clean.clone(), sample_rate=SR)
+    out, info = _master_loudness(poisoned, sample_rate=SR)
+    assert bool(torch.isfinite(out).all())
+    assert info["mode"] == "lufs"
+    assert info["nonfinite_samples"] == 1
+    assert _lufs(out) == pytest.approx(_lufs(out_clean), abs=0.1)
+
+
+def test_a_clean_master_reports_no_non_finite_samples():
+    _out, info = _master_loudness(_speechlike(), sample_rate=SR)
+    assert info["nonfinite_samples"] == 0

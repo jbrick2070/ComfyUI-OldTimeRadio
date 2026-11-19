@@ -63,7 +63,8 @@ def _row(cue_id, batch_index, samples, placement, anchor):
     }
 
 
-def _assemble(tmp_path, monkeypatch, *, themes=True, bridge=True, policy=""):
+def _assemble(tmp_path, monkeypatch, *, themes=True, bridge=True, policy="",
+              cue_channels=2):
     audio_dir = tmp_path / "audio"
     audio_dir.mkdir()
     ledger_path = audio_dir / "bridge_ep_ledger.json"
@@ -89,9 +90,11 @@ def _assemble(tmp_path, monkeypatch, *, themes=True, bridge=True, policy=""):
         cues.append(_tone(5.0, 660.0, 0.3))
         rows.append(_row("inter_01", len(rows), 5 * SR, "interstitial", "b002"))
     width = max(c.shape[-1] for c in cues)
-    batch = torch.zeros(len(cues), 2, width)
+    # cue_channels=1 is what OTR_StableAudioTheme really emits: its
+    # stereo_policy is not a widget, so the canonical cues are mono_safe.
+    batch = torch.zeros(len(cues), cue_channels, width)
     for i, c in enumerate(cues):
-        batch[i, :, :c.shape[-1]] = c
+        batch[i, :, :c.shape[-1]] = c[:cue_channels]
     manifest = CM.build_manifest(SR, rows)
 
     scene = {"waveform": _scene_with_gap(), "sample_rate": SR}
@@ -115,6 +118,7 @@ def _assemble(tmp_path, monkeypatch, *, themes=True, bridge=True, policy=""):
     return {
         "path": Path(out_path),
         "window_rms": _rms(window),
+        "channel_rms": [_rms(window[:, c]) for c in range(window.shape[1])],
         "head_rms": _rms(window[:edge]),
         "tail_rms": _rms(window[-edge:]),
         "ledger": json.loads(ledger_path.read_text(encoding="utf-8")),
@@ -189,6 +193,28 @@ def test_the_stamped_bridge_row_points_where_the_cue_was_mixed(tmp_path,
     assert len(rows) == 1
     assert rows[0]["start_s_space"] == "master_mix"
     assert rows[0]["start_s"] == pytest.approx(got["bridge_master_s"], abs=1e-3)
+
+
+def test_a_mono_bridge_cue_plays_in_both_ears(tmp_path, monkeypatch):
+    """The canonical theme emits mono cues into a stereo episode. Mixing only
+    the smaller channel count left the right ear in digital silence for every
+    act break (The Last Circuit master, 2026-10-20: L/R RMS 0.19/0.00)."""
+    got = _assemble(tmp_path, monkeypatch, cue_channels=1)
+    left, right = got["channel_rms"]
+    assert left > 0.05 and right > 0.05, got["channel_rms"]
+    assert right == pytest.approx(left, rel=1e-3)
+
+
+def test_a_stereo_bridge_cue_keeps_its_own_channels():
+    """Widening applies to a mono cue only; a stereo cue's left and right are
+    mixed as they are."""
+    cue = torch.zeros(1, 2, SR)
+    cue[0, 0] = 0.5
+    cue[0, 1] = -0.25
+    assert torch.equal(sc._match_cue_channels(cue, 2), cue)
+    widened = sc._match_cue_channels(cue[:, :1], 2)
+    assert widened.shape == (1, 2, SR)
+    assert torch.equal(widened[0, 1], cue[0, 0])
 
 
 def test_with_no_interstitial_cue_the_helper_returns_its_input():

@@ -329,6 +329,16 @@ def _floor_span_lengths(audio_input, n_rows, n_samples, sr) -> dict:
     return out
 
 
+def _match_cue_channels(cue_wf, channels):
+    """Widen a ``[B, C, T]`` cue to ``channels`` by repeating its first
+    channel, the rule the bookend themes already follow. A cue that already
+    has enough channels is returned untouched (a stereo cue keeps its own
+    left and right)."""
+    while int(cue_wf.shape[1]) < int(channels):
+        cue_wf = torch.cat([cue_wf, cue_wf[:, :1, :]], dim=1)
+    return cue_wf
+
+
 def _trim_trailing_silence(clip_np, threshold=1e-4, min_samples=100):
     """Strip trailing zero-padding from a 1-D float32 numpy array.
 
@@ -536,9 +546,23 @@ def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None,
     loudness engine.
     """
     ceiling = 10.0 ** (ceiling_dbfs / 20.0)
+    # NON-FINITE SAMPLES ARE SILENCED BEFORE ANYTHING IS MEASURED. One NaN
+    # made the peak and the LUFS reading NaN, the fallback then multiplied
+    # the whole episode by ceiling/NaN (every sample NaN); one +inf scaled
+    # the whole episode to zero. A bad sample is a generator fault upstream
+    # (PBUG-20260907-09), so it costs that sample, loudly -- never the master.
+    nonfinite = int((~torch.isfinite(waveform)).sum())
+    if nonfinite:
+        log.warning(
+            "[EpisodeAssembler] master had %d non-finite sample(s) of %d "
+            "(%.4f%%); they are silenced before loudness. An upstream engine "
+            "produced them -- find it.", nonfinite, int(waveform.numel()),
+            100.0 * nonfinite / max(1, int(waveform.numel())))
+        waveform = torch.nan_to_num(waveform, nan=0.0, posinf=0.0, neginf=0.0)
     peak = waveform.abs().max()
     if float(peak) < 1e-8:
-        return waveform, {"mode": "silent", "makeup_db": 0.0}
+        return waveform, {"mode": "silent", "makeup_db": 0.0,
+                          "nonfinite_samples": nonfinite}
 
     if target_lufs is None:
         try:
@@ -634,6 +658,7 @@ def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None,
             "limiter_corrections": corrections,
             "delivered_lufs": (None if delivered is None else round(delivered, 2)),
             "makeup_db": 0.0,
+            "nonfinite_samples": nonfinite,
         }
 
     # --- Fallback: the legacy tanh master, unchanged ------------------------
@@ -662,6 +687,7 @@ def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None,
         "mode": "legacy_peak",
         "ceiling_dbfs": float(ceiling_dbfs),
         "makeup_db": makeup_db,
+        "nonfinite_samples": nonfinite,
     }
 
 
@@ -2529,6 +2555,12 @@ class EpisodeAssembler:
             if not owns_waveform:
                 episode_waveform = episode_waveform.clone()
                 owns_waveform = True
+            # A MONO CUE GOES TO EVERY CHANNEL. The theme ships cues
+            # mono_safe ([B, 1, T]) while AudioEnhance hands the assembler a
+            # stereo episode, and slicing to the smaller channel count put the
+            # act-break bridge in the left ear only (The Last Circuit, L/R RMS
+            # 0.19/0.00). The bookend themes are widened the same way above.
+            cue_wf = _match_cue_channels(cue_wf, int(episode_waveform.shape[1]))
             channels = min(episode_waveform.shape[1], cue_wf.shape[1])
             episode_waveform[:, :channels, start_idx:start_idx + mix_len] += (
                 cue_wf[:, :channels, :mix_len])
