@@ -29,11 +29,12 @@ app.registerExtension({
         // (graphData, clean, restore_view, workflow, options).
         //
         // THE RETURN VALUE IS FORWARDED ON EVERY PATH BUT ONE: a refusal returns
-        // undefined where the original would return a Promise. Every call site
-        // in the installed frontend `await`s this and none chains .then() or
-        // reads the result, so awaiting undefined is harmless there -- but the
-        // asymmetry is real and is stated rather than glossed, because a future
-        // caller that does chain would find it the hard way.
+        // undefined where the original would return a Promise. The installed
+        // frontend `await`s this; its template loader (1.59.6
+        // `loadTemplateGraph`) also READS the result and treats undefined as
+        // "not started", which is the honest answer for a refused graph.
+        // Only this pack's own node types can be refused (see
+        // `isPackNodeType` in the core).
         app.loadGraphData = function (graphData, ...rest) {
             let verdict;
             try {

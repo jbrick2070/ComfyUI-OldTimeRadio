@@ -22,11 +22,14 @@ import path from "node:path";
 const here = path.dirname(new URL(import.meta.url).pathname.replace(/^\//, ""));
 const CORE = pathToFileURL(
     path.join(here, "..", "..", "js", "workflow_schema_core.js")).href;
-const { reconcileGraph, writerName, comboOptions } = await import(CORE);
+const { reconcileGraph, writerName, comboOptions, hasSeedCompanion, isPackNodeType } =
+    await import(CORE);
 
 /** The live-schema lookup the core reads, shaped like LiteGraph's registry. */
 const registry = {};
-function reconcile(graph) { return reconcileGraph(graph, registry); }
+// The generic rule is exercised on every type here; which types are judged in
+// production (only this pack's own) is tested on its own below.
+function reconcile(graph) { return reconcileGraph(graph, registry, () => true); }
 
 /** Declare a node type's live widget order, as /object_info would. */
 function declare(type, widgetNames, extra = {}) {
@@ -399,4 +402,90 @@ test("a named seed widget carries its companion through a migration", () => {
     assert.deepEqual(migrated.widgets_values, [43, "randomize", 10],
         "rebuilt in live order with the companion right after its seed");
     assert.deepEqual(migrated.inputs.map((s) => s.widget?.name), ["seed", "steps"]);
+});
+
+// ---------------------------------------------------------------------------
+// Audit N-JS1 / B16 (2026-11-19): only this pack's own node types are judged.
+// ---------------------------------------------------------------------------
+
+test("a ComfyUI template node with partial descriptors loads untouched", () => {
+    // api_anthropic_claude_opus_5_5.json saves ONE descriptor ('prompt') and
+    // SEVEN values. The frontend restores that positionally on its own; this
+    // pack refused the whole template before ownership was checked.
+    registry.ClaudeNode = { nodeData: { input: { required: {
+        prompt: ["STRING", {}], model: [["Opus 5.5"]], max_tokens: ["INT", {}],
+        effort: [["high"]], seed: ["INT", { control_after_generate: true }],
+        system_prompt: ["STRING", {}],
+    } } } };
+    const node = {
+        id: 5, type: "ClaudeNode",
+        inputs: [{ name: "images.image_1", link: null },
+                 { name: "prompt", widget: { name: "prompt" }, link: null }],
+        widgets_values: ["", "Opus 5.5", 32768, "high", 534380505, "randomize", ""],
+    };
+    const graph = { nodes: [node], links: [] };
+    const before = structuredClone(graph);
+    const out = reconcileGraph(graph, registry);
+    assert.equal(out.ok, true, out.detail);
+    assert.equal(out.changed, false);
+    assert.deepEqual(out.graph, before);
+});
+
+test("this pack's own node with the same shape is still refused", () => {
+    registry.OTR_SceneSequencer = { nodeData: { input: { required: {
+        a: ["STRING", {}], b: ["STRING", {}],
+    } } } };
+    const out = reconcileGraph({
+        nodes: [{ id: 3, type: "OTR_SceneSequencer",
+                  inputs: [{ name: "a", widget: { name: "a" }, link: null }],
+                  widgets_values: ["A", "B", "EXTRA"] }],
+        links: [],
+    }, registry);
+    assert.equal(out.ok, false);
+    assert.match(out.detail, /OTR_SceneSequencer/);
+});
+
+test("only OTR_ types are this pack's", () => {
+    assert.equal(isPackNodeType("OTR_LedgerScriptWriter"), true);
+    for (const t of ["KSampler", "ClaudeNode", "W", "", null, undefined,
+                     "134b0aa2-0237-4237-8366-558c4a007c68"]) {
+        assert.equal(isPackNodeType(t), false, String(t));
+    }
+});
+
+test("the seed companion follows the frontend's rule exactly", () => {
+    // frontend 1.59.6: control_after_generate ?? ["seed","noise_seed"].includes(name)
+    assert.equal(hasSeedCompanion("seed", "INT", null), true);
+    assert.equal(hasSeedCompanion("noise_seed", "INT", { default: 0 }), true);
+    assert.equal(hasSeedCompanion("seed", "INT", { control_after_generate: false }), false);
+    assert.equal(hasSeedCompanion("steps", "INT", { control_after_generate: true }), true);
+    assert.equal(hasSeedCompanion("steps", "INT", { control_after_generate: "fixed" }), true);
+    assert.equal(hasSeedCompanion("steps", "INT", {}), false);
+    assert.equal(hasSeedCompanion("seed", "STRING", {}), false);
+});
+
+test("a pack node whose seed relies on the default companion reconciles", () => {
+    // Saved by the current frontend: every widget described, the companion
+    // value right after the seed with no descriptor of its own.
+    registry.OTR_SeedDefault = { nodeData: { input: { required: {
+        seed: ["INT", { default: 0 }], steps: ["INT", { default: 20 }],
+    } } } };
+    const out = reconcileGraph({
+        nodes: [{ id: 9, type: "OTR_SeedDefault",
+                  inputs: [{ name: "seed", widget: { name: "seed" }, link: null },
+                           { name: "steps", widget: { name: "steps" }, link: null }],
+                  widgets_values: [7, "randomize", 20] }],
+        links: [],
+    }, registry);
+    assert.equal(out.ok, true, out.detail);
+    assert.equal(out.changed, false);
+});
+
+test("every node this pack registers is recognised as its own", async () => {
+    const fs = await import("node:fs");
+    const manifest = JSON.parse(fs.readFileSync(
+        path.join(here, "..", "..", "node_list.json"), "utf8"));
+    const types = Array.isArray(manifest) ? manifest : Object.keys(manifest);
+    assert.ok(types.length > 0);
+    for (const t of types) assert.equal(isPackNodeType(t), true, t);
 });

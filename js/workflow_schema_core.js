@@ -32,6 +32,38 @@ function refuse(reason, detail) {
 /** The seed companion the frontend saves without a descriptor. */
 const COMPANION = "control_after_generate";
 
+/**
+ * Whether the frontend gives this widget a seed companion -- ITS rule, copied:
+ * frontend 1.59.6's INT widget constructor tests
+ * `control_after_generate ?? ["seed", "noise_seed"].includes(name)`. So an INT
+ * named `seed` or `noise_seed` gets one unless the option is EXPLICITLY false,
+ * and any truthy option (true, or a default mode string) gets one too. Counting
+ * only an explicit truthy option made every node relying on the default carry
+ * one value more than this file expected (audit B16, 2026-11-19).
+ */
+export function hasSeedCompanion(name, typeDef, opts) {
+    const flag = opts ? opts.control_after_generate : undefined;
+    if (flag !== undefined && flag !== null) return Boolean(flag);
+    return typeDef === "INT" && (name === "seed" || name === "noise_seed");
+}
+
+/**
+ * Whether this pack owns a node type, and so whether this file may judge it.
+ *
+ * EVERY REGISTERED OTR NODE IS `OTR_*` (node_list.json, pinned by a test). The
+ * guarantee the reconciler relies on -- one saved widget descriptor per saved
+ * value -- holds for THIS pack's graphs and for no one else's: ComfyUI's own
+ * templates save a descriptor only for a widget that was converted or wired,
+ * so ClaudeNode carries one descriptor and seven values. Judging foreign nodes
+ * by our rule refused about a fifth of the installed ComfyUI templates, and
+ * unrelated user graphs, whenever this pack was installed (audit N-JS1,
+ * 2026-11-19). A foreign node is passed to the loader exactly as the frontend
+ * would have received it without this extension.
+ */
+export function isPackNodeType(type) {
+    return typeof type === "string" && type.startsWith("OTR_");
+}
+
 export function liveWidgetNames(nodeType, lookup) {
     const input = lookup?.[nodeType]?.nodeData?.input;
     if (!input) return null;
@@ -59,7 +91,7 @@ export function liveWidgetNames(nodeType, lookup) {
             // descriptor of its own: core's KSampler saves seven values for six
             // declared inputs. Every graph with a KSampler was refused until
             // this line existed (2026-10-27, loading a community AnimateDiff graph).
-            if (opts && opts.control_after_generate) {
+            if (hasSeedCompanion(name, typeDef, opts)) {
                 names.push(COMPANION);
             }
         }
@@ -330,9 +362,10 @@ export function repairLinkSlots(graph) {
  *
  * Returns `{ok:true, graph, changed, notes}` or a refusal. The caller passes the
  * copy to the loader only on success, so a refusal leaves the open canvas as it
- * was.
+ * was. `owns(type)` decides which nodes are judged; it defaults to this pack's
+ * own types and is injectable so the tests can exercise the rule generically.
  */
-export function reconcileGraph(graphData, lookup) {
+export function reconcileGraph(graphData, lookup, owns = isPackNodeType) {
     if (!graphData || !Array.isArray(graphData.nodes)) {
         return { ok: true, graph: graphData, changed: false, notes: [] };
     }
@@ -360,6 +393,8 @@ export function reconcileGraph(graphData, lookup) {
             changed = true;
             notes.push(...respelled);
         }
+        // A foreign node is never judged: its saving rules are not ours.
+        if (!owns(node.type)) continue;
         const verdict = reconcileNode(node, lookup);
         if (!verdict.ok) return verdict;
         if (verdict.changed) {
