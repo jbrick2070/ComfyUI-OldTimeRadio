@@ -641,21 +641,29 @@ different proof.
 
 ## 2. CODE -- decided, in order
 
-### 0t. Final audit 2026-11-19 -- code landed in 2.3.53; live proofs and four rows left
+### 0t. Final audit 2026-11-19 -- code landed (2.3.53 + follow-ups); what is left
 
 The report is `C:\Users\jeffr\Documents\ComfyUI\otr_reviews\OTR-final-audit-and-coding-plan.md`.
-Fixes went out as `5f17f57f`..`5bc46894`, release `9c9f4228` (2.3.53, Pending). Left, in order:
 
-1. **Live proofs.** One 2-act canonical leg to `otr/obs`, checking four things:
-   - `<ep>_master.wav` bridge windows read L = R (PBUG-20261119-01);
-   - SlotContract tok/s in the log, against 22.7 tok/s on 2026-10-28;
-   - SilentComposite wall time, against the 33 s floor count;
-   - his ear on the last spoken line, where a 500 ms closing crossfade overlaps it (N-A1; pad the scene tail and head if he hears it).
+**Already true, proven on a live 2-act canonical leg** (obs `desk_ink_20261119_025209_..._final.mp4`):
+- the act-break bridge is L = R (0.195/0.195);
+- SlotContract runs at 29.6 tok/s (22.7 before).
 
-   One Google-writer leg must log "Build 3 slot drama contracts: N slot(s)" (PBUG-20261119-02).
-2. **O6:** stream frame conversion into ffmpeg in `wrapper_bridge.py` (+324 MiB peak today).
-3. **Studio:** the plain-episode path keeps no attempt record, so a lost submit reply can queue a second render (N-S1, a design choice). Also: the `::1` bind, the reconcile body, and the options repaint.
-4. **Operator decision:** agy rated the 2.3.51 boot-time spaCy wheel fetch (`_otr_kokoro_voice_prefetch.py`) a HIGH registry-policy risk. Keep it, or move to an install-time download, if 2.3.53 is Flagged.
+**Pushed after 2.3.53 and not yet released:**
+- O6 streaming encode, `fd858c5a` + `afe5de74`;
+- the Studio `::1` bind, reconcile body and no-MAKE-without-choices fixes, `da718ca7`;
+- the theme cue lengths, Bark prepare and SA3 per-call pins, `20e172d0`.
+
+These ride the next bump, once 2.3.53 is Active or Flagged.
+
+**Left:**
+
+1. **His ear on the closing line (N-A1).** The 500 ms crossfade into the closing theme overlaps the last spoken line's final 0.5 s. If he hears it, pad the scene tail and head by the crossfade length.
+2. **Studio double render (N-S1).** The plain-episode path keeps no attempt record, so a lost submit reply or a settle timeout re-enables MAKE while ComfyUI keeps rendering. This needs a design choice: hold an attempt as the producer path does, or check ComfyUI's queue.
+3. **Mux episode identity.** `_master_wav_owes_a_delivery_gain` and `_obs_basename` read the in-flight ledger without an identity check. The existing stem check cannot be reused, because the master WAV keeps its `pending_` name after the episode is retitled. It needs a rename-proof key.
+4. **Operator decision on the spaCy wheel.** agy rated the 2.3.51 boot-time spaCy wheel fetch a HIGH registry-policy risk. Revisit it only if 2.3.53 is Flagged.
+5. **One Google-writer leg** should log "Build 3 slot drama contracts: N slot(s)" (PBUG-20261119-02).
+6. **IndexTTS2 device and `mktemp`: on purpose, not changed.** `eng_indextts2.py` is byte-fingerprinted for the Lemmy route, so an edit demotes the route.
 
 ### 0p. Gemini audit 2026-10-13 -- code landed; three live proofs and one row left
 
