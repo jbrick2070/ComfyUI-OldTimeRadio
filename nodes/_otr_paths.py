@@ -50,6 +50,7 @@ Input/models/log/HF resolvers are exempt (not OTR-output paths). Walkers over
 """
 from __future__ import annotations
 
+import logging
 import os
 import re as _re
 from pathlib import Path
@@ -65,6 +66,8 @@ except ImportError:  # pragma: no cover -- flat test imports
 #: NAME it -- the clip reuse key leaves it out, because the pack writes it while
 #: a prompt runs -- imports this rather than spelling it.
 OUTPUT_DIR_ENV = "OTR_OUTPUT_DIR"
+
+_LOG = logging.getLogger("OldTimeRadio")
 
 
 class OtrPathContractError(ValueError):
@@ -409,17 +412,31 @@ def _confine(value, field: str, candidates, *, base=None, verb: str = "read") ->
         try:
             real = os.path.realpath(lexical)
         except Exception as exc:  # noqa: BLE001 -- a malformed path is a refusal
+            _LOG.warning("[OTR paths] %s %r is not a usable path: %s",
+                         field, text, exc)
             raise OtrPathContractError(
-                "%s is not a usable path (%r): %s" % (field, text, exc))
+                "%s is not a usable path (%s): %s"
+                % (field, os.path.basename(text), type(exc).__name__))
         if any(_inside(real, real_root) for _lex, real_root in roots):
             return lexical
+        _LOG.warning("[OTR paths] %s %s leads through a link to %s, outside "
+                     "every permitted %s root", field, lexical, real, verb)
         raise OtrPathContractError(
-            "%s (%s) leads through a link to %s, outside every permitted %s "
-            "root." % (field, lexical, real, verb))
+            "%s (%s) leads through a link outside every permitted %s root; "
+            "the server log names where it leads."
+            % (field, os.path.basename(lexical), verb))
+    # EXCEPTION TEXT NAMES THE FILE, THE SERVER LOG NAMES THE PATHS. ComfyUI
+    # echoes an exception to /history and the websocket with no login; the
+    # resolved path and this machine's permitted roots are server-side facts
+    # (registry policy flagged the same class on 2.3.51).
+    _LOG.warning("[OTR paths] %s resolves to %s, outside every permitted %s "
+                 "root (%s)", field, lexical, verb,
+                 ", ".join(lex for lex, _real in roots) or "none")
     raise OtrPathContractError(
-        "%s resolves to %s, which is outside every permitted %s root (%s). "
-        "Set OTR_EXTRA_OUTPUT_ROOTS to authorize another one."
-        % (field, lexical, verb, ", ".join(lex for lex, _real in roots) or "none"))
+        "%s (%s) resolves outside every permitted %s root. Set "
+        "OTR_EXTRA_OUTPUT_ROOTS to authorize another one; the server log "
+        "names the path and the roots."
+        % (field, os.path.basename(lexical), verb))
 
 
 def _comfy_temp_dir() -> Optional[Path]:

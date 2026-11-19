@@ -393,3 +393,17 @@ def test_a_value_outside_every_root_is_never_resolved(roots, monkeypatch):
     with pytest.raises(OtrPathContractError, match="outside every permitted"):
         P.confine_to_read_roots(str(roots["outside"] / "x.wav"), "video_path")
     assert not [p for p in resolved if "elsewhere" in p]
+
+
+def test_a_refusal_names_the_file_not_the_paths(roots):
+    """Registry integrity review 2026-11-19 (codex + agy): ComfyUI echoes an
+    exception to /history with no login, so the refusal names the field and
+    the file; the resolved path and this machine's permitted roots go to the
+    server log only (the information-disclosure class flagged on 2.3.51)."""
+    target = roots["outside"] / "secret_dir" / "clip.mp4"
+    with pytest.raises(OtrPathContractError) as info:
+        P.confine_to_read_roots(str(target), "video_path")
+    text = str(info.value)
+    assert "clip.mp4" in text and "outside every permitted read root" in text
+    assert "secret_dir" not in text
+    assert str(roots["out"]) not in text and str(roots["input"]) not in text

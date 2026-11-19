@@ -1924,8 +1924,11 @@ class OTRCreditsRoll:
         # the probe: registry review flagged "arbitrary-file-read".
         video_path = confine_to_read_roots(video_path, "video_path")
         if not video_path or not os.path.exists(video_path):
+            log.warning("[OTR_CreditsRoll] credits input video missing: %r",
+                        video_path)
             raise CreditsDataError(
-                f"credits input video missing: {video_path!r}")
+                "credits input video missing: "
+                f"{os.path.basename(video_path or '') or '(none)'}")
         try:
             manifest = json.loads(clip_manifest_json or "")
         except (TypeError, ValueError) as exc:

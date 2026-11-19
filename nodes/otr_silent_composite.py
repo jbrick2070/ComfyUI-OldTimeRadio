@@ -1206,9 +1206,13 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
                         seg_path, int(n_frames))
         elif got_frames != int(n_frames):
             error_raised = True
+            log.warning("[OTR_SilentComposite] segment frame count mismatch: "
+                        "%d != %d (src=%r seg=%r)", got_frames, int(n_frames),
+                        src, seg_path)
             raise RuntimeError(
-                "segment frame count mismatch: %d != %d (src=%r seg=%r)"
-                % (got_frames, int(n_frames), src, seg_path))
+                "segment frame count mismatch: %d != %d (src=%s seg=%s)"
+                % (got_frames, int(n_frames), os.path.basename(src),
+                   os.path.basename(seg_path)))
     except BaseException:
         # BaseException, not Exception: a KeyboardInterrupt or a Comfy
         # InterruptProcessingException (both BaseException) must still reap
