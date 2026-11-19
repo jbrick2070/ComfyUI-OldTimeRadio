@@ -13,6 +13,7 @@ import http.client
 import json
 import mimetypes
 import re
+import socket
 import threading
 import time
 import traceback
@@ -496,6 +497,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def _reconcile(self, project_id: str) -> None:
         """{} -> a run that looks again at the project's pending attempt."""
+        # The body carries nothing, but it is still read: answered with its
+        # body unread, a connection can be reset before the client sees the
+        # status (the reason _discard_body exists).
+        self._discard_body()
         self._start(lambda: self.runs.start_reconcile(project_id),
                     lambda run: {"project_id": project_id, "id": run.id,
                                  "stage": run.label.get("stage", "")})
@@ -725,8 +730,16 @@ def _watch_gpu(runs: Runs, free=free_comfyui_models, sleep=time.sleep) -> None:
             free(runs.studio.settings.comfyui_url)
 
 
+class _IPv6Server(ThreadingHTTPServer):
+    """The same server on an IPv6 socket: ``ThreadingHTTPServer`` is IPv4-only,
+    so the ``::1`` loopback the CLI accepts failed to bind (reproduced on the
+    M6 Mac, 2026-11-19)."""
+    address_family = socket.AF_INET6
+
+
 def make_server(studio: Studio, host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
-    server = ThreadingHTTPServer((host, port), Handler)
+    server_class = _IPv6Server if ":" in host else ThreadingHTTPServer
+    server = server_class((host, port), Handler)
     server.daemon_threads = True
     server.runs = Runs(studio)  # type: ignore[attr-defined]
     threading.Thread(target=_watch_gpu, args=(server.runs,), daemon=True).start()

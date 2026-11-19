@@ -93,3 +93,15 @@ def test_the_page_posts_the_decks_dial_fields():
 def test_the_page_skips_my_story_like_the_deck():
     assert 'MY_STORY_BANK = "my_story"' in HTML
     assert "c === MY_STORY_BANK" in HTML
+
+
+def test_no_make_until_the_choices_were_read():
+    """Audit secondary finding. When /api/options failed at startup the picks
+    were empty, so "past the last pick" was true and a key press sent the
+    server's defaults; the last paint also still said "reading". Verified live
+    2026-11-19 against an unreachable ComfyUI: the page reads "Could not read
+    the choices." and Enter/Space send nothing."""
+    assert "function atMake() { return S.options !== null && S.step >= S.picks.length; }" in HTML
+    assert "if (S.making || !S.options) return;" in HTML        # make() itself
+    assert 'Could not read the choices.' in HTML
+    assert "render();   // repaint" in HTML

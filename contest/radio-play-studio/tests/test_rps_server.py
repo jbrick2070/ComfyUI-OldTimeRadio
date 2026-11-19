@@ -354,3 +354,28 @@ def test_logblaster_is_offered_only_when_comfyui_serves_its_page(app, monkeypatc
     assert server.logblaster_url("http://127.0.0.1:8000/") == "http://127.0.0.1:8000/logblaster"
     Page.headers = {"Content-Type": "application/json"}
     assert server.logblaster_url("http://127.0.0.1:8000") is None
+
+
+def test_the_ipv6_loopback_the_cli_accepts_really_binds(settings, schemas):
+    """`--host ::1` is an accepted loopback, but ThreadingHTTPServer is
+    IPv4-only and the bind failed (reproduced on the M6 Mac, 2026-11-19)."""
+    import socket
+
+    if not socket.has_ipv6:
+        pytest.skip("no IPv6 on this host")
+    studio = Studio(settings, client_factory=lambda url: FakeClient(_good_job()),
+                    fetch=lambda url: schemas)
+    try:
+        server = make_server(studio, "::1", 0)
+    except OSError as exc:  # an IPv6 stack with loopback disabled
+        pytest.skip("IPv6 loopback unavailable: %s" % exc)
+    try:
+        assert server.address_family == socket.AF_INET6
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        conn = http.client.HTTPConnection("::1", server.server_address[1], timeout=10)
+        conn.request("GET", "/api/options")
+        assert conn.getresponse().status in (200, 503)
+        conn.close()
+    finally:
+        server.shutdown()
+        server.server_close()

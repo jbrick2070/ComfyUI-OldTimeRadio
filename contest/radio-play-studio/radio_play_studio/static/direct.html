@@ -218,10 +218,12 @@ function workflowWords(options) {
 
 /* ---- moving the cursor and picking ------------------------------------ */
 function live() { return S.picks[S.step]; }
-function atMake() { return S.step >= S.picks.length; }
+// No MAKE until the choices were read: with no options there are no picks, and
+// "past the last pick" would send the server's defaults on one key press.
+function atMake() { return S.options !== null && S.step >= S.picks.length; }
 
 function move(delta) {
-  if (S.making || S.busy) return;
+  if (S.making || S.busy || !S.options) return;
   if (atMake()) return;
   const n = live().choices.length;
   if (!n) return;
@@ -242,7 +244,7 @@ function enter(step) {
 }
 
 async function pick() {
-  if (S.making || S.busy) return;
+  if (S.making || S.busy || !S.options) return;
   if (atMake()) return make();
   const p = live();
   if (!p.choices.length) return enter(S.step + 1);
@@ -278,7 +280,7 @@ function chosenWorkflow() {
 
 /* ---- making the episode ----------------------------------------------- */
 async function make() {
-  if (S.making) return;
+  if (S.making || !S.options) return;
   const choices = {};
   for (const p of S.picks) if (DIAL_FIELDS.includes(p.key) && p.value != null) choices[p.key] = p.value;
   const workflow = chosenWorkflow();
@@ -386,6 +388,13 @@ function render() {
     return;
   }
   if (S.done) { $("prompt").textContent = "Done. Press play."; return; }
+  if (!S.options) {
+    // The choices could not be read: there is nothing to pick and nothing to
+    // make, so no tile is active (a MAKE here would send the defaults).
+    $("prompt").textContent = "Could not read the choices.";
+    row.appendChild(tile({label: "reload", note: "once ComfyUI answers"}, false));
+    return;
+  }
   if (atMake()) {
     $("prompt").textContent = "Everything is picked.";
     const go = tile({label: "MAKE", note: "the episode, with these picks"}, true, "make");
@@ -464,7 +473,7 @@ function onMIDI(msg) {
   const [status, data1, data2] = msg.data;
   const kind = status & 0xf0;
   if (kind === 0x90 && data2 > 0) pick();                 // any pad or key: pick
-  else if (kind === 0xb0 && !S.making && !atMake()) {     // any knob or fader: scrub
+  else if (kind === 0xb0 && !S.making && S.options && !atMake()) {     // any knob or fader: scrub
     const n = live().choices.length;
     if (!n) return;
     const i = Math.min(n - 1, Math.round(data2 / 127 * (n - 1)));
@@ -594,6 +603,10 @@ function ringTiles() {
     out.push({key: "dn", text: JSON.stringify(["Done", "take the headset off to play it", true, "make"]), angle: 0, y: 0});
     return out;
   }
+  if (!S.options) {
+    out.push({key: "ttl", text: JSON.stringify(["Could not read the choices", "reload once ComfyUI answers", false, ""]), angle: 0, y: .62});
+    return out;
+  }
   if (atMake()) {
     out.push({key: "mk", text: JSON.stringify(["MAKE", "pull the trigger", true, "make"]), angle: 0, y: 0});
     out.push({key: "ttl", text: JSON.stringify(["Everything is picked", "", false, ""]), angle: 0, y: .62});
@@ -658,7 +671,7 @@ function xrInputs(session, time, pose) {
       if (time - XR.lastStick > 260) { move(x > 0 ? 1 : -1); XR.lastStick = time; }
     }
   }
-  if (stickUsed || S.making || S.done || S.busy || atMake()) return;
+  if (stickUsed || S.making || S.done || S.busy || !S.options || atMake()) return;
   const m = pose.views[0].transform.matrix;        // forward is -z of the view
   const fx = -m[8], fz = -m[10];
   const yaw = Math.atan2(fx, -fz);                 // 0 straight ahead, + to the right
@@ -710,6 +723,7 @@ $("again").addEventListener("click", again);
   } catch (e) {
     setStatus("could not read the choices");
     showError(e.message);
+    render();   // repaint: the last paint still said "reading the choices..."
   }
 })();
 </script>
