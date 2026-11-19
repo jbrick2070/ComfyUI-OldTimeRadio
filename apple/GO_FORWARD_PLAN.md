@@ -641,6 +641,22 @@ different proof.
 
 ## 2. CODE -- decided, in order
 
+### 0t. Final audit 2026-11-19 -- code landed in 2.3.53; live proofs and four rows left
+
+The report is `C:\Users\jeffr\Documents\ComfyUI\otr_reviews\OTR-final-audit-and-coding-plan.md`.
+Fixes went out as `5f17f57f`..`5bc46894`, release `9c9f4228` (2.3.53, Pending). Left, in order:
+
+1. **Live proofs.** One 2-act canonical leg to `otr/obs`, checking four things:
+   - `<ep>_master.wav` bridge windows read L = R (PBUG-20261119-01);
+   - SlotContract tok/s in the log, against 22.7 tok/s on 2026-10-28;
+   - SilentComposite wall time, against the 33 s floor count;
+   - his ear on the last spoken line, where a 500 ms closing crossfade overlaps it (N-A1; pad the scene tail and head if he hears it).
+
+   One Google-writer leg must log "Build 3 slot drama contracts: N slot(s)" (PBUG-20261119-02).
+2. **O6:** stream frame conversion into ffmpeg in `wrapper_bridge.py` (+324 MiB peak today).
+3. **Studio:** the plain-episode path keeps no attempt record, so a lost submit reply can queue a second render (N-S1, a design choice). Also: the `::1` bind, the reconcile body, and the options repaint.
+4. **Operator decision:** agy rated the 2.3.51 boot-time spaCy wheel fetch (`_otr_kokoro_voice_prefetch.py`) a HIGH registry-policy risk. Keep it, or move to an install-time download, if 2.3.53 is Flagged.
+
 ### 0p. Gemini audit 2026-10-13 -- code landed; three live proofs and one row left
 
 The seven fixes and both forks are code on `claude/vigilant-lamport-p6x7ck`
