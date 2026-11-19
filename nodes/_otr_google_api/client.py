@@ -221,6 +221,11 @@ def _quota_retry(call, *, label: str, quota: dict | None = None):
                 raise
 
 
+#: HTTP answers that ask the caller to send again (timeout, conflict, too
+#: early): create_interaction keeps retrying these whatever their class.
+_RESENDABLE_HTTP = frozenset({408, 409, 425})
+
+
 def _attach_evidence(exc: GoogleAPIError, *, status: int | None,
                      response_json: Any = None, raw_body: str | None = None,
                      headers: Any = None) -> GoogleAPIError:
@@ -577,7 +582,11 @@ def create_interaction(
             # The classifier already decided (_attach_evidence): an auth,
             # request-shape or other non-retryable HTTP answer will not change
             # on a resend, so it is raised at once instead of POSTed again.
-            if attempt >= retries or getattr(exc, "retryable", True) is False:
+            # 408/409/425 are "try again" answers by definition and keep their
+            # retries even though the classifier files them as plain http.
+            final = (getattr(exc, "retryable", True) is False
+                     and getattr(exc, "http_status", None) not in _RESENDABLE_HTTP)
+            if attempt >= retries or final:
                 raise
             time.sleep(min(2.0, 0.25 * (2 ** attempt)))
     assert last_exc is not None

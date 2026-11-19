@@ -213,7 +213,24 @@ def deterministic_inference(seed: int, *, warn_only: bool = False):
                 raise
             _SCOPE["stack"] = stack
         _SCOPE["depth"] += 1
-        _seed_all(seed, have_cuda)
+        try:
+            _seed_all(seed, have_cuda)
+        except BaseException:
+            # A seed torch refuses (outside 64 bits; the seed comes from a
+            # widget) must not leave this entry counted: a depth that never
+            # returns to zero would keep the strict state on for good
+            # (Sonnet QA 2026-11-19). Roll the entry back, restore if it was
+            # the only one, and re-raise.
+            _SCOPE["depth"] -= 1
+            if _SCOPE["depth"] == 0:
+                stack, saved = _SCOPE["stack"], _SCOPE["saved"]
+                _SCOPE["stack"] = _SCOPE["saved"] = None
+                try:
+                    if stack is not None:
+                        stack.close()
+                finally:
+                    _restore(saved, have_cuda, mps)
+            raise
     try:
         yield
     finally:

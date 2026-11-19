@@ -258,3 +258,18 @@ def test_a_non_retryable_answer_is_not_posted_again(_fast, monkeypatch):
     with pytest.raises(gc.GoogleAPIError):
         gc.create_interaction({"model": "m", "input": "x"}, _post=flaky)
     assert calls["n"] == 3
+
+
+def test_a_try_again_status_keeps_its_retries(_fast, monkeypatch):
+    """408 asks the caller to send again; it keeps its retries."""
+    monkeypatch.setenv("OTR_GOOGLE_MAX_RETRIES", "2")
+    calls = {"n": 0}
+
+    def post(path, payload, api_key, timeout_s):
+        calls["n"] += 1
+        exc = gc._classify_http_error(408, {})
+        raise gc._attach_evidence(exc, status=408)
+
+    with pytest.raises(gc.GoogleAPIError):
+        gc.create_interaction({"model": "m", "input": "x"}, _post=post)
+    assert calls["n"] == 3

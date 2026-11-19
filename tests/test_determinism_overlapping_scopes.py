@@ -120,3 +120,16 @@ def test_the_same_seed_gives_the_same_draw():
     with det.deterministic_inference(11):
         second = torch.rand(4)
     assert torch.equal(first, second)
+
+
+def test_a_seed_torch_refuses_leaves_no_scope_open():
+    """Sonnet QA 2026-11-19: the depth was counted before seeding, so a seed
+    torch rejects (outside 64 bits) raised with the scope still counted and
+    the strict state stayed on for the rest of the process."""
+    before = _state()
+    for _ in range(2):
+        with pytest.raises((ValueError, RuntimeError, OverflowError)):
+            with det.deterministic_inference(2 ** 70):
+                pass
+    assert det._SCOPE["depth"] == 0
+    assert _state() == before

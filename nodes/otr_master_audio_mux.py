@@ -2515,9 +2515,10 @@ class OTRMasterAudioMux:
             # ASSET CLEANUP AFTER PUBLISH (row 0b) -- THE LAST STEP, after the
             # publish, the ledger stamp, the required-delivery gate and the
             # janitor. The episode is already delivered, so nothing here may
-            # fail it: everything is a report line. A Cancel is ComfyUI's
-            # InterruptProcessingException, a BaseException, so the
-            # `except Exception` below can never swallow it.
+            # fail it: everything is a report line. On the current runtime
+            # (ComfyUI 0.46) a Cancel is InterruptProcessingException, a
+            # BaseException, so the `except Exception` below does not catch
+            # it; older builds derived it from Exception (see _poll_interrupt).
             final_removed = False
             try:
                 _cleanup_line, final_removed = self._asset_cleanup(
