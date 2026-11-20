@@ -292,6 +292,16 @@ if _otr_dup is None:
             log.warning("[OldTimeRadio] Failed to load '%s': %s", node_name, e)
             print(f"[OldTimeRadio] Skipped '{node_name}': {e}")
 
+    # Error text a node hands back reaches /history, the websocket and the
+    # served log, so absolute paths are cut to their last component at the
+    # node boundary (nodes/_otr_error_text.py).
+    try:
+        from .nodes._otr_error_text import guard_node_classes
+
+        guard_node_classes(NODE_CLASS_MAPPINGS.values())
+    except Exception as _otr_guard_exc:  # noqa: BLE001
+        log.warning("[OldTimeRadio] Error-text guard not installed: %s", _otr_guard_exc)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # No rename-alias or back-compat surface: every workflow JSON references
 # the current canonical class names directly, and a workflow that names a

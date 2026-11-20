@@ -1,0 +1,132 @@
+"""Node errors carry no absolute paths (nodes/_otr_error_text.py).
+
+ComfyUI copies str(exception) into /history and the websocket error event, so
+the pack cuts absolute paths to their last component at the node boundary.
+"""
+
+from __future__ import annotations
+
+import ast
+import asyncio
+import subprocess
+from pathlib import Path
+
+import pytest
+
+from nodes._otr_error_text import (
+    guard_node_class,
+    guard_node_classes,
+    redact_exception,
+    redact_paths,
+)
+
+PACK_ROOT = Path(__file__).resolve().parent.parent
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        (r"missing C:\Users\someone\ComfyUI\models\tts\voice.pt", "missing voice.pt"),
+        ("missing C:/Users/someone/models/x.safetensors now", "missing x.safetensors now"),
+        ("could not read '/home/someone/ComfyUI/output/ep1/final.mp4'", "could not read 'final.mp4'"),
+        (r"share \\nas\media\clips\a.wav gone", "share a.wav gone"),
+        ("folder /home/someone/out/ is empty", "folder out is empty"),
+    ],
+)
+def test_absolute_paths_are_cut_to_the_last_component(text, expected):
+    assert redact_paths(text) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "fetch https://huggingface.co/org/model/resolve/main/a.bin failed",
+        "relative otr/episodes/ep1/audio.wav is fine",
+        "ratio 3/4 and 16/9",
+        "no paths here",
+        "~/notes/today.txt stays relative to home",
+    ],
+)
+def test_urls_relative_paths_and_plain_text_are_unchanged(text):
+    assert redact_paths(text) == text
+
+
+def test_os_error_filename_attribute_is_redacted():
+    try:
+        open(r"C:\Users\someone\missing_folder\clip.wav", "rb")  # noqa: SIM115
+    except OSError as exc:
+        redact_exception(exc)
+        assert "someone" not in str(exc)
+        assert "clip.wav" in str(exc)
+    else:  # pragma: no cover
+        pytest.fail("the file should not exist")
+
+
+def test_called_process_error_command_is_redacted():
+    exc = subprocess.CalledProcessError(1, ["/opt/someone/bin/ffmpeg", "-i", "/home/someone/a.mp4"])
+    redact_exception(exc)
+    assert "someone" not in str(exc)
+    assert "ffmpeg" in str(exc) and "a.mp4" in str(exc)
+
+
+class _Node:
+    FUNCTION = "run"
+
+    def run(self, where):
+        raise FileNotFoundError(f"no clip at {where}")
+
+
+class _ClassMethodNode:
+    FUNCTION = "go"
+
+    @classmethod
+    def go(cls, where):
+        raise ValueError(f"bad {where}")
+
+
+class _AsyncNode:
+    FUNCTION = "work"
+
+    async def work(self, where):
+        raise RuntimeError(f"failed on {where}")
+
+
+def test_guarded_node_keeps_the_exception_object_and_type():
+    guard_node_class(_Node)
+    with pytest.raises(FileNotFoundError) as info:
+        _Node().run(where="/home/someone/ComfyUI/output/x.mp4")
+    assert str(info.value) == "no clip at x.mp4"
+
+
+def test_guarded_classmethod_stays_a_classmethod():
+    guard_node_class(_ClassMethodNode)
+    assert isinstance(vars(_ClassMethodNode)["go"], classmethod)
+    with pytest.raises(ValueError, match="^bad y.json$"):
+        _ClassMethodNode.go(where=r"D:\data\someone\y.json")
+
+
+def test_guarded_async_node_stays_a_coroutine_function():
+    import inspect
+
+    guard_node_class(_AsyncNode)
+    assert inspect.iscoroutinefunction(_AsyncNode().work)
+    with pytest.raises(RuntimeError, match="^failed on z.wav$"):
+        asyncio.run(_AsyncNode().work(where="/srv/someone/z.wav"))
+
+
+def test_guarding_twice_wraps_once():
+    guard_node_class(_Node)
+    first = vars(_Node)["run"]
+    assert guard_node_classes([_Node, _Node]) == 2
+    assert vars(_Node)["run"] is first
+
+
+def test_pack_init_guards_every_registered_node():
+    """The helper is wired: __init__.py calls it on NODE_CLASS_MAPPINGS."""
+    tree = ast.parse((PACK_ROOT / "__init__.py").read_text(encoding="utf-8"))
+    calls = [
+        n for n in ast.walk(tree)
+        if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "guard_node_classes"
+    ]
+    assert calls, "__init__.py must call guard_node_classes"
+    assert "NODE_CLASS_MAPPINGS" in ast.unparse(calls[0])
