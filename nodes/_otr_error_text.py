@@ -18,7 +18,12 @@ policy is applied once, at the node boundary, rather than at each raise:
   user-facing text themselves.
 
 The file name survives, so a message still says which model or clip failed;
-only the folders above it are dropped. URLs are left alone.
+only the folders above it are dropped. URLs and HTTP routes are left alone.
+
+Out of reach on purpose: the ``traceback`` ComfyUI adds beside the message
+lists the source file of each frame. ComfyUI builds that from the code's own
+location for every pack, and rewriting core's traceback from inside a pack
+would be a larger intrusion than the leak it closes.
 """
 
 from __future__ import annotations
@@ -27,16 +32,63 @@ import functools
 import inspect
 import os
 import re
+from pathlib import Path
 
 __all__ = ["redact_paths", "redact_exception", "guard_node_class", "guard_node_classes"]
 
 # A drive-letter path (C:\a\b, C:/a/b) or a UNC share (\\host\share\a). The
 # drive letter must stand alone, so a URL scheme ("https:/") never matches.
 _WINDOWS_PATH = r"(?:(?<![\w])[A-Za-z]:|\\\\[^\\/\s'\"<>|]+)[\\/][^\s'\"<>|,;()\[\]{}]*"
-# A rooted POSIX path with at least one folder (/a/b). The look-behind keeps
-# URLs (scheme://host/path), relative paths (a/b) and fractions (1/2) out.
-_POSIX_PATH = r"(?<![\w.:/\\~-])/(?:[^\s/'\"<>|,;()\[\]{}]+/)+[^\s/'\"<>|,;()\[\]{}]*"
+# A rooted POSIX path under a filesystem top level (/home/a/b, /workspace/x).
+# Naming the top levels keeps HTTP routes (/v1/chat/completions, /api/prompt)
+# intact, and the look-behind keeps URLs (scheme://host/path) and relative
+# paths (a/b) out.
+_POSIX_ROOTS = (
+    "home", "Users", "Volumes", "root", "tmp", "var", "opt", "srv", "mnt", "media",
+    "private", "usr", "etc", "run", "data", "workspace", "content", "kaggle",
+    "notebooks", "app", "teamspace",
+)
+_POSIX_PATH = (
+    r"(?<![\w.:/\\~-])/(?:" + "|".join(_POSIX_ROOTS) + r")/"
+    r"(?:[^\s/'\"<>|,;()\[\]{}]+/)*[^\s/'\"<>|,;()\[\]{}]*"
+)
 _PATH_RE = re.compile(f"{_WINDOWS_PATH}|{_POSIX_PATH}")
+
+
+def _home_prefixes() -> tuple[str, ...]:
+    """The account's home folder in every spelling a message may carry.
+
+    The path rule stops at whitespace, so on an account named "John Smith" it
+    would leave "John Smith\\Documents\\x.wav" behind; the home prefix is cut
+    first, whatever it contains.
+    """
+    try:
+        home = str(Path.home()).rstrip("\\/")
+    except Exception:  # noqa: BLE001 -- no resolvable home: rely on the path rule
+        return ()
+    if len(home) < 4:
+        return ()
+    spellings = {home, home.replace("\\", "/"), home.replace("/", "\\"), home.replace("\\", "\\\\")}
+    return tuple(sorted(spellings, key=len, reverse=True))
+
+
+_HOME_PREFIXES = _home_prefixes()
+
+
+# What follows the home prefix, up to the end of the path token.
+_UNDER_HOME = r"(?:(?:\\\\|[\\/])[^\s'\"<>|,;()\[\]{}]*)?"
+
+
+def _home_tail(match: re.Match) -> str:
+    rest = (match.group(1) or "").rstrip("\\/.")
+    return re.split(r"[\\/]", rest)[-1] or "~"
+
+
+def _cut_home(text: str) -> str:
+    for prefix in _HOME_PREFIXES:
+        if prefix.lower() in text.lower():
+            text = re.sub(re.escape(prefix) + "(" + _UNDER_HOME + ")", _home_tail, text, flags=re.IGNORECASE)
+    return text
 
 # Attributes some standard exceptions read their text from instead of args.
 _PATH_ATTRS = ("filename", "filename2")
@@ -53,7 +105,7 @@ def redact_paths(text: str) -> str:
     """Return ``text`` with every absolute path cut to its last component."""
     if not isinstance(text, str) or ("/" not in text and "\\" not in text):
         return text
-    return _PATH_RE.sub(_last_component, text)
+    return _PATH_RE.sub(_last_component, _cut_home(text))
 
 
 def _redact_value(value):

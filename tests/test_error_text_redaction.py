@@ -45,10 +45,35 @@ def test_absolute_paths_are_cut_to_the_last_component(text, expected):
         "ratio 3/4 and 16/9",
         "no paths here",
         "~/notes/today.txt stays relative to home",
+        "POST /v1/chat/completions returned 500",
+        "route /api/prompt failed",
     ],
 )
 def test_urls_relative_paths_and_plain_text_are_unchanged(text):
     assert redact_paths(text) == text
+
+
+@pytest.mark.parametrize(
+    "home, text, expected",
+    [
+        (r"C:\Users\John Smith", r"missing C:\Users\John Smith\Documents\x.wav", "missing x.wav"),
+        (r"C:\Users\John Smith", "missing C:/Users/John Smith/models/y.pt here", "missing y.pt here"),
+        (r"C:\Users\John Smith", r"repr 'C:\\Users\\John Smith\\a\\b.json'", "repr 'b.json'"),
+        ("/home/mary jane", "no /home/mary jane/models/z.bin", "no z.bin"),
+        ("/home/mary jane", "home is /home/mary jane", "home is ~"),
+    ],
+)
+def test_a_home_folder_with_spaces_is_cut_whole(monkeypatch, home, text, expected):
+    """The path rule stops at whitespace; the home prefix must not leave the
+    account name behind (Sonnet QA on 9ed01d70d)."""
+    import nodes._otr_error_text as mod
+
+    monkeypatch.setattr(mod, "_HOME_PREFIXES", (
+        home.replace("\\", "\\\\"), home, home.replace("\\", "/"),
+    ))
+    out = redact_paths(text)
+    assert out == expected
+    assert "Smith" not in out and "mary" not in out
 
 
 def test_os_error_filename_attribute_is_redacted():
