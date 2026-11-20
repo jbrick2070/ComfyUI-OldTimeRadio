@@ -121,9 +121,9 @@ Video engines they select: `ltx25_foley_24gb`
 |---|---|---|---|---|---|---|---|
 | `otr_cloud_deluxe_3act` | cloud_ltx25_foley_plus | cloud_elevenlabs | sonilo | cloud_flux_pro | none | `shipping` | complete |
 | `otr_cloud_deluxe_audio_in_3act` | cloud_ltx25_audio_in | cloud_elevenlabs | sonilo | cloud_flux_pro | none | `shipping` | complete |
-| `otr_cloud_low` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | none | `shipping` | complete |
-| `otr_cloud_low_1act` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | none | `shipping` | complete |
-| `otr_cloud_low_5act` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | none | `shipping` | complete |
+| `otr_cloud_low` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_krea_2_turbo | none | `shipping` | complete |
+| `otr_cloud_low_1act` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_krea_2_turbo | none | `shipping` | complete |
+| `otr_cloud_low_5act` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_krea_2_turbo | none | `shipping` | complete |
 | `otr_google_still` | still_flat | google_tts | google_lyria | google_image | none | `shipping` | complete |
 
 ## Voice engines

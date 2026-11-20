@@ -181,39 +181,6 @@ rows:
     seed_supported: true
     selected_output: 0
     status: OK
-  cloud_luma_photon_flash:
-    api_node: true
-    auth_hidden_present:
-    - auth_token_comfy_org
-    - api_key_comfy_org
-    category: partner/image/Luma
-    class_name: LumaImageGenerationNode
-    function: EXECUTE_NORMALIZED_ASYNC
-    import_path: comfy_api_nodes.nodes_luma
-    inputs:
-      hidden:
-        api_key_comfy_org:
-        auth_token_comfy_org:
-        comfy_usage_source:
-        unique_id:
-      optional:
-        character_image: IMAGE
-        image_luma_ref: LUMA_REF
-        style_image: IMAGE
-      required:
-        aspect_ratio: COMBO
-        model: COMBO
-        prompt: STRING
-        seed: INT
-        style_image_weight: FLOAT
-    is_async: true
-    notes: stills; cheapest Luma Photon Flash (0.57cr/run)
-    provider_id: LUMA
-    return_types:
-    - IMAGE
-    seed_supported: true
-    selected_output: 0
-    status: OK
   cloud_ltx25_a2v:
     api_node: true
     auth_hidden_present:

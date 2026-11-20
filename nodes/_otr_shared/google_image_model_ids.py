@@ -14,7 +14,7 @@ very defect class the guard exists to catch. Instead there is exactly one table,
 here, imported by BOTH the invoke path and the inventory collector.
 
 THE FALLTHROUGH IS PART OF THE CONTRACT. Most selectors ARE concrete ids already
-(the seedream / krea / photon rows), so an unmapped value resolves to itself.
+(the seedream / krea rows), so an unmapped value resolves to itself.
 This function must never raise on an unknown selector: that would break every
 one of those rows. It raises only on input that is not a usable selector at all.
 

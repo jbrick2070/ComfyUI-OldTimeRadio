@@ -240,7 +240,6 @@
  "field.writer_comfy.help": "脚本家が Comfy のときに使います。このページのキーで Comfy クレジットを使います。",
  "choice.stills.cloud_flux_pro": "FLUX Pro（クラウド・有料）",
  "choice.stills.cloud_krea_2_turbo": "Krea 2 Turbo（クラウド・有料）",
- "choice.stills.cloud_luma_photon_flash": "Luma Photon Flash（クラウド・有料）",
  "choice.stills.cloud_nano_banana_2": "Nano Banana 2（クラウド・有料）",
  "choice.stills.cloud_seedream_2": "Seedream 2（クラウド・有料）",
  "choice.stills.ideo": "Ideogram 4（クラウド・有料）",

@@ -19,14 +19,12 @@ _CLOUD_ROWS = (
     "cloud_nano_banana_2",
     "cloud_seedream_2",
     "cloud_krea_2_turbo",
-    "cloud_luma_photon_flash",
 )
 _CLOUD_ENGINES = (
     eci.FluxPro,
     eci.NanoBanana2,
     eci.Seedream2,
     eci.Krea2Turbo,
-    eci.LumaPhotonFlash,
 )
 
 
@@ -210,54 +208,6 @@ def test_krea_2_turbo_rejects_unknown_model(monkeypatch):
         eci.Krea2Turbo._partner_inputs(_req())
     assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
     assert "OTR_CLOUD_KREA_MODEL" in str(ei.value)
-
-
-def test_luma_photon_flash_inputs(monkeypatch):
-    monkeypatch.delenv("OTR_CLOUD_LUMA_PHOTON_MODEL", raising=False)
-    monkeypatch.delenv("OTR_CLOUD_LUMA_STYLE_IMAGE_WEIGHT", raising=False)
-    ins = eci.LumaPhotonFlash._partner_inputs(_req())
-    assert set(ins) == {
-        "prompt", "model", "aspect_ratio", "seed", "style_image_weight",
-    }
-    assert ins["model"] == "photon-flash-1"
-    assert ins["aspect_ratio"] == "16:9"
-    assert ins["style_image_weight"] == 1.0
-    assert eci.LumaPhotonFlash._est_usd() == 0.0027
-    _assert_visual_safety(ins["prompt"])
-
-
-def test_luma_photon_flash_env_overrides(monkeypatch):
-    monkeypatch.setenv("OTR_CLOUD_LUMA_PHOTON_MODEL", "photon-1")
-    monkeypatch.setenv("OTR_CLOUD_LUMA_PHOTON_ASPECT", "1:1")
-    monkeypatch.setenv("OTR_CLOUD_LUMA_STYLE_IMAGE_WEIGHT", "0.6")
-    ins = eci.LumaPhotonFlash._partner_inputs(_req())
-    assert ins["model"] == "photon-1"
-    assert ins["aspect_ratio"] == "1:1"
-    assert ins["style_image_weight"] == 0.6
-
-
-def test_luma_photon_flash_rejects_unknown_model(monkeypatch):
-    monkeypatch.setenv("OTR_CLOUD_LUMA_PHOTON_MODEL", "ray-flash")
-    with pytest.raises(CloudMediaError) as ei:
-        eci.LumaPhotonFlash._partner_inputs(_req())
-    assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
-    assert "OTR_CLOUD_LUMA_PHOTON_MODEL" in str(ei.value)
-
-
-def test_luma_photon_flash_rejects_stale_aspect(monkeypatch):
-    monkeypatch.setenv("OTR_CLOUD_LUMA_PHOTON_ASPECT", "3:2")
-    with pytest.raises(CloudMediaError) as ei:
-        eci.LumaPhotonFlash._partner_inputs(_req())
-    assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
-    assert "OTR_CLOUD_LUMA_PHOTON_ASPECT" in str(ei.value)
-
-
-def test_luma_photon_flash_rejects_bad_style_weight(monkeypatch):
-    monkeypatch.setenv("OTR_CLOUD_LUMA_STYLE_IMAGE_WEIGHT", "1.5")
-    with pytest.raises(CloudMediaError) as ei:
-        eci.LumaPhotonFlash._partner_inputs(_req())
-    assert ei.value.code is CloudErrorCode.MALFORMED_CONFIG
-    assert "OTR_CLOUD_LUMA_STYLE_IMAGE_WEIGHT" in str(ei.value)
 
 
 def test_ideo_registered_and_inputs(monkeypatch):

@@ -883,10 +883,10 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 ## otr_cloud_low
 
 - file: `workflows/otr_cloud_low.json`
-- workflow: `otr_cloud_low` (Comfy Cloud 3-act -- Sonnet 5 creative + GPT 5.6 Luna tech (Comfy Credits), cheapest partners (ElevenLabs, Sonilo, Luma Flash, Vidu Q2 Pro Fast I2V). Length is what credits buy. Needs OTR_COMFY_API_KEY.)
+- workflow: `otr_cloud_low` (Comfy Cloud 3-act -- Sonnet 5 creative + GPT 5.6 Luna tech (Comfy Credits), cheapest partners (ElevenLabs, Sonilo, Krea 2 Turbo, Vidu Q2 Pro Fast I2V). Length is what credits buy. Needs OTR_COMFY_API_KEY.)
 - status: shipping
 - platform/backend/vendor: any/cpu/none
-- master_hash: `8df9b6884ee1d74420d916f282736649a2d14d3fa99d06d7980050eafc9038b3`
+- master_hash: `0c37035798b04d86b9f541037e38593a09835ead6579ced44d0569fc12346c36`
 
 ### ComfyUI launch
 
@@ -927,7 +927,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_cloud_low_1act` (Comfy Cloud 1-act trial -- Sonnet 5 creative + GPT 5.6 Luna tech (Comfy Credits), same cheapest partners as the 3-act and 5-act workflows (Vidu Q2 Pro Fast I2V). Short paid-length smoke. Needs OTR_COMFY_API_KEY.)
 - status: shipping
 - platform/backend/vendor: any/cpu/none
-- master_hash: `6ed91bbd7c9bbefbd0f6807b2f870a493796dfb69f488b17bcdba37b5aef45c1`
+- master_hash: `480bd7383775f825d87b301c1d2436ec213549f45a4d123fefeaa1cd79ea0325`
 
 ### ComfyUI launch
 
@@ -968,7 +968,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_cloud_low_5act` (Comfy Cloud 5-act -- Sonnet 5 creative + GPT 5.6 Luna tech (Comfy Credits), same cheapest partners as the 1-act trial and 3-act workflows (Vidu Q2 Pro Fast I2V). Long paid-length episode. Needs OTR_COMFY_API_KEY.)
 - status: shipping
 - platform/backend/vendor: any/cpu/none
-- master_hash: `e576431df00f7b320eb7672e7963cedbe9a973c86cadf2ee75bd2293e878b199`
+- master_hash: `2a361170a403ec2e640b51f5f7f4c7f93eba1ff62331bdb6a57284ea87f1a43d`
 
 ### ComfyUI launch
 

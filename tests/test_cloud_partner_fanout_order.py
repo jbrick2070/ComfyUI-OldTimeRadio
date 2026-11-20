@@ -207,7 +207,7 @@ def test_cloud_stills_fan_out_but_commit_in_object_order(
     monkeypatch.delenv("OTR_CLOUD_FANOUT", raising=False)
     monkeypatch.delenv("OTR_CLOUD_VIDEO_FANOUT", raising=False)
     clean_image_registry._registry.clear()
-    ireg.register(_img_stub(name="cloud_luma_photon_flash", native=False))
+    ireg.register(_img_stub(name="cloud_krea_2_turbo", native=False))
     finish = []
     lock = threading.Lock()
     delays = {"c0": 0.12, "c1": 0.06, "c2": 0.0}
@@ -222,7 +222,7 @@ def test_cloud_stills_fan_out_but_commit_in_object_order(
     policy = {
         "policy_version": 2,
         "image_models": {
-            "character_image_model": {"engine_id": "cloud_luma_photon_flash"},
+            "character_image_model": {"engine_id": "cloud_krea_2_turbo"},
         },
         "video_models": _complete_video_models(),
         "seed": {"request_seed": 0},

@@ -240,7 +240,6 @@
  "field.writer_comfy.help": "編劇是 Comfy 時使用。以本頁的金鑰扣 Comfy 點數。",
  "choice.stills.cloud_flux_pro": "FLUX Pro（雲端，付費）",
  "choice.stills.cloud_krea_2_turbo": "Krea 2 Turbo（雲端，付費）",
- "choice.stills.cloud_luma_photon_flash": "Luma Photon Flash（雲端，付費）",
  "choice.stills.cloud_nano_banana_2": "Nano Banana 2（雲端，付費）",
  "choice.stills.cloud_seedream_2": "Seedream 2（雲端，付費）",
  "choice.stills.ideo": "Ideogram 4（雲端，付費）",

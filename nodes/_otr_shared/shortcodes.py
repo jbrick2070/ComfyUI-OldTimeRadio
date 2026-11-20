@@ -181,7 +181,6 @@ VIDEO_LANE = {
 IMAGE_GEN = {
     "cloud_flux_pro": "cflx",
     "cloud_krea_2_turbo": "ckr2",
-    "cloud_luma_photon_flash": "clum",
     "cloud_nano_banana_2": "cnb2",
     "cloud_seedream_2": "csd2",
 

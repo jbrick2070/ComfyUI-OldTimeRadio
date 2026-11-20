@@ -240,7 +240,6 @@
  "field.writer_comfy.help": "Se usa cuando el escritor es Comfy. Cobra créditos de Comfy con la clave de esta página.",
  "choice.stills.cloud_flux_pro": "FLUX Pro (nube, de pago)",
  "choice.stills.cloud_krea_2_turbo": "Krea 2 Turbo (nube, de pago)",
- "choice.stills.cloud_luma_photon_flash": "Luma Photon Flash (nube, de pago)",
  "choice.stills.cloud_nano_banana_2": "Nano Banana 2 (nube, de pago)",
  "choice.stills.cloud_seedream_2": "Seedream 2 (nube, de pago)",
  "choice.stills.ideo": "Ideogram 4 (nube, de pago)",

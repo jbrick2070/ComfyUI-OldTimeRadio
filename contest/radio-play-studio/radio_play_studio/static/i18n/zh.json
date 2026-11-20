@@ -240,7 +240,6 @@
  "field.writer_comfy.help": "编剧是 Comfy 时使用。用本页的密钥扣 Comfy 点数。",
  "choice.stills.cloud_flux_pro": "FLUX Pro（云端，付费）",
  "choice.stills.cloud_krea_2_turbo": "Krea 2 Turbo（云端，付费）",
- "choice.stills.cloud_luma_photon_flash": "Luma Photon Flash（云端，付费）",
  "choice.stills.cloud_nano_banana_2": "Nano Banana 2（云端，付费）",
  "choice.stills.cloud_seedream_2": "Seedream 2（云端，付费）",
  "choice.stills.ideo": "Ideogram 4（云端，付费）",

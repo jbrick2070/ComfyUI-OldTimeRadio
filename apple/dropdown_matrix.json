@@ -52,14 +52,6 @@
       },
       "size_gb": null
     },
-    "cloud_luma_photon_flash": {
-      "memory": {
-        "mac16": "fits",
-        "nv16": "fits",
-        "nv8": "fits"
-      },
-      "size_gb": null
-    },
     "cloud_ltx25_audio_in": {
       "memory": {
         "mac16": "fits",

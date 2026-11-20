@@ -1,14 +1,13 @@
 """Cloud partner IMAGE (stills) adapters -- S1 stills lane (pass04 + remaining-
 sprints PLAN.md Sprint B; operator GO 2026-07-03 "S1").
 
-Four rows from the S0 pin table, invoked through the S0 bridge
+Rows from the S0 pin table, invoked through the S0 bridge
 (``invoke_partner_node``) and conformed by ``canonicalize_image``:
 
     cloud_flux_pro       text2img   BEST (prompt continuity with flux_gen1)
     cloud_nano_banana_2  text2img   BEST (V3 model row; reference consistency)
     cloud_seedream_2     text2img   cheapest stylization tier (V3 model row)
     cloud_krea_2_turbo   text2img   cheap Krea 2 Medium Turbo stills (V3)
-    cloud_luma_photon_flash text2img cheapest Luma Photon Flash stills
 
 (``cloud_ideogram_v4`` ships as ``ideo`` for ordinary scene stills; a future
 ``ideo_word`` specialist can share the same Partner row.)
@@ -90,11 +89,6 @@ _KREA_MODELS = ("Krea 2 Medium Turbo", "Krea 2 Medium", "Krea 2 Large")
 _KREA_ASPECTS = ("1:1", "4:3", "3:2", "16:9", "2.35:1", "4:5", "2:3", "9:16")
 _KREA_RESOLUTIONS = ("1K",)
 _KREA_CREATIVITY_LEVELS = ("raw", "low", "medium", "high")
-
-_LUMA_PHOTON_MODELS = ("photon-flash-1", "photon-1")
-_LUMA_PHOTON_ASPECTS = (
-    "1:1", "16:9", "9:16", "4:3", "3:4", "21:9", "9:21",
-)
 
 _IDEOGRAM_RESOLUTIONS = (
     "Auto",
@@ -526,66 +520,6 @@ class CloudKrea2TurboImageEngine(_CloudImageBase):
         return "1:1"
 
 
-class CloudLumaPhotonFlashImageEngine(_CloudImageBase):
-    """Luma Photon Flash: the cheapest Comfy Cloud stills lane."""
-
-    name = "cloud_luma_photon_flash"
-    node_key = "cloud_luma_photon_flash"
-    est_usd_env = "OTR_CLOUD_LUMA_PHOTON_FLASH_EST_USD"
-    est_usd_default = 0.0027
-
-    def cloud_selectors(self):
-        model = otr_env.get("OTR_CLOUD_LUMA_PHOTON_MODEL", "").strip() or "photon-flash-1"
-        aspect = otr_env.get("OTR_CLOUD_LUMA_PHOTON_ASPECT", "").strip()
-        aspects = (aspect,) if aspect else _LUMA_PHOTON_ASPECTS
-        return {self.node_key: {
-            "model": (model,),
-            "aspect_ratio": aspects,
-        }}
-
-    def _partner_inputs(self, request):
-        # pinned required: aspect_ratio COMBO, model COMBO, prompt STRING,
-        # seed INT, style_image_weight FLOAT. No image refs are emitted here:
-        # this adapter is the cheap text-to-image Photon Flash lane.
-        return {
-            "prompt": self._prompt(request),
-            "model": _choice_env(
-                "OTR_CLOUD_LUMA_PHOTON_MODEL", "photon-flash-1",
-                _LUMA_PHOTON_MODELS),
-            "aspect_ratio": self._aspect_ratio(request),
-            "seed": self._seed_u64(request),
-            "style_image_weight": self._style_image_weight(),
-        }
-
-    def _aspect_ratio(self, request) -> str:
-        env = otr_env.get("OTR_CLOUD_LUMA_PHOTON_ASPECT", "").strip()
-        if env:
-            return _choice(env, _LUMA_PHOTON_ASPECTS,
-                           name="OTR_CLOUD_LUMA_PHOTON_ASPECT")
-        w, h = self._canvas_wh(request)
-        if h > w:
-            return "9:16"
-        if w > h:
-            return "16:9"
-        return "1:1"
-
-    def _style_image_weight(self) -> float:
-        env_name = "OTR_CLOUD_LUMA_STYLE_IMAGE_WEIGHT"
-        raw = otr_env.get(env_name, "").strip()
-        if not raw:
-            return 1.0
-        try:
-            value = float(raw)
-        except ValueError as exc:
-            from .._otr_shared.cloud_media_backend import CloudErrorCode, CloudMediaError
-            raise CloudMediaError(
-                CloudErrorCode.MALFORMED_CONFIG,
-                f"{env_name}={raw!r} is not a float") from exc
-        if not (0.0 <= value <= 1.0):
-            _shape_error(f"{env_name}={raw!r} must be between 0.0 and 1.0")
-        return value
-
-
 class CloudIdeoImageEngine(_CloudImageBase):
     """Ideogram v4: PLAIN scene-still option for ANY slot (S1+1 `ideo`).
 
@@ -641,15 +575,14 @@ FluxPro = CloudFluxProImageEngine()
 NanoBanana2 = CloudNanoBanana2ImageEngine()
 Seedream2 = CloudSeedream2ImageEngine()
 Krea2Turbo = CloudKrea2TurboImageEngine()
-LumaPhotonFlash = CloudLumaPhotonFlashImageEngine()
 Ideo = CloudIdeoImageEngine()
 
-for _eng in (FluxPro, NanoBanana2, Seedream2, Krea2Turbo, LumaPhotonFlash, Ideo):
+for _eng in (FluxPro, NanoBanana2, Seedream2, Krea2Turbo, Ideo):
     register(_eng)
 
 __all__ = [
     "CloudFluxProImageEngine",
     "CloudNanoBanana2ImageEngine", "CloudSeedream2ImageEngine",
-    "CloudKrea2TurboImageEngine", "CloudLumaPhotonFlashImageEngine",
+    "CloudKrea2TurboImageEngine",
     "CloudIdeoImageEngine",
 ]

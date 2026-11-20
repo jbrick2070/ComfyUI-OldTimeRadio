@@ -213,11 +213,6 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": True, "sidecar_conditional": False,
         "model_requirements": []},
-    "cloud_luma_photon_flash": {"required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": True, "sidecar_conditional": False,
-        "model_requirements": []},
     # `ideo` -- plain cloud Ideogram scene-still (S1+1). node_key cloud_ideogram_v4.
     "ideo": {"required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,

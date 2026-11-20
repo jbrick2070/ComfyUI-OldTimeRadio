@@ -1259,7 +1259,6 @@ _REMOTE_NO_WEIGHT_IMAGE_ENGINES = {
     "cloud_nano_banana_2",
     "cloud_seedream_2",
     "cloud_krea_2_turbo",
-    "cloud_luma_photon_flash",
     "ideo",
     "google_image",
 }

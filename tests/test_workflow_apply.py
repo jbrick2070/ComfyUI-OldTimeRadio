@@ -229,7 +229,7 @@ def test_apply_otr_cloud_low_trio_is_cheapest_nodes_length_only(schemas, master_
         ) == "sonilo"
         assert _widget_value(
             nodes_by_type, schemas, "OTR_VideoDirector", "character_image_model"
-        ) == "cloud_luma_photon_flash"
+        ) == "cloud_krea_2_turbo"
         for widget in (
             "announcer_video_model", "music_video_model", "character_video_model",
         ):

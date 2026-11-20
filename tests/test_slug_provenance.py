@@ -88,8 +88,8 @@ def test_both_display_mappings_reach_the_invoke_resolver():
 
 
 def test_the_identity_fallthrough_is_preserved():
-    """Raising on an unmapped selector would break every seedream / krea /
-    photon row, none of which is mapped."""
+    """Raising on an unmapped selector would break every seedream / krea
+    row, none of which is mapped."""
     from nodes._otr_shared.google_image_model_ids import resolve_selector_to_model_id
 
     assert resolve_selector_to_model_id("seedream-4-0-250828") == "seedream-4-0-250828"
@@ -391,7 +391,6 @@ ENGINE_COVERAGE = {
     # --- image: cloud ---------------------------------------------------------
     "google_image": "collected", "cloud_nano_banana_2": "collected",
     "cloud_seedream_2": "collected", "cloud_krea_2_turbo": "collected",
-    "cloud_luma_photon_flash": "collected",
     # cloud_flux_pro and ideo route through eng_cloud_image but ship no
     # concrete model collection of their own -- same shape as sonilo.
     "cloud_flux_pro": "exempt", "ideo": "exempt",

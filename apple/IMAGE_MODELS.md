@@ -77,7 +77,6 @@ is exactly what you see below.
 |---|---|
 | `cloud_flux_pro` | Comfy partner |
 | `cloud_krea_2_turbo` | Comfy partner |
-| `cloud_luma_photon_flash` | Comfy partner |
 | `cloud_nano_banana_2` | Comfy partner |
 | `cloud_seedream_2` | Comfy partner |
 | `ideo` | Comfy partner (Ideogram) |

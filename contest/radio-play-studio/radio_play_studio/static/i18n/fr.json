@@ -240,7 +240,6 @@
  "field.writer_comfy.help": "Utilisé quand l'auteur est Comfy. Facture des crédits Comfy avec la clé de cette page.",
  "choice.stills.cloud_flux_pro": "FLUX Pro (cloud, payant)",
  "choice.stills.cloud_krea_2_turbo": "Krea 2 Turbo (cloud, payant)",
- "choice.stills.cloud_luma_photon_flash": "Luma Photon Flash (cloud, payant)",
  "choice.stills.cloud_nano_banana_2": "Nano Banana 2 (cloud, payant)",
  "choice.stills.cloud_seedream_2": "Seedream 2 (cloud, payant)",
  "choice.stills.ideo": "Ideogram 4 (cloud, payant)",

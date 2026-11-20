@@ -155,8 +155,6 @@ SLUG_PROVENANCE: Dict[Tuple[str, str], ProvenanceRecord] = {
     ("Krea 2 Medium Turbo", "comfy_image"): _UNSET,
     ("Krea 2 Medium", "comfy_image"):       _UNSET,
     ("Krea 2 Large", "comfy_image"):        _UNSET,
-    ("photon-flash-1", "comfy_image"):      _UNSET,
-    ("photon-1", "comfy_image"):            _UNSET,
     # The nano rows resolve to real Google ids, so Google's catalog CAN see
     # them -- but Comfy still decides whether Comfy serves them, which is why a
     # hit here is a SIGNAL and not authority verification.
@@ -338,10 +336,6 @@ EVERGREEN_EXEMPTIONS: Dict[Tuple[str, str], str] = {
         "ByteDance publishes no -latest alias; date-pinned by the vendor",
     ("seedream-4-0-250828", "comfy_image"):
         "ByteDance publishes no -latest alias; date-pinned by the vendor",
-    ("photon-flash-1", "comfy_image"):
-        "Luma publishes no -latest alias",
-    ("photon-1", "comfy_image"):
-        "Luma publishes no -latest alias",
     ("gemini-3.1-flash-lite-image", "comfy_image"):
         "Google publishes no -latest pointer for image models (2026-08-10 catalog)",
     ("gemini-3.1-flash-image-preview", "comfy_image"):

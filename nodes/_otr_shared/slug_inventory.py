@@ -130,8 +130,7 @@ def collect_inventory() -> List[InventoryRecord]:
         getattr(ci, "_NANO_MODELS", ()), "comfy_image", CATALOG_GOOGLE,
         resolve=True)
     for const, surface in (("_SEEDREAM_MODELS", "comfy_seedream"),
-                           ("_KREA_MODELS", "comfy_krea"),
-                           ("_LUMA_PHOTON_MODELS", "comfy_photon")):
+                           ("_KREA_MODELS", "comfy_krea")):
         add("cloud_image.%s" % const, "engine", surface,
             getattr(ci, const, ()), "comfy_image", None, resolve=True)
 

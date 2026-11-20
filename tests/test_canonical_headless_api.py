@@ -194,7 +194,7 @@ def test_visual_style_override_does_not_patch_story_fields(tmp_path):
     "profile_id,video_engine,image_engine",
     [
         ("otr_cloud_low", "cloud_vidu_q2_pro_fast_720p",
-         "cloud_luma_photon_flash"),
+         "cloud_krea_2_turbo"),
         ("otr_cloud_deluxe_3act", "cloud_ltx25_foley_plus", "cloud_flux_pro"),
     ],
 )

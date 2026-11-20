@@ -342,7 +342,6 @@ def _fix_hint(node_key: str, input_name: str, live) -> str:
         env_name = spec["env"]
     extras = {
         ("cloud_elevenlabs_tts", "model"): "OTR_ELEVENLABS_MODEL_ID",
-        ("cloud_luma_photon_flash", "model"): "OTR_CLOUD_LUMA_PHOTON_MODEL",
         ("cloud_ideogram_v4", "resolution"): "OTR_CLOUD_IDEOGRAM_RESOLUTION",
         ("cloud_vidu_q2_i2v", "movement_amplitude"): "OTR_CLOUD_VIDU_Q2_MOVEMENT",
     }

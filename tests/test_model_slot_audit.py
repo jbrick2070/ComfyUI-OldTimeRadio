@@ -163,7 +163,6 @@ def test_requested_cloud_smoke_candidate_contracts_are_inspected():
         "cloud_nano_banana_2",
         "cloud_seedream_2",
         "cloud_krea_2_turbo",
-        "cloud_luma_photon_flash",
     }
     for engine_id in cloud_still_candidates:
         engine = image_registry.get_engine(engine_id)

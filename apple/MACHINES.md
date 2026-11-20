@@ -100,7 +100,6 @@ If you change a dropdown yourself, these are the only picks that need anything b
 |---|---|---|---|---|---|---|---|
 | `cloud_flux_pro` | none | -- | key | key | key | key | key |
 | `cloud_krea_2_turbo` | none | -- | key | key | key | key | key |
-| `cloud_luma_photon_flash` | none | -- | key | key | key | key | key |
 | `cloud_nano_banana_2` | none | -- | key | key | key | key | key |
 | `cloud_seedream_2` | none | -- | key | key | key | key | key |
 | `google_image` | none | -- | key | key | key | key | key |
