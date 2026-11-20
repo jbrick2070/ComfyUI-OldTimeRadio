@@ -122,3 +122,7 @@
 2026-11-19 | Video | LongCat-Video-Avatar Comfy-Org repack (int8_convrot 15.97 GB, umt5 int8_convrot 5.69 GB) | WATCH | https://huggingface.co/Comfy-Org/LongCat-Video-Avatar
 2026-11-19 | Video | MovieRoll (gated) / invoker-render-1.0 (33B fp32) | SKIP | https://huggingface.co/inclusionAI/invoker-render-1.0
 2026-11-19 | Upscale | ComfyUI core Video Deflicker + Faster RAFT (v0.46.0) | WATCH | https://github.com/Comfy-Org/ComfyUI/commit/ba546e921
+2026-11-20 | Voice | OmniVoice (k2-fsa, 0.6B base, cloning, 600+ languages, CC-BY-NC, no int8) | WATCH | https://huggingface.co/k2-fsa/OmniVoice
+2026-11-20 | Video | Wan-Animate-2 (Comfy-Org int8_convrot, motion transfer) | SKIP | https://huggingface.co/Comfy-Org/Wan-Animate-2
+2026-11-20 | Voice | fishaudio drama-3 (35B MoE, server-scale) | SKIP | https://huggingface.co/fishaudio/drama-3
+2026-11-20 | Writer | TimeCapsuleLLM English 1800-1875 v3-mini 500M (GGUF Q4 327 MB / Q8 531 MB) | WATCH | https://huggingface.co/haykgrigorian/TimeCapsuleLLM-English-1800-1875-v3mini-eval1-500M
