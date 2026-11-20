@@ -330,7 +330,7 @@ EVERGREEN_EXEMPTIONS: Dict[Tuple[str, str], str] = {
         "Comfy display selector, not a provider version pin",
     ("Krea 2 Large", "comfy_image"):
         "Comfy display selector, not a provider version pin",
-    # These four ARE date/version pinned, and ByteDance / Luma publish no
+    # These ARE date/version pinned, and ByteDance and Google publish no
     # pointer. They are the lane most likely to rot next.
     ("seedream-4-5-251128", "comfy_image"):
         "ByteDance publishes no -latest alias; date-pinned by the vendor",

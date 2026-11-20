@@ -124,7 +124,7 @@ def collect_inventory() -> List[InventoryRecord]:
     # Comfy partner IMAGE selectors. The nano rows are DISPLAY NAMES that
     # resolve to Google ids, so they are checkable against Google's catalog even
     # though Comfy is the authority for whether Comfy serves them. The other
-    # three groups are ByteDance / Krea / Luma and have no reachable catalog.
+    # two groups are ByteDance / Krea and have no reachable catalog.
     from .._otr_image_engines import eng_cloud_image as ci
     add("cloud_nano_banana_2", "engine", "comfy_nano",
         getattr(ci, "_NANO_MODELS", ()), "comfy_image", CATALOG_GOOGLE,

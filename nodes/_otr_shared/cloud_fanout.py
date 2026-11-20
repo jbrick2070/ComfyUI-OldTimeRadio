@@ -101,7 +101,7 @@ def run_cloud_fanout(
     """Request many provider jobs; collect by id.
 
     ``execute(item)`` runs in a worker. Every item is ready at t=0 -- every
-    cheap Vidu / Luma still / ElevenLabs line -- and at most ``workers`` of
+    cheap Vidu clip / Krea still / ElevenLabs line -- and at most ``workers`` of
     them are in flight at once.
 
     Results and errors are keyed by id. The caller walks the original
