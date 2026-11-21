@@ -443,6 +443,15 @@ def normalize_role(role) -> str:
     return role if role in GHOST_ROLES else ""
 
 
+#: Words a cast name can carry that are not themselves names: articles,
+#: connectives and honorifics ("THE NARRATOR", "MR. HOLBROOK JACKSON", "MRS.
+#: GRIMES", "DR. JEKYLL"). Never stripped on their own.
+_NAME_FUNCTION_PARTS = frozenset({
+    "the", "and", "of", "mr", "mrs", "ms", "miss", "dr", "sir", "von", "van",
+    "del", "der", "des", "les",
+})
+
+
 def strip_cast_names(text, names) -> str:
     """Remove every known cast name -- whole and by part -- from ``text``.
 
@@ -451,6 +460,14 @@ def strip_cast_names(text, names) -> str:
     proper noun the model will try to draw. Tokens shorter than three
     characters are skipped: an initial is not a name leak, and stripping ``a``
     would destroy the sentence.
+
+    A PART THAT IS NOT A NAME IS NOT STRIPPED (Mac log, 2026-11-20). A cast of
+    "THE NARRATOR" and "MR. HOLBROOK JACKSON" made "the" and "mr." name parts,
+    so every leaf containing "the" read as carrying a cast name and was
+    rejected ("a microphone stands on the desk as a shadow crosses its
+    grille", twice). Articles, connectives and honorifics in a name are
+    skipped as parts; the whole name is still removed, and so is every real
+    part ("narrator", "holbrook", "jackson").
     """
     out = str(text or "")
     tokens = []
@@ -459,7 +476,8 @@ def strip_cast_names(text, names) -> str:
         if not name:
             continue
         tokens.append(name)
-        tokens.extend(name.split())
+        tokens.extend(part for part in name.split()
+                      if part.lower().strip(".,") not in _NAME_FUNCTION_PARTS)
     # LONGEST FIRST. Removing "Adrian" before "Adrian Spender" would leave a
     # bare surname behind -- still a proper noun, still a leak.
     for token in sorted({t for t in tokens if len(t) >= 3}, key=len,

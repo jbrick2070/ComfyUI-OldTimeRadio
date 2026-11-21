@@ -1125,3 +1125,17 @@ def test_a_broken_pool_cannot_hide_an_impossible_adjacency(monkeypatch):
     with pytest.raises(gsa.GhostAuthorError, match="no nonadjacent"):
         gsa.deterministic_leaf(spec, episode_seed=7, style=STYLE,
                                ledger_meta=_DET_META, used=[sig])
+
+
+def test_articles_and_honorifics_in_a_cast_name_are_not_name_parts():
+    """Mac log, 2026-11-20: a cast of THE NARRATOR and MR. HOLBROOK JACKSON
+    rejected every leaf containing "the" as carrying a cast name."""
+    from nodes._otr_video_engines import ghost_signal_author as GA
+
+    names = ["ANNOUNCER", "MR. HOLBROOK JACKSON", "THE NARRATOR"]
+    leaf = "a microphone stands on the desk as a shadow crosses its grille"
+    assert GA.strip_cast_names(leaf, names) == leaf
+    assert GA.strip_cast_names("Jackson opens the door", names) == "opens the door"
+    assert GA.strip_cast_names("the narrator lifts a pen", names) == "lifts a pen"
+    assert GA.strip_cast_names("Holbrook Jackson waits", names) == "waits"
+    assert GA.strip_cast_names("Mr. Holbrook Jackson waits", names) == "waits"
