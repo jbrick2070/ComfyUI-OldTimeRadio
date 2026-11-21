@@ -137,6 +137,19 @@ class CaptionResolutionTests(unittest.TestCase):
         })
         self.assertEqual(FF.resolve_caption_ffmpeg(), "/venv/imageio/ffmpeg")
 
+    def test_the_switch_is_logged_once(self):
+        FF._CAPTION_SWITCH_LOGGED.clear()
+        self._host("/opt/homebrew/bin/ffmpeg", "/venv/imageio/ffmpeg", {
+            "/opt/homebrew/bin/ffmpeg": {"ass": False, "libx264": True},
+            "/venv/imageio/ffmpeg": self.FULL,
+        })
+        with self.assertLogs("OTR.ffmpeg", level="INFO") as seen:
+            FF.resolve_caption_ffmpeg()
+            FF.resolve_caption_ffmpeg()
+        self.assertEqual(len(seen.output), 1)
+        self.assertIn("has no ass", seen.output[0])
+        FF._CAPTION_SWITCH_LOGGED.clear()
+
     def test_a_usual_build_that_burns_captions_is_kept(self):
         self._host("C:/winget/ffmpeg.exe", "/venv/imageio/ffmpeg", {
             "C:/winget/ffmpeg.exe": self.FULL,

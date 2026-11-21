@@ -21,9 +21,12 @@ name. That test, not this docstring, is what makes "one owner" true.
 """
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 from typing import Optional
+
+log = logging.getLogger("OTR.ffmpeg")
 
 try:
     from .ffprobe import _BARE_FFMPEG_NAMES, _explicit, _usable
@@ -386,8 +389,20 @@ def resolve_caption_ffmpeg(preferred=None) -> Optional[str]:
     if not bundled or os.path.realpath(bundled) == os.path.realpath(primary):
         return primary
     if _burns_captions(probe_ffmpeg_capabilities(bundled)):
+        # Said once per pair per process. The switch can pass over an
+        # OTR_FFMPEG pin, which could not have burned captions anyway, so it
+        # must be visible rather than silent (Sonnet QA on 70d54f13).
+        if (primary, bundled) not in _CAPTION_SWITCH_LOGGED:
+            _CAPTION_SWITCH_LOGGED.add((primary, bundled))
+            missing = [n for n in (CAPTION_FILTER, CAPTION_ENCODER) if caps.get(n) is False]
+            log.info("[OTR.ffmpeg] captions burn with the bundled ffmpeg %s: the usual "
+                     "ffmpeg %s has no %s", bundled, primary, " or ".join(missing))
         return bundled
     return primary
+
+
+#: (usual, bundled) pairs already reported by resolve_caption_ffmpeg.
+_CAPTION_SWITCH_LOGGED: set = set()
 
 
 # THE DEFENCE AGAINST A WIDGET-SUPPLIED ffmpeg PATH IS NON-DECLARATION: no node
