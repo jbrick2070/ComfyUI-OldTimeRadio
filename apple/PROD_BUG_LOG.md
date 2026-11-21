@@ -17655,3 +17655,36 @@ not promote it to the Bug Bible on this evidence alone.
   (`CaptionResolutionTests`).
 - status: FIXED in code; live proof is the next Mac episode with burned
   captions.
+
+## PBUG-20261120-03 -- Mac: the second episode in one Comfy session cannot load the writer
+- evidence: Mac mini (Apple M6, 24 GB, macOS 27.2.1, torch 2.12.1,
+  transformers 5.20.2), `otr_mac16_low`, Qwen3.5-4B bf16 sdpa. The Hindi
+  episode `signal_lost_hi_20261120_224026` published (46:08); every prompt
+  after it in the same process died at the writer load with `MPS backend out
+  of memory (MPS allocated: 5.64 GiB, other allocations: 24.52 GiB, max
+  allowed: 30.19 GiB)` -- five in a row, including a Shakespeare-to-Japanese
+  run. The episode's MEMORY_SNAPSHOT lines show live tensors flat at 7.83 GiB
+  while `driver_allocated_memory` climbed ~0.3 GiB per writer call, 8.3 to
+  31.8 GiB, and stayed at 24.5 GiB after `model.to("cpu")` +
+  `torch.mps.empty_cache()`.
+- cause: measured in a standalone probe with the same venv and model. With
+  sdpa, every new prompt LENGTH leaves Metal memory behind outside the PyTorch
+  allocator, growing with the square of the length (+0.22 GiB at 1,056
+  tokens, +0.56 at 1,976, +1.15 at 2,896) and nothing on a repeat of a length
+  already seen. Short prompts (25-40 tokens) never grow. PyTorch 2.12.1's
+  `MPSGraphCache` is process-wide with no eviction and no clear hook, and
+  `empty_cache()` reaches only allocator pools (Codex lane, source-verified);
+  only process exit frees it. Eager attention over five NEW lengths up to
+  3,011 tokens held flat at the same speed, with the reference Gated DeltaNet
+  layers unchanged -- so the growth is in the sdpa path, not DeltaNet.
+- fix: the four Apple rows in `config/workflow_matrix.json` set
+  `llm.attn_impl` to `eager`; the generated `otr_mac16_*` workflows carry it.
+  NVIDIA rows are untouched (the delta lives only on `platform: mac` rows).
+  The `llm_attn_impl` tooltip says why. Coverage:
+  `tests/test_mac_profiles_contract.py::test_the_writer_runs_eager_attention_on_metal`
+  pins both the row and the shipped workflow.
+- cost: eager builds each full-attention layer's score matrix in one piece,
+  freed after the call (estimated 3-4 GB transient at the longest ~5,600-token
+  writer prompt, not yet measured on hardware).
+- status: FIXED in code; live proof is two Mac episodes back to back in one
+  Comfy session.

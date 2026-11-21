@@ -2837,7 +2837,11 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     {"default": "sdpa",
                      "tooltip": "Attention implementation for the "
                                 "transformers lane (the FA2 auto-probe is "
-                                "gone). sdpa = the proven baseline."},
+                                "gone). sdpa = the proven baseline on "
+                                "NVIDIA. eager on Apple silicon: there sdpa "
+                                "keeps a compiled graph for every prompt "
+                                "length and never frees it, so a second "
+                                "episode cannot load the writer."},
                 ),
                 "llm_quant_policy": (
                     ["bnb_nf4", "bnb_8bit", "none"],

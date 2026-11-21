@@ -1049,7 +1049,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_mac16_animatediff` (Apple Silicon -- AnimateDiff Lightning, the variant proven on Apple Silicon (the haunted lane is OOM here). SD 1.5 stills, Kokoro voices, Stable Audio 3, no upscaler. Proven on a 16 GB M4.)
 - status: shipping
 - platform/backend/vendor: mac/mps/apple
-- master_hash: `45f91bc52c4299142f22a938176802deabb607adb3f1acf1900302649564730c`
+- master_hash: `5c7d3860c6a23bcddfc080ec9de2659ff248380a84f715d8af4d4854e920d5d2`
 
 ### ComfyUI launch
 
@@ -1089,7 +1089,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_mac16_low` (Apple Silicon -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, sd15 stills, Kokoro voices, Stable Audio 3. Writer Qwen3.5-4B at a 10.0 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: mac/mps/apple
-- master_hash: `aca691485fbfbcc328efc5ea4731e86b26bd780cb97fd75dfa5e2df843679400`
+- master_hash: `2b7a8a21d65278a85a10a32726f6c8bcc698898cd245f1b5a83dda2cdd7bf961`
 
 ### ComfyUI launch
 
@@ -1129,7 +1129,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_mac16_still` (Apple Silicon -- a still image with motion, minted by SD 1.5. SD 1.5 stills, Kokoro voices, Stable Audio 3, no upscaler. Proven on a 16 GB M4.)
 - status: shipping
 - platform/backend/vendor: mac/mps/apple
-- master_hash: `2add8d1b69c9637d3b8b6fa155b40cc206642bedf8eb8cabe929ec38c411abf4`
+- master_hash: `4f4a51962c242a555b91764874017e3f1dae6d737718a53d13f466c4c81fa7fb`
 
 ### ComfyUI launch
 
@@ -1169,7 +1169,7 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 - workflow: `otr_mac16_video` (Apple Silicon -- real video diffusion on LTX 0.9.8 -- the only video engine that downloads itself. SD 1.5 stills, Kokoro voices, Stable Audio 3, no upscaler. Proven on a 16 GB M4.)
 - status: shipping
 - platform/backend/vendor: mac/mps/apple
-- master_hash: `aa487b4caa3a86f156b0b3a6310e7e48487a138f6229e16083f3c1b39d88345d`
+- master_hash: `4a5de10beb759690d412a236f5002c1512858c9d4d2ee31c8ade529e8d07d1a8`
 
 ### ComfyUI launch
 

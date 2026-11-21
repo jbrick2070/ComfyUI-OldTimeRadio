@@ -193,3 +193,32 @@ def test_availability_is_computed_and_every_role_is_admissible(name, decls):
     assert not bad, (
         "%s (%s) names inadmissible role(s): %r"
         % (name, p["status"], bad))
+
+
+@pytest.mark.parametrize("name", MAC_PROFILES)
+def test_the_writer_runs_eager_attention_on_metal(name):
+    """PBUG-20261120-03, measured on a 24 GB M6 (torch 2.12.1, macOS 27.2.1).
+
+    With sdpa, Metal compiles one attention graph per prompt LENGTH and keeps
+    its working buffers for the life of the process: +0.22 GiB at 1,056
+    tokens, +0.56 at 1,976, +1.15 at 2,896, and nothing on a repeat of a
+    length already seen. empty_cache() cannot reach it -- it sits outside the
+    PyTorch allocator. A Hindi episode left 24.5 GiB parked that way and the
+    next prompt's writer load hit the 30.19 GiB ceiling. Eager over five new
+    lengths up to 3,011 tokens held flat, at the same speed.
+
+    Pinned at BOTH the matrix row and the generated workflow the user loads,
+    because the row alone proves nothing about what ships."""
+    assert _profile(name)["llm"].get("attn_impl") == "eager"
+    import json
+    with open(os.path.join(_REPO, "workflows", name + ".json"),
+              encoding="utf-8") as fh:
+        wf = json.load(fh)
+    writers = [n for n in wf["nodes"] if n.get("type") == "OTR_LedgerScriptWriter"]
+    assert writers, "%s has no writer node" % name
+    for node in writers:
+        values = node.get("widgets_values") or []
+        assert "eager" in values and "sdpa" not in values, (
+            "%s ships llm_attn_impl other than eager: %r"
+            % (name, [v for v in values if v in ("sdpa", "eager",
+                                                 "flash_attention_2")]))

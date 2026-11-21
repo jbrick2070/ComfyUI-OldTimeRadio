@@ -182,7 +182,7 @@ LLM device. 'default' asks ComfyUI what this machine has and RECORDS what it cho
 
 **`llm_attn_impl`** -- a choice from the dropdown.
 
-Attention implementation for the transformers lane (the FA2 auto-probe is gone). sdpa = the proven baseline.
+Attention implementation for the transformers lane (the FA2 auto-probe is gone). sdpa = the proven baseline on NVIDIA. eager on Apple silicon: there sdpa keeps a compiled graph for every prompt length and never frees it, so a second episode cannot load the writer.
 
 **`llm_quant_policy`** -- a choice from the dropdown.
 
