@@ -547,14 +547,11 @@ PROFILE_CANVAS_DOCUMENTED_DEAD: dict = {
         "Lane 13, 2026-08-11."),
     "viz_mxc_mandala": (
         "INERT, and this was the visualizer most likely to have needed a real "
-        "declaration -- the only one with a NAMED external dependency, painting "
-        "through a graphics library rather than numpy -- so the premise was "
-        "re-checked with more suspicion, not less. It holds: render_clip "
-        "allocates cairo.ImageSurface(FORMAT_ARGB32, w, h) from the request's "
-        "own dimensions, paint_mandala(ctx, w, h, ...) and "
-        "mandala_surface_to_rgb take the same pair, and so do the scanline and "
-        "vignette tables and the encoder. Cairo imposes no canvas of its own -- "
-        "an ImageSurface is whatever size you ask for. Lane 14, 2026-08-11."),
+        "declaration -- painting through a graphics library rather than bare "
+        "numpy -- so the premise was re-checked with more suspicion, not less. "
+        "It holds: paint_mandala_rgb(w, h, ...) lays the mandala out from the "
+        "request's own dimensions, and so do the scanline and vignette tables "
+        "and the encoder. Lane 14, 2026-08-11; Pillow since 2026-11-20."),
     "still_motion": (
         "INERT, and the premise was re-checked on a path NONE of the four "
         "visualizers touch: these lanes reach ffmpeg through "

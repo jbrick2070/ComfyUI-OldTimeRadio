@@ -98,8 +98,8 @@ are what you get with zero downloads. `sd15` plus the `still_*` lanes cost one
   bitsandbytes falls back to a Python dequantise loop. It is slow enough that
   the 40 s `NewsCurationDeep` budget expires and the run dies with a confusing
   `_LLMTimeoutWorkflowPause`. It does not look like "quantisation is slow".
-* **Do not select `viz_mxc_mandala`.** It needs `pycairo`, which has no macOS
-  wheel (section 8). The engine says so itself when you select it on a Mac.
+* **`viz_mxc_mandala` runs on a Mac now** (2.3.60): it is painted with Pillow,
+  which every install has. It used to need `pycairo`, which has no macOS wheel.
 
 ### Memory: 16 GB is the floor, and it is tight
 
@@ -954,21 +954,13 @@ job.
 
 ## 8. Engines that need manual steps, and what those steps measure
 
-### `viz_mxc_mandala` -- needs Homebrew
+### `viz_mxc_mandala` -- nothing to install any more
 
-`pycairo` publishes Windows wheels, an sdist, and **no macOS wheel**. On a stock
-Mac `pip install pycairo` falls back to the sdist and fails to build, because
-libcairo headers are not present. Measured 2026-09-07.
-
-```bash
-brew install cairo pkg-config
-pip install pycairo
-```
-
-Without Homebrew this engine cannot run. **Use `viz_mxc_cpu`, `viz_green` or
-`viz_camera` instead** -- zero dependencies, no cairo. Linux has the same
-problem for a different reason (no Linux wheels): `apt install libcairo2-dev
-pkg-config` first.
+It was painted with `pycairo`, which publishes Windows wheels only: a stock
+Mac's `pip install pycairo` fell back to the sdist and failed to build, and a
+Mac episode died ten minutes in at its first mandala beat (2026-11-20). Since
+2.3.60 the mandala is painted with Pillow, the same geometry drawn at 2x and
+reduced, so it runs on macOS and Linux with nothing beyond the pack itself.
 
 ### `ffmpeg` and `ffprobe` -- nothing beyond `pip install`
 

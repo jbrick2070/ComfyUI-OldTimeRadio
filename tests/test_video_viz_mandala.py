@@ -1,13 +1,10 @@
-r"""viz_mxc_mandala -- the Cosmic Radio Mandala pycairo engine (2026-06-30,
-kibitz r1-r4 hardened).
+r"""viz_mxc_mandala -- the Cosmic Radio Mandala engine (2026-06-30, kibitz
+r1-r4 hardened; painted with Pillow since 2026-11-20 so it runs on every OS).
 
-Registration/capability/wiring/cold-import tests stay cairo-free (importorskip
-gates only the paint/determinism/visual-smoke tests, per the plan). Covers:
-registration + CAPABILITIES; required_inputs=() fits all 5 roles by capability;
-accepts_still=False (mints no still); the ambient-audio gate; content-oracle
-motion-exemption; cold-import (cairo NEVER at module scope); the missing-cairo
-assert_usable LOUD-fail path (monkeypatched, unskipped even with cairo present);
-the silent-clip render contract for BOTH audio-present (reactive) and
+Covers: registration + CAPABILITIES; required_inputs=() fits all 5 roles by
+capability; accepts_still=False (mints no still); the ambient-audio gate;
+content-oracle motion-exemption; cold-import; that nothing imports cairo any
+more (the universal port); the silent-clip render contract for BOTH audio-present (reactive) and
 audio-absent (idle) paths; frame-count exactness; paint + CRT-post determinism;
 and a visual-acceptance smoke (nonblack ratio + frame-to-frame delta +
 reproducibility). UTF-8, no BOM, SFW.
@@ -15,6 +12,7 @@ reproducibility). UTF-8, no BOM, SFW.
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 import shutil
 import subprocess
 import sys
@@ -73,12 +71,10 @@ def test_the_lane_DECLARES_NO_canvas_and_honours_ANY_request_size():
     """G2 / lesson L19 (lane 14, 2026-08-11), premise re-checked with suspicion.
 
     This is the visualizer most likely to have needed a real canvas: the only
-    one with a NAMED external dependency, painting through a graphics library
-    rather than numpy. It still has no native canvas -- `render_clip` allocates
-    `cairo.ImageSurface(FORMAT_ARGB32, w, h)` from the request's own dimensions,
-    `paint_mandala(ctx, w, h, ...)` and `mandala_surface_to_rgb` take the same
-    pair, and so do the scanline/vignette tables and the encoder. Cairo imposes
-    no canvas of its own.
+    one painting through a graphics library rather than bare numpy. It still
+    has no native canvas -- `paint_mandala_rgb(w, h, ...)` lays the mandala out
+    from the request's own dimensions, and so do the scanline/vignette tables
+    and the encoder.
 
     So the 1472x832 an episode hands it is `OTR_VIDEO_LANDSCAPE_CANVAS`'s
     default -- an operator lever -- and declaring would overrule it for this
@@ -133,15 +129,24 @@ def test_cold_import_no_heavy_libs():
     assert r.returncode == 0, f"heavy libs (incl. cairo) at import:\n{r.stdout}\n{r.stderr}"
 
 
-def test_assert_usable_missing_cairo_fails_loud(monkeypatch):
-    """Forces ``import cairo`` to raise ImportError (regardless of whether cairo
-    is actually installed on the test box) via the sys.modules-None sentinel
-    trick, proving the LOUD fail-closed path unconditionally -- this must NOT
-    be skipped even when pycairo IS present."""
+def test_the_lane_runs_without_cairo(monkeypatch):
+    """The universal port (operator, 2026-11-20): pycairo has Windows wheels
+    only, and a Mac episode died ten minutes in at its first mandala beat. With
+    ``import cairo`` made to fail, the engine is still usable and paints."""
     monkeypatch.setitem(sys.modules, "cairo", None)
     eng = vreg.get_engine(NAME)
-    with pytest.raises(vreg.EngineUnusable, match="pycairo"):
-        eng.assert_usable({}, {})
+    assert eng.assert_usable({}, {}) == NAME
+    rgb = sd.paint_mandala_rgb(96, 64, 1, 3, 25, 0.5,
+                               np.linspace(0.0, 1.0, 32).astype(np.float32), 0.4, 0.0)
+    assert rgb.shape == (64, 96, 3) and rgb.any()
+
+
+def test_no_source_file_imports_cairo():
+    root = Path(__file__).resolve().parents[1]
+    for path in (root / "nodes" / "_otr_shared" / "scope_draw.py",
+                 root / "nodes" / "_otr_video_engines" / "eng_viz_mandala.py"):
+        text = path.read_text(encoding="utf-8")
+        assert "import cairo" not in text and "cairo." not in text, path
 
 
 def _req(frames=3, w=96, h=64, seed=7, audio=None):
@@ -179,7 +184,6 @@ def _render_capturing_frames(monkeypatch, request):
 
 
 def test_render_contract_audio_absent_idle(monkeypatch, tmp_path):
-    pytest.importorskip("cairo")
     raw, cap = _render_capturing_frames(monkeypatch, _req(frames=3))
     assert raw["frame_count"] == 3 and raw["mode"] == "idle"
     assert raw["audio_used"] is False
@@ -191,7 +195,6 @@ def test_render_contract_audio_absent_idle(monkeypatch, tmp_path):
 
 
 def test_render_contract_audio_present_reactive(monkeypatch, tmp_path):
-    pytest.importorskip("cairo")
     import soundfile as sf
     wav = tmp_path / "beat.wav"
     sr = 24000
@@ -204,16 +207,11 @@ def test_render_contract_audio_present_reactive(monkeypatch, tmp_path):
 
 
 def test_paint_mandala_is_deterministic():
-    pytest.importorskip("cairo")
-    import cairo
     w, h = 96, 64
     freq = np.linspace(0.0, 1.0, 32).astype(np.float32)
 
     def _paint_once():
-        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, w, h)
-        ctx = cairo.Context(surface)
-        sd.paint_mandala(ctx, w, h, 1, 3, 25, 0.5, freq, 0.4, 0.0)
-        return sd.mandala_surface_to_rgb(surface, w, h)
+        return sd.paint_mandala_rgb(w, h, 1, 3, 25, 0.5, freq, 0.4, 0.0)
 
     a = _paint_once()
     b = _paint_once()
@@ -240,7 +238,6 @@ def test_visual_acceptance_smoke_nonblack_and_changes(monkeypatch, tmp_path):
     frozen-frame bug -- the content-oracle itself treats 'abstract' as
     motion-EXEMPT; this is a separate build-time sanity check), and the same
     request/seed reproduces byte-identical frames."""
-    pytest.importorskip("cairo")
     import soundfile as sf
     wav = tmp_path / "beat.wav"
     sr = 24000

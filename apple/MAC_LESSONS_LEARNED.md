@@ -222,7 +222,8 @@ none was "Apple Silicon can't do this":
    entirely (PBUG-20260907-05). Fixed in alpha.29.
 2. **The canonical shipped `viz_mxc_mandala`**, whose `pycairo` dependency is
    Windows-only, as the music lane -- so the shipped default could never render
-   on macOS *or Linux* (PBUG-20260907-10). Now `viz_green`.
+   on macOS *or Linux* (PBUG-20260907-10). Now `viz_green`. (Resolved at the
+   root in 2.3.60: the mandala is painted with Pillow and needs no cairo.)
 3. **ffmpeg was never a declared dependency** -- the run died at the mp4 encode
    telling a Mac user to run `winget install ffmpeg`. Now `imageio-ffmpeg`.
 4. **ffprobe was the other half** -- imageio ships ffmpeg alone, and the

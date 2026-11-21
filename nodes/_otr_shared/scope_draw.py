@@ -642,19 +642,27 @@ def paint_golden_camera_frame(w, h, fi, total, fps, vol, freq, wave, signal, los
 
 
 # --------------------------------------------------------------------------- #
-# Cosmic Radio Mandala (viz_mxc_mandala, 2026-06-30) -- pycairo painter +
-# cairo->numpy conversion + the shared CRT post applied AFTER conversion (the
-# native-cairo CRT glue was cut for v1; PIL roundtrip reuses the SAME
-# scanlines/vignette/grain machinery as paint_frame/paint_rainbow_frame).
-# cairo is imported LOCALLY inside paint_mandala only -- NOT at module scope
-# anywhere in this file (V-12 cold-import clean; pycairo is not in
-# the main requirements, so a box without system libcairo never breaks any
-# OTHER engine's install). Ported from the operator-approved prototype;
-# ring/spoke/band coefficients
-# are a build-time LOOK pass (2026-06-30: 48 solid spectrum wedges + 9 bolder
-# rings, denser look approved), NOT frozen constants -- a future look-pass may
-# retune them; only the "core rings/eye must not clip on 16:9" invariant holds.
+# Cosmic Radio Mandala (viz_mxc_mandala, 2026-06-30; Pillow since 2026-11-20).
+# Painted with Pillow at 2x and box-reduced, so edges are as smooth as the
+# cairo original's, then the shared CRT post (scanlines/vignette/grain) runs
+# over the result like every other visualizer.
+#
+# WHY NOT CAIRO ANY MORE (operator, 2026-11-20: "figure a way to port it
+# universally to mac and linux"). pycairo publishes Windows wheels only: on a
+# Mac it needs Homebrew's cairo, on Linux the distro headers, and a Mac episode
+# died ten minutes in at the first mandala beat. Pillow ships with every
+# install, so the mandala now runs wherever the pack does, with no extra step.
+# The geometry, colours and reactivity are the cairo painter's, line for line;
+# ring/spoke/band coefficients are the 2026-06-30 approved look (48 spectrum
+# wedges + 9 rings), and the core rings/eye still never clip on 16:9.
 # --------------------------------------------------------------------------- #
+#: Supersampling factor: the frame is drawn this many times larger and reduced.
+_MANDALA_SS = 2
+#: Arc points per spectrum wedge; enough that a wedge edge reads as a curve.
+_MANDALA_WEDGE_STEPS = 6
+_MANDALA_BG_CACHE: dict = {}
+
+
 def _mandala_band(freq, a, b):
     seg = freq[a:b]
     return float(np.mean(seg)) if len(seg) else 0.0
@@ -668,141 +676,139 @@ def _mandala_centroid(freq):
     return float((np.arange(len(f)) * f).sum() / s / max(1, len(f)))
 
 
-def paint_mandala(ctx, w, h, fi, total, fps, vol, freq, sig, onset):
-    """Paint ONE 16:9 'Cosmic Radio Mandala' frame on a cairo Context: a
-    centered tuning-eye + radio-dial rings/spokes + an outer solid spectrum
-    band, muted iridescent hues. CRT post is applied SEPARATELY (see
-    :func:`apply_crt_post_rgb`) after the cairo->numpy conversion.
-
-    Reactivity: bass(0-5)->ring radius+stroke+band inner-radius;
-    mids(5-16)->spoke count/rotation+band rotation; treble(16-32)->filigree
-    flicker; onset(RMS delta)->symmetry-flip+signal-lock flash; spectral
-    centroid->global hue drift; vol->tuning-eye pulse. Fully deterministic
-    (no RNG here -- only fi/t/audio-features feed the geometry).
-    ``ctx.save()/restore()`` brackets the whole body so no cairo state (line
-    width/cap/source) leaks across frames sharing one reused context."""
-    import cairo
-
-    ctx.save()
-    try:
-        cx, cy = w / 2.0, h / 2.0
-        t = fi / float(fps or 25)
-        bass = _mandala_band(freq, 0, 5)
-        mid = _mandala_band(freq, 5, 16)
-        treble = _mandala_band(freq, 16, 32)
-        base_hue = (_mandala_centroid(freq) * 0.6 + t * 0.02) % 1.0
-
-        # -- background: deep radio-bronze radial wash. OPAQUE (rgb-only color
-        # stops, full ctx.paint()) so premultiplied-alpha == straight -- the
-        # later ARGB32->RGB read needs no unpremultiply step. --
-        bg = cairo.RadialGradient(cx, cy, 0, cx, cy, w * 0.6)
-        bg.add_color_stop_rgb(0.0, 0.05, 0.03, 0.02)
-        bg.add_color_stop_rgb(1.0, 0.01, 0.01, 0.02)
-        ctx.set_source(bg)
-        ctx.paint()
-        ctx.set_line_cap(cairo.LINE_CAP_ROUND)
-
-        # -- outer solid spectrum band ring (filled wedges; MAY bleed past 16:9) --
-        n_band = 48
-        r_in = (0.40 + bass * 0.06) * min(w, h)
-        band_rot = t * (0.05 + mid * 0.4)
-        for k in range(n_band):
-            a0 = 2 * math.pi * k / n_band + band_rot
-            a1 = 2 * math.pi * (k + 1) / n_band + band_rot
-            mag = max(0.0, min(1.0, float(freq[k % len(freq)])))
-            r_out = r_in + (0.02 + 0.10 * (0.4 + mag)) * min(w, h)
-            hue = (base_hue + k / float(n_band)) % 1.0
-            r, g, b = _hue_rgb(hue, 0.6, 0.32 + 0.55 * mag)
-            ctx.set_source_rgba(r / 255.0, g / 255.0, b / 255.0, 0.55 + 0.4 * mag)
-            ctx.move_to(cx + r_in * math.cos(a0), cy + r_in * math.sin(a0))
-            ctx.arc(cx, cy, r_in, a0, a1)
-            ctx.arc_negative(cx, cy, r_out, a1, a0)
-            ctx.close_path()
-            ctx.fill()
-
-        # -- concentric core rings (bass; must NOT clip on 1472x832) --
-        n_rings = 9
-        for i in range(n_rings):
-            rr = (0.10 + 0.055 * i) * min(w, h) * (1.0 + bass * 0.30)
-            hue = (base_hue + i * 0.10) % 1.0
-            r, g, b = _hue_rgb(hue, 0.58, 0.40 + 0.5 * (0.4 + bass))
-            ctx.set_source_rgba(r / 255.0, g / 255.0, b / 255.0, 0.55 + 0.4 * bass)
-            ctx.set_line_width(max(1.5, (3.0 + bass * 7.0) * (1.0 - i / (n_rings * 2.2))))
-            ctx.arc(cx, cy, rr, 0, 2 * math.pi)
-            ctx.stroke()
-
-        # -- radial spokes (mids), kaleidoscopic; symmetry flips on onset --
-        sym = 24 + (12 if onset > 0.5 else 0)
-        rot = t * (0.15 + mid * 1.6)
-        inner = 0.14 * min(w, h)
-        outer = (0.52 + bass * 0.1) * min(w, h)
-        for k in range(sym):
-            a = 2 * math.pi * k / sym + rot
-            hue = (base_hue + k / float(sym)) % 1.0
-            r, g, b = _hue_rgb(hue, 0.5, 0.3 + 0.6 * mid)
-            ctx.set_source_rgba(r / 255.0, g / 255.0, b / 255.0, 0.28 + 0.5 * mid)
-            ctx.set_line_width(max(1.0, 1.0 + mid * 3.0))
-            ctx.move_to(cx + inner * math.cos(a), cy + inner * math.sin(a))
-            ctx.line_to(cx + outer * math.cos(a), cy + outer * math.sin(a))
-            ctx.stroke()
-            # filigree ticks (treble) along the spoke
-            if treble > 0.06:
-                steps = 3 + int(treble * 8)
-                for s2 in range(steps):
-                    rr = inner + (outer - inner) * (s2 + 1) / (steps + 1)
-                    tick = (2 + treble * 8) * (0.5 + 0.5 * math.sin(t * 6 + k))
-                    hue2 = (hue + 0.5) % 1.0
-                    r2, g2, b2 = _hue_rgb(hue2, 0.6, 0.4 + 0.6 * treble)
-                    ctx.set_source_rgba(r2 / 255.0, g2 / 255.0, b2 / 255.0,
-                                        0.5 * treble + 0.15)
-                    px, py = cx + rr * math.cos(a), cy + rr * math.sin(a)
-                    ctx.arc(px, py, max(0.8, tick * 0.4), 0, 2 * math.pi)
-                    ctx.fill()
-
-        # -- the tuning eye: pulsing iris + oscilloscope crosshair (core; no clip) --
-        eye_r = (0.05 + vol * 0.05) * min(w, h)
-        for j in range(5):
-            rr = eye_r * (1.0 - j * 0.16)
-            r, g, b = _hue_rgb((base_hue + 0.5 + j * 0.05) % 1.0, 0.45, 0.5 + 0.4 * sig)
-            ctx.set_source_rgba(r / 255.0, g / 255.0, b / 255.0, 0.85 - j * 0.12)
-            ctx.arc(cx, cy, max(1.0, rr), 0, 2 * math.pi)
-            ctx.fill()
-        if onset > 0.5:
-            ctx.set_source_rgba(1.0, 0.95, 0.8, min(0.8, onset))
-            ctx.set_line_width(3.0)
-            ctx.arc(cx, cy, eye_r * 2.6, 0, 2 * math.pi)
-            ctx.stroke()
-        ctx.set_source_rgba(0.9, 0.85, 0.6, 0.5)
-        ctx.set_line_width(1.0)
-        ctx.move_to(cx - eye_r * 1.6, cy)
-        ctx.line_to(cx + eye_r * 1.6, cy)
-        ctx.stroke()
-        ctx.move_to(cx, cy - eye_r * 1.6)
-        ctx.line_to(cx, cy + eye_r * 1.6)
-        ctx.stroke()
-    finally:
-        ctx.restore()
+def _mandala_background(W, H):
+    """The deep radio-bronze radial wash at the drawing size, cached per size:
+    (0.05, 0.03, 0.02) at the centre to (0.01, 0.01, 0.02) at 0.6 x width, held
+    flat beyond it (the cairo radial gradient's pad extend)."""
+    key = (W, H)
+    cached = _MANDALA_BG_CACHE.get(key)
+    if cached is None:
+        yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+        t = np.clip(np.hypot(xx - W / 2.0, yy - H / 2.0) / (W * 0.6), 0.0, 1.0)
+        c0 = np.array([0.05, 0.03, 0.02], dtype=np.float32) * 255.0
+        c1 = np.array([0.01, 0.01, 0.02], dtype=np.float32) * 255.0
+        rgb = c0 + (c1 - c0) * t[:, :, None]
+        cached = Image.fromarray(np.clip(rgb + 0.5, 0, 255).astype(np.uint8), mode="RGB")
+        if len(_MANDALA_BG_CACHE) > 4:
+            _MANDALA_BG_CACHE.clear()
+        _MANDALA_BG_CACHE[key] = cached
+    return cached.copy()
 
 
-def mandala_surface_to_rgb(surface, w, h):
-    """Convert a cairo ARGB32 ``ImageSurface`` to a contiguous HxWx3 uint8 RGB
-    array. ``flush()`` FIRST (else ``get_data`` can return a blank/partial
-    frame), then read the REAL stride via ``get_stride()`` (never assume
-    ``w*4`` -- cairo may pad rows for alignment). cairo ARGB32 is BGRA in
-    memory (little-endian); the background is painted fully opaque so
-    premultiplied-alpha == straight and no unpremultiply step is needed."""
-    surface.flush()
-    stride = surface.get_stride()
-    bgra = np.ndarray(shape=(h, w, 4), dtype=np.uint8,
-                       buffer=surface.get_data(), strides=(stride, 4, 1))
-    rgb = np.ascontiguousarray(bgra[:, :, [2, 1, 0]])
-    assert rgb.shape == (h, w, 3) and rgb.dtype == np.uint8
+def _rgba(rgb, alpha):
+    r, g, b = rgb
+    return (int(r), int(g), int(b), int(round(max(0.0, min(1.0, alpha)) * 255)))
+
+
+def _ring(draw, cx, cy, radius, width, colour):
+    """A stroked circle centred on ``radius`` (cairo strokes straddle the path;
+    Pillow's ellipse outline grows inward from its box)."""
+    width = max(1, int(round(width)))
+    outer = radius + width / 2.0
+    draw.ellipse([cx - outer, cy - outer, cx + outer, cy + outer],
+                 outline=colour, width=width)
+
+
+def _disc(draw, cx, cy, radius, colour):
+    draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius], fill=colour)
+
+
+def paint_mandala_rgb(w, h, fi, total, fps, vol, freq, sig, onset):
+    """Paint ONE 16:9 'Cosmic Radio Mandala' frame and return it as a
+    contiguous HxWx3 uint8 RGB array: a centred tuning eye, radio-dial rings
+    and spokes, and an outer solid spectrum band in muted iridescent hues. The
+    CRT post is applied separately (:func:`apply_crt_post_rgb`).
+
+    Reactivity: bass(0-5) -> ring radius + stroke + band inner radius;
+    mids(5-16) -> spoke rotation + band rotation; treble(16-32) -> filigree
+    flicker; onset (RMS delta) -> symmetry flip + signal-lock flash; spectral
+    centroid -> global hue drift; vol -> tuning-eye pulse. Fully deterministic:
+    no RNG here, only fi, t and the audio features feed the geometry."""
+    ss = _MANDALA_SS
+    W, H = int(w) * ss, int(h) * ss
+    img = _mandala_background(W, H)
+    draw = ImageDraw.Draw(img, "RGBA")        # RGBA on RGB = alpha-blended fills
+    m = min(w, h) * ss                        # every length below scales with it
+    cx, cy = W / 2.0, H / 2.0
+    t = fi / float(fps or 25)
+    bass = _mandala_band(freq, 0, 5)
+    mid = _mandala_band(freq, 5, 16)
+    treble = _mandala_band(freq, 16, 32)
+    base_hue = (_mandala_centroid(freq) * 0.6 + t * 0.02) % 1.0
+
+    # -- outer solid spectrum band ring (filled wedges; MAY bleed past 16:9) --
+    n_band = 48
+    r_in = (0.40 + bass * 0.06) * m
+    band_rot = t * (0.05 + mid * 0.4)
+    steps = _MANDALA_WEDGE_STEPS
+    for k in range(n_band):
+        a0 = 2 * math.pi * k / n_band + band_rot
+        a1 = 2 * math.pi * (k + 1) / n_band + band_rot
+        mag = max(0.0, min(1.0, float(freq[k % len(freq)])))
+        r_out = r_in + (0.02 + 0.10 * (0.4 + mag)) * m
+        hue = (base_hue + k / float(n_band)) % 1.0
+        colour = _rgba(_hue_rgb(hue, 0.6, 0.32 + 0.55 * mag), 0.55 + 0.4 * mag)
+        arc = [a0 + (a1 - a0) * i / steps for i in range(steps + 1)]
+        points = [(cx + r_in * math.cos(a), cy + r_in * math.sin(a)) for a in arc]
+        points += [(cx + r_out * math.cos(a), cy + r_out * math.sin(a))
+                   for a in reversed(arc)]
+        draw.polygon(points, fill=colour)
+
+    # -- concentric core rings (bass; must NOT clip on 1472x832) --
+    n_rings = 9
+    for i in range(n_rings):
+        rr = (0.10 + 0.055 * i) * m * (1.0 + bass * 0.30)
+        hue = (base_hue + i * 0.10) % 1.0
+        colour = _rgba(_hue_rgb(hue, 0.58, 0.40 + 0.5 * (0.4 + bass)), 0.55 + 0.4 * bass)
+        width = max(1.5, (3.0 + bass * 7.0) * (1.0 - i / (n_rings * 2.2))) * ss
+        _ring(draw, cx, cy, rr, width, colour)
+
+    # -- radial spokes (mids), kaleidoscopic; symmetry flips on onset --
+    sym = 24 + (12 if onset > 0.5 else 0)
+    rot = t * (0.15 + mid * 1.6)
+    inner = 0.14 * m
+    outer = (0.52 + bass * 0.1) * m
+    for k in range(sym):
+        a = 2 * math.pi * k / sym + rot
+        hue = (base_hue + k / float(sym)) % 1.0
+        colour = _rgba(_hue_rgb(hue, 0.5, 0.3 + 0.6 * mid), 0.28 + 0.5 * mid)
+        width = max(1, int(round(max(1.0, 1.0 + mid * 3.0) * ss)))
+        draw.line([(cx + inner * math.cos(a), cy + inner * math.sin(a)),
+                   (cx + outer * math.cos(a), cy + outer * math.sin(a))],
+                  fill=colour, width=width)
+        # filigree ticks (treble) along the spoke
+        if treble > 0.06:
+            n_ticks = 3 + int(treble * 8)
+            hue2 = (hue + 0.5) % 1.0
+            tick_colour = _rgba(_hue_rgb(hue2, 0.6, 0.4 + 0.6 * treble), 0.5 * treble + 0.15)
+            for s2 in range(n_ticks):
+                rr = inner + (outer - inner) * (s2 + 1) / (n_ticks + 1)
+                tick = (2 + treble * 8) * (0.5 + 0.5 * math.sin(t * 6 + k))
+                _disc(draw, cx + rr * math.cos(a), cy + rr * math.sin(a),
+                      max(0.8, tick * 0.4) * ss, tick_colour)
+
+    # -- the tuning eye: pulsing iris + oscilloscope crosshair (core; no clip) --
+    eye_r = (0.05 + vol * 0.05) * m
+    for j in range(5):
+        rr = eye_r * (1.0 - j * 0.16)
+        colour = _rgba(_hue_rgb((base_hue + 0.5 + j * 0.05) % 1.0, 0.45, 0.5 + 0.4 * sig),
+                       0.85 - j * 0.12)
+        _disc(draw, cx, cy, max(1.0 * ss, rr), colour)
+    if onset > 0.5:
+        _ring(draw, cx, cy, eye_r * 2.6, 3.0 * ss,
+              _rgba((255, 242, 204), min(0.8, onset)))
+    cross = _rgba((230, 217, 153), 0.5)
+    draw.line([(cx - eye_r * 1.6, cy), (cx + eye_r * 1.6, cy)], fill=cross, width=ss)
+    draw.line([(cx, cy - eye_r * 1.6), (cx, cy + eye_r * 1.6)], fill=cross, width=ss)
+
+    rgb = np.ascontiguousarray(np.asarray(img.reduce(ss), dtype=np.uint8))
+    assert rgb.shape == (int(h), int(w), 3)
     return rgb
 
 
 def apply_crt_post_rgb(rgb, scanlines, vignette, fi, rng_key, vol=0.0):
     """CRT post-process over an ALREADY-RENDERED RGB frame (the mandala's
-    cairo->numpy array, or any HxWx3 uint8 array): composite the scanline
+    painted array, or any HxWx3 uint8 array): composite the scanline
     overlay, multiply the vignette, then add seed-keyed film grain (the same
     ``_rng(rng_key, fi, "grain")`` used by :func:`paint_frame` /
     :func:`paint_rainbow_frame`, intensity ``int(4 + vol*10)``). ``fi`` is

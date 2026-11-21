@@ -275,8 +275,6 @@ def test_the_engine_stamps_the_PROVEN_count_not_the_declared_one(
     if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
         pytest.skip("the engine renders a real clip to prove")
     pytest.importorskip("soundfile")
-    if engine_name == "viz_mxc_mandala":
-        pytest.importorskip("cairo")
 
     sentinel = 4242
     monkeypatch.setattr(wb, "proven_frame_count",

@@ -307,10 +307,9 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": True, "sidecar_conditional": False,
         "model_requirements": []},
-    # viz_mxc_mandala (2026-06-30): Cosmic Radio Mandala -- pycairo vector CPU
-    # painter, no GPU/shaders. required_toolchain None: pycairo is NOT in
-    # the main requirements (lazy-imported + probed by assert_usable so a box
-    # without system libcairo never breaks any OTHER engine's install).
+    # viz_mxc_mandala (2026-06-30): Cosmic Radio Mandala -- CPU painter, no
+    # GPU/shaders. Painted with Pillow since 2026-11-20 (it was pycairo, which
+    # had no macOS or Linux wheel), so it needs nothing beyond the pack itself.
     "viz_mxc_mandala": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,

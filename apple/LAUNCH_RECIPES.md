@@ -288,7 +288,6 @@ One section per per-machine workflow in `workflows/`: the ComfyUI launch argumen
 
 - torch cu128+ build (the nv baseline is 2.10/cu130)
 - ffmpeg on PATH (mac: ensure libx264 + aac encoders are in the build).
-- minimal Linux: libcairo2-dev + pkg-config, then `pip install pycairo` (this workflow selects `viz_mxc_mandala`).
 
 ### Preflight models
 

@@ -38,28 +38,17 @@ from nodes._otr_video_engines import registry as vreg  # noqa: E402
 MAC_PROFILES = ("otr_mac16_low", "otr_mac16_still", "otr_mac16_video",
                 "otr_mac16_animatediff")
 
-#: Engines a Mac profile must not SELECT BY DEFAULT, with the reason. Note the
-#: two reasons are different in kind, and neither is visible to
-#: ``cp.availability()`` -- which is exactly why this dict exists rather than
-#: leaning on the device rows.
-#:
-#: ``viz_mxc_mandala``'s row says ["cuda","cpu","mps"] and that row is CORRECT:
-#: it is pure CPU vector graphics and genuinely runs on any device. What stops
-#: it here is a missing SYSTEM LIBRARY (pycairo publishes no macOS wheel), which
-#: is a different axis from the device, and deliberately not a
-#: ``required_toolchain`` -- registry.py:315 explains that pycairo is kept out
-#: of the main requirements so a box without libcairo cannot break any OTHER
-#: engine's install. It is reachable after `brew install cairo pkg-config`; it
-#: must simply not be the DEFAULT a Mac reader lands on.
+#: Engines a Mac profile must not SELECT BY DEFAULT, with the reason. It is not
+#: visible to ``cp.availability()`` -- which is exactly why this dict exists
+#: rather than leaning on the device rows. (``viz_mxc_mandala`` was here until
+#: 2026-11-20, for pycairo's missing macOS wheel; it is painted with Pillow now
+#: and runs on a Mac.)
 #:
 #: ``z_image_turbo`` is a hardware fact rather than an install step: 12.3 GB
 #: bf16 needs ~20.4 GiB in the KSampler at 16 GB, and the int8 build hits
 #: aten::_int_mm, which MPS does not implement. No amount of installing fixes
 #: that one.
 BANNED_ON_MAC = {
-    "viz_mxc_mandala": ("pycairo has no macOS wheel, so assert_usable refuses "
-                        "until `brew install cairo pkg-config` -- not a "
-                        "default a Mac reader should land on"),
     "z_image_turbo": "12.3 GB bf16 OOMs at 16 GB; int8 hits aten::_int_mm",
 }
 

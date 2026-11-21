@@ -76,8 +76,7 @@ Two things follow from it:
   `python -c "import torch; print(torch.__version__, torch.cuda.is_available())"`
   must print `True` before anything else is worth trying.
 * **Do not install `sageattention`.** It is CUDA-only and the pack refuses to
-  run if it finds it patched in. You do not need `pycairo` either -- no AMD
-  graph selects the one engine that wants it.
+  run if it finds it patched in.
 
 **Whether `bitsandbytes` quantisation works under ROCm is UNTESTED, not
 settled.** The loader used to assume it did not, and that assumption was found

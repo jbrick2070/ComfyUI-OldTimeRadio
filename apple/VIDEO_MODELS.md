@@ -73,7 +73,7 @@ written yourself -- see [EXTENDING.md](EXTENDING.md).
 | `viz_mxc_cpu` | a radio-dial spectrum sweep in a muted rainbow, on a dark field |
 | `viz_green` | green and amber CRT scopes -- frequency ring, waveform, bars |
 | `viz_camera` | warm gold noir: spinning reels, projector beam, mandala rings |
-| `viz_mxc_mandala` | a vector tuning-eye mandala on radio bronze. Needs `pycairo` |
+| `viz_mxc_mandala` | a vector tuning-eye mandala on radio bronze. Pillow only; runs on every OS |
 | `still_flat` | the beat's still image, held dead flat. Nothing moves, and nothing is cropped |
 | `still_pan` | the same still, given a slow pan and zoom across the frame |
 | `still_motion` | the same slow pan. These two do the same thing today |

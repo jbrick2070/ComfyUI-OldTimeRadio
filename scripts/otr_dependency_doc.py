@@ -27,11 +27,6 @@ _REPO = os.path.dirname(_HERE)
 
 #: Things pip cannot install, with the symptom you get without them.
 SYSTEM_LIBS = [
-    ("libcairo2-dev, pkg-config", "apt-get install -y libcairo2-dev pkg-config",
-     "pycairo is a C extension. Without these, `pip install pycairo` fails at "
-     "metadata generation -- and because `import cairo` sits UNGUARDED inside "
-     "the draw function, every viz_mandala frame and every scope overlay then "
-     "raises ImportError at RENDER time, not at install."),
     ("ffmpeg", "apt-get install -y ffmpeg  (or ships with the image)",
      "muxing, captions and the credits concat. Note: having ffmpeg proves "
      "nothing about NVENC -- most containers expose CUDA for compute but not "
@@ -84,7 +79,7 @@ def render() -> str:
     A("## The short version\n")
     A("```bash\n"
       "# 1. system libraries pip cannot provide (Linux)\n"
-      "sudo apt-get install -y libcairo2-dev pkg-config ffmpeg\n\n"
+      "sudo apt-get install -y ffmpeg\n\n"
       "# 2. the pack and its Python dependencies -- INTO THE PYTHON COMFYUI RUNS\n"
       "git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio\n"
       "<comfyui-python> -m pip install -r ComfyUI-OldTimeRadio/requirements.txt\n\n"

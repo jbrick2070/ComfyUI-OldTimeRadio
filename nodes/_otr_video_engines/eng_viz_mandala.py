@@ -1,16 +1,19 @@
-r"""``viz_mxc_mandala`` -- the Cosmic Radio Mandala, a pycairo audio-reactive
+r"""``viz_mxc_mandala`` -- the Cosmic Radio Mandala, an audio-reactive
 tuning-eye mandala (operator 2026-06-30, kibitz-hardened r1-r4).
 
-A SEPARATE selectable engine alongside ``viz_mxc_cpu`` (the zero-dep numpy/PIL
-rainbow scope stays as the zero-dep alternate; this is the pycairo UPGRADE the
-operator asked for after finding the PIL rainbow underwhelming). Pure CPU vector
-graphics (pycairo -- cross-platform, no GPU/shaders) painting a centered tuning
-eye + radio-dial concentric rings/spokes + an outer solid spectrum band, in a
-muted iridescent palette on a deep radio-bronze field. The CRT scanlines +
-vignette + film grain are applied as a POST-PROCESS over the rendered RGB frame
-(:func:`nodes._otr_shared.scope_draw.apply_crt_post_rgb`) -- native-cairo CRT
-glue was cut for v1 (PIL roundtrip reuses the SAME machinery as
-``paint_frame``/``paint_rainbow_frame``).
+A SEPARATE selectable engine alongside ``viz_mxc_cpu`` (the rainbow scope),
+painting a centered tuning eye + radio-dial concentric rings/spokes + an outer
+solid spectrum band, in a muted iridescent palette on a deep radio-bronze
+field. The CRT scanlines + vignette + film grain are applied as a POST-PROCESS
+over the rendered RGB frame (:func:`nodes._otr_shared.scope_draw.apply_crt_post_rgb`),
+the same machinery as ``paint_frame``/``paint_rainbow_frame``.
+
+PILLOW, NOT CAIRO (2026-11-20). It was first painted with pycairo, which
+publishes Windows wheels only, so the engine could not run on a stock Mac or
+Linux box and a Mac episode died ten minutes in at its first beat. The operator
+asked for a universal port: :func:`scope_draw.paint_mandala_rgb` paints the
+same geometry with Pillow at 2x and reduces it, so the lane needs nothing the
+pack does not already install, on any OS.
 
 AUDIO-OPTIONAL (``required_inputs=()``): reacts to audio where present and
 idles a slow mandala on silence -- ALSO the no-image floor for
@@ -18,12 +21,9 @@ retired_role_a/background (fits every role by capability, C2). ``accepts_still=
 False`` -> mints NO still, so it never triggers an image model on a non-audio
 slot. has_audio is always False (only OTR_MasterAudioMux adds audio,
 test_audio_byte_identical invariant). NO FALLBACKS (fallback_engine=None);
-assert_usable fails LOUD (probes BOTH pycairo AND ffmpeg, separate messages).
-Cold-import clean (V-12: cairo / soundfile / PIL / scope_draw imported lazily
-inside load/assert_usable/render_clip -- cairo is NEVER at module scope,
-matching pycairo NOT being added to the main requirements, so a box without
-system libcairo never breaks any OTHER engine's install). UTF-8, no BOM,
-ASCII source.
+assert_usable fails LOUD when ffmpeg is missing. Cold-import clean (V-12:
+soundfile / PIL / scope_draw imported lazily inside load/assert_usable/
+render_clip). UTF-8, no BOM, ASCII source.
 
 Ported from the operator-approved prototype; the full grounded spec
 converged over a kibitz r1-r4 arc. Config (env): ``OTR_FFMPEG`` ffmpeg path.
@@ -45,40 +45,9 @@ except ImportError:  # pragma: no cover -- flat test imports
 _LOG = logging.getLogger("OTR.video.viz_mxc_mandala")
 
 
-def _pycairo_hint() -> str:
-    """What a user on THIS platform must actually do to get pycairo.
-
-    `pip install pycairo` is correct on Windows and useless on macOS, where
-    pycairo publishes no wheel: pip falls back to the sdist, which needs
-    libcairo headers a stock Mac does not have. Measured 2026-09-07 on a Mac
-    mini M4 -- `uv pip install 'pycairo>=1.24'` resolved to the sdist and failed
-    to build, no libcairo anywhere, no Homebrew. Telling a Mac operator to run
-    the pip line sends them into that wall with no explanation.
-
-    Linux is the same shape for a different reason: pycairo ships Windows wheels
-    and an sdist and no Linux wheels, so it needs the distro's cairo dev
-    package first.
-    """
-    import sys
-    if sys.platform == "darwin":
-        return ("viz_mxc_mandala needs pycairo, which has NO macOS wheel -- "
-                "`pip install pycairo` will fail to build. It needs cairo "
-                "itself first: `brew install cairo pkg-config` then "
-                "`pip install pycairo`. Without Homebrew this engine cannot "
-                "run on macOS; use viz_mxc_cpu, viz_green or viz_camera "
-                "instead -- they are zero-dependency and need no cairo.")
-    if sys.platform.startswith("linux"):
-        return ("viz_mxc_mandala needs pycairo, which publishes no Linux wheel "
-                "-- install your distro's cairo headers first (e.g. "
-                "`apt install libcairo2-dev pkg-config`), then "
-                "`pip install pycairo`. Or use viz_mxc_cpu / viz_green / "
-                "viz_camera, which need no cairo.")
-    return "viz_mxc_mandala needs pycairo (pip install pycairo)"
-
-
 @register
 class VizMxcMandalaEngine:
-    """The pycairo Cosmic Radio Mandala engine (engine_id ``viz_mxc_mandala``)."""
+    """The Cosmic Radio Mandala engine (engine_id ``viz_mxc_mandala``)."""
 
     name = "viz_mxc_mandala"
     family = "abstract"
@@ -87,7 +56,7 @@ class VizMxcMandalaEngine:
     #: fit every role BY CAPABILITY.
     roles = ("announcer_visual", "music_visual", "character_video")
     default_roles = ()                  # opt-in selectable only; never an auto-default
-    commercial_clean = True             # own code + pycairo (LGPL/MPL) + ffmpeg encode
+    commercial_clean = True             # own code + Pillow + ffmpeg encode
     requires_flag = None                # registry IS the menu; no flag gate
     #: AUDIO-OPTIONAL -- () fits every role by capability (mirrors viz_mxc_cpu);
     #: render_clip idles a slow mandala when no audio_ref is present.
@@ -98,15 +67,11 @@ class VizMxcMandalaEngine:
     render_aspect = "wide"              # 16:9; no portrait geometry branch
     #: NO ``render_canvas`` DECLARATION, deliberately (lane 14, 2026-08-11 --
     #: lesson L19). This is the visualizer most likely to have needed one, since
-    #: it is the only lane in the family with a NAMED external dependency and it
-    #: paints through a real graphics library rather than numpy -- so the premise
-    #: was re-checked here with more suspicion than on lanes 11-13, not less.
-    #: It holds: ``render_clip`` allocates the surface as
-    #: ``cairo.ImageSurface(FORMAT_ARGB32, w, h)`` from the request's own
-    #: dimensions, ``paint_mandala(ctx, w, h, ...)`` lays the mandala out from
-    #: the same pair, the scanline/vignette tables and ``mandala_surface_to_rgb``
-    #: take them too, and the encoder is handed them last. Cairo imposes no
-    #: canvas of its own -- an ImageSurface is whatever size you ask for.
+    #: it paints through a graphics library rather than bare numpy -- so the
+    #: premise was re-checked here with more suspicion than on lanes 11-13.
+    #: It holds: ``paint_mandala_rgb(w, h, ...)`` lays the mandala out from the
+    #: request's own dimensions, the scanline/vignette tables take them too, and
+    #: the encoder is handed them last. Nothing imposes a canvas of its own.
     #:
     #: So the 1472x832 an episode hands this lane is ``OTR_VIDEO_LANDSCAPE_CANVAS``'s
     #: default -- an operator lever -- and declaring would overrule it for this
@@ -129,10 +94,9 @@ class VizMxcMandalaEngine:
     #: last of the four visualizers. The sentence above had claimed "CONTINUITY
     #: none" since this engine was written while the keyword was never passed,
     #: so the value was a dataclass DEFAULT. True here for a reason worth
-    #: stating precisely, because this lane LOOKS stateful and is not: the cairo
-    #: surface and context ARE reused across frames for allocation reasons, but
-    #: ``paint_mandala`` repaints the full field every frame from that frame's
-    #: own audio analysis, and nothing reads a predecessor frame's PIXELS. So
+    #: stating precisely: ``paint_mandala_rgb`` repaints the full field every
+    #: frame from that frame's own audio analysis (only the static background
+    #: wash is cached), and nothing reads a predecessor frame's PIXELS. So
     #: there is no terminal state a successor segment could inherit.
     frame_contract = FrameContract(
         min_frames=1,
@@ -148,15 +112,8 @@ class VizMxcMandalaEngine:
     def __init__(self):
         self._loaded = False
 
-    # ---- residency (none: CPU pycairo + ffmpeg only) ----
+    # ---- residency (none: CPU Pillow + ffmpeg only) ----
     def load(self):
-        try:
-            import cairo  # noqa: F401
-        except ImportError as exc:
-            raise EngineUnusable(
-                self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                _pycairo_hint(),
-                kind="video") from exc
         from .._otr_shared import scope_draw as _sd
         if not _sd.find_ffmpeg(None):
             raise EngineUnusable(
@@ -176,13 +133,6 @@ class VizMxcMandalaEngine:
 
     # ---- usability (fail LOUD; no NVML / weights / node gate) ----
     def assert_usable(self, host_caps, profile, request_template=None):
-        try:
-            import cairo  # noqa: F401
-        except ImportError as exc:
-            raise EngineUnusable(
-                self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                _pycairo_hint(),
-                kind="video") from exc
         from .._otr_shared import scope_draw as _sd
         if not _sd.find_ffmpeg(None):
             raise EngineUnusable(
@@ -224,10 +174,9 @@ class VizMxcMandalaEngine:
     # ---- render ----
     def render_clip(self, request, prepared=None):
         """Decode the per-beat audio (if any) -> analyse -> paint full-16:9
-        MANDALA frames on ONE reused cairo surface/context -> CRT-post each
-        frame -> encode ONE silent mp4. Audio-optional: no audio_ref -> idle
-        mandala from silence (also the scene/background no-image floor)."""
-        import cairo
+        MANDALA frames -> CRT-post each frame -> encode ONE silent mp4.
+        Audio-optional: no audio_ref -> idle mandala from silence (also the
+        scene/background no-image floor)."""
         import numpy as np
 
         from ._tmp import otr_engine_tmp_mp4
@@ -268,14 +217,11 @@ class VizMxcMandalaEngine:
         vignette = _sd.build_vignette(w, h)
         rng_key = "viz_mxc_mandala|%d" % int(plan["seed"])
 
-        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, w, h)
-        ctx = cairo.Context(surface)
-
         def _frames():
             for fi in range(total):
-                _sd.paint_mandala(ctx, w, h, fi, total, fps, float(volume[fi]),
-                                  freqs[fi], float(signal[fi]), float(onsets[fi]))
-                rgb = _sd.mandala_surface_to_rgb(surface, w, h)
+                rgb = _sd.paint_mandala_rgb(w, h, fi, total, fps, float(volume[fi]),
+                                            freqs[fi], float(signal[fi]),
+                                            float(onsets[fi]))
                 rgb = _sd.apply_crt_post_rgb(rgb, scanlines, vignette, fi, rng_key,
                                              vol=float(volume[fi]))
                 yield np.asarray(rgb, dtype=np.uint8)
