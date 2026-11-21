@@ -203,7 +203,6 @@ apple/dropdown_matrix.json
 apple/evidence/
 apple/known-failures.md
 apple/model-license-audit-targets.txt
-apple/model-license-google--gemma-2-2b-it.md
 apple/model-license-google--gemma-4-12b-it.md
 apple/model-license-google--gemma-4-e2b-it.md
 apple/model-license-google--gemma-4-e4b-it.md

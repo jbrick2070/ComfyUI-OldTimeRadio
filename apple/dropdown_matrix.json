@@ -473,11 +473,6 @@
         "nv16": "proven"
       }
     },
-    "google/gemma-2-2b-it": {
-      "memory": {
-        "nv8": "proven"
-      }
-    },
     "google/gemma-4-12b-it": {
       "memory": {
         "nv16": "proven",
