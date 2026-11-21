@@ -192,8 +192,25 @@ def assert_no_silent_stretch(plan, tol=0.02):
 def vram_used_mb():
     """Machine-wide VRAM used (MB) via the shared NVML probe, or ``None`` when
     NVML is unavailable (e.g. the CPU box). Never ComfyUI ``get_free_memory()``
-    (this-process view only -- it cannot see a sidecar's allocation)."""
-    return _GR.sample_used_mb()
+    (this-process view only -- it cannot see a sidecar's allocation).
+
+    APPLE SILICON (2026-11-20). NVML does not exist there, so the peak sampler
+    recorded nothing and every Mac episode's credits read "VRAM: (unknown)".
+    When NVML answers nothing and Metal is available, this returns what
+    Metal's driver holds for this process (``driver_allocated_memory``). That
+    is a per-process figure, not machine-wide, which on a Mac -- one GPU
+    process, no sidecars -- is the closest honest reading. CUDA boxes never
+    reach it: NVML answers first."""
+    used = _GR.sample_used_mb()
+    if used is not None:
+        return used
+    try:
+        import torch  # type: ignore
+        if torch.cuda.is_available() or not torch.backends.mps.is_available():
+            return None
+        return float(torch.mps.driver_allocated_memory()) / (1024.0 * 1024.0)
+    except Exception:  # noqa: BLE001 -- no torch / older torch: unknown
+        return None
 
 
 class VramPeakProbe:

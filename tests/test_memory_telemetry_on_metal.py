@@ -117,3 +117,24 @@ def test_system_specs_off_a_mac_never_ask_sysctl(monkeypatch):
     monkeypatch.setattr(specs.sys, "platform", "win32")
     monkeypatch.setattr(specs.otr_proc, "run", boom)
     assert specs._mac_chip_name() == ""
+
+
+def test_video_peak_sampler_reads_metal_when_nvml_answers_nothing(monkeypatch):
+    """The credits' "VRAM: x of y" peak comes from VramPeakProbe, which read
+    NVML only, so every Mac episode printed "(unknown)"."""
+    from nodes._otr_video_engines import motion_common as MC
+
+    monkeypatch.setattr(MC._GR, "sample_used_mb", lambda *a, **k: None)
+    monkeypatch.setitem(sys.modules, "torch", _fake_torch(cuda=False))
+    assert MC.vram_used_mb() == pytest.approx(6 * 1024.0)
+
+
+def test_video_peak_sampler_keeps_nvml_first(monkeypatch):
+    from nodes._otr_video_engines import motion_common as MC
+
+    monkeypatch.setattr(MC._GR, "sample_used_mb", lambda *a, **k: 1234.0)
+    monkeypatch.setitem(sys.modules, "torch", _fake_torch(cuda=False))
+    assert MC.vram_used_mb() == 1234.0
+    monkeypatch.setattr(MC._GR, "sample_used_mb", lambda *a, **k: None)
+    monkeypatch.setitem(sys.modules, "torch", _fake_torch(cuda=True))
+    assert MC.vram_used_mb() is None
