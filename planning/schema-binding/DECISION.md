@@ -60,10 +60,21 @@ per token, a bound pass runs:
 
 | Writer | Machine | Model time per token | Bound pass |
 |---|---|---|---|
-| Gemma 4 12B native | 5080 | ~24 ms | ~2x slower |
-| Gemma 4 E2B native | 5080 | ~8 ms | ~3-4x slower |
-| Gemma 4 E2B native | 4060 | ~16 ms | ~2x slower |
+| Gemma 4 12B native | 5080 | ~24 ms | estimated ~2x; **measured ~8%** (below) |
+| Gemma 4 E2B native | 5080 | ~8 ms | estimated ~3-4x; not measured |
+| Gemma 4 E2B native | 4060 | ~16 ms | estimated ~2x; not measured |
 | Qwen 3.5 4B | Mac M6 | ~120 ms | ~10-15% slower |
+
+**Measured on the 5080, 2026-11-21, and it overturns the NVIDIA estimate.** A
+Japanese Shakespeare episode on 2.3.63 (`otr_16gb_low`, native Gemma 4 12B,
+`assassin_corpse_ja_20261121_080500`, published in 10:47) ran its bound passes
+at a median 35.5 tok/s against 38.7 for its unbound writer passes in the same
+run -- about 8% slower, not 2x. ComfyUI's native adapter applies the allowed set
+far more cheaply than transformers' `PrefixConstrainedLogitsProcessor`, which is
+what the CPU estimate modelled. The E2B rows are still estimates and are likely
+far lower too. This weakens the COST argument against binding on NVIDIA; it does
+not touch the reason D stands -- binding trades loud, repairable failures for
+silent truncation and buried punctuation unless each pass gets its own checks.
 
 The Mac's own log fits the corrected figure: bound passes ran at a median 7.5
 tok/s against 8.3 unbound, about 10% (the first draft wrongly called that 4%).

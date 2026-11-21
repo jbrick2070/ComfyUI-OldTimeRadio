@@ -17738,7 +17738,11 @@ not promote it to the Bug Bible on this evidence alone.
   `prayer_night_ja_20261121_010332` (The Tempest, 12 entries in 3 calls),
   `masked_rosie_zh_20261121_011922` (As You Like It, 12 in 3),
   `signal_lost_hi_20261121_013536` (12 in 3) on 2.3.62, and
-  `broken_rhyme_ja_20261121_015321` (12 in 3) on 2.3.63.
+  `broken_rhyme_ja_20261121_015321` (12 in 3) on 2.3.63. Also proven on
+  NVIDIA the same day: the 5080 (native Gemma 4 12B, `otr_16gb_low`)
+  translated A Midsummer Night's Dream into Japanese, 12 entries in 4 calls,
+  every batch first try, and published `assassin_corpse_ja_20261121_080500`
+  in 10:47; bound passes ran ~8% slower than unbound ones in the same run.
 
 ## PBUG-20261121-02 -- Japanese and Chinese captions could open a line with "。" or end one on "「"
 - evidence: `prayer_night_ja_20261121_010332` (Mac M6, 2.3.62,
