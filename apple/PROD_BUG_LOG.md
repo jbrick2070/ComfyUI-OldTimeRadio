@@ -17677,12 +17677,20 @@ not promote it to the Bug Bible on this evidence alone.
   only process exit frees it. Eager attention over five NEW lengths up to
   3,011 tokens held flat at the same speed, with the reference Gated DeltaNet
   layers unchanged -- so the growth is in the sdpa path, not DeltaNet.
-- fix: the four Apple rows in `config/workflow_matrix.json` set
-  `llm.attn_impl` to `eager`; the generated `otr_mac16_*` workflows carry it.
-  NVIDIA rows are untouched (the delta lives only on `platform: mac` rows).
-  The `llm_attn_impl` tooltip says why. Coverage:
+- fix: `a59816ae` -- the four Apple rows in `config/workflow_matrix.json` set
+  `llm.attn_impl` to `eager`; the generated `otr_mac16_*` workflows carry it,
+  and the `llm_attn_impl` tooltip says why. Sonnet QA held it and named the
+  gap: the canonical ships `sdpa` and is the "any machine" path, so a Mac
+  loading it kept the leak. The follow-up adds
+  `llm_policy.effective_attn_impl` (the attention counterpart to
+  `effective_quant_policy`): with the RESOLVED device `mps`, `sdpa` becomes
+  `eager` in both policy builds, so the frozen policy, cache key and ledger
+  name what ran. Every other device passes the widget value through, so the
+  NVIDIA path is unchanged by construction. Coverage:
   `tests/test_mac_profiles_contract.py::test_the_writer_runs_eager_attention_on_metal`
-  pins both the row and the shipped workflow.
+  (row and shipped workflow) and three tests in
+  `tests/test_llm_runtime_policy.py` (the helper, the real preflight, both
+  build sites).
 - cost: eager builds each full-attention layer's score matrix in one piece,
   freed after the call (estimated 3-4 GB transient at the longest ~5,600-token
   writer prompt, not yet measured on hardware).

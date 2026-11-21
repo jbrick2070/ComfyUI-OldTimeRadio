@@ -124,6 +124,32 @@ class LLMRuntimePolicy:
 BASELINE_POLICY = LLMRuntimePolicy()
 
 
+def effective_attn_impl(attn_impl: str, *, device: str) -> str:
+    """The attention implementation that actually runs on ``device``.
+
+    The ``llm_attn_impl`` widget's counterpart to
+    ``_otr_model_catalog.effective_quant_policy``: the widget states a
+    preference, and the resolved device decides what can honour it. Both
+    policy builds (``_preflight_llm_selection`` and ``_resolve_inputs``) call
+    this with the RESOLVED device, so the frozen policy, its cache key and the
+    ledger stamp all name what really ran.
+
+    On Apple silicon ``sdpa`` becomes ``eager`` (PBUG-20261120-03, measured on
+    an M6 with torch 2.12.1). Under sdpa every new prompt length leaves Metal
+    memory behind outside the PyTorch allocator -- +0.22 GiB at 1,056 tokens,
+    +1.15 GiB at 2,896, nothing on a repeated length -- and only process exit
+    frees it, so one episode parked 24.5 GiB and the next could not load its
+    writer. Eager held flat over new lengths at the same speed. The canonical
+    workflow ships ``sdpa`` and is the "any machine" path, which is why this
+    lives here and not only in the Mac rows.
+
+    Every other device, and every other value on ``mps``, passes through.
+    """
+    if device == "mps" and attn_impl == "sdpa":
+        return "eager"
+    return attn_impl
+
+
 def policy_from_meta(meta: Any) -> "LLMRuntimePolicy | None":
     """Rebuild the writer-stamped policy from ledger ``meta['llm_policy']``
     (post-ship audit fix, 2026-07-10): downstream LLM consumers that only

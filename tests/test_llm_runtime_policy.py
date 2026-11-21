@@ -441,3 +441,56 @@ def test_admission_runs_before_every_cache_read_in_source():
     assert gate < src.index('LLM_CACHE.get("policy_key")')
 
 
+
+
+# --------------------------------------------------------------------------
+# Attention on Apple silicon (PBUG-20261120-03)
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("device,widget,expected", [
+    ("mps", "sdpa", "eager"),
+    ("mps", "eager", "eager"),
+    ("mps", "flash_attention_2", "flash_attention_2"),
+    ("cuda", "sdpa", "sdpa"),
+    ("cuda:1", "sdpa", "sdpa"),
+    ("cpu", "sdpa", "sdpa"),
+    ("cuda", "eager", "eager"),
+])
+def test_effective_attn_impl_translates_only_sdpa_on_metal(device, widget,
+                                                           expected):
+    """sdpa on Metal keeps memory for every prompt length until the process
+    exits; eager does not. Nothing else is touched -- the NVIDIA path keeps
+    exactly the value its widget states."""
+    assert lp.effective_attn_impl(widget, device=device) == expected
+
+
+@pytest.mark.parametrize("resolved,expected", [("mps", "eager"),
+                                               ("cuda", "sdpa")])
+def test_the_writer_preflight_builds_the_policy_with_the_translation(
+        monkeypatch, resolved, expected):
+    """Through the real preflight, not the helper alone: the canonical ships
+    sdpa and resolves its device at run time, so a Mac loading it must still
+    get eager in the frozen policy (and so in its cache key and ledger)."""
+    from nodes import OTR_LedgerScriptWriter as W
+    monkeypatch.setattr(W._OTR_DEVICE_OPTIONS, "resolve_device",
+                        lambda *a, **k: resolved)
+    pre = W._preflight_llm_selection(
+        creative_writing_model="Qwen/Qwen3.5-4B",
+        technical_model="Qwen/Qwen3.5-4B",
+        llm_device="default", llm_attn_impl="sdpa",
+        llm_quant_policy="none", llm_vram_ceiling_gb=10.0,
+    )
+    assert pre.policy.device == resolved
+    assert pre.policy.attn_impl == expected
+
+
+def test_both_policy_builds_route_attention_through_the_translation():
+    """The two builds are meant to be byte-identical; a site that went back
+    to the raw widget would give the scheduler and the ledger different
+    policies on a Mac."""
+    from nodes import OTR_LedgerScriptWriter as W
+    from nodes import _otr_writer_inputs as WI
+    for fn in (W._preflight_llm_selection, WI._resolve_inputs):
+        src = inspect.getsource(fn)
+        assert "effective_attn_impl(" in src, fn.__qualname__
+        assert "attn_impl=str(llm_attn_impl)" not in src, fn.__qualname__

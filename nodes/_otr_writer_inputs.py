@@ -644,7 +644,8 @@ def _resolve_inputs(
             # it carries into cache_key(). These two constructions are meant to
             # be byte-identical, so they resolve identically.
             device=resolved_device,
-            attn_impl=str(llm_attn_impl),
+            attn_impl=_llm_policy.effective_attn_impl(
+                str(llm_attn_impl), device=resolved_device),
             quant_policy=baked_quant,
             vram_ceiling_gb=float(llm_vram_ceiling_gb),
         ),

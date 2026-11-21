@@ -542,10 +542,18 @@ def _preflight_llm_selection(
         # under one key and silently reuse a resident model across them.
         # Resolving here keeps the policy honest and the ledger truthful.
         device=resolved_device,
-        attn_impl=str(llm_attn_impl),
+        attn_impl=_llm_policy.effective_attn_impl(
+            str(llm_attn_impl), device=resolved_device),
         quant_policy=baked_quant,
         vram_ceiling_gb=float(llm_vram_ceiling_gb),
     )
+    if policy.attn_impl != str(llm_attn_impl):
+        log.info(
+            "[OTR_LedgerScriptWriter] attention %s -> %s on %s: sdpa keeps "
+            "Metal memory for every prompt length until the process exits "
+            "(PBUG-20261120-03)",
+            llm_attn_impl, policy.attn_impl, resolved_device,
+        )
     norm_creative = _otr_model_catalog.validate_model_id(creative_writing_model)
     norm_technical = _otr_model_catalog.validate_model_id(technical_model)
     return _LLMPreflight(
