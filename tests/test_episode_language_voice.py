@@ -582,3 +582,18 @@ def test_the_mac_family_list_follows_the_measure_walk():
     mac_walk = [p for p in _os_script_font_paths("C:/Windows/Fonts", "cjk")
                 if p.startswith("/System/")]
     assert [p for p, _f in C._MAC_CJK_FAMILIES] == mac_walk
+
+
+def test_a_broken_install_without_the_shipped_face_names_a_system_face(monkeypatch):
+    """_script_family names a system face only when the shipped file is
+    missing (Sonnet QA on b243fbfb)."""
+    import nodes._otr_captions as C
+    import nodes._otr_script_fonts as SF
+
+    monkeypatch.setattr(SF, "bundled_path", lambda policy: None)
+    monkeypatch.setattr(C.sys, "platform", "win32")
+    assert C._script_family("devanagari") == "Nirmala UI"
+    assert C._script_family("cjk") == "Microsoft YaHei"
+    monkeypatch.setattr(C.sys, "platform", "darwin")
+    monkeypatch.setattr(C.os.path, "isfile", lambda p: p == "/System/Library/Fonts/STHeiti Light.ttc")
+    assert C._script_family("cjk") == "Heiti SC"
