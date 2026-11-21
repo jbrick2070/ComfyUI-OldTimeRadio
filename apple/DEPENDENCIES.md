@@ -8,7 +8,7 @@ Written for a machine that has never run OTR. If you are on the box that develop
 
 ```bash
 # 1. system libraries pip cannot provide (Linux)
-sudo apt-get install -y libcairo2-dev pkg-config ffmpeg
+sudo apt-get install -y ffmpeg
 
 # 2. the pack and its Python dependencies -- INTO THE PYTHON COMFYUI RUNS
 git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio
@@ -44,7 +44,6 @@ Check yours with `git describe --tags` in the ComfyUI directory. A rented pod im
 
 | package | install | why, and what breaks without it |
 |---|---|---|
-| `libcairo2-dev, pkg-config` | `apt-get install -y libcairo2-dev pkg-config` | pycairo is a C extension. Without these, `pip install pycairo` fails at metadata generation -- and because `import cairo` sits UNGUARDED inside the draw function, every viz_mandala frame and every scope overlay then raises ImportError at RENDER time, not at install. |
 | `ffmpeg` | `apt-get install -y ffmpeg  (or ships with the image)` | muxing, captions and the credits concat. Note: having ffmpeg proves nothing about NVENC -- most containers expose CUDA for compute but not libnvidia-encode.so.1, and OTR falls back to CPU encoding automatically. |
 
 ## 2. Python packages
@@ -77,7 +76,6 @@ pypinyin>=0.50; python_version >= "3.13" and python_version < "3.14"
 cn2an>=0.5.22; python_version >= "3.13" and python_version < "3.14"
 ordered-set>=4.1; python_version >= "3.13" and python_version < "3.14"
 pyloudnorm>=0.1.1
-pycairo>=1.24; sys_platform == 'win32'
 pillow>=10.0
 aiohttp>=3.9
 imageio-ffmpeg>=0.5
