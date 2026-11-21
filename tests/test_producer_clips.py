@@ -298,14 +298,14 @@ def test_the_key_and_body_come_from_one_projection_and_the_body_is_bounded():
     strings are kept as hash and length, and a nested non-string key is a
     documented place where the body cannot be re-hashed to the key."""
     kw = dict(shot_id="shot_x", requests=[{"text_prompt": "a", "frames": (1, 2),
-                                           "plate_path": "C:/gone", "request_id": "r",
+                                           "request_id": "r",
                                            "nested": {2: "two", 10: "ten"}}],
               coverage_plan={"join": "chain"}, engine={"engine_id": "stub"},
               render_policy={"device": "cuda"}, settings={"env": {"OTR_LONG": "x" * 5000}})
     key, body = PC.clip_key_and_body(**kw)
     assert key == PC.clip_reuse_key(**kw)
     assert json.loads(json.dumps(body)) == body
-    assert body["requests"][0]["frames"] == [1, 2] and "plate_path" not in body["requests"][0]
+    assert body["requests"][0]["frames"] == [1, 2] and "request_id" not in body["requests"][0]
     assert body["requests"][0]["nested"] == {"2": "two", "10": "ten"}
     assert body["settings"]["env"]["OTR_LONG"].startswith("sha256:") and "(5000 chars)" in body["settings"]["env"]["OTR_LONG"]
     assert len(json.dumps(body)) < 1500
@@ -550,7 +550,7 @@ def test_the_key_sees_what_files_hold_never_where_they_are(tmp_path):
         path.write_bytes(still)
         base = {"shot_id": "shot_b001", "request_id": "shot_b001", "text_prompt": "a desk",
                 "asset_refs": {"init_image": str(path)}, "seed_bundle": {"request_seed": 7},
-                "observability": {"init_image": str(path)}, "plate_path": str(tmp_path / folder)}
+                "observability": {"init_image": str(path)}}
         base.update(extra)
         return base
 

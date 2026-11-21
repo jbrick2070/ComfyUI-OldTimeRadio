@@ -85,9 +85,9 @@ _STORE_NAMES = {"clip": "clip.mp4", "foley": "foley.wav"}
 _EPISODE_DIRS = {"clip": ("clips",), "foley": ("audio", "foley")}
 #: The clip fields that name a file. A record keeps the files, not the paths.
 _PATH_FIELDS = {"clip": "path", "foley": "foley_path"}
-#: Request fields that never reach the pixels: the request's own name, the
-#: trace stamps, and the folder an engine writes its plate into.
-_NOT_CAUSAL = frozenset({"request_id", "observability", "plate_path"})
+#: Request fields that never reach the pixels: the request's own name and the
+#: trace stamps.
+_NOT_CAUSAL = frozenset({"request_id", "observability"})
 #: ``OTR_`` settings that never change a clip's bytes. The pack writes the
 #: first four itself while a prompt runs -- the workflow validator's two
 #: exports, the output folder, the writer's style-grammar switch -- so they can
@@ -179,7 +179,7 @@ def _as_file(value: Any) -> Any:
 
 def request_projection(request: Any) -> Dict[str, Any]:
     """What one prebuilt request asks its engine for, as the key hashes it: the
-    whole request but its id, its trace stamps and its plate folder, with each
+    whole request but its id and its trace stamps, with each
     file it names -- init image, references, audio, base clip -- as the file's
     hash."""
     if hasattr(request, "model_dump"):

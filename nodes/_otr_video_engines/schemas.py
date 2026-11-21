@@ -163,17 +163,7 @@ class VideoRequest(_Forbid):
     #: A REAL field because the model is extra="forbid": undeclared top-level
     #: keys would make every built request schema-invalid.
     observability: dict = Field(default_factory=dict)
-    #: THE STILL-IN LAB PEER'S PLATE (campaign item 2, 2026-09-02). Declared
-    #: conditioning, deliberately -- the one thing ``observability`` may never
-    #: carry. ``plate_prompt`` is the pack's full language plus the ledger's
-    #: world, composed by ``render_driver`` for engines declaring
-    #: ``wants_plate_prompt``; it is CAUSAL through ``sampler_inputs`` on the
-    #: render receipt. ``plate_path`` is the DIRECTORY the engine writes the
-    #: plate PNG into (non-causal; a path is never hashed). Both default to ""
-    #: and are absent from every other lane's request, byte for byte.
-    plate_prompt: str = ""
-    plate_path: str = ""
-    #: THE BEAT'S OWN OBJECTS, ONE REGION EACH (2026-10-27). Declared conditioning, like the plate:
+    #: THE BEAT'S OWN OBJECTS, ONE REGION EACH (2026-10-27). Declared conditioning:
     #: ``render_driver`` fills it only for an engine declaring ``wants_scene_regions``: first from the
     #: filmable things the beat's own spoken line names (``ghost_scene_object_author``, stamped on the
     #: shot row at plan time and admitted against the line again at render time), otherwise from the

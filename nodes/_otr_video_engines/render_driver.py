@@ -3996,37 +3996,15 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # char_id is a schema extra; VideoRequest is extra="forbid").
     if char_id:
         req["conditioning_refs"]["char_id"] = char_id
-    # THE STILL-IN LAB PEER'S PLATE (campaign item 2, 2026-09-02). A CAPABILITY
-    # branch, never an id compare: an engine declaring `wants_plate_prompt`
-    # gets the pack's full language + the ledger's world composed onto the
-    # declared request field `plate_prompt` (causal through sampler_inputs)
-    # and the DIRECTORY it writes the plate PNG into on `plate_path`
-    # (non-causal). Composed HERE because the engine has no ledger and no pack;
-    # `_vstyle` is the same resolved style the video prompt used above.
-    _plate_eng = (_vreg.get_engine(_eng_id)
-                  if _eng_id and _vreg.is_registered(_eng_id) else None)
-    if _plate_eng is not None and getattr(_plate_eng, "wants_plate_prompt", False):
-        from .ghost_plate_prompt import compose_plate_prompt
-        _plate = compose_plate_prompt(_vstyle, (ledger or {}).get("meta") or {})
-        req["plate_prompt"] = str(_plate["positive"])
-        _plate_episode = _still_spine_episode_id(ledger)
-        if _plate_episode:
-            from .._otr_paths import otr_stills_dir
-            req["plate_path"] = str(otr_stills_dir(_plate_episode) / "ghost_plates")
-        _p_obs = req.setdefault("observability", {})
-        _p_obs["plate_prompt_sha8"] = _plate["sha8"]
-        _p_obs["plate_clip_tokens"] = _plate["clip_tokens"]
-        _p_obs["plate_dropped"] = list(_plate["dropped"])
-        _LOG.warning(
-            "[OTR.render_driver] PLATE PROMPT: %s beat %s composed %d chars / %s "
-            "SD1 tokens (dropped: %s)",
-            _shot_role, shot.get("shot_id"), len(req["plate_prompt"]),
-            _plate["clip_tokens"], ", ".join(_plate["dropped"]) or "none")
-    # THE BEAT'S OWN OBJECTS, ONE REGION EACH (2026-10-27). Same shape as the plate above: a
-    # CAPABILITY branch, never an id compare. An engine declaring `wants_scene_regions` gets the
+    # The engine this beat renders on, for the capability branches below: each
+    # reads a declared flag, never compares an id.
+    _cap_eng = (_vreg.get_engine(_eng_id)
+                if _eng_id and _vreg.is_registered(_eng_id) else None)
+    # THE BEAT'S OWN OBJECTS, ONE REGION EACH (2026-10-27). A CAPABILITY branch,
+    # never an id compare. An engine declaring `wants_scene_regions` gets the
     # episode's own key objects that THIS beat's dialogue refers to on the declared request field
     # `scene_objects` (causal through sampler_inputs). Every other lane's request is untouched.
-    if _plate_eng is not None and getattr(_plate_eng, "wants_scene_regions", False):
+    if _cap_eng is not None and getattr(_cap_eng, "wants_scene_regions", False):
         from .ghost_scene_regions import resolve_scene_objects
         _sr_stored = shot.get("ghost_prompt")
         _sr_mode = str((_sr_stored or {}).get("mode") or "") if isinstance(_sr_stored, dict) else ""
