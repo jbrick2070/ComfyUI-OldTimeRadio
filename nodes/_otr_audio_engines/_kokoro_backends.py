@@ -301,12 +301,19 @@ def ensure_voices_npz(voices_dir: str) -> str:
 def _otr_scratch_dir() -> str:
     """OTR's own scratch tier (``<output>/otr/episodes/_shared/tmp``), which the
     janitor sweeps -- never the ambient system TEMP, which nothing sweeps
-    (tests/test_node_temp_hygiene.py)."""
+    (tests/test_node_temp_hygiene.py).
+
+    Created here: ``otr_shared_tmp_dir()`` only names the folder, and jieba
+    writes its dictionary cache into whatever ``tmp_dir`` it is given without
+    creating it, so a fresh install logged "Dump cache file failed" and rebuilt
+    the index on every Mandarin episode."""
     try:
         from .._otr_paths import otr_shared_tmp_dir
     except ImportError:                       # imported straight from nodes/
         from _otr_paths import otr_shared_tmp_dir  # type: ignore
-    return str(otr_shared_tmp_dir())
+    scratch = str(otr_shared_tmp_dir())
+    os.makedirs(scratch, exist_ok=True)
+    return scratch
 
 
 def _fallback_voices_dir() -> str:

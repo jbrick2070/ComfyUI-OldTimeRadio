@@ -492,3 +492,16 @@ def test_credits_layout_carries_font_policy_and_paints_language_header():
            / "otr_credits_roll.py").read_text(encoding="utf-8")
     assert 'lang_header = str(layout.get("language_header") or "").strip()' in src
     assert '"font_policy": _credits_font_policy(meta),' in src
+
+
+def test_kokoro_scratch_dir_exists_before_jieba_writes_into_it(monkeypatch, tmp_path):
+    """jieba writes its dictionary cache into tmp_dir without creating it; a
+    fresh install's _shared/tmp did not exist yet, so every Mandarin episode
+    logged "Dump cache file failed" (Mac log, 2026-11-20)."""
+    import nodes._otr_paths as P
+
+    target = tmp_path / "otr" / "episodes" / "_shared" / "tmp"
+    monkeypatch.setattr(P, "otr_shared_tmp_dir", lambda: target)
+    assert not target.exists()
+    assert KB._otr_scratch_dir() == str(target)
+    assert target.is_dir()
