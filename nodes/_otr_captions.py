@@ -259,6 +259,9 @@ def _is_wide(ch: str) -> bool:
 _CJK_NO_LINE_START = frozenset(
     "、。，．・：；？！‼⁇⁈⁉）〕］｝〉》」』】〙〗〟’”｠»"
     "ゝゞヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎゕゖ々〻‐゠–〜～"
+    # The ellipsis and the dash are East Asian Width "A", so a "……" or "——"
+    # is one Latin-style run; gluing it keeps it off the start of a line.
+    "…‥—"
     ",.!?:;)]}%")
 #: Characters a Chinese or Japanese line may not END with: opening brackets
 #: and quotes, which belong with the words they open.

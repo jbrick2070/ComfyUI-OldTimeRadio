@@ -422,6 +422,7 @@ def test_cjk_wrap_obeys_kinsoku():
         ("お父様、もしあなたの術がこの荒れ狂う海をこうしたのなら、「静めて」ください。", 9),
         ("他说：“我们明天再见。”然后转身离开了，没有回头。", 6),
         ("ちょっと待って！それは困ります。ジョーは人々を待たせない。", 4),
+        ("他说……然后——他走了。", 3),                 # Sonnet QA on bfa7cf7e
     ]:
         lines = CAP.wrap_cjk_chars(text, max_chars=width)
         assert "".join(lines).replace(" ", "") == text.replace(" ", ""), lines
