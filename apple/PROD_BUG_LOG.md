@@ -17731,8 +17731,14 @@ not promote it to the Bug Bible on this evidence alone.
   sends it back through the repair ladder, on every lane. Coverage:
   `tests/test_verbatim_translation.py` (the binding, the residue repair, and
   Spanish/French/Japanese/German quotation passing clean).
-- status: FIXED in code; live proof is a Mac Japanese Shakespeare episode that
-  publishes.
+- status: FIXED, PROVEN ON HARDWARE 2026-11-21 on the M6 (headless ComfyUI
+  0.46.2 from the Comfy Desktop install, `otr_mac16_low`, Shakespeare). Every
+  verbatim translation passed with every batch on its first attempt, four
+  episodes back to back in one session, all published to `otr/obs/`:
+  `prayer_night_ja_20261121_010332` (The Tempest, 12 entries in 3 calls),
+  `masked_rosie_zh_20261121_011922` (As You Like It, 12 in 3),
+  `signal_lost_hi_20261121_013536` (12 in 3) on 2.3.62, and
+  `broken_rhyme_ja_20261121_015321` (12 in 3) on 2.3.63.
 
 ## PBUG-20261121-02 -- Japanese and Chinese captions could open a line with "。" or end one on "「"
 - evidence: `prayer_night_ja_20261121_010332` (Mac M6, 2.3.62,
@@ -17752,5 +17758,8 @@ not promote it to the Bug Bible on this evidence alone.
   Coverage: `tests/test_episode_language_voice.py`
   (`test_cjk_wrap_obeys_kinsoku`, and the pin rewritten as
   `test_cjk_wrap_pure_cjk_slices_by_width_where_every_break_is_legal`).
-- status: FIXED in code; live proof is the next Japanese or Mandarin episode's
-  captions.
+- status: FIXED, PROVEN ON HARDWARE 2026-11-21: 2.3.63 on the M6,
+  `broken_rhyme_ja_20261121_015321` (As You Like It in Japanese, 19 caption
+  events). Caption strips sampled every 5 s across two minutes show no line
+  opening with a closing mark; small kana stay with their syllable and lines
+  break before "か。" rather than inside it.
