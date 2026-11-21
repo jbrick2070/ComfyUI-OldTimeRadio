@@ -83,6 +83,15 @@ Japanese -- now bound and fixed) against one bound death (the treatment,
 PBUG-20260929-05 -- fixed). The unbound episode-language passes have produced
 Hindi, Mandarin and Japanese episodes with no recorded death.
 
+**A near miss, the night this page was written.** The overnight Mac run
+(2.3.62, `otr_mac16_low`, Shakespeare in Hindi, prompt `a0148d26`):
+`OTR_Outline.macro` -- unbound -- came back malformed on attempt 1 ("Expecting
+property name enclosed in double quotes") and attempt 2 ("Unterminated
+string"), and passed only on attempt 3 of 3, the typed repair at temperature
+0.1. One more bad reply and the episode dies. Under D this pass is the first
+candidate for step 2; check its schema's `max_length` fields before binding it,
+since binding would turn an over-long field into silent truncation.
+
 ## The options
 
 **A. Bind every JSON pass inside `structured_call`.** Costs 2-4x in the LLM
