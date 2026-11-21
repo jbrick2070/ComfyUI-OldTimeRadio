@@ -256,11 +256,13 @@ def build_source_wrapper(
 # production; flat import when loaded standalone / under test.
 try:
     from ._otr_structured_call import (
+        forward_schema_binding,
         structured_call,
         StructuredCallFailedError,
     )
 except ImportError:  # pragma: no cover - standalone / test load
     from _otr_structured_call import (  # type: ignore
+        forward_schema_binding,
         structured_call,
         StructuredCallFailedError,
     )
@@ -431,12 +433,17 @@ def build_news_briefs(
     # ladder attempt; the writer logs this number.
     slot_calls = 0
 
-    def _counting_slot_fn(msgs, *, temperature, max_new_tokens):
-        nonlocal slot_calls
-        slot_calls += 1
-        return generate_fn(
-            msgs, temperature=temperature, max_new_tokens=max_new_tokens,
-        )
+    def _counted(slot_fn):
+        def _counting_slot_fn(msgs, *, temperature, max_new_tokens):
+            nonlocal slot_calls
+            slot_calls += 1
+            return slot_fn(
+                msgs, temperature=temperature, max_new_tokens=max_new_tokens,
+            )
+        # A pass that binds a schema through this wrapper still counts.
+        return forward_schema_binding(_counting_slot_fn, slot_fn, _counted)
+
+    _counting_slot_fn = _counted(generate_fn)
 
     # LLM slot: technical -- structured JSON briefs,
     # routed through the shared ladder. The structural retry runs at

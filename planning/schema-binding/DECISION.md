@@ -5,7 +5,9 @@ the Mac died because the verbatim-translation reply was malformed JSON six times
 in a row. Binding that pass's schema at token selection fixed it (2.3.62, live
 on the Mac the same night: 12 entries translated in 3 calls, every batch first
 try). This page asks whether the rest of the local JSON passes should get the
-same treatment. **Recommendation: D, evidence-led.** Nothing below is built yet.
+same treatment. **Decision: D, evidence-led -- approved by the operator
+2026-11-21. Step 1 (re-wrapping forwarders) is built; no pass beyond the
+four that bound before is bound.**
 
 The first draft recommended C. An Opus contrarian refuted it with
 measurements, and each claim was re-checked before this revision; the

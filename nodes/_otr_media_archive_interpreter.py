@@ -16,9 +16,11 @@ from typing import Callable
 from pydantic import BaseModel, Field
 
 try:
-    from ._otr_structured_call import StructuredCallFailedError, structured_call
+    from ._otr_structured_call import (
+        StructuredCallFailedError, forward_schema_binding, structured_call)
 except ImportError:  # pragma: no cover - flat test imports
-    from _otr_structured_call import StructuredCallFailedError, structured_call  # type: ignore
+    from _otr_structured_call import (  # type: ignore
+        StructuredCallFailedError, forward_schema_binding, structured_call)
 
 try:
     from . import _otr_source_payload as _osp
@@ -233,13 +235,18 @@ def build_media_archive_briefs(
 
     slot_calls = 0
 
-    def _counting_slot_fn(msgs, *, temperature, max_new_tokens):
-        nonlocal slot_calls
-        slot_calls += 1
-        # LLM slot: technical -- delegated source-brief generation call.
-        return technical_fn(
-            msgs, temperature=temperature, max_new_tokens=max_new_tokens,
-        )
+    def _counted(slot_fn):
+        def _counting_slot_fn(msgs, *, temperature, max_new_tokens):
+            nonlocal slot_calls
+            slot_calls += 1
+            # LLM slot: technical -- delegated source-brief generation call.
+            return slot_fn(
+                msgs, temperature=temperature, max_new_tokens=max_new_tokens,
+            )
+        # A pass that binds a schema through this wrapper still counts.
+        return forward_schema_binding(_counting_slot_fn, slot_fn, _counted)
+
+    _counting_slot_fn = _counted(technical_fn)
 
     def _content_validator(brief: MediaArchiveBriefs) -> str | None:
         # The field is defaulted on the model solely so frozen/older brief

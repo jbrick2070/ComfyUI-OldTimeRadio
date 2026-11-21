@@ -34,9 +34,11 @@ except ImportError:  # pragma: no cover -- flat import harnesses
     import _otr_roster_gender as _roster_gender  # type: ignore
 
 try:
-    from ._otr_structured_call import StructuredCallFailedError, structured_call
+    from ._otr_structured_call import (
+        StructuredCallFailedError, forward_schema_binding, structured_call)
 except ImportError:  # pragma: no cover -- flat import harnesses
-    from _otr_structured_call import StructuredCallFailedError, structured_call  # type: ignore
+    from _otr_structured_call import (  # type: ignore
+        StructuredCallFailedError, forward_schema_binding, structured_call)
 
 MANIFEST_SCHEMA_VERSION = "v1"
 PROMPT_VERSION = "shakespeare_interpreter_v2"
@@ -671,12 +673,17 @@ def build_shakespeare_briefs(
 
     slot_calls = 0
 
-    def _counting_slot_fn(msgs, *, temperature, max_new_tokens):
-        nonlocal slot_calls
-        slot_calls += 1
-        # LLM slot: technical -- structured source-brief extraction for the
-        # Shakespeare lane, routed through the writer's technical slot.
-        return technical_fn(msgs, temperature=temperature, max_new_tokens=max_new_tokens)
+    def _counted(slot_fn):
+        def _counting_slot_fn(msgs, *, temperature, max_new_tokens):
+            nonlocal slot_calls
+            slot_calls += 1
+            # LLM slot: technical -- structured source-brief extraction for the
+            # Shakespeare lane, routed through the writer's technical slot.
+            return slot_fn(msgs, temperature=temperature, max_new_tokens=max_new_tokens)
+        # A pass that binds a schema through this wrapper still counts.
+        return forward_schema_binding(_counting_slot_fn, slot_fn, _counted)
+
+    _counting_slot_fn = _counted(technical_fn)
 
     def _content_validator(brief: ShakespeareBriefs) -> str | None:
         # No brief-level safety rejection here (operator directive 2026-08-05):

@@ -54,6 +54,7 @@ except ImportError:  # pragma: no cover -- flat test imports
 try:
     from . import _otr_episode_budget as _OTRB
     from ._otr_structured_call import (
+        forward_schema_binding,
         StructuredCallFailedError,
         structured_call,
     )
@@ -87,6 +88,7 @@ try:
 except ImportError:  # pragma: no cover -- flat test/standalone load
     import _otr_episode_budget as _OTRB  # type: ignore
     from _otr_structured_call import (  # type: ignore
+        forward_schema_binding,
         StructuredCallFailedError,
         structured_call,
     )
@@ -554,17 +556,22 @@ def _creative_context_cap_fn(slot_scheduler: Any):
     return lambda: reader("creative")
 
 
-def _counting(slot_fn: Callable[..., str]):
+def _counting(slot_fn: Callable[..., str], box: dict | None = None):
     """Runner-local counting wrapper (media-interpreter precedent, r2/S2):
     structured_call does not return attempt counts on success, so the
-    receipt reads the wrapper's counter."""
-    box = {"calls": 0}
+    receipt reads the wrapper's counter.
+
+    The slot's schema-binding hook is forwarded by re-wrapping, so a pass that
+    binds through this wrapper is constrained AND still counted in the same
+    ``box`` (``forward_schema_binding``)."""
+    box = {"calls": 0} if box is None else box
 
     def _fn(msgs, *, temperature, max_new_tokens):
         box["calls"] += 1
         return slot_fn(
             msgs, temperature=temperature, max_new_tokens=max_new_tokens)
 
+    forward_schema_binding(_fn, slot_fn, lambda bound: _counting(bound, box)[0])
     return _fn, box
 
 

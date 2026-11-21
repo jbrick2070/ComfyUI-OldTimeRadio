@@ -623,6 +623,42 @@ def inspect_structured_fit(
     return inspect_fit(_prompt_to_messages(contract), max_new_tokens=max_new_tokens)
 
 
+def forward_schema_binding(
+    wrapper: Callable[..., str],
+    inner: Callable[..., str],
+    rewrap: Callable[[Callable[..., str]], Callable[..., str]],
+) -> Callable[..., str]:
+    """Give a slot WRAPPER the schema-binding hook of the slot it wraps.
+
+    A local writer slot exposes ``_otr_bind_schema``: a pass that calls
+    ``bind(Schema)`` gets a closure that makes invalid JSON un-sampleable. A
+    plain wrapper (an attempt counter, say) drops every attribute of the slot
+    it wraps, so a pass that bound behind one would silently get the unbound
+    slot. Copying the hook would be wrong too: ``bind`` returns the raw
+    scheduler closure, and calls through it would skip the wrapper -- the
+    counter would stop counting. So the forwarded hook binds the INNER slot and
+    hands the result to ``rewrap``, which wraps it again the same way.
+
+    ``_otr_bound_schema_model`` is carried over as well, so "this slot is
+    already bound" stays detectable through the wrapper. Nothing else is
+    forwarded: the OpenRouter json_object markers these wrappers also drop are
+    a separate decision (planning/schema-binding/DECISION.md, option D).
+
+    A slot with no hook (a remote lane, a test double) leaves the wrapper as
+    it is. Returns ``wrapper``.
+    """
+    bind = getattr(inner, "_otr_bind_schema", None)
+    if callable(bind):
+        def _bind_through_wrapper(schema):
+            return rewrap(bind(schema))
+
+        wrapper._otr_bind_schema = _bind_through_wrapper  # type: ignore[attr-defined]
+    bound = getattr(inner, "_otr_bound_schema_model", None)
+    if bound is not None:
+        wrapper._otr_bound_schema_model = bound  # type: ignore[attr-defined]
+    return wrapper
+
+
 def invoke_structured_slot(
     slot_fn: Callable[..., str],
     messages: Any,
