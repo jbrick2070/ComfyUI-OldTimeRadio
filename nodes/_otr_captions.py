@@ -450,6 +450,35 @@ TITLE_STYLE_NAME = "TITLE"
 # to move, not `core vs outline`, which was already passing.
 TITLE_OUTLINE_W = 6
 TITLE_SHADOW = 2
+#: macOS's own Chinese faces, in the order ``_os_script_font_paths`` walks
+#: them, with the family name libass must be given for each.
+_MAC_CJK_FAMILIES = (
+    ("/System/Library/Fonts/PingFang.ttc", "PingFang SC"),
+    ("/System/Library/Fonts/STHeiti Light.ttc", "Heiti SC"),
+    ("/System/Library/Fonts/Hiragino Sans GB.ttc", "Hiragino Sans GB"),
+)
+
+
+def _cjk_family_for_this_os() -> str:
+    """The Chinese family the caption and title styles name on this machine.
+
+    Windows: Microsoft YaHei, as always. macOS: the family of the first Mac
+    face ``_os_script_font_paths`` finds, so the title is measured and burned
+    in the same face. Naming Microsoft YaHei on a Mac only worked while
+    fontconfig substituted a Mac face for it; the self-contained ffmpeg
+    imageio-ffmpeg bundles, which a Mac now burns captions with, does no such
+    substitution and drew every Chinese glyph as a box (M6, 2026-11-20; the
+    same build draws "Heiti SC", "Hiragino Sans GB" and the pack's "Noto Sans
+    SC"). With no Mac face the shipped face takes over as it does on Linux
+    (``_shipped_family_if_no_os_face``).
+    """
+    if sys.platform == "darwin":
+        for path, family in _MAC_CJK_FAMILIES:
+            if os.path.isfile(path):
+                return family
+    return "Microsoft YaHei"
+
+
 def _shipped_family_if_no_os_face(policy: str) -> "str | None":
     """The family of the face the pack ships for ``policy`` when this machine
     has no face of its own for the script (a bare Linux image), else None --
@@ -682,8 +711,7 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
                 st["font"] = "Nirmala UI"
                 title_font = "Nirmala UI"
             elif font_policy == "cjk":
-                st["font"] = "Microsoft YaHei"
-                title_font = "Microsoft YaHei"
+                st["font"] = title_font = _cjk_family_for_this_os()
             shipped = _shipped_family_if_no_os_face(font_policy)
             if shipped:
                 st["font"] = title_font = shipped

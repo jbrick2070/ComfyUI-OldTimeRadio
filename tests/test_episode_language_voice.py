@@ -529,3 +529,38 @@ def test_mandarin_phonemizer_points_jieba_at_the_created_cache_dir():
     src =(Path(__file__).resolve().parents[1] / "nodes" / "_otr_audio_engines"
            / "_kokoro_backends.py").read_text(encoding="utf-8")
     assert "jieba.dt.tmp_dir = _jieba_cache_dir()" in src
+
+
+
+def test_a_mac_names_a_chinese_face_it_has(monkeypatch):
+    """Naming Microsoft YaHei on a Mac drew every Chinese caption and title as
+    boxes once the burn ran the bundled ffmpeg (M6, 2026-11-20)."""
+    import nodes._otr_captions as C
+
+    monkeypatch.setattr(C.sys, "platform", "darwin")
+    have = {"/System/Library/Fonts/STHeiti Light.ttc", "/System/Library/Fonts/Hiragino Sans GB.ttc"}
+    monkeypatch.setattr(C.os.path, "isfile", lambda p: p in have)
+    assert C._cjk_family_for_this_os() == "Heiti SC"
+    have.add("/System/Library/Fonts/PingFang.ttc")
+    assert C._cjk_family_for_this_os() == "PingFang SC"
+    have.clear()
+    assert C._cjk_family_for_this_os() == "Microsoft YaHei"
+
+
+def test_windows_and_linux_keep_microsoft_yahei(monkeypatch):
+    import nodes._otr_captions as C
+
+    for platform in ("win32", "linux"):
+        monkeypatch.setattr(C.sys, "platform", platform)
+        assert C._cjk_family_for_this_os() == "Microsoft YaHei"
+
+
+def test_the_mac_family_list_follows_the_measure_walk():
+    """The title is measured with the first face _os_script_font_paths finds;
+    the burn must name that same face."""
+    import nodes._otr_captions as C
+    from nodes.otr_credits_roll import _os_script_font_paths
+
+    mac_walk = [p for p in _os_script_font_paths("C:/Windows/Fonts", "cjk")
+                if p.startswith("/System/")]
+    assert [p for p, _f in C._MAC_CJK_FAMILIES] == mac_walk
