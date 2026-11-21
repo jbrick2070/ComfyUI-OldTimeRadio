@@ -17694,5 +17694,36 @@ not promote it to the Bug Bible on this evidence alone.
 - cost: eager builds each full-attention layer's score matrix in one piece,
   freed after the call (estimated 3-4 GB transient at the longest ~5,600-token
   writer prompt, not yet measured on hardware).
-- status: FIXED in code; live proof is two Mac episodes back to back in one
-  Comfy session.
+- status: FIXED, PROVEN ON HARDWARE 2026-11-21 with 2.3.61 from the registry
+  on the M6. Episode `projector_switch_hi_20261121_000546` published in
+  15:27; live tensors held at 7.83 GiB through every writer call and the
+  writer's retirement left 0.19 GiB of Metal memory (24.5 GiB before the
+  fix). The next prompt in the same Comfy session loaded the writer from
+  0.19 GiB and generated -- it later died in translation, a separate defect
+  (PBUG-20261121-01), not memory.
+
+## PBUG-20261121-01 -- Mac Japanese Shakespeare leg died: the translation reply was malformed JSON six times
+- evidence: Mac mini (M6), 2.3.61 from the registry, `otr_mac16_low`,
+  Qwen3.5-4B, Twelfth Night 1.5 (speeches 113-115) translated to Japanese.
+  The prompt died after 124.9 s: `[verbatim_translation] the passage could not
+  be translated (batch of 2 line(s) starting at entry 2; 2 attempt(s) at each
+  of 3 output budget(s) ...) Unterminated string`. Every one of the six
+  replies closed its last line -- "What ho, Malvolio!", which the model wraps
+  in Japanese quotation brackets -- as `"「おい、マルヴォリオ！」]}`: the
+  closing bracket, then `]}`, with the JSON quote dropped. Each reply ended on
+  its own (`ended_with_eos=True`), so the three growing output budgets were
+  spent on a reply that was never out of room.
+- cause: `translate_entries` handed `structured_call` the unbound creative
+  slot, so the reply was free text validated after the fact. Every other local
+  structured pass binds its schema through the slot's `_otr_bind_schema`
+  (`_otr_story_source`, `_otr_my_story`, `_otr_ledger_clean`), which makes an
+  unclosed string un-sampleable; this one never did.
+- measured on the same Mac and model, OTR's real `translate_entries` on the
+  exact passage: unbound, the leg passed only on its fourth attempt and
+  shipped a mismatched bracket pair (and one attempt ended `")]`); bound, 3 of
+  3 trials passed with every batch on its first attempt, ~37 s each.
+- fix: `translate_entries` binds `TranslatedTexts` when the slot can
+  (`_otr_bind_schema`); remote slots keep their own routing. Coverage:
+  `tests/test_verbatim_translation.py::test_a_local_slot_translates_with_the_schema_bound_at_token_selection`.
+- status: FIXED in code; live proof is a Mac Japanese Shakespeare episode that
+  publishes.

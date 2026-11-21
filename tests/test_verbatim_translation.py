@@ -330,3 +330,29 @@ def test_the_first_budget_rung_is_the_unchanged_one():
     assert VT._OUTPUT_BUDGET_GROWTH[0] == 1
     assert list(VT._OUTPUT_BUDGET_GROWTH) == sorted(VT._OUTPUT_BUDGET_GROWTH)
     assert len(set(VT._OUTPUT_BUDGET_GROWTH)) == len(VT._OUTPUT_BUDGET_GROWTH)
+
+
+def test_a_local_slot_translates_with_the_schema_bound_at_token_selection():
+    """PBUG-20261121-01: Qwen 3.5 4B on a Mac Japanese leg closed a line that
+    opened with a corner bracket by writing the closing bracket and ]} and
+    dropping the JSON quote -- the same malformed reply on all six attempts.
+    A slot that can bind a schema (the local transformers lane) must translate
+    through the bound closure, so an unclosed string cannot be sampled."""
+    entries = _entries("When shall we three meet again?",
+                       "When the hurlyburly's done.")
+    bound_seen = []
+    bound = _Slot([{"texts": ["¿Cuándo volveremos a vernos?",
+                              "Cuando acabe el tumulto."]}])
+    unbound = _Slot([])
+
+    def bind(schema):
+        bound_seen.append(schema)
+        return bound
+
+    unbound._otr_bind_schema = bind
+    out, _receipt = VT.translate_entries(
+        entries, language_instruction=RULE, creative_fn=unbound)
+    assert bound_seen == [VT.TranslatedTexts]
+    assert len(bound.calls) == 1 and unbound.calls == []
+    assert [e.text for e in out] == ["¿Cuándo volveremos a vernos?",
+                                     "Cuando acabe el tumulto."]

@@ -236,6 +236,15 @@ def translate_entries(
         return (), {"receipt_version": RECEIPT_VERSION, "entries": 0, "batches": 0,
                     "attempts": 0}
     system = _EPLANG.lead_system(_SYSTEM, language_instruction)
+    # BIND THE SCHEMA AT TOKEN SELECTION where the slot can (the local
+    # transformers lane advertises `_otr_bind_schema`, as every other local
+    # structured pass uses it). PBUG-20261121-01: on a Mac Japanese leg Qwen
+    # 3.5 4B closed a line that opened with 「 by writing 」]} and dropping the
+    # closing quote, identically on all six attempts -- no amount of retrying
+    # or output room fixes a reply that is malformed by habit. Bound, an
+    # unclosed string is un-sampleable. Remote slots keep their own routing.
+    bind = getattr(creative_fn, "_otr_bind_schema", None)
+    translate_fn = bind(TranslatedTexts) if callable(bind) else creative_fn
     batches = batch_entries(entries, max_source_words=max_source_words)
     translated: list[Any] = list(entries)
     attempts_total = 0
@@ -299,7 +308,7 @@ def translate_entries(
                          "content": _user_prompt(entries, indices)},
                     ],
                     schema=TranslatedTexts,
-                    slot_fn=creative_fn,
+                    slot_fn=translate_fn,
                     base_temperature=0.2,
                     structural_retry_temperature=0.1,
                     repair_prompt_factory=make_dispatching_repair_factory(),
