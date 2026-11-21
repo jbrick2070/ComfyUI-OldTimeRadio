@@ -93,7 +93,6 @@ Anything not listed there is a manual install -- see its row below.
 | `indextts2` | **a SEPARATE project + its own venv** | manual, see below | - |
 | `kokoro` | 1 weight file(s) | auto (boot prefetch: voices + ONNX model; torch model via HF cache) | 22 profile(s) |
 | `musicgen` | `facebook/musicgen-small` | auto (HF cache) | - |
-| `stable_audio` | `stabilityai/stable-audio-open-1.0` | auto (HF cache) **(HF_TOKEN)** | - |
 | `stable_audio_3` | 3 weight file(s) | `otr_fetch_lane_weights.py stable_audio_3` | 22 profile(s) |
 
 ## Image engines (every shipped workflow picks one)
@@ -212,10 +211,6 @@ So where a lane appears in the one-command list above, **the fetcher is authorit
 **`musicgen`** -- `nodes/_otr_audio_engines/eng_musicgen.py`
 
 - Hugging Face: `facebook/musicgen-small`
-
-**`stable_audio`** -- `nodes/_otr_audio_engines/eng_stable_audio.py`
-
-- Hugging Face: `stabilityai/stable-audio-open-1.0`
 
 **`stable_audio_3`** -- `nodes/_otr_audio_engines/eng_stable_audio_3.py`
 
