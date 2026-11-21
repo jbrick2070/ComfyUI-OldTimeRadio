@@ -43,12 +43,30 @@ def _fmt_gib(num_bytes: float) -> str:
         return _UNKNOWN
 
 
+def _mac_chip_name() -> str:
+    """The chip name macOS reports (e.g. "Apple M6"), or "" off a Mac."""
+    if sys.platform != "darwin":
+        return ""
+    try:
+        out = otr_proc.run(
+            ["sysctl", "-n", "machdep.cpu.brand_string"],
+            capture_output=True, text=True, timeout=5, check=False,
+        )
+        return (out.stdout or "").strip()
+    except Exception:  # noqa: BLE001 -- probe only
+        return ""
+
+
 def _cpu_model() -> str:
-    """Human CPU model string. platform.processor() is often blank on Linux;
-    fall back to /proc/cpuinfo, then the registry-free platform name."""
+    """Human CPU model string. platform.processor() is often blank on Linux
+    and only says "arm" on Apple Silicon; ask macOS for the chip name, fall
+    back to /proc/cpuinfo, then the registry-free platform name."""
     name = (platform.processor() or "").strip()
-    if name and name.lower() not in ("", "x86_64", "amd64", "i386"):
+    if name and name.lower() not in ("", "x86_64", "amd64", "i386", "arm", "arm64", "aarch64"):
         return name
+    chip = _mac_chip_name()
+    if chip:
+        return chip
     # Linux: /proc/cpuinfo "model name"
     try:
         with open("/proc/cpuinfo", "r", encoding="utf-8", errors="ignore") as fh:
@@ -111,6 +129,17 @@ def _gpu_via_torch() -> tuple[str, str, str]:
             props = torch.cuda.get_device_properties(idx)
             vram = _fmt_gib(getattr(props, "total_memory", 0))
             return (name or _UNKNOWN, vram, str(cuda_ver))
+        mps = getattr(torch.backends, "mps", None)
+        if mps is not None and mps.is_available():
+            # Apple Silicon: the GPU shares the chip's unified memory, and
+            # Metal's working-set ceiling is the part of it the GPU may use.
+            # Without this a Mac episode's SYSTEM block read "GPU (unknown)".
+            chip = _mac_chip_name() or "Apple Silicon"
+            try:
+                vram = _fmt_gib(torch.mps.recommended_max_memory())
+            except Exception:  # noqa: BLE001 -- older torch without the call
+                vram = _UNKNOWN
+            return (chip + " GPU (Metal)", vram, "n/a (Metal)")
         return (_UNKNOWN, _UNKNOWN, str(cuda_ver))
     except Exception:  # noqa: BLE001 -- torch optional / no GPU
         return (_UNKNOWN, _UNKNOWN, _UNKNOWN)

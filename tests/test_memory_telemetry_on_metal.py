@@ -77,3 +77,43 @@ def test_load_placement_on_cuda_is_unchanged(monkeypatch):
     )
     assert rec["peak_accelerator_gb"] == pytest.approx(3.0)
     assert rec["physical_vram_gb"] == pytest.approx(15.99)
+
+
+def test_lfc_watchdog_reads_metal_allocation(monkeypatch):
+    from nodes import _otr_lfc_watchdog as wd
+
+    monkeypatch.setitem(sys.modules, "torch", _fake_torch(cuda=False))
+    assert wd._torch_vram_allocated_gb() == pytest.approx(4.0)
+    monkeypatch.setitem(sys.modules, "torch", _fake_torch(cuda=True))
+    assert wd._torch_vram_allocated_gb() == pytest.approx(1.0)
+
+
+def test_system_specs_name_the_mac_chip_and_metal_gpu(monkeypatch):
+    """A Mac episode's SYSTEM block read "CPU arm", "GPU (unknown)",
+    "CUDA (unknown)"."""
+    import platform
+
+    from nodes import _otr_sys_specs as specs
+
+    fake = _fake_torch(cuda=False)
+    fake.version = types.SimpleNamespace(cuda=None)
+    monkeypatch.setitem(sys.modules, "torch", fake)
+    monkeypatch.setattr(specs.sys, "platform", "darwin")
+    monkeypatch.setattr(platform, "processor", lambda: "arm")
+    monkeypatch.setattr(
+        specs.otr_proc, "run",
+        lambda *a, **k: types.SimpleNamespace(stdout="Apple M6\n", returncode=0),
+    )
+    assert specs._cpu_model() == "Apple M6"
+    assert specs._gpu_via_torch() == ("Apple M6 GPU (Metal)", "18.0 GiB", "n/a (Metal)")
+
+
+def test_system_specs_off_a_mac_never_ask_sysctl(monkeypatch):
+    from nodes import _otr_sys_specs as specs
+
+    def boom(*_a, **_k):
+        raise AssertionError("sysctl asked off a Mac")
+
+    monkeypatch.setattr(specs.sys, "platform", "win32")
+    monkeypatch.setattr(specs.otr_proc, "run", boom)
+    assert specs._mac_chip_name() == ""
