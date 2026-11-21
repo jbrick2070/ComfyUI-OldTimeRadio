@@ -57,8 +57,16 @@ log = logging.getLogger("OTR.nodes._otr_vram_levers")
 def _vram_snapshot() -> dict:
     """Best-effort ``(allocated, reserved, free, total)`` in MB.
 
-    Every field is ``float('nan')`` when torch / CUDA is unavailable
+    Every field is ``float('nan')`` when no accelerator can be probed
     (headless test runs). Pure telemetry -- never raises.
+
+    CUDA is read first and is unchanged. On Apple Silicon the same four
+    fields come from Metal, with the definition the video frame budget uses
+    (``motion_common.free_vram_mb``): allocated = tensors this process holds,
+    reserved = what Metal's driver holds for it, total = Metal's working-set
+    ceiling (``recommended_max_memory``), free = ceiling minus reserved, a
+    per-process figure. Before this every Mac render logged ``nan`` here
+    twice per beat.
     """
     snap = {
         "alloc_mb": float("nan"),
@@ -74,7 +82,19 @@ def _vram_snapshot() -> dict:
             free_b, total_b = torch.cuda.mem_get_info()
             snap["free_mb"] = free_b / (1024 ** 2)
             snap["total_mb"] = total_b / (1024 ** 2)
+            return snap
     except Exception:  # noqa: BLE001
+        return snap
+    try:
+        if torch.backends.mps.is_available():
+            ceiling_b = float(torch.mps.recommended_max_memory())
+            held_b = float(torch.mps.driver_allocated_memory())
+            snap["alloc_mb"] = float(torch.mps.current_allocated_memory()) / (1024 ** 2)
+            snap["reserved_mb"] = held_b / (1024 ** 2)
+            if ceiling_b > 0:
+                snap["total_mb"] = ceiling_b / (1024 ** 2)
+                snap["free_mb"] = max(0.0, ceiling_b - held_b) / (1024 ** 2)
+    except Exception:  # noqa: BLE001 -- older torch without torch.mps: stay nan
         pass
     return snap
 

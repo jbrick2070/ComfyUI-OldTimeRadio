@@ -672,10 +672,19 @@ def _record_load_placement(
     """Log truthful post-load placement. Called from the load_llm return dict."""
     placement = _summarize_hf_device_map(model)
     peak_gb = 0.0
+    physical_gb = float(total_vram or 0.0)
     try:
         import torch
         if torch.cuda.is_available():
             peak_gb = torch.cuda.max_memory_allocated() / (1024 ** 3)
+        elif torch.backends.mps.is_available():
+            # Metal keeps no peak counter. What its driver holds right after
+            # the load and warmup pass is the closest honest figure, and the
+            # working-set ceiling is the accelerator size a Mac actually has.
+            # Telemetry only: ``total_vram`` stays 0 on a Mac, because the
+            # loader's CUDA memory planning keys off it.
+            peak_gb = float(torch.mps.driver_allocated_memory()) / (1024 ** 3)
+            physical_gb = float(torch.mps.recommended_max_memory()) / (1024 ** 3)
     except Exception:  # noqa: BLE001 -- telemetry must not fail the load
         peak_gb = 0.0
     cpu_used = bool(placement.get("cpu_modules") or cpu_overflow)
@@ -685,14 +694,14 @@ def _record_load_placement(
         "actual_quantized=%s peak_accelerator_gb=%.2f physical_vram_gb=%.2f "
         "cpu_overflow=%s disk_offload=%s",
         placement, quant_policy, actual_quant, peak_gb,
-        float(total_vram or 0.0), cpu_used, disk_used,
+        physical_gb, cpu_used, disk_used,
     )
     return {
         "placement": placement,
         "cpu_offload": cpu_used,
         "disk_offload": disk_used,
         "peak_accelerator_gb": peak_gb,
-        "physical_vram_gb": float(total_vram or 0.0),
+        "physical_vram_gb": physical_gb,
     }
 
 
