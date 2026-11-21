@@ -469,13 +469,28 @@ def _cjk_family_for_this_os() -> str:
     imageio-ffmpeg bundles, which a Mac now burns captions with, does no such
     substitution and drew every Chinese glyph as a box (M6, 2026-11-20; the
     same build draws "Heiti SC", "Hiragino Sans GB" and the pack's "Noto Sans
-    SC"). With no Mac face the shipped face takes over as it does on Linux
+    SC"). With no Mac face the shipped face takes over
     (``_shipped_family_if_no_os_face``).
+
+    Linux: the pack's own Noto Sans SC, always, handed to libass by file
+    (``otr_caption_burn._shipped_fonts_option``). Linux boxes burn with static
+    ffmpeg builds (the pod provisioner installs johnvansickle's; the bundled
+    imageio-ffmpeg is another), whose fontconfig does not substitute a CJK
+    face for a family the box lacks, so naming Microsoft YaHei over an
+    installed Noto CJK is the Mac failure again. A face passed by file needs
+    no fontconfig at all; on the M6 the same mechanism drew the text.
     """
     if sys.platform == "darwin":
         for path, family in _MAC_CJK_FAMILIES:
             if os.path.isfile(path):
                 return family
+    elif sys.platform.startswith("linux"):
+        try:
+            from . import _otr_script_fonts as _SF
+        except ImportError:  # pragma: no cover -- flat load
+            import _otr_script_fonts as _SF  # type: ignore
+        if _SF.bundled_path("cjk"):
+            return _SF.bundled_family("cjk")
     return "Microsoft YaHei"
 
 

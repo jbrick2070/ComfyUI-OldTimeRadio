@@ -547,12 +547,26 @@ def test_a_mac_names_a_chinese_face_it_has(monkeypatch):
     assert C._cjk_family_for_this_os() == "Microsoft YaHei"
 
 
-def test_windows_and_linux_keep_microsoft_yahei(monkeypatch):
+def test_windows_keeps_microsoft_yahei(monkeypatch):
     import nodes._otr_captions as C
 
-    for platform in ("win32", "linux"):
-        monkeypatch.setattr(C.sys, "platform", platform)
-        assert C._cjk_family_for_this_os() == "Microsoft YaHei"
+    monkeypatch.setattr(C.sys, "platform", "win32")
+    assert C._cjk_family_for_this_os() == "Microsoft YaHei"
+
+
+def test_linux_names_the_shipped_face_so_the_burn_hands_it_over_by_file(monkeypatch, tmp_path):
+    """Linux burns with static ffmpeg builds that do not substitute a CJK face
+    for Microsoft YaHei; the shipped Noto Sans SC goes by file."""
+    import nodes._otr_captions as C
+    import nodes._otr_script_fonts as SF
+    import nodes.otr_caption_burn as BURN
+
+    monkeypatch.setattr(C.sys, "platform", "linux")
+    family = C._cjk_family_for_this_os()
+    assert family == SF.bundled_family("cjk") == "Noto Sans SC"
+    ass = tmp_path / "episode_captions.ass"
+    ass.write_text("Style: Default,%s,40,&H00FFFFFF\n" % family, encoding="utf-8")
+    assert BURN._shipped_fonts_option(str(ass)) == ":fontsdir=otr_fonts"
 
 
 def test_the_mac_family_list_follows_the_measure_walk():
