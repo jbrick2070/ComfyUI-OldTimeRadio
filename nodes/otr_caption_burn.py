@@ -111,12 +111,18 @@ def _ffmpeg_bin(ffmpeg: str) -> str:
     ONE OWNER ANSWERS (``_otr_shared.ffmpeg.resolve_ffmpeg``, 2026-09-04),
     and the widget's own default literal ``"ffmpeg"`` is not a choice: with
     ffmpeg on PATH that literal would win here and the pin would never be read.
+
+    THE CAPTION-CAPABLE PICK (2026-11-20). In this module the binary only ever
+    runs the libass ``ass`` burn, so it asks ``resolve_caption_ffmpeg``: the
+    same answer as ``resolve_ffmpeg`` whenever that build can burn captions,
+    and the build imageio-ffmpeg bundles when it cannot. Homebrew's ffmpeg has
+    no libass, and a Mac finds it first, so Mac episodes published uncaptioned.
     """
     try:
-        from ._otr_shared.ffmpeg import resolve_ffmpeg
+        from ._otr_shared.ffmpeg import resolve_caption_ffmpeg
     except ImportError:  # pragma: no cover -- flat (sys.path) test import
-        from _otr_shared.ffmpeg import resolve_ffmpeg  # type: ignore
-    return resolve_ffmpeg(ffmpeg) or ""
+        from _otr_shared.ffmpeg import resolve_caption_ffmpeg  # type: ignore
+    return resolve_caption_ffmpeg(ffmpeg) or ""
 
 
 #: Characters that are SYNTAX inside an ffmpeg filtergraph, so a filename

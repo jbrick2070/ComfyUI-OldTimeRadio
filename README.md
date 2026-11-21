@@ -767,13 +767,17 @@ the LTX 2.5 lanes included.
 still say `z_image_turbo` while the video lane you picked consumes a still. Set
 the image dropdowns to `sd15` first.
 
-**The episode plays but has no captions.** Your ffmpeg can write the audio
-but cannot burn text: captions need the `ass` filter and libx264, and the
-lightweight `imageio-ffmpeg` wheel usually ships neither. The console says
-`CAPABILITY GAP on this host` and names it. The episode is finished and correct
-otherwise -- it is not re-rendered, because a host's missing filter is not worth
-throwing an episode away. Install a full ffmpeg (`winget install Gyan.FFmpeg`,
-`brew install ffmpeg`, or a static Linux build) and the next run has them.
+**The episode plays but has no captions.** No ffmpeg on this machine can burn
+text: captions need the `ass` filter (libass) and libx264. When your usual
+ffmpeg lacks them, the caption step switches to the one the `imageio-ffmpeg`
+wheel bundles (0.8.1 ships ffmpeg 9.0 with both), so this only happens when
+that one lacks them too. Homebrew's `ffmpeg` formula has no libass, so on a
+Mac `brew install ffmpeg` does not fix this; `pip install -U imageio-ffmpeg`
+does. The console says `CAPABILITY GAP on this host` and names what is
+missing. The episode is finished and correct otherwise -- it is not
+re-rendered, because a host's missing filter is not worth throwing an episode
+away. On Windows `winget install Gyan.FFmpeg` carries both, and on Linux a
+static build does.
 
 **It ran, but nothing showed up in ComfyUI.** The last node draws one still
 from the finished episode; nothing else in the workflow draws anything, and the

@@ -57,8 +57,10 @@ class CapabilityProbeTests(unittest.TestCase):
         gap = FF.caption_support_gap("/fake/min")
         self.assertIsNotNone(gap)
         self.assertIn("ass", gap)
-        self.assertIn("brew install ffmpeg", gap,
+        self.assertIn("imageio-ffmpeg", gap,
                       "the message must name the fix, not just the fault")
+        self.assertNotIn("`brew install ffmpeg` ships", gap,
+                         "Homebrew's formula has no libass (2026-11-20)")
 
     def test_both_missing_are_reported_together(self):
         self._fake_probe(False, False)
@@ -106,6 +108,64 @@ class MacOSResolutionTests(unittest.TestCase):
     def test_windows_candidates_are_untouched(self):
         self.assertTrue(any("WinGet" in c for c in FF._WINDOWS_INSTALL_CANDIDATES))
         self.assertTrue(any("ffmpeg.exe" in c for c in FF._WINDOWS_INSTALL_CANDIDATES))
+
+
+
+class CaptionResolutionTests(unittest.TestCase):
+    """resolve_caption_ffmpeg: Homebrew's ffmpeg (9.0.2) has no libass and a Mac
+    finds it first, while imageio-ffmpeg 0.8.1's bundled 9.0 has libass and
+    libx264 (measured on an M6, 2026-11-20). A Mac episode published with no
+    captions."""
+
+    FULL = {"ass": True, "libx264": True}
+
+    def setUp(self):
+        self._saved = (FF.resolve_ffmpeg, FF._imageio_ffmpeg, FF.probe_ffmpeg_capabilities)
+
+    def tearDown(self):
+        FF.resolve_ffmpeg, FF._imageio_ffmpeg, FF.probe_ffmpeg_capabilities = self._saved
+
+    def _host(self, primary, bundled, caps_by_path):
+        FF.resolve_ffmpeg = lambda preferred=None: primary
+        FF._imageio_ffmpeg = lambda: bundled
+        FF.probe_ffmpeg_capabilities = lambda p=None: dict(caps_by_path[p], path=p)
+
+    def test_a_brew_build_without_libass_hands_captions_to_the_bundled_build(self):
+        self._host("/opt/homebrew/bin/ffmpeg", "/venv/imageio/ffmpeg", {
+            "/opt/homebrew/bin/ffmpeg": {"ass": False, "libx264": True},
+            "/venv/imageio/ffmpeg": self.FULL,
+        })
+        self.assertEqual(FF.resolve_caption_ffmpeg(), "/venv/imageio/ffmpeg")
+
+    def test_a_usual_build_that_burns_captions_is_kept(self):
+        self._host("C:/winget/ffmpeg.exe", "/venv/imageio/ffmpeg", {
+            "C:/winget/ffmpeg.exe": self.FULL,
+            "/venv/imageio/ffmpeg": self.FULL,
+        })
+        self.assertEqual(FF.resolve_caption_ffmpeg(), "C:/winget/ffmpeg.exe")
+
+    def test_an_unrunnable_probe_keeps_the_usual_build(self):
+        self._host("/usr/bin/ffmpeg", "/venv/imageio/ffmpeg", {
+            "/usr/bin/ffmpeg": {"ass": None, "libx264": None},
+            "/venv/imageio/ffmpeg": self.FULL,
+        })
+        self.assertEqual(FF.resolve_caption_ffmpeg(), "/usr/bin/ffmpeg")
+
+    def test_a_bundled_build_that_also_lacks_libass_is_not_used(self):
+        self._host("/opt/homebrew/bin/ffmpeg", "/venv/imageio/ffmpeg", {
+            "/opt/homebrew/bin/ffmpeg": {"ass": False, "libx264": True},
+            "/venv/imageio/ffmpeg": {"ass": False, "libx264": True},
+        })
+        self.assertEqual(FF.resolve_caption_ffmpeg(), "/opt/homebrew/bin/ffmpeg")
+
+    def test_no_ffmpeg_at_all_is_none(self):
+        self._host(None, None, {})
+        self.assertIsNone(FF.resolve_caption_ffmpeg())
+
+    def test_the_caption_burn_asks_the_caption_resolver(self):
+        src = (ROOT / "nodes" / "otr_caption_burn.py").read_text(encoding="utf-8")
+        self.assertIn("return resolve_caption_ffmpeg(ffmpeg)", src)
+        self.assertIn("fb = _ffmpeg_bin(ffmpeg)", src)
 
 
 if __name__ == "__main__":

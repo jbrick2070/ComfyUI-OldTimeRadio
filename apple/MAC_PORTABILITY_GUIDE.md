@@ -976,7 +976,9 @@ pkg-config` first.
 Apple Silicon and Intel) and PyAV (`av`), which the pack probes media with when
 no ffprobe binary resolves -- the visualizer probes back every clip it encodes,
 and that probe reads the same document from PyAV. `brew install ffmpeg` still
-gives you both binaries if you prefer them. (`ffmpeg-downloader`, declared from
+gives you both binaries if you prefer them, but Homebrew's formula (9.0.2,
+measured 2026-11-20) is built without libass, so it cannot burn captions; the
+caption step then uses the imageio-ffmpeg binary, which has libass and libx264. (`ffmpeg-downloader`, declared from
 2026-09-07 to 2026-10-30, shipped a fetcher and no binaries; the `ffdl install`
 step it asked for is gone.) This Mac ships ffmpeg 9.0, which removed `-vsync`;
 the pack probes the binary and uses `-fps_mode` there (section 9).

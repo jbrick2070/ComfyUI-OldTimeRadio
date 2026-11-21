@@ -189,13 +189,15 @@ def probe_ffmpeg_capabilities(path=None) -> dict:
     ask" and "it answered no" justify different messages, and a caller that
     treats them the same will refuse a working box on a failed subprocess.
 
-    WHY THIS EXISTS. A Homebrew ffmpeg carries libass and libx264 by default,
-    so a Mac that ran `brew install ffmpeg` burns captions fine. A MINIMAL
-    build -- notably the binary bundled inside imageio-ffmpeg, the obvious
-    candidate for an automatic fallback -- typically ships neither. Without
-    this probe that box renders the whole episode and then dies at the caption
-    stage, twenty minutes of writer, voices, music and video after the point
-    where the answer was already knowable.
+    WHY THIS EXISTS. Which builds carry what changes under us, so it is asked,
+    never assumed. Measured 2026-11-20 on an M6 Mac mini: Homebrew's ffmpeg
+    formula (9.0.2) is built WITHOUT libass, so `brew install ffmpeg` no
+    longer burns captions, while the binary imageio-ffmpeg 0.8.1 bundles
+    (ffmpeg 9.0) carries libass, freetype and libx264 -- the reverse of what
+    this docstring used to say. Without the probe a box renders the whole
+    episode and then fails at the caption stage, after the point where the
+    answer was already knowable; with it, :func:`resolve_caption_ffmpeg` picks
+    a build that can do the job.
     """
     # An explicit path still has to EXIST. Without this a caller passing a
     # dead path got every capability as None, which caption_support_gap then
@@ -335,17 +337,57 @@ def caption_support_gap(path=None) -> Optional[str]:
     caps = probe_ffmpeg_capabilities(path)
     if caps["path"] is None:
         return ("no ffmpeg was found on this host, so captions cannot be "
-                "burned; install ffmpeg (macOS: `brew install ffmpeg`) or set "
-                "OTR_FFMPEG to a full build")
+                "burned; `pip install -U imageio-ffmpeg` brings a build with "
+                "libass and libx264, or set OTR_FFMPEG to one")
     missing = [name for name in (CAPTION_FILTER, CAPTION_ENCODER)
                if caps[name] is False]
     if not missing:
         return None
     return ("the ffmpeg at %s is a minimal build missing %s; caption burning "
-            "needs both the `ass` filter (libass) and the libx264 encoder. "
-            "Install a full build -- macOS `brew install ffmpeg` ships both -- "
-            "or set OTR_FFMPEG to one, or turn burn_captions off."
+            "needs both the `ass` filter (libass) and the libx264 encoder, and "
+            "no build on this host has both. `pip install -U imageio-ffmpeg` "
+            "brings one (0.8.1 bundles ffmpeg 9.0 with both; Homebrew's "
+            "`ffmpeg` formula has no libass), or set OTR_FFMPEG to a full "
+            "build, or turn burn_captions off."
             % (caps["path"], " and ".join(missing)))
+
+
+def _burns_captions(caps: dict) -> bool:
+    return caps.get(CAPTION_FILTER) is True and caps.get(CAPTION_ENCODER) is True
+
+
+def resolve_caption_ffmpeg(preferred=None) -> Optional[str]:
+    """The ffmpeg the caption burn should run, or ``None`` when there is none.
+
+    The usual pick (:func:`resolve_ffmpeg`) whenever it can burn captions, or
+    whenever the probe cannot tell: an unrunnable probe is not evidence, and
+    on such a box nothing changes. Only when that build ANSWERS that it lacks
+    the ``ass`` filter or libx264 is the binary imageio-ffmpeg bundles asked
+    the same question, and used if it answers yes to both.
+
+    WHY. Homebrew's ffmpeg formula dropped libass (measured 2026-11-20, 9.0.2),
+    and on a Mac ``resolve_ffmpeg`` finds that build first -- on PATH or at
+    /opt/homebrew/bin -- so a Mac episode published with no captions while a
+    build that could burn them sat in the pack's own venv. The other stages
+    keep the usual pick: only this one needs libass. The bundled binary is
+    already step 5 of the resolution chain, so no new source of argv[0] is
+    added. NEVER RAISES, per this module's contract.
+    """
+    primary = resolve_ffmpeg(preferred)
+    if not primary:
+        return None
+    caps = probe_ffmpeg_capabilities(primary)
+    if all(caps.get(name) is not False for name in (CAPTION_FILTER, CAPTION_ENCODER)):
+        return primary
+    try:
+        bundled = _imageio_ffmpeg()
+    except Exception:  # noqa: BLE001 -- resolution must never raise
+        bundled = None
+    if not bundled or os.path.realpath(bundled) == os.path.realpath(primary):
+        return primary
+    if _burns_captions(probe_ffmpeg_capabilities(bundled)):
+        return bundled
+    return primary
 
 
 # THE DEFENCE AGAINST A WIDGET-SUPPLIED ffmpeg PATH IS NON-DECLARATION: no node
