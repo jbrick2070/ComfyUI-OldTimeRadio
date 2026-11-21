@@ -160,8 +160,10 @@ def test_gated_curated_models_derived_from_requires_auth():
     # API reports `"gated": false` for Mistral-Nemo and for both Gemma 4 rows,
     # and only `google/gemma-2-2b-it` answers `"gated": "manual"`. The flags
     # were demanding an HF_TOKEN for models that download freely, which is why
-    # a fresh install with no token could not reach the writer at all.
-    assert "google/gemma-2-2b-it" in catalog.GATED_CURATED_MODELS
+    # a fresh install with no token could not reach the writer at all. The one
+    # truly gated row, google/gemma-2-2b-it, was removed 2026-11-20 (operator:
+    # "no gated models"), so the set is empty.
+    assert catalog.GATED_CURATED_MODELS == frozenset()
 
 
 def test_default_llm_is_not_gated():
@@ -659,8 +661,6 @@ _LOCAL_ROW_CASES = [
     ("google/gemma-4-E4B-it", False),
     ("google/gemma-4-12b-it", True),
     ("google/gemma-4-12b-it", False),
-    ("google/gemma-2-2b-it", True),
-    ("google/gemma-2-2b-it", False),
     ("mistralai/Mistral-Nemo-Instruct-2407", True),
     ("mistralai/Mistral-Nemo-Instruct-2407", False),
     # Qwen2.5-14B pruned from the catalog 2026-08-25; a parametrized case
@@ -692,12 +692,11 @@ def test_curated_local_row_label_is_bare_regardless_of_disk(tmp_path, repo_id, p
 @pytest.fixture
 def hub_root_operator_gemma_mix(tmp_path: Path) -> Path:
     """Mirror the operator's real cache: E4B materialized (weights present),
-    E2B + gemma-2-2b config-only (metadata pull, no weight blob)."""
+    E2B config-only (metadata pull, no weight blob)."""
     root = tmp_path / "opmix_hub"  # distinct name -> safe to co-request empty_hub_root
     root.mkdir()
     _make_snapshot(root, "google", "gemma-4-E4B-it", weights=True)
     _make_snapshot(root, "google", "gemma-4-E2B-it", weights=False)
-    _make_snapshot(root, "google", "gemma-2-2b-it", weights=False)
     return root
 
 
@@ -731,9 +730,9 @@ def test_no_dropdown_label_carries_any_state_badge(
 
 
 def test_operator_gemma_mix_labels_bare_on_disk_tracked(hub_root_operator_gemma_mix):
-    """The reported scenario, resolved: all three gemma rows show the bare id;
+    """The reported scenario, resolved: both gemma rows show the bare id;
     on_disk still distinguishes materialized E4B (True) from the config-only
-    E2B / gemma-2-2b (False)."""
+    E2B (False)."""
     by_repo = {
         e.repo_id: e
         for e in catalog.build_dropdown_choices(hub_root=hub_root_operator_gemma_mix)
@@ -741,10 +740,8 @@ def test_operator_gemma_mix_labels_bare_on_disk_tracked(hub_root_operator_gemma_
     for rid in (
         "google/gemma-4-E4B-it",
         "google/gemma-4-E2B-it",
-        "google/gemma-2-2b-it",
     ):
         assert by_repo[rid].label == rid
         _assert_no_state_badge(by_repo[rid].label)
     assert by_repo["google/gemma-4-E4B-it"].on_disk is True
     assert by_repo["google/gemma-4-E2B-it"].on_disk is False
-    assert by_repo["google/gemma-2-2b-it"].on_disk is False

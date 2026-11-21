@@ -14,7 +14,7 @@ from nodes._otr_model_catalog import writer_fit_line, writer_tooltip_table
 
 
 def test_lines_state_the_measured_download_and_no_context_term():
-    for repo in ("google/gemma-4-E2B-it", "google/gemma-2-2b-it", "Qwen/Qwen3.5-4B"):
+    for repo in ("google/gemma-4-E2B-it", "unsloth/Llama-3.2-3B-Instruct", "Qwen/Qwen3.5-4B"):
         line = writer_fit_line(repo)
         assert line.startswith("about "), (repo, line)
         assert "ctx" not in line and "context" not in line, (repo, line)
@@ -28,9 +28,7 @@ def test_the_fit_words_come_from_the_gate_s_own_projection():
         assert ("fits " + " ".join(tags)) in writer_fit_line(repo), repo
 
 
-def test_a_gated_row_says_so_after_its_size_and_native_rows_claim_no_fit():
-    gated = writer_fit_line("google/gemma-2-2b-it")
-    assert gated.split("; ")[1].startswith("gated"), gated
+def test_native_rows_claim_no_fit():
     native = writer_fit_line("comfy_native:gemma4-e2b-it-int8-convrot")
     assert native.startswith("about 5.2 GB") and "fit not rated" in native
     assert "fits " not in native

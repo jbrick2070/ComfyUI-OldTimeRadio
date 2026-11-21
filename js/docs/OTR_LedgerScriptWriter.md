@@ -130,7 +130,6 @@ Writers -- download size and where each fits:
 - google/gemma-4-E2B-it: about 10.2 GB; fits mac16-tight nv8-nf4 nv16 nv24
 - google/gemma-4-E4B-it: about 16.0 GB; fits mac16-tight nv16-nf4 nv24
 - google/gemma-4-12b-it: about 23.9 GB; fits nv16-nf4 nv24-nf4
-- google/gemma-2-2b-it: about 5.2 GB; gated (needs a Hugging Face licence and HF_TOKEN); fits mac16 nv8 nv16 nv24
 - comfy_native:gemma4-e2b-it-int8-convrot: about 5.2 GB; run by ComfyUI itself; fit not rated by these tags
 - comfy_native:gemma4-e4b-it-int8-convrot: about 8.1 GB; run by ComfyUI itself; fit not rated by these tags
 - comfy_native:gemma4-12b-int8-convrot: about 12.1 GB; run by ComfyUI itself; fit not rated by these tags
@@ -148,7 +147,6 @@ Writers -- download size and where each fits:
 - google/gemma-4-E2B-it: about 10.2 GB; fits mac16-tight nv8-nf4 nv16 nv24
 - google/gemma-4-E4B-it: about 16.0 GB; fits mac16-tight nv16-nf4 nv24
 - google/gemma-4-12b-it: about 23.9 GB; fits nv16-nf4 nv24-nf4
-- google/gemma-2-2b-it: about 5.2 GB; gated (needs a Hugging Face licence and HF_TOKEN); fits mac16 nv8 nv16 nv24
 - comfy_native:gemma4-e2b-it-int8-convrot: about 5.2 GB; run by ComfyUI itself; fit not rated by these tags
 - comfy_native:gemma4-e4b-it-int8-convrot: about 8.1 GB; run by ComfyUI itself; fit not rated by these tags
 - comfy_native:gemma4-12b-int8-convrot: about 12.1 GB; run by ComfyUI itself; fit not rated by these tags

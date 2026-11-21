@@ -202,11 +202,11 @@ def test_auto_download_gated_no_token_raises_before_snapshot_download(tmp_path, 
     )
     snap = MagicMock()
     api = MagicMock()
-    # 2026-08-25: this used to pass DEFAULT_LLM with the comment "Mistral-Nemo
-    # is gated". It is not -- the HF API reports `"gated": false` for it. Take
-    # a genuinely gated row from the derived set instead, so the test cannot go
-    # stale again the next time a vendor removes a gate.
-    gated_repo = sorted(catalog.GATED_CURATED_MODELS)[0]
+    # No curated row is gated since 2026-11-20 (operator: "no gated models";
+    # tests/test_no_gated_writers.py), so a stand-in id exercises the pre-flight
+    # that still guards the download path.
+    gated_repo = "example-org/gated-stand-in"
+    monkeypatch.setattr(catalog, "GATED_CURATED_MODELS", frozenset({gated_repo}))
     with pytest.raises(GatedModelError) as exc:
         catalog.auto_download_if_missing(
             gated_repo,

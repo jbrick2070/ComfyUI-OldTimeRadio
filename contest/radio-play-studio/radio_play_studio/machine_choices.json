@@ -21,7 +21,6 @@
    "writer": {
     "Qwen/Qwen3.5-4B": "?",
     "Qwen/Qwen3.8-27B": "?",
-    "google/gemma-2-2b-it": "?",
     "google/gemma-4-12b-it": "?",
     "google/gemma-4-E2B-it": "?",
     "google/gemma-4-E4B-it": "?",
@@ -49,7 +48,6 @@
    "writer": {
     "Qwen/Qwen3.5-4B": "?",
     "Qwen/Qwen3.8-27B": "?",
-    "google/gemma-2-2b-it": "?",
     "google/gemma-4-12b-it": "?",
     "google/gemma-4-E2B-it": "?",
     "google/gemma-4-E4B-it": "?",
@@ -77,7 +75,6 @@
    "writer": {
     "Qwen/Qwen3.5-4B": "proven",
     "Qwen/Qwen3.8-27B": "no",
-    "google/gemma-2-2b-it": "fits",
     "google/gemma-4-12b-it": "no",
     "google/gemma-4-E2B-it": "oom",
     "google/gemma-4-E4B-it": "tight",
@@ -105,7 +102,6 @@
    "writer": {
     "Qwen/Qwen3.5-4B": "proven",
     "Qwen/Qwen3.8-27B": "24 gb+",
-    "google/gemma-2-2b-it": "fits",
     "google/gemma-4-12b-it": "proven",
     "google/gemma-4-E2B-it": "proven",
     "google/gemma-4-E4B-it": "proven",
@@ -133,7 +129,6 @@
    "writer": {
     "Qwen/Qwen3.5-4B": "proven",
     "Qwen/Qwen3.8-27B": "no",
-    "google/gemma-2-2b-it": "proven",
     "google/gemma-4-12b-it": "measured",
     "google/gemma-4-E2B-it": "proven",
     "google/gemma-4-E4B-it": "measured",

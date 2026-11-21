@@ -58,8 +58,8 @@ makers intend, and Mistral-Nemo at more than double its card's value.
   per CANONICAL model id, from each maker's generation_config.json or model
   card; `sampling_baseline(model_id)` resolves a quant twin to its base model
   through the canonical id, never a per-row copy that could drift. A local
-  model with no published baseline (google/gemma-2-2b-it, an uncurated cache
-  find) gets `SAMPLING_FALLBACK` -- the old balanced numbers -- so it still
+  model with no published baseline (an uncurated cache find) gets
+  `SAMPLING_FALLBACK` -- the old balanced numbers -- so it still
   samples: greedy decoding flattens dialogue.
 - A cloud slot returns None: no sampling key is sent and the provider applies
   the model's own default. All three cloud backends already honour a None
@@ -81,7 +81,6 @@ makers intend, and Mistral-Nemo at more than double its card's value.
 | google/gemma-4-E2B-it, E4B-it, 12b-it | 1.0 / 0.95 / 64 | generation_config.json |
 | unsloth/Llama-3.2-3B-Instruct | 0.6 / 0.9 / - | generation_config.json |
 | mistralai/Mistral-Nemo-Instruct-2407 | 0.35 / - / - | model card examples (generation_config has no sampling keys) |
-| google/gemma-2-2b-it | none published | SAMPLING_FALLBACK 0.85 / 0.95 |
 | openrouter / comfy / google_api slots | none | no keys sent; provider default |
 
 Coverage: `tests/test_model_sampling_baseline.py`, which calls the real
@@ -1690,8 +1689,12 @@ Measured: `gemma-2-2b-it` drove `original` at act 3 to a clean ledger in 5.1
 minutes and could not get `scifi_news` past P0 in 34. It was not a runaway --
 it was bounded, honest, futile work. **The defect is the silence, not the
 floor.** Proven for `scifi_news` / `scifi_news_pro`: `gemma-4-12b-it` and
-`Mistral-Nemo`. Do NOT delete `gemma-2-2b-it` -- it is the fastest writer-lane
-model on the box.
+`Mistral-Nemo`. ~~Do NOT delete `gemma-2-2b-it` -- it is the fastest writer-lane
+model on the box.~~ **SUPERSEDED 2026-11-20 (operator): "nuke that gated
+model, no gated models."** `gemma-2-2b-it` was the one writer needing a Hugging
+Face login, and a Mac user who picked it to try a small writer stopped at
+GatedModelError. The row is removed; `tests/test_no_gated_writers.py` keeps the
+writer list free of gated models.
 
 ### OPEN -- F1's last miss class
 

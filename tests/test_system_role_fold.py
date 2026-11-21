@@ -209,19 +209,5 @@ def test_helpers_are_exported() -> None:
         )
 
 
-def test_gemma_2_2b_it_row_is_a_clean_technical_pick() -> None:
-    """BUG-LOCAL-262: google/gemma-2-2b-it must have a catalog row
-    with its transformers_default chat template.
-    """
-    from nodes import _otr_model_catalog as catalog
-
-    rows = {m.repo_id: m for m in catalog.CURATED_LLM_MODELS}
-    row = rows.get("google/gemma-2-2b-it")
-    assert row is not None, (
-        "google/gemma-2-2b-it missing from CURATED_LLM_MODELS"
-    )
-    assert row.chat_template_kind == "transformers_default"
-
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

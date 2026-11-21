@@ -351,7 +351,7 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         # for this repo -- the flag was demanding an HF_TOKEN for a model that
         # downloads freely, so a fresh install with no token hit
         # GatedModelError on the DEFAULT row and never reached the writer.
-        # Only `google/gemma-2-2b-it` is genuinely gated (`"gated": "manual"`).
+        # No curated row is gated (operator, 2026-11-20).
         requires_auth=False,
         loader_backend="transformers_safetensors",
         vram_fit_tier="PASS",
@@ -428,27 +428,6 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         license="apache_2_0",
         license_audit_status="mit_equivalent",
         implied_quant_policy="bnb_nf4",
-    ),
-    CuratedModel(
-        repo_id="google/gemma-2-2b-it",
-        requires_auth=True,
-        loader_backend="transformers_safetensors",
-        vram_fit_tier="PASS",
-        approx_safetensors_gb=5.2,
-        notes="Smallest curated technical-slot pick (2B, NF4 -- tiny "
-        "VRAM). Gemma-2 has no system role by design; the writer "
-        "generate path folds system content into the first user "
-        "turn via normalize_messages_for_tokenizer (BUG-LOCAL-262). "
-        "Gemma-2 ships under the restricted Gemma Terms of Use "
-        "(NOT Apache 2.0 -- only Gemma 4 is) so the row is "
-        "research-lane: technical-slot use only, not bound in the "
-        "default creative-binding workflow JSON.",
-        prompt_profile="modern",
-        chat_template_kind="transformers_default",
-        stop_tokens=(),
-        context_window=8192,
-        license="gated_terms",
-        license_audit_status="research_lane",
     ),
     CuratedModel(
         # Plan row 0n (2026-09-26): Gemma 4 E2B as ComfyUI's own text model --
@@ -543,10 +522,9 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
     # apple/LLM_PREFLIGHT.md for the seven gates a new row must clear. WARN is
     # information, not an automatic rip (operator 2026-09-06); ripping a row
     # is an explicit decision.
-    # gemma-2-2b-it is the smallest technical-slot pick (BUG-LOCAL-262).
-    # Gemma-2's chat template rejects the system role; the generate path
-    # normalizes system messages before apply_chat_template so the row is a
-    # clean technical pick.
+    # NO GATED ROWS (operator, 2026-11-20: "no gated models"). Every local row
+    # must download with no Hugging Face account; google/gemma-2-2b-it, the one
+    # gated row, was removed for that. tests/test_no_gated_writers.py holds it.
     # No otr_1940s_v1 period row is curated at present. The period-routing
     # surface (otr_1940s_v1 profile, GPTQ-int4 backend, _otr_period_prompts)
     # stays parked for a future period model; see the ROADMAP period-model
@@ -767,8 +745,8 @@ SAMPLING_BASELINES = {
 #: Providers that run on this machine. Everything else is a cloud slot.
 LOCAL_PROVIDERS = frozenset({"local", "comfy_native"})
 
-#: A local model with no published baseline (google/gemma-2-2b-it, or a model
-#: found in the cache that the catalog does not curate). The "balanced"
+#: A local model with no published baseline (a model found in the cache that
+#: the catalog does not curate). The "balanced"
 #: preset, so it still SAMPLES: a model left greedy flattens dialogue.
 SAMPLING_FALLBACK = (0.85, 0.95, None)
 
@@ -2269,7 +2247,6 @@ CURATED_CONTEXT_OVERRIDES: dict[str, int] = {
     # These historical working windows are estimates until config is available.
     "unsloth/Llama-3.2-3B-Instruct": 8192,
     "mistralai/Mistral-Nemo-Instruct-2407": 16384,
-    "google/gemma-2-2b-it": 8192,
     "google/gemma-4-E2B-it": 8192,
     "google/gemma-4-E4B-it": 8192,
     "google/gemma-4-12b-it": 8192,
@@ -2577,7 +2554,6 @@ _MEASURED_DOWNLOAD_BYTES: "dict[str, int]" = {
     "google/gemma-4-E2B-it": 10_246_621_918,
     "google/gemma-4-E4B-it": 15_992_595_884,
     "google/gemma-4-12b-it": 23_919_549_408,
-    "google/gemma-2-2b-it": 5_228_717_488,
     "comfy_native:gemma4-e2b-it-int8-convrot": 5_199_997_904,
     "comfy_native:gemma4-e4b-it-int8-convrot": 8_090_965_702,
     "comfy_native:gemma4-12b-int8-convrot": 12_055_234_634,

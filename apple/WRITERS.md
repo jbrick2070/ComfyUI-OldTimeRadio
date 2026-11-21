@@ -100,9 +100,8 @@ workflow *ships*, and Qwen 3.5 4B is what the Mac and AMD workflows ship.
 | `google/gemma-4-E4B-it` | 16.0 GB | `mac16-tight` `nv16-nf4` `nv24` | Apache 2.0 | Same family, a size up. Proven on 16 GB NVIDIA. Not an 8 GB pick: it does not fit there as NF4 and only crawls (~0.5 tok/s) through CPU offload. |
 | `google/gemma-4-12b-it` | 23.9 GB | `nv16-nf4` `nv24-nf4` | Apache 2.0 | What the 16 GB NVIDIA workflows shipped until 2026-09-26. NF4 is baked into the pick, so you do not also change Quant; it loads NF4 even if Quant still says `none`. Too big for an 8 GB card -- it is refused at the gate there, not at the crash. |
 | `Qwen/Qwen3.8-27B` | 55.6 GB | `nv24-nf4` | Apache 2.0 | **The big-card writer**, and the only row here that asks for more than 24 GB of card. Same architecture as the Qwen above it, six times the parameters, and prose quality is the only thing it buys -- it is about a quarter slower than `gemma-4-12b-it`. NF4 is baked into the pick. Measured on an RTX 5090: 17.7 GB resident, coherent prose, and constrained JSON that parsed. No workflow ships it and nobody has published an episode with it yet -- pick it deliberately, and mind that the download is over 50 GB. |
-| `google/gemma-2-2b-it` | 5.2 GB | gated, `mac16` `nv8` `nv16` `nv24` | Gemma Terms of Use | The smallest of all, and **the only one that needs a Hugging Face login**. Intended as a `technical_model`, not a creative one. |
 
-The local rows download themselves except the gated Gemma 2 pick, which still needs a Hugging Face login.
+Every local row downloads itself; none needs a Hugging Face login. (The one gated writer, `google/gemma-2-2b-it`, was removed on 2026-11-20: no gated models.)
 
 If your dropdown also shows `openrouter:`, `comfy:` or `google_api:` entries,
 those are the optional paid cloud writers -- see [CLOUD.md](CLOUD.md). They are
@@ -222,11 +221,10 @@ Pick a model whose tooltip line carries your machine's tag. The ceiling itself i
 `llm_vram_ceiling_gb` widget, and raising it does not create memory; it only
 moves where the failure happens.
 
-**"GatedModelError: ... requires HuggingFace authentication".** You picked
-`google/gemma-2-2b-it`, the one gated row. Either pick another one, or make a
-free Hugging Face account, accept the licence on that model's page, and set
-`HF_TOKEN` in the environment before ComfyUI starts. The message walks through
-it. After that, the download fires on the next Queue by itself.
+**"... is not a valid choice" for `google/gemma-2-2b-it` in a saved
+graph.** That writer was the one gated row and was removed on 2026-11-20 (no
+gated models). Pick another writer; for a small one on a Mac,
+`unsloth/Llama-3.2-3B-Instruct`.
 
 **"requires bitsandbytes, which is not importable on this host".** Your machine
 has no 4-bit support -- most often AMD.

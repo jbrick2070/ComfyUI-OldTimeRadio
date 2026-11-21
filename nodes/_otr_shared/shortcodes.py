@@ -62,7 +62,6 @@ LLM = {
     "google/gemma-4-E2B-it": "g4e2",
     "google/gemma-4-E4B-it": "g4e4",
     "google/gemma-4-12b-it": "g412",
-    "google/gemma-2-2b-it": "g22b",
     # Gemma 4 E2B run by ComfyUI itself (plan row 0n): the same weights family
     # as g4e2, a different writer, so a different code. Its first 5080 episode
     # (knot_midnight_20260926_180140) published as ``__unk__``.

@@ -36,7 +36,6 @@ OLD_LABELS = (
     "google/gemma-4-E2B-it (6.0 GB download, mac16-tight nv8 nv16 nv24)",
     "google/gemma-4-E4B-it (9.0 GB download, mac16-tight nv8-nf4 nv16 nv24)",
     "google/gemma-4-12b-it (23.9 GB download, nv16-nf4 nv24-nf4)",
-    "google/gemma-2-2b-it (5.2 GB download, gated mac16 nv8 nv16 nv24)",
     "comfy_native:gemma4-e2b-it-int8-convrot (4.8 GB download)",
     "comfy_native:gemma4-e4b-it-int8-convrot (7.5 GB download)",
     "comfy_native:gemma4-12b-int8-convrot (11.2 GB download)",
@@ -44,7 +43,7 @@ OLD_LABELS = (
     "google_api:slot-a", "google_api:slot-b",
 )
 #: The published-filename code each writer had before the change.
-OLD_CODES = ("q354b", "q3827", "lla3", "nemo", "g4e2", "g4e4", "g412", "g22b",
+OLD_CODES = ("q354b", "q3827", "lla3", "nemo", "g4e2", "g4e4", "g412",
              "cg4e2", "cg4e4", "cg412", "orsa", "orsb", "cmsa", "cmsb", "gasa", "gasb")
 
 

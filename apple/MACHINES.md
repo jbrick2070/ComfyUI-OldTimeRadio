@@ -138,7 +138,6 @@ If you change a dropdown yourself, these are the only picks that need anything b
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `google/gemma-2-2b-it` | GATED | 4.9 GiB | **proven** | fits | fits | ? | ? |
 | `unsloth/Llama-3.2-3B-Instruct` | **auto** | 6.0 GiB | fits | fits | fits | ? | ? |
 | `Qwen/Qwen3.5-4B` | **auto** | 8.7 GiB | **proven** | **proven** | **proven** | ? | ? |
 | `google/gemma-4-E2B-it` | **auto** | 9.5 GiB | **proven** | **proven** | **OOM** | ? | ? |

@@ -642,8 +642,8 @@ The details, and the Windows long-path fallback, are in
 
 **You do not need a Hugging Face token to run OTR.** Everything the canonical
 selects, and everything the 8 GB and Mac workflows select, is ungated. A token is
-needed only for the handful of gated rows -- `google/gemma-2-2b-it` and
-`stable_audio_music` -- and for those you accept the licence on
+needed only for the one gated music option, `stable_audio_music` (no writer in
+the list is gated) -- and for it you accept the licence on
 the model's page while signed in, then log in locally once:
 
 ```bash
@@ -759,8 +759,8 @@ local voice they admit -- and the hosted voices Google TTS and ElevenLabs
 (your own account and key). A full non-English episode on
 3.14 through a hosted voice has not been run.
 
-**A gated model returns HTTP 401.** `gemma-2-2b-it` and `stable_audio_music` need
-a licence click on Hugging Face plus a login; every default weight is ungated,
+**A gated model returns HTTP 401.** `stable_audio_music` needs a licence click
+on Hugging Face plus a login; every writer and every default weight is ungated,
 the LTX 2.5 lanes included.
 
 **On a Mac, a 19 GB download starts the moment you queue.** The image dropdowns
