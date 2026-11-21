@@ -504,4 +504,28 @@ def test_kokoro_scratch_dir_exists_before_jieba_writes_into_it(monkeypatch, tmp_
     monkeypatch.setattr(P, "otr_shared_tmp_dir", lambda: target)
     assert not target.exists()
     assert KB._otr_scratch_dir() == str(target)
+    assert not target.exists(), "naming the scratch folder must not create it"
+    assert KB._jieba_cache_dir() == str(target)
     assert target.is_dir()
+
+
+def test_voice_table_fallback_path_never_creates_the_scratch_folder(monkeypatch, tmp_path):
+    """ensure_voices_npz asks for the fallback path on every build; an
+    unwritable output tree must not stop a table that writes beside the voices
+    (Sonnet QA on 07acf9d1d)."""
+    import nodes._otr_paths as P
+
+    def refuse(*_a, **_k):
+        raise PermissionError("output tree is read-only")
+
+    monkeypatch.setattr(P, "otr_shared_tmp_dir", lambda: tmp_path / "ro" / "tmp")
+    monkeypatch.setattr(KB.os, "makedirs", refuse)
+    assert KB._fallback_voices_dir().endswith("kokoro_voices")
+
+
+def test_mandarin_phonemizer_points_jieba_at_the_created_cache_dir():
+    from pathlib import Path
+
+    src =(Path(__file__).resolve().parents[1] / "nodes" / "_otr_audio_engines"
+           / "_kokoro_backends.py").read_text(encoding="utf-8")
+    assert "jieba.dt.tmp_dir = _jieba_cache_dir()" in src

@@ -301,17 +301,26 @@ def ensure_voices_npz(voices_dir: str) -> str:
 def _otr_scratch_dir() -> str:
     """OTR's own scratch tier (``<output>/otr/episodes/_shared/tmp``), which the
     janitor sweeps -- never the ambient system TEMP, which nothing sweeps
-    (tests/test_node_temp_hygiene.py).
-
-    Created here: ``otr_shared_tmp_dir()`` only names the folder, and jieba
-    writes its dictionary cache into whatever ``tmp_dir`` it is given without
-    creating it, so a fresh install logged "Dump cache file failed" and rebuilt
-    the index on every Mandarin episode."""
+    (tests/test_node_temp_hygiene.py). Names the folder only; a caller that
+    writes into it creates it."""
     try:
         from .._otr_paths import otr_shared_tmp_dir
     except ImportError:                       # imported straight from nodes/
         from _otr_paths import otr_shared_tmp_dir  # type: ignore
-    scratch = str(otr_shared_tmp_dir())
+    return str(otr_shared_tmp_dir())
+
+
+def _jieba_cache_dir() -> str:
+    """The scratch folder jieba caches its dictionary index in, created.
+
+    jieba writes into whatever ``tmp_dir`` it is given without creating it, so
+    on a fresh install, where ``_shared/tmp`` did not exist yet, every Mandarin
+    episode logged "Dump cache file failed" with a traceback and rebuilt the
+    9 MB index. Created here rather than in ``_otr_scratch_dir``: the voice
+    table asks that function for its fallback path on every build, and an
+    unwritable output tree must not stop a voice table that writes beside the
+    voices."""
+    scratch = _otr_scratch_dir()
     os.makedirs(scratch, exist_ok=True)
     return scratch
 
@@ -428,7 +437,7 @@ class MandarinPhonemizer:
         try:
             # jieba caches its 9 MB dictionary index under the system TEMP by
             # default; keep it in OTR's own swept scratch tier instead.
-            jieba.dt.tmp_dir = _otr_scratch_dir()
+            jieba.dt.tmp_dir = _jieba_cache_dir()
         except Exception:  # noqa: BLE001 -- no OTR output tree (a bare probe)
             pass
         self._g2p = ZHG2P()
