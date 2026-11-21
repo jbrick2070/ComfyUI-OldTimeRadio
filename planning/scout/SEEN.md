@@ -126,3 +126,6 @@
 2026-11-20 | Video | Wan-Animate-2 (Comfy-Org int8_convrot, motion transfer) | SKIP | https://huggingface.co/Comfy-Org/Wan-Animate-2
 2026-11-20 | Voice | fishaudio drama-3 (35B MoE, server-scale) | SKIP | https://huggingface.co/fishaudio/drama-3
 2026-11-20 | Writer | TimeCapsuleLLM English 1800-1875 v3-mini 500M (GGUF Q4 327 MB / Q8 531 MB) | WATCH | https://huggingface.co/haykgrigorian/TimeCapsuleLLM-English-1800-1875-v3mini-eval1-500M
+2026-11-21 | Voice | Reverb-TTS (software-mansion, 297M cloning, int8 307 MB, 5 of 8 OTR languages) + comfyui-reverb-tts pack | TEST | https://huggingface.co/software-mansion/Reverb-TTS
+2026-11-21 | Image | P-Image-OSS-Comfy (Pruna; w4a8 13.4 GB, int8_convrot 21.2 GB) | WATCH | https://huggingface.co/PrunaAI/P-Image-OSS-Comfy
+2026-11-21 | Upscale | Steppe latent upscaler (Wan/Qwen-Image latents, registry only) | WATCH | https://github.com/TensorForger/ComfyUI-Steppe
