@@ -390,17 +390,46 @@ def test_cjk_wrap_never_cuts_a_latin_word():
     assert long == ["a" * 8, "a" * 8, "a" * 4], long
 
 
-def test_cjk_wrap_pure_cjk_is_unchanged():
+def test_cjk_wrap_pure_cjk_slices_by_width_where_every_break_is_legal():
     """Text made only of wide characters (ideographs, kana, hangul, fullwidth
-    forms) slices exactly as before: max_chars characters a line. A digit run
-    of two or more, or any Latin text, is deliberately kept whole instead."""
-    # Includes East Asian Width F forms (fullwidth comma, letter and digit),
-    # not only W: a mutation accepting just "W" must fail this pin.
-    text = "关联性高的因子被筛选出来最有影响的是特定的生活习惯，Ａ１。「引用」"
+    forms) slices max_chars characters a line wherever the break is legal. A
+    digit run of two or more, or any Latin text, is deliberately kept whole."""
+    text = "关联性高的因子被筛选出来最有影响的是特定的生活习惯"
     assert CAP.wrap_cjk_chars(text, max_chars=10) == [
         text[i:i + 10] for i in range(0, len(text), 10)]
+    # East Asian Width F forms (fullwidth letters) break like ideographs: a
+    # mutation that accepted only "W" would keep "ＡＢＣＤ" whole as a word.
+    assert CAP.wrap_cjk_chars("日本語のＡＢＣＤ", max_chars=6) == [
+        "日本語のＡＢ", "ＣＤ"]
     assert CAP.wrap_cjk_chars("你好吗朋友们好吗2024年", max_chars=9) == [
         "你好吗朋友们好吗", "2024年"]
+    # The string this test used to pin: its width-10 slice ended on "「",
+    # which kinsoku forbids. The bracket now goes down with the words it opens.
+    old = "关联性高的因子被筛选出来最有影响的是特定的生活习惯，Ａ１。「引用」"
+    assert CAP.wrap_cjk_chars(old, max_chars=10) == [
+        "关联性高的因子被筛选", "出来最有影响的是特定", "的生活习惯，Ａ１。",
+        "「引用」"]
+
+
+def test_cjk_wrap_obeys_kinsoku():
+    """Live 2026-11-21, a Japanese Tempest episode on the Mac: a caption's
+    second line opened with "。". No line may open with a closing mark or end
+    on an opening bracket, in Japanese or Chinese, and nothing is lost."""
+    live = ("PROSPERO: いいえ、女児。それは食う寝るし、私たちが持つような感覚を"
+            "持っています。あなたが目にしたこの男は、船難の末に生き残ったものです。")
+    for text, width in [
+        (live, 44), (live, 12), (live, 7),
+        ("お父様、もしあなたの術がこの荒れ狂う海をこうしたのなら、「静めて」ください。", 9),
+        ("他说：“我们明天再见。”然后转身离开了，没有回头。", 6),
+        ("ちょっと待って！それは困ります。ジョーは人々を待たせない。", 4),
+    ]:
+        lines = CAP.wrap_cjk_chars(text, max_chars=width)
+        assert "".join(lines).replace(" ", "") == text.replace(" ", ""), lines
+        assert all(len(l) <= width for l in lines), (width, lines)
+        for line in lines[1:]:
+            assert line[0] not in CAP._CJK_NO_LINE_START, (width, lines)
+        for line in lines[:-1]:
+            assert line[-1] not in CAP._CJK_NO_LINE_END, (width, lines)
 
 
 def test_cjk_wrap_ideographic_space_never_makes_a_blank_line():

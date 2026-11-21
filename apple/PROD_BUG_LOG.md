@@ -17733,3 +17733,24 @@ not promote it to the Bug Bible on this evidence alone.
   Spanish/French/Japanese/German quotation passing clean).
 - status: FIXED in code; live proof is a Mac Japanese Shakespeare episode that
   publishes.
+
+## PBUG-20261121-02 -- Japanese and Chinese captions could open a line with "。" or end one on "「"
+- evidence: `prayer_night_ja_20261121_010332` (Mac M6, 2.3.62,
+  `otr_mac16_low`, The Tempest 1.2 in Japanese), published to `otr/obs/`. The
+  frame at 0:40 shows a two-line caption whose second line opens with "。"
+  (`...感覚を持っています` / `。あなたが目にした...`).
+- cause: `wrap_cjk_chars` allowed a break after ANY wide character, so a
+  closing mark could open a line and an opening bracket could end one. Japanese
+  kinsoku and the Chinese equivalent forbid both. One test pinned a slice that
+  ended on "「", enshrining the defect.
+- fix: tokens that may not open a line (`_CJK_NO_LINE_START`: closing brackets
+  and quotes, clause and sentence marks, the prolonged-sound mark, iteration
+  marks, small kana) glue onto the token before them, and the token after an
+  opening bracket (`_CJK_NO_LINE_END`) glues onto it, before width wrapping.
+  Lines still fit the width; a line breaks one character earlier when its last
+  break was illegal. Only the `cjk_chars` policy (Japanese, Mandarin) changes.
+  Coverage: `tests/test_episode_language_voice.py`
+  (`test_cjk_wrap_obeys_kinsoku`, and the pin rewritten as
+  `test_cjk_wrap_pure_cjk_slices_by_width_where_every_break_is_legal`).
+- status: FIXED in code; live proof is the next Japanese or Mandarin episode's
+  captions.

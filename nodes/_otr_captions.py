@@ -251,6 +251,20 @@ def _is_wide(ch: str) -> bool:
     return unicodedata.east_asian_width(ch) in ("W", "F")
 
 
+#: Characters a Chinese or Japanese line may not START with (kinsoku shori;
+#: Chinese avoids the same marks): closing brackets and quotes, clause and
+#: sentence punctuation, the prolonged-sound mark, iteration marks and small
+#: kana. Live 2026-11-21, a Japanese Tempest episode: a caption's second line
+#: opened with "。" -- the wrapper broke after any wide character.
+_CJK_NO_LINE_START = frozenset(
+    "、。，．・：；？！‼⁇⁈⁉）〕］｝〉》」』】〙〗〟’”｠»"
+    "ゝゞヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎゕゖ々〻‐゠–〜～"
+    ",.!?:;)]}%")
+#: Characters a Chinese or Japanese line may not END with: opening brackets
+#: and quotes, which belong with the words they open.
+_CJK_NO_LINE_END = frozenset("（〔［｛〈《「『【〘〖〝‘“｟«([{")
+
+
 def wrap_cjk_chars(text: str, max_chars: int = MAX_CHARS_PER_LINE) -> list[str]:
     """Wrap CJK by character count, but keep any Latin or digit run whole.
 
@@ -259,8 +273,13 @@ def wrap_cjk_chars(text: str, max_chars: int = MAX_CHARS_PER_LINE) -> list[str]:
     is one unbreakable word, so an English title, a quoted passage or a name
     inside a Mandarin or Japanese caption is never cut in half ("soul r /
     avished", seen on a live Mandarin episode, 2026-10-15). A run longer than
-    the line is hard-broken. Pure CJK text wraps exactly as it always did:
-    ``max_chars`` characters a line."""
+    the line is hard-broken.
+
+    Breaks obey kinsoku: a mark in ``_CJK_NO_LINE_START`` stays on the line of
+    the character before it, and an opening bracket in ``_CJK_NO_LINE_END``
+    goes down with the character after it, so a line never opens with "。" or
+    "」" and never ends on "「". Each line still fits ``max_chars``; a line
+    simply breaks one character earlier when its last break was illegal."""
     compact = str(text or "").replace("\n", "")
     if not compact:
         return [""]
@@ -285,9 +304,20 @@ def wrap_cjk_chars(text: str, max_chars: int = MAX_CHARS_PER_LINE) -> list[str]:
             word += ch
     if word:
         tokens.append(word)
+    # Kinsoku: glue each token that may not open a line onto the token before
+    # it, and the token after an opening bracket onto the bracket. A space is
+    # a legal break and is never glued across.
+    units: list[str] = []
+    for tok in tokens:
+        if (tok != " " and units and units[-1] != " "
+                and (tok[0] in _CJK_NO_LINE_START
+                     or units[-1][-1] in _CJK_NO_LINE_END)):
+            units[-1] += tok
+        else:
+            units.append(tok)
     lines: list[str] = []
     cur = ""
-    for tok in tokens:
+    for tok in units:
         if tok == " ":
             if cur:
                 cur += " "
