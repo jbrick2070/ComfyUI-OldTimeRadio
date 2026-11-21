@@ -460,7 +460,8 @@ _MAC_CJK_FAMILIES = (
 
 
 def _cjk_family_for_this_os() -> str:
-    """The Chinese family the caption and title styles name on this machine.
+    """The system Chinese family, named only when the pack's own Noto Sans SC
+    is missing from the install (:func:`_script_family`).
 
     Windows: Microsoft YaHei, as always. macOS: the family of the first Mac
     face ``_os_script_font_paths`` finds, so the title is measured and burned
@@ -469,29 +470,40 @@ def _cjk_family_for_this_os() -> str:
     imageio-ffmpeg bundles, which a Mac now burns captions with, does no such
     substitution and drew every Chinese glyph as a box (M6, 2026-11-20; the
     same build draws "Heiti SC", "Hiragino Sans GB" and the pack's "Noto Sans
-    SC"). With no Mac face the shipped face takes over
-    (``_shipped_family_if_no_os_face``).
-
-    Linux: the pack's own Noto Sans SC, always, handed to libass by file
-    (``otr_caption_burn._shipped_fonts_option``). Linux boxes burn with static
-    ffmpeg builds (the pod provisioner installs johnvansickle's; the bundled
-    imageio-ffmpeg is another), whose fontconfig does not substitute a CJK
-    face for a family the box lacks, so naming Microsoft YaHei over an
-    installed Noto CJK is the Mac failure again. A face passed by file needs
-    no fontconfig at all; on the M6 the same mechanism drew the text.
+    SC").
     """
     if sys.platform == "darwin":
         for path, family in _MAC_CJK_FAMILIES:
             if os.path.isfile(path):
                 return family
-    elif sys.platform.startswith("linux"):
-        try:
-            from . import _otr_script_fonts as _SF
-        except ImportError:  # pragma: no cover -- flat load
-            import _otr_script_fonts as _SF  # type: ignore
-        if _SF.bundled_path("cjk"):
-            return _SF.bundled_family("cjk")
     return "Microsoft YaHei"
+
+
+def _script_family(policy: str) -> str:
+    """The family a Devanagari or CJK caption and title style names: the face
+    the pack ships, on EVERY operating system, handed to libass by file.
+
+    THE PERMANENT FIX FOR NON-LATIN BOXES (2026-11-20). Naming a system face
+    left the glyphs to two things outside the pack: which fonts the machine
+    has, and whether its ffmpeg's fontconfig substitutes one face for
+    another. Both failed in one night -- Windows' "Microsoft YaHei" drew
+    boxes on a Mac once captions burned with the bundled ffmpeg, and a
+    static-ffmpeg Linux pod was set up the same way. A face passed by file
+    (``otr_caption_burn._shipped_fonts_option``) needs neither, so every
+    machine draws the same glyphs. The title is measured, and the credits
+    drawn, with the same file (``otr_credits_roll._credits_script_font_paths``
+    tries it first). A system face is named only when the shipped file is
+    missing from a broken install.
+    """
+    try:
+        from . import _otr_script_fonts as _SF
+    except ImportError:  # pragma: no cover -- flat load
+        import _otr_script_fonts as _SF  # type: ignore
+    if _SF.bundled_path(policy):
+        return _SF.bundled_family(policy)
+    if policy == "devanagari":
+        return "Nirmala UI"
+    return _cjk_family_for_this_os()
 
 
 def _shipped_family_if_no_os_face(policy: str) -> "str | None":
@@ -722,11 +734,8 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
             cap = _EPLANG.row_from_meta(ledger.get("meta") or {}).captions
             wrap_policy = str(cap.get("wrap_policy") or "word_split")
             font_policy = str(cap.get("font_policy") or "")
-            if font_policy == "devanagari":
-                st["font"] = "Nirmala UI"
-                title_font = "Nirmala UI"
-            elif font_policy == "cjk":
-                st["font"] = title_font = _cjk_family_for_this_os()
+            if font_policy in ("devanagari", "cjk"):
+                st["font"] = title_font = _script_family(font_policy)
             shipped = _shipped_family_if_no_os_face(font_policy)
             if shipped:
                 st["font"] = title_font = shipped

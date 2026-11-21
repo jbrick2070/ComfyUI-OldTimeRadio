@@ -232,7 +232,7 @@ def test_captions_off_still_reads_the_ledger_for_the_title_font(
                                 captions=False, iso="hi")
     _, _, on_style = _burn_ass(plan_json, tmp_path, monkeypatch,
                                captions=True, iso="hi")
-    assert off_style == on_style and "Nirmala UI" in off_style[0]
+    assert off_style == on_style and "OTR Noto Devanagari Latin" in off_style[0]
 
 
 def test_the_builder_default_still_draws_dialogue(plan, tmp_path):

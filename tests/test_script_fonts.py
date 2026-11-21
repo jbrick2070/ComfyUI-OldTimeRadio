@@ -45,22 +45,13 @@ def test_the_registry_bundle_keeps_the_fonts():
                Path(SF.bundled_path(p)).parent.parent.name == "nodes" for p in SF.BUNDLED)
 
 
-def test_the_shipped_cjk_face_is_the_last_candidate(tmp_path):
-    paths = CR._credits_script_font_paths(str(tmp_path), "cjk")
-    assert paths[-1] == SF.bundled_path("cjk")
-    assert paths[:-1] == CR._os_script_font_paths(str(tmp_path), "cjk")
-
-
-def test_the_shipped_devanagari_face_comes_before_linuxs_latin_less_ones(tmp_path):
-    """Noto Sans Devanagari has no Latin letters, so the merge goes ahead of
-    the Linux faces -- and still behind Nirmala UI and Sangam."""
-    paths = CR._credits_script_font_paths(str(tmp_path), "devanagari")
-    shipped = paths.index(SF.bundled_path("devanagari"))
-    assert all(not p.startswith("/usr/") for p in paths[:shipped])
-    assert all(p.startswith("/usr/") for p in paths[shipped + 1:])
-    assert any("Nirmala" in p for p in paths[:shipped])
-    assert sorted(paths[:shipped] + paths[shipped + 1:]) == sorted(
-        CR._os_script_font_paths(str(tmp_path), "devanagari"))
+@pytest.mark.parametrize("policy", ["cjk", "devanagari"])
+def test_the_shipped_face_is_the_first_candidate_then_the_os_faces(tmp_path, policy):
+    """The title is measured, and the credits drawn, in the face the caption
+    burn hands libass by file -- the shipped one, on every OS (2026-11-20)."""
+    paths = CR._credits_script_font_paths(str(tmp_path), policy)
+    assert paths[0] == SF.bundled_path(policy)
+    assert paths[1:] == CR._os_script_font_paths(str(tmp_path), policy)
 
 
 def test_the_shipped_devanagari_face_carries_latin():

@@ -108,10 +108,10 @@ def test_a_script_policy_resolves_a_script_face_when_the_host_has_one(policy, wi
     font = VE._load_font(20, policy)
     assert getattr(font, "path", "") == path
     assert font is not VE._load_font(20)
-    # The face the CRT measures with must carry the glyphs ASS will burn.
+    # The face the CRT measures with is the face ASS burns: the shipped one.
+    from nodes import _otr_captions as CAP
     family = getattr(font, "getname", lambda: ("", ""))()[0]
-    expected = {"devanagari": "Nirmala", "cjk": ("Microsoft YaHei", "SimHei", "SimSun", "Yu Gothic")}[policy]
-    assert any(family.startswith(e) for e in ((expected,) if isinstance(expected, str) else expected)), family
+    assert family == CAP._script_family(policy), family
 
 
 def test_the_renderer_loads_every_face_through_its_policy():

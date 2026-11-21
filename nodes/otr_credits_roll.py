@@ -707,12 +707,16 @@ def _use_credits_font_policy(layout) -> str:
 
 
 def _credits_script_font_paths(fd: str, policy: str) -> list:
-    """Faces that can actually paint the row's script: the OS's own, then the
-    one the pack ships (``_otr_script_fonts``) for a box that has none -- a
-    Linux image carries no CJK or Devanagari face (RunPod 2026-10-21: every
-    Mandarin caption and credit boxed). Tried BEFORE the English monospace
-    list so Hindi / CJK titles do not tofu, and AFTER ``OTR_CREDITS_FONT`` so
-    the operator override still wins."""
+    """Faces that can actually paint the row's script: the one the pack ships
+    (``_otr_script_fonts``) FIRST, then the OS's own for an install missing it.
+    Tried BEFORE the English monospace list so Hindi / CJK titles do not tofu,
+    and AFTER ``OTR_CREDITS_FONT`` so the operator override still wins.
+
+    SHIPPED FIRST ON EVERY OS (2026-11-20). The caption and title styles now
+    name the shipped face everywhere (``_otr_captions._script_family``), so the
+    title card is measured, and the credits drawn, in the same file the burn
+    hands libass. The shipped Devanagari face is a merge with Noto Sans Latin,
+    so a credits line mixing a Hindi heading with names stays whole."""
     os_faces = _os_script_font_paths(fd, policy)
     try:
         from . import _otr_script_fonts as _SF
@@ -721,13 +725,7 @@ def _credits_script_font_paths(fd: str, policy: str) -> list:
     shipped = _SF.bundled_path(policy)
     if not shipped:
         return os_faces
-    if policy == "devanagari":
-        # Linux's Devanagari faces carry no Latin letters, and these walks draw
-        # a whole line in one face: the shipped merge goes ahead of them, still
-        # behind Windows' Nirmala UI and macOS's Sangam, which have Latin.
-        linux = [path for path in os_faces if path.startswith("/usr/")]
-        return [path for path in os_faces if path not in linux] + [shipped] + linux
-    return os_faces + [shipped]
+    return [shipped] + os_faces
 
 
 def _shipped_latin_mono() -> "str | None":

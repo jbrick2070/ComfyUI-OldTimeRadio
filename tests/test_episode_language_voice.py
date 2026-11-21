@@ -475,10 +475,10 @@ def test_accented_spanish_survives_ass_and_is_not_ascii_stripped(tmp_path):
 
 def test_hindi_and_cjk_ass_use_the_row_font(tmp_path):
     hi = _caption_ledger(tmp_path, "hi", "नमस्ते दुनिया")
-    assert "Nirmala UI" in hi
+    assert "OTR Noto Devanagari Latin" in hi
     assert "नमस्ते" in hi
     ja = _caption_ledger(tmp_path, "ja", "日本語の字幕です")
-    assert "Microsoft YaHei" in ja
+    assert "Noto Sans SC" in ja
     assert "日本語" in ja
 
 
@@ -554,15 +554,19 @@ def test_windows_keeps_microsoft_yahei(monkeypatch):
     assert C._cjk_family_for_this_os() == "Microsoft YaHei"
 
 
-def test_linux_names_the_shipped_face_so_the_burn_hands_it_over_by_file(monkeypatch, tmp_path):
-    """Linux burns with static ffmpeg builds that do not substitute a CJK face
-    for Microsoft YaHei; the shipped Noto Sans SC goes by file."""
+@pytest.mark.parametrize("platform", ["win32", "darwin", "linux"])
+def test_every_os_names_the_shipped_face_so_the_burn_hands_it_over_by_file(
+        monkeypatch, tmp_path, platform):
+    """System faces drew boxes on a Mac (bundled ffmpeg, no substitution) and a
+    static-ffmpeg Linux pod was set up the same way; the shipped face goes by
+    file on every OS."""
     import nodes._otr_captions as C
     import nodes._otr_script_fonts as SF
     import nodes.otr_caption_burn as BURN
 
-    monkeypatch.setattr(C.sys, "platform", "linux")
-    family = C._cjk_family_for_this_os()
+    monkeypatch.setattr(C.sys, "platform", platform)
+    assert C._script_family("devanagari") == SF.bundled_family("devanagari")
+    family = C._script_family("cjk")
     assert family == SF.bundled_family("cjk") == "Noto Sans SC"
     ass = tmp_path / "episode_captions.ass"
     ass.write_text("Style: Default,%s,40,&H00FFFFFF\n" % family, encoding="utf-8")
