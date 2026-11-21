@@ -305,9 +305,9 @@ def hf_token_engines() -> frozenset:
 
     `config/audio_engine_profiles.yaml` declares `requires_hf_token` per
     profile, and it is the only structured statement of that fact in the repo.
-    Before this was read, the matrix derived `stable_audio_music` as **auto**
-    -- whose legend promises "no account and no token; just pick it and run" --
-    for a lane whose weights are gated behind a licence click. That is the
+    Before this was read, the matrix derived the (since removed) gated
+    `stable_audio_music` lane as **auto** -- whose legend promises "no account
+    and no token; just pick it and run" -- for weights behind a licence click. That is the
     single worst thing this table can say, because a reader picks a music
     engine on exactly that promise.
 

@@ -201,7 +201,6 @@ def test_google_lyria_has_no_partner_or_local_engine_call_path():
         "invoke_partner_node",
         "cloud_media_invoke",
         "eng_musicgen",
-        "eng_stable_audio",
         "eng_stable_audio_3",
         "eng_cloud_sonilo",
     }

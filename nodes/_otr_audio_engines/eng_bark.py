@@ -73,7 +73,7 @@ class BarkEngine:
         from .._otr_bark_lib import _load_bark
 
         # Thread the CastLock ledger's device stamp, exactly as
-        # eng_musicgen / eng_kokoro / eng_stable_audio already do
+        # eng_musicgen / eng_kokoro / eng_stable_audio_3 already do
         # (`getattr(self, "requested_device", None) or "cuda"`, the S4
         # 2026-07-10 idiom stamped by _otr_voice_node_common.py).
         #
@@ -91,7 +91,7 @@ class BarkEngine:
         auto-detect.
 
         DELIBERATELY NOT `or "cuda"`, which is what the sibling adapters
-        (eng_musicgen, eng_kokoro, eng_stable_audio) use. Those hand their
+        (eng_musicgen, eng_kokoro, eng_stable_audio_3) use. Those hand their
         default straight to a `.to(device)`, so a literal "cuda" default is
         merely the nv50 baseline for them. Bark is different: `_load_bark`
         treats ``device=None`` as "auto-detect", and that probe is now

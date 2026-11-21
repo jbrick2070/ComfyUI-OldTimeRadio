@@ -357,14 +357,6 @@
       },
       "size_gb": 3.5
     },
-    "stable_audio_music": {
-      "memory": {
-        "mac16": "fits",
-        "nv16": "fits",
-        "nv8": "fits"
-      },
-      "size_gb": 4.5
-    },
     "still_flat": {
       "memory": {
         "mac16": "proven",

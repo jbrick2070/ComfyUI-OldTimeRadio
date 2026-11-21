@@ -107,12 +107,10 @@ def test_engine_dropdown_legacy_first_and_stable(monkeypatch):
     assert engines == [
         "stable_audio_3",
         "musicgen",
-        "stable_audio_music",
         "sonilo",
         "google_lyria",
     ]
     assert it["required"]["engine"][1]["default"] == "stable_audio_3"
-    monkeypatch.setenv("OTR_ENABLE_STABLE_AUDIO", "1")
     assert list(T.INPUT_TYPES()["required"]["engine"][0]) == engines
 
 
@@ -128,8 +126,7 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
     engines = list(it["required"]["engine"][0])
     # OTR-F003 (2026-10-15): the broken-profiles fallback leads with the SAME
     # shipped default as the registry -- never musicgen (CC-BY-NC).
-    assert engines == ["stable_audio_3", "musicgen", "stable_audio_music",
-                       "sonilo", "google_lyria"]
+    assert engines == ["stable_audio_3", "musicgen", "sonilo", "google_lyria"]
     assert it["required"]["engine"][1]["default"] == "stable_audio_3"
 
 
@@ -345,19 +342,6 @@ def test_dispatch_fails_closed_with_taxonomy(monkeypatch):
     # C6: no flag-gate dispatch case any more -- a registered engine is
     # selectable (the registry IS the menu). The fail-closed taxonomy here is
     # MALFORMED_CONFIG (unknown engine) + INCOMPATIBLE_PROFILE (wrong role) above.
-
-
-def test_stable_audio_missing_hf_token_fails_closed(monkeypatch):
-    """No HF_TOKEN -> MISSING_HF_TOKEN on the generate path (C-5)."""
-    from nodes._otr_audio_engines import EngineUnusable, EngineUsabilityReason
-    from nodes.stable_audio_theme import StableAudioTheme
-
-    monkeypatch.delenv("HF_TOKEN", raising=False)
-    with pytest.raises(EngineUnusable) as missing:
-        StableAudioTheme().generate(
-            script_json='{"meta": {}}', engine="stable_audio_music",
-        )
-    assert missing.value.reason is EngineUsabilityReason.MISSING_HF_TOKEN
 
 
 def test_node_wired_into_init_by_table_not_literal_key():

@@ -32,7 +32,6 @@ Pro** -- and there is one per act break, so `act_count` 1 gives none and
 |---|---|---|
 | **`stable_audio_3`** *(the default)* | Nothing. Two files, about 3.2 GiB, fetched on the first run that needs them | NVIDIA and Apple Silicon. **Not CPU.** |
 | **`musicgen`** | Nothing. 2.2 GiB fetched on first use | NVIDIA, Apple Silicon and CPU |
-| **`stable_audio_music`** | **A Hugging Face licence acceptance and a token** | NVIDIA only |
 | **`sonilo`** | A Comfy account and credits | Hosted -- no GPU of yours |
 | **`google_lyria`** | A Google API key. Paid, and preview-only | Hosted -- no GPU of yours |
 
@@ -140,9 +139,10 @@ In this order.
 ## If something goes wrong
 
 **The run stops naming the music engine.** You picked one that is not set up on
-this machine. `stable_audio_music` needs a licence accepted on Hugging Face and
-a token; `sonilo` needs a Comfy login; `google_lyria` needs a Google key. It
-will not silently substitute another engine. Go back to `stable_audio_3`.
+this machine. `sonilo` needs a Comfy login; `google_lyria` needs a Google key.
+It will not silently substitute another engine. Go back to `stable_audio_3`.
+(`stable_audio_music`, which needed a Hugging Face licence and token, was
+removed in 2.3.60: no gated models.)
 
 **The run stops on the music step on a machine with no GPU.** Stable Audio 3 is
 CUDA and Metal only. Use `musicgen`, which is what the CPU preset ships with.

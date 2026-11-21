@@ -64,11 +64,11 @@ def test_the_chatterbox_worker_accepts_an_ordinal_device():
 
 
 def test_adapters_branch_on_the_device_kind_not_the_literal():
-    """A round-tripped cuda:1 must still be CUDA to musicgen's dtype pick,
-    stable-audio's seeding and Bark's dtype pick."""
+    """A round-tripped cuda:1 must still be CUDA to musicgen's dtype pick and
+    Bark's dtype pick."""
     from nodes import _otr_bark_lib as bark
-    from nodes._otr_audio_engines import eng_musicgen, eng_stable_audio
-    for module in (eng_musicgen, eng_stable_audio, bark):
+    from nodes._otr_audio_engines import eng_musicgen
+    for module in (eng_musicgen, bark):
         src = inspect.getsource(module)
         assert 'device == "cuda" else torch.float32' not in src, module.__name__
         assert 'if dev == "cuda":' not in src, module.__name__

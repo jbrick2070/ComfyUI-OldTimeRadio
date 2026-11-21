@@ -74,7 +74,7 @@ def _audio_registry():
     from nodes._otr_audio_engines import registry as areg
     from nodes._otr_audio_engines import (  # noqa: F401  (register adapters)
         eng_bark, eng_chatterbox, eng_indextts2, eng_kokoro,
-        eng_musicgen, eng_stable_audio, eng_stable_audio_3,
+        eng_musicgen, eng_stable_audio_3,
     )
     return areg
 

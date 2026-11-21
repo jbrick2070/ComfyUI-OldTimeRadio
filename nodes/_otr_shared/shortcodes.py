@@ -221,7 +221,6 @@ VALUE_ALIASES = {
 MUSIC_GEN = {
     "stable_audio_3": "sa3",
     "musicgen": "mgen",
-    "stable_audio_music": "sam",
     "sonilo": "soni",
     "google_lyria": "lyra",
 }

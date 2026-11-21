@@ -67,8 +67,7 @@ _LEGACY_FIRST_ENGINES: Dict[str, tuple] = {
     # (direct-api, BYO key) APPENDED 2026-07-08 -- index 0 stays the
     # byte-identical default; external paid picks are never automatic (C2).
     "music": (
-        "stable_audio_3", "musicgen", "stable_audio_music", "sonilo",
-        "google_lyria",
+        "stable_audio_3", "musicgen", "sonilo", "google_lyria",
     ),
 }
 

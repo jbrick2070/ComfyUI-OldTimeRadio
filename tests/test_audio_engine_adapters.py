@@ -27,9 +27,12 @@ def test_char_voice_pool_has_optins():
     assert {"bark", "chatterbox", "indextts2"} <= pool
 
 
-def test_music_role_has_stable_audio():
-    assert "stable_audio_music" in AE.engines_for_role("music")
-    assert "google_lyria" in AE.engines_for_role("music")
+def test_music_role_has_stable_audio_3_and_no_gated_engine():
+    """stable_audio_music (HF-gated weights) was removed 2026-11-20: no gated
+    models. stable_audio_3 is the ungated shipped default."""
+    music = AE.engines_for_role("music")
+    assert "stable_audio_3" in music and "google_lyria" in music
+    assert "stable_audio_music" not in music
 
 
 def test_unknown_role_has_no_engines():
@@ -60,9 +63,6 @@ def test_optin_flags_and_licensing():
     idx = AE.get_engine("indextts2")
     assert idx.requires_flag is None  # PROMOTED 2026-06-04: shipped char_voice default
     assert idx.commercial_clean is False  # Bilibili non-commercial (non-blocking warn)
-    sa = AE.get_engine("stable_audio_music")
-    assert sa.requires_flag is None  # C6: registry IS the menu (no flag gate)
-    assert sa.commercial_clean is True
 
 
 def test_assert_usable_no_flag_gate(monkeypatch):

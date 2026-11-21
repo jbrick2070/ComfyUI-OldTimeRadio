@@ -13,7 +13,7 @@ def test_load_resolver_profile_ids():
         "char_kokoro_v1",
         "announcer_kokoro_v1", "announcer_chatterbox_v1",
         "announcer_bark_v1",
-        "music_musicgen_v1", "music_stable_audio_v1", "music_stable_audio_3_v1",
+        "music_musicgen_v1", "music_stable_audio_3_v1",
         # cloud ElevenLabs voice (cloud-audio S1, 2026-07-03)
         "char_elevenlabs_cloud_v1", "announcer_elevenlabs_cloud_v1",
         # direct Google Gemini TTS (BYO API key, explicit-selection-only)
@@ -47,13 +47,10 @@ def test_resolve_optin_selectable_no_flag(monkeypatch):
     # C6 -- registry IS the menu: an opt-in engine resolves with NO flag gate
     # (validation is the operator's MANUAL process, never a code gate).
     monkeypatch.delenv("OTR_ENABLE_CHATTERBOX", raising=False)
-    monkeypatch.delenv("OTR_ENABLE_STABLE_AUDIO", raising=False)
     r = EP.load_resolver()
     p = r.resolve_casting_plan(role="char_voice", engine="chatterbox",
                                voice_bank="default")
     assert p.profile_id == "char_chatterbox_v1"
-    p2 = r.resolve_casting_plan(role="music", engine="stable_audio_music")
-    assert p2.profile_id  # resolves without a flag gate
 
 
 def test_resolve_optin_succeeds_when_flag_on(monkeypatch):
@@ -80,10 +77,20 @@ def test_unknown_profile_id_is_malformed_config():
     assert ei.value.reason is EngineUsabilityReason.MALFORMED_CONFIG
 
 
+def test_no_audio_profile_needs_a_hugging_face_token():
+    """No gated models (operator, 2026-11-20): music_stable_audio_v1 was the
+    last profile with requires_hf_token."""
+    r = EP.load_resolver()
+    gated = [pid for pid in r.profile_ids() if r.get(pid).requires_hf_token]
+    assert gated == []
+
+
 def test_missing_token_raises_in_generate_not_input_types(monkeypatch):
     monkeypatch.delenv("HF_TOKEN", raising=False)
     r = EP.load_resolver()
-    sa = r.get("music_stable_audio_v1")
+    # No shipped profile is gated, so a stand-in exercises the guard that
+    # still protects the generate path.
+    sa = r.get("char_bark_v1").model_copy(update={"requires_hf_token": True})
     with pytest.raises(EngineUnusable) as ei:
         EP.assert_token_for_profile(sa)
     assert ei.value.reason is EngineUsabilityReason.MISSING_HF_TOKEN

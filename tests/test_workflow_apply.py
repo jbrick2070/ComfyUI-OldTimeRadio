@@ -83,7 +83,7 @@ def _registry_engine_ids():
     from nodes._otr_audio_engines import (  # noqa: F401
         eng_bark, eng_chatterbox, eng_indextts2, eng_kokoro,
         eng_cloud_elevenlabs, eng_cloud_sonilo, eng_musicgen,
-        eng_stable_audio, eng_stable_audio_3,
+        eng_stable_audio_3,
     )
     from nodes._otr_image_engines import registry as ireg
     # `hidream_i1` and `sd35_large` left this list on 2026-09-12 for the same

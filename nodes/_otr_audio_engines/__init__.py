@@ -29,7 +29,6 @@ from . import eng_bark, eng_kokoro, eng_musicgen  # noqa: E402,F401
 # Opt-in engines (flag-gated; never a default).
 from . import (  # noqa: E402,F401
     eng_chatterbox,
-    eng_stable_audio,
     eng_stable_audio_3,
 )
 

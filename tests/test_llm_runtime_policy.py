@@ -355,18 +355,6 @@ def test_shot_lock_threads_the_ledger_policy():
     assert "policy=policy_from_meta(meta)" in sl
 
 
-def test_stable_audio_music_has_no_device_waterfall():
-    """eng_stable_audio was the adapter the S4 sweep missed: it must read
-    requested_device (theme-node stamp), never probe cuda."""
-    import inspect
-
-    from nodes._otr_audio_engines import eng_stable_audio as sa
-
-    src = inspect.getsource(sa)
-    assert 'getattr(self, "requested_device"' in src
-    assert 'dev = "cuda" if torch.cuda.is_available() else "cpu"' not in src
-
-
 # --------------------------------------------------------------------------
 # A1 (2026-07-27): the ceiling is an ADMISSION field, so it is evaluated on
 # every REQUEST -- ahead of cache reuse and ahead of loading. Before this it

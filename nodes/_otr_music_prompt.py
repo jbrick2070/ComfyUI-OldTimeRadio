@@ -32,10 +32,10 @@ prompts and make them more musical ... ideally it is relevant to the story"):
   No character cap is applied here: Sonilo owns its own
   1000-character limit and raises on it (`eng_cloud_sonilo.generate_clip`),
   which is the fail-closed shape this pack prefers over a silent trim -- and
-  google_lyria and stable_audio_music, which have NO local length guard, are
-  not exposed by that: measured over the 2029 authored music rows on disk the
-  longest is 374 characters, the p99 is 298, and none exceeds 500. The brief
-  form adds about 60. No limit is invented for those two, because a guessed
+  google_lyria, which has NO local length guard, is not exposed by that:
+  measured over the 2029 authored music rows on disk the longest is 374
+  characters, the p99 is 298, and none exceeds 500. The brief form adds about
+  60. No limit is invented for it, because a guessed
   ceiling would be worse than the measurement that says one is not needed
   today; if authored rows ever grow, this is the paragraph that has to change.
 

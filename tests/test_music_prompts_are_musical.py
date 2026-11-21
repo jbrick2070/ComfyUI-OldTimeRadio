@@ -235,7 +235,7 @@ def test_a_ratio_below_the_floor_is_a_control_arm_and_warns_that_it_breaks_the_i
 @pytest.mark.parametrize("module,cls", [
     ("eng_stable_audio_3", "StableAudio3Engine"),
     ("eng_musicgen", None), ("eng_google_lyria", None),
-    ("eng_cloud_sonilo", None), ("eng_stable_audio", None),
+    ("eng_cloud_sonilo", None),
 ])
 def test_every_music_adapter_accepts_placement_and_negative_prompt(module, cls):
     import importlib

@@ -366,7 +366,7 @@ ENGINE_COVERAGE = {
     # --- audio: local engines ship presets or weights, not provider slugs ----
     "bark": "local", "kokoro": "local", "chatterbox": "local",
     "indextts2": "local", "musicgen": "local",
-    "stable_audio_3": "local", "stable_audio_music": "local",
+    "stable_audio_3": "local",
     # --- audio: cloud engines ship concrete provider model ids ---------------
     "cloud_elevenlabs": "collected",
     "google_tts": "collected",

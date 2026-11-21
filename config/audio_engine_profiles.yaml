@@ -177,18 +177,6 @@ profiles:
     requires_hf_token: false
     license_state: gated            # CC-BY-NC (non-commercial)
 
-  - profile_id: music_stable_audio_v1
-    role: music
-    engine: stable_audio_music
-    commercial_clean: true         # Stability Community license (revenue-capped)
-    model_path: ""
-    default_params: {steps: 100, seconds_total: 30}
-    allowed_voice_banks: []
-    engine_impl_version: "1"
-    sample_rate: 44100
-    requires_hf_token: true         # stable-audio-open-1.0 weights are HF-gated
-    license_state: clean            # mirrors commercial_clean=true; plan flags revenue-cap review (S6)
-
   - profile_id: music_stable_audio_3_v1
     role: music
     engine: stable_audio_3

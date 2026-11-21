@@ -296,14 +296,13 @@ open MPS black-video defect on top, section 13). A 32 GB Mac would change some
 of these answers; that is a hardware question, not a portability defect.
 
 **Never run here.** `lumina_image`, `flux_gen1`, `humo_1.7B`, `humo_1.7B_169`,
-`mesh_stage`, `stable_audio_music`, the sidecar voices (`indextts2`,
+`mesh_stage`, the sidecar voices (`indextts2`,
 `chatterbox` -- blocked by a PowerShell-only installer, not by Metal;
 `indextts2` by size as well).
 The matrix reads each one's code and sizes it; **an "unsafe at 16 GB" for any
 of them is a size estimate, not a measurement**, and the reason not to try
 anyway is the cost of being wrong (a reboot), not confidence that the estimate
-is right. `stable_audio_music` additionally needs the `stable-audio-tools`
-package, which nothing declares, and gated weights -- friction, not failure.
+is right.
 
 ### Rows that gained `mps` this campaign, each on a receipt
 

@@ -640,15 +640,10 @@ what kind it is; the first two are ComfyUI registered folders that
 The details, and the Windows long-path fallback, are in
 [apple/INSTALL.md](apple/INSTALL.md#weights-what-you-do-not-have-to-do).
 
-**You do not need a Hugging Face token to run OTR.** Everything the canonical
-selects, and everything the 8 GB and Mac workflows select, is ungated. A token is
-needed only for the one gated music option, `stable_audio_music` (no writer in
-the list is gated) -- and for it you accept the licence on
-the model's page while signed in, then log in locally once:
-
-```bash
-hf auth login
-```
+**You do not need a Hugging Face token to run OTR.** No model in any dropdown is
+gated: every writer, voice, music engine and default weight downloads with no
+account (the two gated options, `google/gemma-2-2b-it` and `stable_audio_music`,
+were removed in 2.3.60).
 
 **Never paste a token into a workflow widget.** No node here asks for one, and a
 value saved into a workflow travels with it -- into every workflow you share, every
@@ -758,10 +753,6 @@ Mac where Bark is a memory hazard. Non-English rows admit Kokoro -- the only
 local voice they admit -- and the hosted voices Google TTS and ElevenLabs
 (your own account and key). A full non-English episode on
 3.14 through a hosted voice has not been run.
-
-**A gated model returns HTTP 401.** `stable_audio_music` needs a licence click
-on Hugging Face plus a login; every writer and every default weight is ungated,
-the LTX 2.5 lanes included.
 
 **On a Mac, a 19 GB download starts the moment you queue.** The image dropdowns
 still say `z_image_turbo` while the video lane you picked consumes a still. Set

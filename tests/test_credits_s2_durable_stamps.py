@@ -48,12 +48,12 @@ def test_stamp_durable_copies_sections_and_meta_into_singleton(fresh_singleton):
              "voice_engine": "indextts2", "commercial_clean": True}]
     ret = pl.stamp_durable(
         sections={"cast": cast},
-        meta_updates={"music_engine": "stable_audio_music"},
+        meta_updates={"music_engine": "stable_audio_3"},
         source="spec",
     )
     led = pl.get_ledger()
     assert led.data["cast"] == cast
-    assert led.data["meta"]["music_engine"] == "stable_audio_music"
+    assert led.data["meta"]["music_engine"] == "stable_audio_3"
     # test-mode injection path: in-memory only, no disk save, returns None
     assert ret is None
     assert not led.data["meta"].get("paths")  # save() never ran

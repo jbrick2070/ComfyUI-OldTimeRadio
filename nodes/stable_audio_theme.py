@@ -10,9 +10,6 @@ Every music engine is a self-contained ``clip`` engine:
     (``_otr_music_prompt.compose_music_prompt``), a per-cue external seed
     (``_seed_to_int64(music_rng_seed, slot)``, G1), the adapter ``generate_clip``
     call, and ``pack_audio_batch`` into the AUDIO-batch contract (C-4).
-  * ``stable_audio_music`` (opt-in, flag-gated + HF-token-gated, ``clip``) -> the
-    same clip path; native stereo downmixed to mono while the assembly chain is
-    mono.
 
 Unlike the voice nodes this node has THREE AUDIO outputs, so it is self-contained
 rather than built on the voice-node base; it reuses the shared
@@ -50,8 +47,7 @@ ROLE = "music"
 # It is the WHOLE registry list, like the voice nodes' fallbacks (P1.1 in
 # apple/TTS_VOICE_PREFLIGHT.md), so a saved sonilo / google_lyria pick still
 # has its value in a degraded boot.
-_LEGACY_FIRST_FALLBACK = ("stable_audio_3", "musicgen", "stable_audio_music",
-                          "sonilo", "google_lyria")
+_LEGACY_FIRST_FALLBACK = ("stable_audio_3", "musicgen", "sonilo", "google_lyria")
 
 # The three fixed theme cues. Durations + the per-cue prompt are composed by the
 # single-source Meta-brief composer (nodes/_otr_music_prompt.compose_music_prompt),
@@ -150,9 +146,9 @@ class StableAudioTheme:
                         # changed the value and not the sentence describing it.
                         "Theme-music engine. `stable_audio_3` is the shipped "
                         "default and is ungated; `musicgen` is selectable and "
-                        "is noncommercial; `stable_audio_music` needs a "
-                        "Hugging Face licence acceptance. Unusable selections "
-                        "fail closed with a named error."
+                        "is noncommercial. No choice needs a Hugging Face "
+                        "login. Unusable selections fail closed with a named "
+                        "error."
                     ),
                 }),
             },

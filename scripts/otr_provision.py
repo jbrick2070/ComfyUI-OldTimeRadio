@@ -1342,7 +1342,6 @@ NO_LANE_REASON = {
     "kokoro": "hf_cache",
     "bark": "hf_cache",
     "musicgen": "hf_cache",
-    "stable_audio_music": "hf_cache",
     # Voice engines with their own installers (scripts/_otr_*_install.ps1).
     "chatterbox": "sidecar",
     "indextts2": "sidecar",

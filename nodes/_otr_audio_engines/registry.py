@@ -237,14 +237,6 @@ CAPABILITIES = {
                  "practical_without_gpu": True,
                  "sidecar_conditional": False,
                  "model_requirements": ["musicgen-small"]},
-    "stable_audio_music": {"required_toolchain": None,
-                           "requires_sidecar": False,
-                           "device_backends": ["cuda"],
-                           "requires_vendor": None,
-                           "needs_fp8_te": False, "needs_fp4_te": False,
-                           "practical_without_gpu": False,
-                           "sidecar_conditional": False,
-                           "model_requirements": ["stable-audio-open"]},
     # stable_audio_3 is comfy-native: Comfy core owns its device layer, and
     # the mac_mps tier ships it as the music engine (verify-at-build item).
     "stable_audio_3": {"required_toolchain": None, "requires_sidecar": False,

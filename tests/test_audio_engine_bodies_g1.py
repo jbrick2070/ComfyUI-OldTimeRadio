@@ -74,20 +74,11 @@ def test_indextts2_pathb_fails_closed_without_worker(monkeypatch, tmp_path):
         eng.generate_voice("hello there", None, None, 7)
 
 
-def test_music_engine_fails_closed_without_lib():
-    if not _absent("stable_audio_tools"):
-        pytest.skip("stable_audio_tools present -- real inference needs the GPU pilot")
-    eng = _engine("eng_stable_audio", "StableAudioMusicEngine")
-    with pytest.raises(RuntimeError, match="not installed"):
-        eng.generate_clip("warm ambient pad", 4.0, 7)
-
-
 @pytest.mark.parametrize(
     "modname,clsname",
     [
         ("eng_chatterbox", "ChatterboxEngine"),
         ("eng_indextts2", "IndexTTS2Engine"),
-        ("eng_stable_audio", "StableAudioMusicEngine"),
     ],
 )
 def test_engine_not_external_generator_ready_until_pilot(modname, clsname):

@@ -17,7 +17,7 @@ Frozen v2 ledger JSON from OTR_LedgerFreezeCascade. Passed VERBATIM to the legac
 
 **Music - composer** (`engine`) -- a choice from the dropdown.
 
-Theme-music engine. `stable_audio_3` is the shipped default and is ungated; `musicgen` is selectable and is noncommercial; `stable_audio_music` needs a Hugging Face licence acceptance. Unusable selections fail closed with a named error.
+Theme-music engine. `stable_audio_3` is the shipped default and is ungated; `musicgen` is selectable and is noncommercial. No choice needs a Hugging Face login. Unusable selections fail closed with a named error.
 
 ### Optional
 
