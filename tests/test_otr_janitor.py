@@ -121,3 +121,13 @@ def test_shared_readme_idempotent(out_root):
     J.ensure_shared_readme()
     assert readme.read_text(encoding="utf-8") == first
     assert "janitor" in first.lower()      # the tier docs name the sweep
+
+
+def test_shared_readme_creates_the_tmp_and_cache_tiers(out_root):
+    """Libraries handed _shared/tmp write into it without creating it; on a
+    fresh Mac install the voice stage's first write there failed because no
+    earlier stage had made the folder (2026-11-20)."""
+    assert not P.otr_shared_tmp_dir().exists()
+    J.ensure_shared_readme()
+    assert P.otr_shared_tmp_dir().is_dir()
+    assert P.otr_shared_cache_dir().is_dir()

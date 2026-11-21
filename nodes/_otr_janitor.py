@@ -70,15 +70,25 @@ class TmpSweepReport:
 
 
 def ensure_shared_readme() -> None:
-    """Drop README.txt into ``episodes/_shared/`` (OH-1; idempotent,
-    never raises)."""
+    """Drop README.txt into ``episodes/_shared/`` and create its ``tmp/`` and
+    ``cache/`` tiers (OH-1; idempotent, never raises).
+
+    The path helpers only name folders, and the scratch tier is handed to
+    libraries that write into it without creating it (jieba's dictionary
+    cache, ``tempfile`` with ``dir=``). On a fresh install the voice stage ran
+    before anything had made ``_shared/tmp``, so its first write failed
+    (Mac log, 2026-11-20). Creating both tiers at boot covers every such
+    writer on a writable output tree; callers still create what they need.
+    """
     try:
-        from ._otr_paths import otr_shared_root
+        from ._otr_paths import otr_shared_cache_dir, otr_shared_root, otr_shared_tmp_dir
     except ImportError:  # pragma: no cover -- flat test imports
-        from _otr_paths import otr_shared_root  # type: ignore
+        from _otr_paths import otr_shared_cache_dir, otr_shared_root, otr_shared_tmp_dir  # type: ignore
     try:
         root = otr_shared_root()
         root.mkdir(parents=True, exist_ok=True)
+        for tier in (otr_shared_tmp_dir(), otr_shared_cache_dir()):
+            tier.mkdir(parents=True, exist_ok=True)
         readme = root / "README.txt"
         if not readme.exists():
             readme.write_text(_SHARED_README, encoding="utf-8")
