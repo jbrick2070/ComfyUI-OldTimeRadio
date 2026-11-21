@@ -17613,3 +17613,45 @@ not promote it to the Bug Bible on this evidence alone.
 - `_master_loudness` now silences and counts non-finite samples before
   measuring (`5f17f57f`): one NaN had made every master sample NaN, one +inf
   had made the master silent.
+
+## PBUG-20261120-01 -- a fresh install's first Mandarin episode could not write jieba's cache
+- evidence: Mac mini (Apple M6, 24 GB, macOS 27.2.1, Comfy Desktop, ComfyUI
+  0.46.0), `otr_mac16_animatediff`, episode
+  `signal_lost_沙滩上未干的悲伤脚印_zh_20261120_162307`: the Comfy Desktop log
+  shows a `FileNotFoundError` traceback from `jieba/__init__.py` `mkstemp`
+  into `<output>/otr/episodes/_shared/tmp/` and "Dump cache file failed"
+  during the Kokoro Mandarin voice stage. The folder appeared later, when the
+  video stage created it.
+- cause: the `_otr_paths` helpers only name folders, by design.
+  `MandarinPhonemizer` pointed `jieba.dt.tmp_dir` at `otr_shared_tmp_dir()`
+  without creating it, and the boot hook created `_shared/` but not `tmp/`.
+- fix: `b01f9236` -- `_jieba_cache_dir()` creates the folder at the jieba
+  site (the first cut, `07acf9d1`, created it inside `_otr_scratch_dir`, which
+  Sonnet QA showed would fail the voice table for every language on a
+  read-only output tree). `f7d604f5` -- the boot hook also creates
+  `_shared/tmp` and `_shared/cache`. Coverage:
+  `tests/test_episode_language_voice.py`, `tests/test_otr_janitor.py`.
+- status: FIXED in code; live proof is the next Mandarin episode's log with
+  no "Dump cache file failed".
+
+## PBUG-20261120-02 -- Mac episodes published without captions: Homebrew's ffmpeg has no libass
+- evidence: the same episode published to `otr/obs/` (149 MB, 39:50) with
+  `[OTR_CaptionBurn] CAPABILITY GAP on this host -- the ffmpeg at
+  /opt/homebrew/bin/ffmpeg is a minimal build missing ass`. Homebrew ffmpeg
+  9.0.2_1's configure line has no `--enable-libass`. The imageio-ffmpeg 0.8.1
+  binary in the same venv (ffmpeg 9.0) lists `ass`, `subtitles`, `drawtext`
+  and `libx264`.
+- cause: `resolve_ffmpeg` finds the Homebrew build first (PATH, then
+  `/opt/homebrew/bin`). The probe docstring, the gap message and the README all
+  assumed the reverse ("`brew install ffmpeg` ships both", "imageio-ffmpeg
+  typically ships neither"), so the error told the user to install exactly
+  the build that had failed.
+- fix: `70d54f13` -- `resolve_caption_ffmpeg` keeps the usual pick unless
+  its probe answers that `ass` or libx264 is missing, then uses the bundled
+  binary if it has both. The caption burn's `_ffmpeg_bin` asks it, and the
+  message and docs are corrected. Proven on hardware the same night: the Mac
+  resolves to the imageio binary with no gap, and the 5080 keeps its winget
+  build. Coverage: `tests/test_ffmpeg_caption_capability.py`
+  (`CaptionResolutionTests`).
+- status: FIXED in code; live proof is the next Mac episode with burned
+  captions.
