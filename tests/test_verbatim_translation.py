@@ -356,3 +356,31 @@ def test_a_local_slot_translates_with_the_schema_bound_at_token_selection():
     assert len(bound.calls) == 1 and unbound.calls == []
     assert [e.text for e in out] == ["¿Cuándo volveremos a vernos?",
                                      "Cuando acabe el tumulto."]
+
+
+def test_json_punctuation_buried_in_a_line_is_sent_back_not_shipped():
+    """Codex contrarian on 72916607: a schema-bound decode guarantees the reply
+    parses, not that each string is clean. A model that mistakes a closing
+    quotation bracket for the closing quote can leave ]} inside a finished
+    string; that must be repaired, never shipped as dialogue."""
+    entries = _entries("When shall we three meet again?", "What ho, Malvolio!")
+    slot = _Slot([
+        {"texts": ["いつまた三人で会おうか？", "「おい、マルヴォリオ！」]}"]},
+        {"texts": ["いつまた三人で会おうか？", "「おい、マルヴォリオ！」"]},
+    ])
+    out, _receipt = VT.translate_entries(
+        entries, language_instruction=RULE, creative_fn=slot)
+    assert [e.text for e in out] == ["いつまた三人で会おうか？",
+                                     "「おい、マルヴォリオ！」"]
+    assert len(slot.calls) == 2
+    assert "JSON punctuation" in json.dumps(slot.calls[1][0], ensure_ascii=False)
+
+
+@pytest.mark.parametrize("line", [
+    'dijo "sí", y se marchó',          # Spanish: a quote then a comma
+    "« Qui va là ? » cria-t-il",       # French guillemets
+    "「何者だ？」と彼は叫んだ",           # Japanese quotation brackets
+    "„Wer da?“ rief er",               # German low-high quotes
+])
+def test_ordinary_quotation_in_any_language_is_not_residue(line):
+    assert VT._JSON_RESIDUE.search(line) is None

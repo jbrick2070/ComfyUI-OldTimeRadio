@@ -80,6 +80,15 @@ _TRUNCATION_SIGNATURES = (
 )
 
 
+#: JSON punctuation that never belongs in a spoken line (PBUG-20261121-01).
+#: Binding the schema guarantees the reply PARSES, not that every string is
+#: clean: a model that mistakes a closing quotation bracket for the closing
+#: quote can still bury `]}` or `"]` inside a finished string, and it would
+#: ship as dialogue. A quote followed by a comma is NOT here -- `dijo "sí", y`
+#: is ordinary Spanish.
+_JSON_RESIDUE = re.compile(r'\]\s*\}|"\s*[\]\}]|[\[\{]\s*"')
+
+
 def _looks_out_of_room(error: Any) -> bool:
     """Is this failure the shape of a reply that was cut off mid-JSON?"""
     text = str(error or "").lower()
@@ -265,6 +274,12 @@ def translate_entries(
                 if not shipped.strip():
                     return (f"line {n} came back empty (or as a bare speaker "
                             "label); return the spoken words")
+                residue = _JSON_RESIDUE.search(shipped)
+                if residue and not _JSON_RESIDUE.search(str(entries[index].text)):
+                    return (f"line {n} has JSON punctuation "
+                            f"({residue.group(0)!r}) inside its text; return "
+                            "only the spoken words and close each string with "
+                            "a plain double quote")
             return None
 
         attempts = 0

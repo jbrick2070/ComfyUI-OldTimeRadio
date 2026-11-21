@@ -17722,8 +17722,14 @@ not promote it to the Bug Bible on this evidence alone.
   exact passage: unbound, the leg passed only on its fourth attempt and
   shipped a mismatched bracket pair (and one attempt ended `")]`); bound, 3 of
   3 trials passed with every batch on its first attempt, ~37 s each.
-- fix: `translate_entries` binds `TranslatedTexts` when the slot can
-  (`_otr_bind_schema`); remote slots keep their own routing. Coverage:
-  `tests/test_verbatim_translation.py::test_a_local_slot_translates_with_the_schema_bound_at_token_selection`.
+- fix: `72916607` -- `translate_entries` binds `TranslatedTexts` when the
+  slot can (`_otr_bind_schema`); remote slots keep their own routing. The
+  Codex contrarian on that commit (MUST-FIX D) showed a bound decode still
+  guarantees only that the reply PARSES: `]}` or `"]` can sit inside a
+  finished string and ship as dialogue. The follow-up rejects JSON punctuation
+  buried in a line (never a quote-then-comma, which is ordinary Spanish) and
+  sends it back through the repair ladder, on every lane. Coverage:
+  `tests/test_verbatim_translation.py` (the binding, the residue repair, and
+  Spanish/French/Japanese/German quotation passing clean).
 - status: FIXED in code; live proof is a Mac Japanese Shakespeare episode that
   publishes.

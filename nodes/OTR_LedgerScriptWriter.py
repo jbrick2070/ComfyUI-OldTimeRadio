@@ -776,10 +776,14 @@ class _SlotScheduler:
                     and _google_slot_supports_json(self.ids.get(slot, "")))
             ),
             # The plain scheduler closure does not bind a schema itself.
-            # Local-transformers closures expose `_otr_bind_schema`; the SciFi
-            # structured invoker uses it to bind each pass's exact Pydantic
-            # result type. OpenRouter retains its existing json_object
-            # response-format behavior and is intentionally unchanged.
+            # Local-transformers closures expose `_otr_bind_schema`, and a pass
+            # that wants invalid JSON un-sampleable binds its own Pydantic
+            # result type with it. As of 2026-11-21 the callers that do are
+            # verbatim translation, the My Story treatment, the source rewrite
+            # and ledger_clean's scope authorization -- NOT the SciFi passes,
+            # which an earlier version of this comment claimed. OpenRouter
+            # retains its existing json_object response-format behavior and
+            # is intentionally unchanged.
             "_otr_response_format": None,
         }
 
