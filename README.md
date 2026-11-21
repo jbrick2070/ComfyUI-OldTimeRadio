@@ -771,9 +771,11 @@ the image dropdowns to `sd15` first.
 text: captions need the `ass` filter (libass) and libx264. When your usual
 ffmpeg lacks them, the caption step switches to the one the `imageio-ffmpeg`
 wheel bundles (0.8.1 ships ffmpeg 9.0 with both), so this only happens when
-that one lacks them too. Homebrew's `ffmpeg` formula has no libass, so on a
-Mac `brew install ffmpeg` does not fix this; `pip install -U imageio-ffmpeg`
-does. The console says `CAPABILITY GAP on this host` and names what is
+that one lacks them too. Homebrew split its formula: plain `ffmpeg` has no
+libass, so on a Mac `brew install ffmpeg` does not fix this, while
+`ffmpeg-full` has it but installs off the PATH -- point `OTR_FFMPEG` at
+`/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg` to use it. `pip install -U
+imageio-ffmpeg` also fixes it. The console says `CAPABILITY GAP on this host` and names what is
 missing. The episode is finished and correct otherwise -- it is not
 re-rendered, because a host's missing filter is not worth throwing an episode
 away. On Windows `winget install Gyan.FFmpeg` carries both, and on Linux a
