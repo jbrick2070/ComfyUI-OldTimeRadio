@@ -129,3 +129,4 @@
 2026-11-21 | Voice | Reverb-TTS (software-mansion, 297M cloning, int8 307 MB, 5 of 8 OTR languages) + comfyui-reverb-tts pack | TEST | https://huggingface.co/software-mansion/Reverb-TTS
 2026-11-21 | Image | P-Image-OSS-Comfy (Pruna; w4a8 13.4 GB, int8_convrot 21.2 GB) | WATCH | https://huggingface.co/PrunaAI/P-Image-OSS-Comfy
 2026-11-21 | Upscale | Steppe latent upscaler (Wan/Qwen-Image latents, registry only) | WATCH | https://github.com/TensorForger/ComfyUI-Steppe
+2026-11-22 | nothing new
