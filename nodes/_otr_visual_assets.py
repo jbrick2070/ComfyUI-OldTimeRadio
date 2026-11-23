@@ -1600,7 +1600,7 @@ def _refuse_missing_node_packs(engines):
         except Exception:  # noqa: BLE001
             # An IMAGE engine may declare a core-version probe (flux3_klein needs
             # a CLIPLoader type added in ComfyUI v0.41.0, moss_image one added in
-            # v0.42.0). Ask it here, at the one
+            # v0.42.0, qwen_image_21 a node added in v0.37.0). Ask it here, at the one
             # point a refusal is still free, and check its node table below.
             try:
                 try:

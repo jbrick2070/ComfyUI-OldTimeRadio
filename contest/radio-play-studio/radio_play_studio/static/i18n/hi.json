@@ -223,6 +223,7 @@
  "choice.stills.ideogram4_local": "Ideogram 4",
  "choice.stills.lumina_image": "Lumina Image",
  "choice.stills.moss_image": "MOSS-Image",
+ "choice.stills.qwen_image_21": "Qwen-Image 2.1",
  "choice.stills.sd15": "Stable Diffusion 1.5",
  "choice.stills.z_image_turbo": "Z-Image Turbo",
  "hint.blank": "बिना शब्दों के चित्र: {n}। पेंट करने से पहले उनका वर्णन करें।",

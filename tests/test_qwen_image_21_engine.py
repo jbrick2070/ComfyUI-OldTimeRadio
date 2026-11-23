@@ -9,7 +9,13 @@ network.
 """
 from __future__ import annotations
 
+import ast
+import importlib.util
 import inspect
+import json
+import os
+import pathlib
+import textwrap
 
 import numpy as np
 import pytest
@@ -249,11 +255,21 @@ def test_an_rgb_batch_comes_back_untouched():
 
 
 def test_a_plain_still_keeps_its_exact_rgb_bytes():
-    # Measured: an ordinary prompt decodes with alpha 0.984-1.0. That is the opaque
-    # noise floor, not transparency, so the colours must not shift toward white.
-    out = QI._flatten_alpha(_frames((10, 20, 30, 255), (10, 20, 30, 251), (200, 100, 50, 252)))
-    assert out.shape == (1, 1, 3, 3)
-    assert out[0, 0].tolist() == [[10, 20, 30], [10, 20, 30], [200, 100, 50]]
+    # Measured: six plain stills decoded with alpha as low as 0.969 (247/255). That is
+    # the opaque noise floor, not transparency, so the colours must not shift toward
+    # white -- including at the measured floor and a little under it.
+    out = QI._flatten_alpha(_frames((10, 20, 30, 255), (10, 20, 30, 247),
+                                    (200, 100, 50, 240), (0, 0, 0, 231)))
+    assert out.shape == (1, 1, 4, 3)
+    assert out[0, 0].tolist() == [[10, 20, 30], [10, 20, 30], [200, 100, 50], [0, 0, 0]]
+
+
+def test_the_opaque_cut_off_sits_between_the_noise_floor_and_real_transparency():
+    assert QI._OPAQUE_ALPHA < 0.969          # below the lowest plain-still alpha measured
+    assert QI._OPAQUE_ALPHA > 0.5            # well above half-see-through
+    # 230/255 = 0.902 is opaque; 229/255 = 0.898 is composited over white (26 = 255 * 0.102).
+    out = QI._flatten_alpha(_frames((0, 0, 0, 230), (0, 0, 0, 229)))
+    assert out[0, 0].tolist() == [[0, 0, 0], [26, 26, 26]]
 
 
 def test_real_transparency_is_composited_over_white():
@@ -270,8 +286,75 @@ def test_an_unexpected_channel_count_is_refused_not_guessed():
 
 
 def test_render_image_really_flattens_the_decode():
-    # A test that calls the helper proves the helper, never the wiring: assert the
-    # call exists at the one site that returns pixels to the dispatcher.
-    src = inspect.getsource(QI.QwenImage21Engine.render_image)
-    assert "_flatten_alpha(_wb.images_to_uint8(" in src
-    assert "return frames[0]" in src
+    # A test that calls the helper proves the helper, never the wiring: assert, in the
+    # syntax tree (a comment or string cannot satisfy it), that the value handed back
+    # to the dispatcher is the flattened decode.
+    tree = ast.parse(textwrap.dedent(inspect.getsource(QI.QwenImage21Engine.render_image)))
+    flatten_calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+                     and isinstance(n.func, ast.Name) and n.func.id == "_flatten_alpha"]
+    assert len(flatten_calls) == 1
+    inner = flatten_calls[0].args[0]
+    assert isinstance(inner, ast.Call) and isinstance(inner.func, ast.Attribute)
+    assert inner.func.attr == "images_to_uint8"
+    assigned = [n for n in ast.walk(tree) if isinstance(n, ast.Assign)
+                and n.value is flatten_calls[0]]
+    assert len(assigned) == 1 and assigned[0].targets[0].id == "frames"
+    returns = [n for n in ast.walk(tree) if isinstance(n, ast.Return)]
+    assert len(returns) == 1
+    value = returns[0].value
+    assert isinstance(value, ast.Subscript) and value.value.id == "frames"
+
+
+# --- the recipe against the vendor's own template ----------------------------------
+def _vendor_template():
+    spec = importlib.util.find_spec("comfyui_workflow_templates_json")
+    if spec is None or not spec.submodule_search_locations:
+        pytest.skip("comfyui_workflow_templates_json is not installed")
+    path = (pathlib.Path(list(spec.submodule_search_locations)[0]) / "templates"
+            / "image_qwen_image_2_1_t2i.json")
+    if not path.exists():
+        pytest.skip("this templates package has no Qwen-Image 2.1 t2i template")
+    return json.loads(path.read_text("utf-8"))
+
+
+def test_the_recipe_matches_the_vendors_own_template(no_qwen_env):
+    # The recipe tests above compare the adapter with numbers typed into this file.
+    # This one compares it with the file Comfy ships, so a template that moves is seen.
+    data = _vendor_template()
+    nodes = [n for sub in data["definitions"]["subgraphs"] for n in sub["nodes"]]
+    by_type = {}
+    for node in nodes:
+        by_type.setdefault(node["type"], []).append(node.get("widgets_values"))
+    p = ireg.get_engine("qwen_image_21")._params({"prompt": "x"})
+    _seed, _control, steps, cfg, sampler, scheduler, denoise = by_type["KSampler"][0]
+    assert (steps, float(cfg), sampler, scheduler, float(denoise)) == (
+        p["steps"], p["cfg"], p["sampler_name"], p["scheduler"], 1.0)
+    assert by_type["UNETLoader"][0][0] == QI._DEFAULT_UNET
+    assert by_type["VAELoader"][0][0] == QI._DEFAULT_VAE
+    text_encoders = [w for w in by_type["CLIPLoader"] if w[1] == QI._CLIP_TYPE]
+    assert [w[0] for w in text_encoders] == [QI._DEFAULT_CLIP]
+    assert by_type["QwenImage21Cache"][0][:2] == ["auto", "default"]
+    assert "TextEncodeQwenImage21" in by_type
+
+
+# --- refusals and routes the other tests do not reach ------------------------------
+def test_a_nondefault_encoder_that_is_not_installed_is_refused_not_swapped(no_qwen_env):
+    # "A missing nondefault choice is a refusal, never a default-weight fallback."
+    with pytest.raises(VA.VisualAssetError):
+        VA.native_requests({"qwen_image_21"}, folder_paths=VA._NothingInstalled,
+                           qwen21=QI, env={QI.CLIP_ENV: "some_other_encoder.safetensors"})
+
+
+def test_selecting_the_engine_without_its_adapter_is_refused(no_qwen_env):
+    with pytest.raises(VA.VisualAssetError, match="adapter resolution is unavailable"):
+        VA.native_requests({"qwen_image_21"}, folder_paths=VA._NothingInstalled)
+
+
+def test_provisioning_routes_the_engine_to_its_own_lane():
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    spec = importlib.util.spec_from_file_location(
+        "otr_provision_for_qwen21", os.path.join(root, "scripts", "otr_provision.py"))
+    prov = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(prov)
+    lane = prov.lane_for_engine("qwen_image_21", "image")
+    assert (lane.lane, lane.manual) == ("qwen_image_21", False)

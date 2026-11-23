@@ -27,11 +27,12 @@ does not match how the dispatcher hands a character portrait to a scene still. T
 is a design question for a separate engine row, not a switch on this one.
 
 TRANSPARENCY: the VAE decodes FOUR channels. An ordinary prompt gives an alpha that
-is opaque to within ~1.6% (measured 0.984-1.0 on plain stills), and the engine
-contract is a plain RGB array, so ``_flatten_alpha`` composites over white (the
-colour the model's own vision tower assumes). Native transparent stills are a
-measured capability of the model (planning/qwen_image_21/probe_2026-11-22.md) but the
-dispatcher does not carry alpha, so this engine does not request it.
+is opaque to within ~3% (the lowest alpha over six plain stills was 0.969; see
+planning/qwen_image_21/probe_2026-11-22.md in the git tree), and the engine contract is
+a plain RGB array, so ``_flatten_alpha`` composites over white (the colour the model's
+own vision tower assumes) wherever alpha falls below ``_OPAQUE_ALPHA``. Native
+transparent stills are a measured capability of the model, but the dispatcher does not
+carry alpha, so this engine does not request it.
 
 Cold-import clean: only the dep-free registry, role vocabulary and stdlib at
 module scope. torch / comfy / numpy are lazy inside the functions that need them.
@@ -81,9 +82,12 @@ _HYGIENE_NEGATIVE = ""
 _CANVAS_MULTIPLE = 32           # the template: "Prefer multiples of 32"
 _CANVAS_FLOOR = 256
 
-#: Alpha above this is the model's opaque noise floor (0.984-0.988 measured on plain
-#: stills), not transparency; below it the pixel is composited over white.
-_OPAQUE_ALPHA = 0.97
+#: Alpha at or above this is treated as opaque. Plain stills reached 0.969 at their
+#: lowest over six renders; real transparency has alpha near 0 over large areas (73-87%
+#: of the frame in the cutouts measured). 0.90 leaves a margin on both sides: a plain
+#: still keeps its exact RGB bytes, and a genuinely see-through pixel is composited
+#: over white.
+_OPAQUE_ALPHA = 0.90
 
 
 def _snap(value: int) -> int:

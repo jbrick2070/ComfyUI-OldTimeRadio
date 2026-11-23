@@ -28,6 +28,9 @@ file of its own (tree read 2026-11-22); its README links Qwen's.
 
 Read in full from `Qwen/Qwen-Image-2.1`'s `LICENSE` on 2026-11-22.
 
+* **Acceptance:** the opening says that using or distributing any part of the
+  Materials means you are deemed to have accepted the agreement. The pack fetches the
+  files silently at queue time, so the person who picks the engine is the one bound.
 * **Grant (s2.a):** a limited, non-transferable, royalty-free licence to use,
   reproduce, distribute, copy and modify the Materials **for non-commercial
   purposes only**.
@@ -41,9 +44,14 @@ Read in full from `Qwen/Qwen-Image-2.1`'s `LICENSE` on 2026-11-22.
   outputs are used to create, train, fine-tune or improve an AI model that is
   distributed, display "Built with Qwen" or "Improved using Qwen"; do not use
   "Qwen" as the primary name of a derivative product.
-* **s5.c:** suing Qwen over the Materials or their outputs ends the licence.
+* **s5.c:** if you start a lawsuit or other proceeding against Qwen **or any
+  entity** alleging that the Materials or any output of them infringe an
+  intellectual-property or other right you own or can license, every licence
+  under the agreement ends on that date.
 * **s6.d:** the user defends and indemnifies Qwen against third-party claims
   arising from their use.
+* **s9.a:** any use of the Materials in a way the agreement does not expressly
+  allow needs a separate licence from Qwen.
 * **s7:** Qwen may terminate on breach, and the user must then delete the
   Materials. **s8:** Chinese law, Hangzhou courts.
 * The agreement says nothing separate about who owns generated **outputs**, and
@@ -57,10 +65,13 @@ Read in full from `Qwen/Qwen-Image-2.1`'s `LICENSE` on 2026-11-22.
 * `commercial_clean = False` -- the same shelf as `flux_gen1` and `flux3_klein`.
   Opt-in only (`default_roles = ()`); never a default, and no shipped workflow
   selects it.
-* Using this engine for episodes you publish commercially needs a separate licence
-  from Qwen. Whether a free, public, unmonetized publication counts as "research or
-  evaluation" is NOT decided here; that is the publisher's reading of s1.i. The
-  pack does not check.
+* s2.b restricts commercial use of the **Materials**, and the text never defines
+  generated outputs as Materials. This build still reads it cautiously: running the
+  model to make something you publish commercially is treated as commercial use,
+  which needs a separate licence from Qwen. That is a reading, not a quotation from
+  the agreement. Whether a free, public, unmonetized publication counts as "research
+  or evaluation" (s1.i) is NOT decided here; it is the publisher's call. The pack
+  does not check.
 * The pack's rights receipt is advisory (standing ruling: always publish to
   otr/obs).
 * The pack does not use outputs to train or fine-tune any model, so s4.b does not
