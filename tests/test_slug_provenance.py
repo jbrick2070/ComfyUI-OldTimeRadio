@@ -388,6 +388,9 @@ ENGINE_COVERAGE = {
     # moss_image (2026-10-19): LOCAL weights fetched from Comfy-Org's pinned,
     # ungated repackage; no provider slug to collect.
     "moss_image": "local",
+    # qwen_image_21 (2026-11-22): LOCAL weights fetched from Comfy-Org's pinned,
+    # ungated repackage; no provider slug to collect.
+    "qwen_image_21": "local",
     # --- image: cloud ---------------------------------------------------------
     "google_image": "collected", "cloud_nano_banana_2": "collected",
     "cloud_seedream_2": "collected", "cloud_krea_2_turbo": "collected",

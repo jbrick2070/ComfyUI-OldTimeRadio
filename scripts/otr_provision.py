@@ -1425,6 +1425,8 @@ def lane_for_engine(engine: str, kind: str, *, low_vram: bool = False):
             return Lane("flux3_klein", False)
         if engine == "moss_image":
             return Lane("moss_image", False)
+        if engine == "qwen_image_21":
+            return Lane("qwen_image_21", False)
         if engine in _REMOTE_NO_WEIGHT_IMAGE_ENGINES:
             return None
         return UNROUTED

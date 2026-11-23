@@ -191,6 +191,7 @@ IMAGE_GEN = {
     "ideogram4_local": "idg4",
     "lumina_image": "lumi",
     "moss_image": "msim",
+    "qwen_image_21": "qwi2",
     "sd15": "sd15",
     "z_image_turbo": "zimg",
 }

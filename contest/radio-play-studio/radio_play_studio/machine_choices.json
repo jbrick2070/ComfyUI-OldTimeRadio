@@ -15,6 +15,7 @@
     "ideogram4_local": "not offered",
     "lumina_image": "?",
     "moss_image": "?",
+    "qwen_image_21": "?",
     "sd15": "?",
     "z_image_turbo": "proven"
    },
@@ -42,6 +43,7 @@
     "ideogram4_local": "not offered",
     "lumina_image": "not offered",
     "moss_image": "not offered",
+    "qwen_image_21": "not offered",
     "sd15": "too slow",
     "z_image_turbo": "not offered"
    },
@@ -69,6 +71,7 @@
     "ideogram4_local": "not offered",
     "lumina_image": "not offered",
     "moss_image": "not offered",
+    "qwen_image_21": "not offered",
     "sd15": "proven",
     "z_image_turbo": "not offered"
    },
@@ -96,6 +99,7 @@
     "ideogram4_local": "proven",
     "lumina_image": "proven",
     "moss_image": "proven",
+    "qwen_image_21": "?",
     "sd15": "proven",
     "z_image_turbo": "proven"
    },
@@ -123,6 +127,7 @@
     "ideogram4_local": "no",
     "lumina_image": "oom",
     "moss_image": "proven",
+    "qwen_image_21": "?",
     "sd15": "fits",
     "z_image_turbo": "proven"
    },

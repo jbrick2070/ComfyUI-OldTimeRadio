@@ -132,6 +132,15 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
+# Qwen-Image 2.1 (LOCAL weights, 2026-11-22) -- OPT-IN (default_roles=()).
+# commercial_clean=False (Qwen Research License: non-commercial only;
+# apple/QWEN_IMAGE_21_LICENSE_ATTESTATION.md). Text-to-image only. Needs ComfyUI
+# >= v0.37.0. Greyed by assert_usable until the diffusion model is installed. Own guard.
+try:  # pragma: no cover - trivial guard
+    from . import qwen_image_21 as _qwen_image_21  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
 # Cloud partner STILLS adapters (S1 stills lane, 2026-07-03): flux_pro
 # / nano_banana_2 / seedream_2 -- the model-agnostic layer's first CLOUD image
 # engines. Register unconditionally with EMPTY default_roles (selectable, never

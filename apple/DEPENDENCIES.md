@@ -37,6 +37,7 @@ Some lanes resolve node classes that live in ComfyUI CORE, not in any node pack,
 | `ltx25` (video / foley_plus / mime) | **ComfyUI >= v0.32.0** | `LTXVDualCFGGuider` and `LTXVModalityGuidance` entered core in commit 57ce8e1a, `Add support for LTX 2.5 (#15499)`, 2026-08-11. First tag containing them is v0.32.0. |
 | `flux3_klein` (the 8 GB NVIDIA and 24 GB foley still engine) | **ComfyUI >= v0.41.0** | CLIPLoader type `flux3` (Qwen3-VL-4B text encoder) entered core in commit 20b46065, `Support Flux3-image (#17064)`. First tag containing it is v0.41.0. |
 | `moss_image` (the 16 GB NVIDIA still engine) | **ComfyUI >= v0.42.0** | CLIPLoader type `moss_image` (Qwen3.5-9B text encoder) and `comfy/ldm/moss_image` entered core in commit e087d8f6, `feat: Add MOSS-image support (#17095)`, 2026-10-16. First tag containing it is v0.42.0. |
+| `qwen_image_21` (opt-in still engine) | **ComfyUI >= v0.37.0** | The `Text Encode Qwen Image 2.1` and `Qwen Image 2.1 Cache` nodes (Qwen3-VL-8B text encoder under the existing `qwen_image` CLIPLoader type) entered core in commit 6bfaacc6, `feat: Qwen-image 2.1 support (CORE-423) (#16400)`, 2026-09-20. First tag containing it is v0.37.0. |
 
 Check yours with `git describe --tags` in the ComfyUI directory. A rented pod image measured v0.26.2 (2026-06-30) -- two months and eight minor versions behind -- and the ltx25 lane was unrunnable there for that reason alone, with every weight and node pack correctly installed.
 

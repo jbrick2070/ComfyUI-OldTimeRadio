@@ -871,6 +871,7 @@ detail in its comments.
 | Lightricks | [ComfyUI-LTXVideo: `ltxvideo-i2v-distilled.json`](https://github.com/Lightricks/ComfyUI-LTXVideo/blob/864ffa6183ba39a9d799c465465d157f7cf93ba0/example_workflows/low_level/ltxvideo-i2v-distilled.json) (removed upstream in January 2026; linked at its last version) and [LTX-Video: `configs/ltxv-2b-0.9.8-distilled.yaml`](https://github.com/Lightricks/LTX-Video/blob/main/configs/ltxv-2b-0.9.8-distilled.yaml) | The distilled sigma schedule, offered as an opt-in setting on the 8 GB LTX lane. |
 | Black Forest Labs | [flux-3-image-klein-comfy: `workflows/flux3_klein_int8_t2i.json`](https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/blob/main/workflows/flux3_klein_int8_t2i.json) (gated: sign in and accept the licence on Hugging Face) | The FLUX 3 Klein still recipe: 16 steps, cfg 1.0, euler, simple, with ModelSamplingFlux. |
 | Comfy-Org | [Template `image_moss_image_t2i`](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/image_moss_image_t2i.json) | The MOSS-Image recipe: 25 steps, cfg 2.5, er_sde, simple. |
+| Comfy-Org | [Template `image_qwen_image_2_1_t2i`](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/image_qwen_image_2_1_t2i.json) | The Qwen-Image 2.1 recipe: int8 ConvRot model, 25 steps, cfg 1, euler, simple. |
 | Comfy-Org | [Template `image_ideogram4_t2i`](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/image_ideogram4_t2i.json) | The local Ideogram 4 graph, its canvas arithmetic, and the three-key caption schema from its magic-prompt subgraph. |
 | Comfy-Org | [Template `llm_gemma4_text_gen`](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/llm_gemma4_text_gen.json) | The Comfy-native Gemma 4 writer: a stock CLIPLoader feeding core TextGenerate. |
 | Comfy-Org | [Templates `audio_stable_audio_3_medium`](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/audio_stable_audio_3_medium.json) and [`audio_stable_audio_3_medium_base`](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/audio_stable_audio_3_medium_base.json) | The reference for Stable Audio 3's settings, one recipe per checkpoint. |
@@ -920,6 +921,10 @@ off-by-default pieces carry restricted terms:
   outputs are commercial-use only for a Qualifying User (under US$5M annual revenue
   with affiliates). BFL's repos are gated, so the pack fetches byte-identical files
   from a pinned, ungated mirror; see `apple/FLUX3_KLEIN_LICENSE_ATTESTATION.md`.
+- `qwen_image_21` (Qwen-Image 2.1) -- Qwen Research License: non-commercial use only; any
+  commercial use needs a separate licence from Qwen. The pack does not ship the weights; it
+  fetches them on first use from Comfy-Org's public repackage; see
+  `apple/QWEN_IMAGE_21_LICENSE_ATTESTATION.md`.
 - `ideogram4_local` -- non-commercial model agreement. The pack does not ship the
   weights; it fetches them on first use from Comfy-Org's public Ideogram-4
   repackage on Hugging Face, under that agreement.

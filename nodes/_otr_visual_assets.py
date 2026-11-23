@@ -156,6 +156,26 @@ _PINNED_SOURCES = (
     ("vae", "Comfy-Org/MOSS-Image", "vae/flux2-vae_small.safetensors",
      "3284a1dbb351e3396d70f39f2a71cbf6ed2ef1bb", 249_521_340,
      "d8d52ba036475f5fb07c8b435e176d3d97ebfa82f0d1a1c317f9cc1e25bd013b"),
+    # QWEN-IMAGE 2.1, added 2026-11-22 (operator: "an image model can fulfil
+    # announcer, character or music slot"). Comfy-Org/Qwen-Image-2.1 is Comfy's
+    # own repackage of Alibaba Qwen's weights: public and ungated (Hub API
+    # gated:false, read 2026-11-22). The int8 ConvRot model and the Qwen3-VL-8B
+    # int8 ConvRot encoder are the files Comfy's own t2i template loads. All three
+    # SHA-256s were also recomputed from the downloaded bytes on the 5080.
+    # LICENCE: Qwen RESEARCH LICENSE AGREEMENT, non-commercial only --
+    # apple/QWEN_IMAGE_21_LICENSE_ATTESTATION.md. The longest HF cache tail is 141
+    # characters, inside the 162 that prestartup_script.py budgets for MAX_PATH.
+    ("diffusion_models", "Comfy-Org/Qwen-Image-2.1",
+     "diffusion_models/qwen_image_2.1_int8_convrot.safetensors",
+     "aacf31a6d48e707f352ecba714cee0680da3479b", 7_256_783_064,
+     "cb74113cb03faecd79611b01fd7fd642f0aa60d6f0b95086abee214d75eaa57d"),
+    ("text_encoders", "Comfy-Org/Qwen-Image-2.1",
+     "text_encoders/qwen3vl_8b_int8_convrot.safetensors",
+     "aacf31a6d48e707f352ecba714cee0680da3479b", 9_350_798_360,
+     "8bfd0f6e12abf2d2d697ecc888e5e90b0d6741d6708f05799f53afa560452e8f"),
+    ("vae", "Comfy-Org/Qwen-Image-2.1", "vae/qwen_image_2.1_vae_bf16.safetensors",
+     "aacf31a6d48e707f352ecba714cee0680da3479b", 675_509_688,
+     "bb21f7473051e1ac368515dd3f2e15cd44d7a11748ee8823e1ddca3e4876b7c9"),
     # FLUX.1-DEV, added 2026-09-29 for the same directive. The all-in-one fp8
     # checkpoint flux_gen1 loads through CheckpointLoaderSimple (model, CLIP
     # and VAE in one file). Comfy-Org/flux1-dev is public and ungated, unlike
@@ -374,7 +394,7 @@ _MINIMAX_H3_WEIGHT_ENGINES = frozenset({
 _HUMO_WEIGHT_ENGINES = frozenset({"humo", "humo_14B_169", "humo_1.7B", "humo_1.7B_169"})
 _COVERED = frozenset({"z_image_turbo", "stable_audio_3", "sd15", "lumina_image",
                       "ideogram4_local", "flux_gen1", "flux3_klein",
-                      "flux3_klein_ref", "moss_image"}
+                      "flux3_klein_ref", "moss_image", "qwen_image_21"}
                      | _LTX_8GB_WEIGHT_ENGINES | _LTX25_WEIGHT_ENGINES
                      | _ANIMATEDIFF_WEIGHT_ENGINES | _MINIMAX_H3_WEIGHT_ENGINES
                      | _HUMO_WEIGHT_ENGINES)
@@ -745,7 +765,7 @@ def _same_file(left, right):
 def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
                     sd15=None, lumina=None, ideogram=None, flux=None, ltx25=None,
                     animatediff=None, minimax_h3=None, humo=None, flux3=None,
-                    moss=None, env=None,
+                    moss=None, qwen21=None, env=None,
                     writer_models=(), upscale_models=()):
     """Bind the adapters' exact tokens to native folders; no writes/network.
 
@@ -922,6 +942,24 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
         for category, key, default in (
             ("text_encoders", moss.CLIP_ENV, moss._DEFAULT_CLIP),
             ("vae", moss.VAE_ENV, moss._DEFAULT_VAE),
+        ):
+            explicit = str(env.get(key) or "")
+            add(category, os.path.basename(explicit or default), explicit=explicit)
+    if "qwen_image_21" in engines:
+        # ASK THE ADAPTER, exactly as for moss_image above: `_resolve_unet_name`
+        # is what assert_usable and the loader share; the encoder and the VAE
+        # follow the env-or-default basename rule.
+        if qwen21 is None:
+            raise VisualAssetError("qwen_image_21 adapter resolution is unavailable")
+        token, verified = qwen21._resolve_unet_name()
+        if verified and _native_path(folder_paths, "diffusion_models", token) is None:
+            raise VisualAssetError("Qwen-Image 2.1 adapter reports an installed selection "
+                                   "that the native loader cannot resolve; no "
+                                   "replacement/path repair")
+        add("diffusion_models", token, explicit=str(env.get(qwen21.MODEL_ENV) or ""))
+        for category, key, default in (
+            ("text_encoders", qwen21.CLIP_ENV, qwen21._DEFAULT_CLIP),
+            ("vae", qwen21.VAE_ENV, qwen21._DEFAULT_VAE),
         ):
             explicit = str(env.get(key) or "")
             add(category, os.path.basename(explicit or default), explicit=explicit)
@@ -1405,7 +1443,7 @@ def _load_adapters(engines):
     ``engines`` -- no adapter module is imported for a lane nobody selected."""
     adapters = dict.fromkeys(
         ("zimage", "ltx", "sa3", "sd15", "lumina", "ideogram", "flux", "ltx25",
-         "animatediff", "minimax_h3", "humo", "flux3", "moss"))
+         "animatediff", "minimax_h3", "humo", "flux3", "moss", "qwen21"))
     if "z_image_turbo" in engines:
         from ._otr_image_engines import z_image_turbo
         adapters["zimage"] = z_image_turbo
@@ -1430,6 +1468,9 @@ def _load_adapters(engines):
     if "moss_image" in engines:
         from ._otr_image_engines import moss_image
         adapters["moss"] = moss_image
+    if "qwen_image_21" in engines:
+        from ._otr_image_engines import qwen_image_21
+        adapters["qwen21"] = qwen_image_21
     if "flux_gen1" in engines:
         from ._otr_image_engines.flux_gen1 import FluxGen1ImageEngine
         adapters["flux"] = FluxGen1ImageEngine()

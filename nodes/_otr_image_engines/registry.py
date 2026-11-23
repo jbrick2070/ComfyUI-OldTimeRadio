@@ -171,6 +171,18 @@ CAPABILITIES = {
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["moss-image-sft-int8-convrot",
                                "qwen3.5-9b-w4a8-gptq", "flux2-vae-small"]},
+    # Qwen-Image 2.1 (2026-11-22): int8 ConvRot 7.3 GB diffusion + 9.4 GB
+    # Qwen3-VL-8B int8 encoder (offloaded before sampling) + 0.7 GB VAE. Declared
+    # cuda only: int8 ConvRot has no Metal kernel here (aten::_int_mm), and it is
+    # unmeasured on cpu. Measured on the RTX 5080 16 GB with no out-of-memory at
+    # 1024 and 2048 (planning/qwen_image_21/probe_2026-11-22.md). Needs ComfyUI
+    # core >= v0.37.0 (checked by the adapter's assert_usable and core_problem).
+    "qwen_image_21": {"required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["qwen-image-2.1-int8-convrot",
+                               "qwen3vl-8b-int8-convrot", "qwen-image-2.1-vae"]},
     # SD 1.5 (2026-09-07): the SMALL local image engine, and the only one that
     # fits a 16 GB Apple Silicon box. mps IS DECLARED EXPLICITLY AND ON PURPOSE
     # -- copying z_image_turbo's ["cuda"] row (directly below) would have made

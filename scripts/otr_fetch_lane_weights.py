@@ -106,6 +106,9 @@ LANE_INFO = {
     "moss_image": (12.11, "IMAGE model, MOSS-Image SFT int8 + Qwen3.5-9B w4a8 "
                           "encoder + small Flux 2 VAE. The 16 GB NVIDIA rows' "
                           "still engine (Apache-2.0)."),
+    "qwen_image_21": (16.10, "IMAGE model, Qwen-Image 2.1 int8 + Qwen3-VL-8B int8 "
+                             "encoder + VAE. Opt-in; no shipped workflow selects it "
+                             "(Qwen Research License: non-commercial only)."),
     "ltx25_16gb": (25.38, "LTX 2.5, mix4x8 DiT + w4a8 encoder + VAEs + "
                                  "upscaler. The 16 GB silent, foley, mime and "
                                  "audio-in lanes all load exactly these."),
@@ -265,6 +268,15 @@ LANES = {
         _PINNED["moss_image_sft_int8_convrot.safetensors"],
         _PINNED["qwen3.5_9b_w4a8_gptq.safetensors"],
         _PINNED["flux2-vae_small.safetensors"],
+    ],
+    # QWEN-IMAGE 2.1 (2026-11-22): an opt-in still engine, no shipped workflow
+    # selects it. All three files are `_PINNED_SOURCES` rows from Comfy-Org's
+    # ungated repackage, so this lane and the queue-time preflight cannot pin
+    # different bytes.
+    "qwen_image_21": [
+        _PINNED["qwen_image_2.1_int8_convrot.safetensors"],
+        _PINNED["qwen3vl_8b_int8_convrot.safetensors"],
+        _PINNED["qwen_image_2.1_vae_bf16.safetensors"],
     ],
     "minimax_h3_video": [
         _PINNED["minimax_h3_fl2va_pruned_int8_convrot.safetensors"],

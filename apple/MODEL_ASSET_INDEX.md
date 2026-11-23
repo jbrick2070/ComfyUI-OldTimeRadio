@@ -51,6 +51,7 @@ python scripts/otr_fetch_lane_weights.py ltx_8gb
 python scripts/otr_fetch_lane_weights.py minimax_h3_audio_in
 python scripts/otr_fetch_lane_weights.py minimax_h3_video
 python scripts/otr_fetch_lane_weights.py moss_image
+python scripts/otr_fetch_lane_weights.py qwen_image_21
 python scripts/otr_fetch_lane_weights.py sd15
 python scripts/otr_fetch_lane_weights.py stable_audio_3
 python scripts/otr_fetch_lane_weights.py z_image
@@ -106,6 +107,7 @@ Anything not listed there is a manual install -- see its row below.
 | `ideogram4_local` | 9 weight file(s) | manual download | - |
 | `lumina_image` | 3 weight file(s) | manual download | - |
 | `moss_image` | 3 weight file(s) | `otr_fetch_lane_weights.py moss_image` | - |
+| `qwen_image_21` | 3 weight file(s) | `otr_fetch_lane_weights.py qwen_image_21` | - |
 | `sd15` | 1 weight file(s); `Comfy-Org/stable-diffusion-v1-5-archive` | `otr_fetch_lane_weights.py sd15` | - |
 | `z_image_turbo` | 3 weight file(s) | manual download | - |
 
@@ -251,6 +253,12 @@ So where a lane appears in the one-command list above, **the fetcher is authorit
 - `flux2-vae_small.safetensors`
 - `moss_image_sft_int8_convrot.safetensors`
 - `qwen3.5_9b_w4a8_gptq.safetensors`
+
+**`qwen_image_21`** -- `nodes/_otr_image_engines/qwen_image_21.py`
+
+- `qwen3vl_8b_int8_convrot.safetensors`
+- `qwen_image_2.1_int8_convrot.safetensors`
+- `qwen_image_2.1_vae_bf16.safetensors`
 
 **`sd15`** -- `nodes/_otr_image_engines/sd15.py`
 

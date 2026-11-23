@@ -320,6 +320,10 @@ def test_only_the_pinned_sources_carry_a_pin():
         ("diffusion_models", "moss_image_sft_int8_convrot.safetensors"),
         ("text_encoders", "qwen3.5_9b_w4a8_gptq.safetensors"),
         ("vae", "flux2-vae_small.safetensors"),
+        # Qwen-Image 2.1 (2026-11-22); all three are its own Comfy-Org rows.
+        ("diffusion_models", "qwen_image_2.1_int8_convrot.safetensors"),
+        ("text_encoders", "qwen3vl_8b_int8_convrot.safetensors"),
+        ("vae", "qwen_image_2.1_vae_bf16.safetensors"),
     }
     humo = {
         ("diffusion_models", "Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors"),
