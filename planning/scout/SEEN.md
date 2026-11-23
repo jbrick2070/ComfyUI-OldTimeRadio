@@ -130,3 +130,7 @@
 2026-11-21 | Image | P-Image-OSS-Comfy (Pruna; w4a8 13.4 GB, int8_convrot 21.2 GB) | WATCH | https://huggingface.co/PrunaAI/P-Image-OSS-Comfy
 2026-11-21 | Upscale | Steppe latent upscaler (Wan/Qwen-Image latents, registry only) | WATCH | https://github.com/TensorForger/ComfyUI-Steppe
 2026-11-22 | nothing new
+2026-11-23 | Voice | BlueV3 (notmax123, 7 languages incl. es/it, cloning, MIT, ONNX int8 66 MB, no pack) | WATCH | https://huggingface.co/notmax123/BlueV3
+2026-11-23 | Voice | tiny-voca / Haru-4B (English 4.5M two voices / full-duplex dialogue) | SKIP | https://huggingface.co/n4ze3m/tiny-voca
+2026-11-23 | Image | H3 Image Character Swap LoRA V1 (akatz-ai, base int8_convrot 20.98 GB, core v0.45.0+) | WATCH | https://huggingface.co/akatz-ai/MiniMax-H3-Image-Character-Swap-LoRA
+2026-11-23 | Image | UltraTex (Flux Klein 9B 3D texturing, core master-only memory commit) | SKIP | https://huggingface.co/Comfy-Org/UltraTex
