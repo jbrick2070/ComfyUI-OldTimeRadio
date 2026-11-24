@@ -134,3 +134,9 @@
 2026-11-23 | Voice | tiny-voca / Haru-4B (English 4.5M two voices / full-duplex dialogue) | SKIP | https://huggingface.co/n4ze3m/tiny-voca
 2026-11-23 | Image | H3 Image Character Swap LoRA V1 (akatz-ai, base int8_convrot 20.98 GB, core v0.45.0+) | WATCH | https://huggingface.co/akatz-ai/MiniMax-H3-Image-Character-Swap-LoRA
 2026-11-23 | Image | UltraTex (Flux Klein 9B 3D texturing, core master-only memory commit) | SKIP | https://huggingface.co/Comfy-Org/UltraTex
+2026-11-24 | Voice | kale-tts-1-nano (7.5M English, draft, no cloning) | SKIP | https://huggingface.co/KaleComputer/kale-tts-1-nano
+2026-11-24 | Video | AURA-1.3B (Kyutai audio-driven avatar, CC-BY-NC, no int8, no ComfyUI path) | WATCH | https://huggingface.co/kyutai/AURA-1.3B
+2026-11-24 | Video | FastKandinsky 6.0 Pro NVFP4 QAD (60 GB bf16 on hub) | SKIP | https://huggingface.co/kandinskylab/FastKandinsky-6.0-Pro-NVPF4-QAD
+2026-11-24 | Image | SenseNova-U1.6 8B MoT (Comfy-Org int8_convrot 17.6 GB, edit + t2i) | WATCH | https://huggingface.co/Comfy-Org/SenseNova-U1
+2026-11-24 | Image | Open-Vision-Banana (Klein 9B perception recipe) | SKIP | https://huggingface.co/FunAILab/Open-Vision-Banana
+2026-11-24 | Writer | MeetInstruct-0.6B-Pre1900 (no card) | SKIP | https://huggingface.co/Ma7ee7/MeetInstruct-0.6B-Pre1900
