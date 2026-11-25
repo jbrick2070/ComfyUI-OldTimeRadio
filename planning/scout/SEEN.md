@@ -140,3 +140,7 @@
 2026-11-24 | Image | SenseNova-U1.6 8B MoT (Comfy-Org int8_convrot 17.6 GB, edit + t2i) | WATCH | https://huggingface.co/Comfy-Org/SenseNova-U1
 2026-11-24 | Image | Open-Vision-Banana (Klein 9B perception recipe) | SKIP | https://huggingface.co/FunAILab/Open-Vision-Banana
 2026-11-24 | Writer | MeetInstruct-0.6B-Pre1900 (no card) | SKIP | https://huggingface.co/Ma7ee7/MeetInstruct-0.6B-Pre1900
+2026-11-25 | Writer | TypewriterLM 1913 7B (typewriter-ai, pre-1913, safetensors 14.5 GB + community GGUF 3.7 GB, no card) | TEST | https://huggingface.co/typewriter-ai/typewriter-1913-7B-sft-v2
+2026-11-25 | Writer | Luoshi-1840 (983M Classical Chinese pre-1840, paper only) | WATCH | https://arxiv.org/abs/2610.16201
+2026-11-25 | Image | Nemotron-Labs-Image-30B-A3B (NVIDIA, about 125 GB, non-commercial) | SKIP | https://huggingface.co/nvidia/Nemotron-Labs-Image-30B-A3B
+2026-11-25 | Voice | VieNeu-TTS v3 Turbo (Vietnamese/English, none of OTR languages) | SKIP | https://alphasignal.ai/repo/vieneu-tts-v3-turbo-runs-vietnamese-voice-cloning-on-a-consumer-gpu
