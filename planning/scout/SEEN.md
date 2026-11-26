@@ -144,3 +144,6 @@
 2026-11-25 | Writer | Luoshi-1840 (983M Classical Chinese pre-1840, paper only) | WATCH | https://arxiv.org/abs/2610.16201
 2026-11-25 | Image | Nemotron-Labs-Image-30B-A3B (NVIDIA, about 125 GB, non-commercial) | SKIP | https://huggingface.co/nvidia/Nemotron-Labs-Image-30B-A3B
 2026-11-25 | Voice | VieNeu-TTS v3 Turbo (Vietnamese/English, none of OTR languages) | SKIP | https://alphasignal.ai/repo/vieneu-tts-v3-turbo-runs-vietnamese-voice-cloning-on-a-consumer-gpu
+2026-11-26 | Image | Ming-Image 0.1/0.2 Design (Comfy-Org repack, DiT int8_convrot 6.2 GB, text encoder 19.5 GB) | WATCH | https://huggingface.co/Comfy-Org/Ming-Image
+2026-11-26 | Image | H3 Image Pose Transfer LoRA (supermansundies, 298 MB, Apache-2.0) | WATCH | https://huggingface.co/supermansundies/Minimax-H3-Image-Pose-Transfer-Lora
+2026-11-26 | Upscale | Kandinsky ImageSR 2.0 (MIT, 10.25 GB bf16 diffusers, no int8, no ComfyUI path) | WATCH | https://huggingface.co/kandinskylab/Kandinsky-ImageSR-2.0
