@@ -27,6 +27,21 @@ import warnings
 
 log = logging.getLogger("OTR")
 
+# NO ABSOLUTE PATHS IN OTR'S LOG LINES. ComfyUI serves its log at
+# /internal/logs with no login; nodes/_otr_error_text.py installs a logging
+# record factory that cuts every path in a record from this pack down to its
+# last component. prestartup_script.py installs it first; this call is the
+# harmless second (idempotent), for an install whose prestartup did not run.
+try:
+    from .nodes._otr_error_text import install_log_redaction as _otr_install_log_redaction
+    from .nodes._otr_error_text import redact_paths as _otr_redact
+    _otr_install_log_redaction()
+except Exception as _otr_redact_err:  # noqa: BLE001 -- never block the pack load
+    log.warning("[OldTimeRadio] log path redaction not installed: %s", type(_otr_redact_err).__name__)
+
+    def _otr_redact(text):  # the boot must still print, unredacted
+        return text
+
 # ─────────────────────────────────────────────────────────────────────────────
 # GLOBAL LOG / WARNING SUPPRESSION — runs once before any node module loads.
 #
@@ -158,9 +173,9 @@ if _otr_dup is not None:
     print(
         "[OldTimeRadio] DUPLICATE PACK skipped.\n"
         "  Already loaded from:\n"
-        f"    {_otr_dup}\n"
+        f"    {_otr_redact(str(_otr_dup))}\n"
         "  This extra copy is:\n"
-        f"    {os.path.abspath(os.path.dirname(__file__))}\n"
+        f"    {_otr_redact(os.path.abspath(os.path.dirname(__file__)))}\n"
         "  Keep ONE OldTimeRadio folder under custom_nodes (git clone "
         "OR Manager install, not both). Do not leave a .bak next to "
         "the live pack -- ComfyUI only skips names ending in "
@@ -290,7 +305,7 @@ if _otr_dup is None:
 
         except Exception as e:
             log.warning("[OldTimeRadio] Failed to load '%s': %s", node_name, e)
-            print(f"[OldTimeRadio] Skipped '{node_name}': {e}")
+            print(f"[OldTimeRadio] Skipped '{node_name}': {_otr_redact(str(e))}")
 
     # Error text a node hands back reaches /history, the websocket and the
     # served log, so absolute paths are cut to their last component at the
@@ -393,7 +408,7 @@ try:
     from .nodes._otr_janitor import run_boot_sweep as _otr_boot_sweep
     _otr_boot_sweep()
 except Exception as _otr_janitor_err:  # noqa: BLE001 -- PD1
-    print(f"[OldTimeRadio] janitor boot sweep skipped: {_otr_janitor_err}")
+    print(f"[OldTimeRadio] janitor boot sweep skipped: {_otr_redact(str(_otr_janitor_err))}")
 
 # =====================================================================
 # THE WRITER'S MODEL FOLDER (2026-09-25): register ComfyUI's `LLM` model
@@ -415,7 +430,7 @@ if _otr_dup is None:
             # extra_model_paths.yaml entry when there is one, else ours.
             log.info("[OldTimeRadio] writer LLM folder: %s", _otr_llm_first)
     except Exception as _otr_llm_err:  # noqa: BLE001 -- PD1
-        print(f"[OldTimeRadio] LLM folder registration skipped: {_otr_llm_err}")
+        print(f"[OldTimeRadio] LLM folder registration skipped: {_otr_redact(str(_otr_llm_err))}")
 
 # =====================================================================
 # WEB_DIRECTORY -- the saved-workflow schema boundary (js/workflow_schema.js).

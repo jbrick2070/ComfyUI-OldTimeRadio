@@ -30,11 +30,13 @@ from __future__ import annotations
 
 import functools
 import inspect
+import logging
 import os
 import re
 from pathlib import Path
 
-__all__ = ["redact_paths", "redact_exception", "guard_node_class", "guard_node_classes"]
+__all__ = ["redact_paths", "redact_exception", "guard_node_class", "guard_node_classes",
+           "install_log_redaction"]
 
 # A drive-letter path (C:\a\b, C:/a/b) or a UNC share (\\host\share\a). The
 # drive letter must stand alone, so a URL scheme ("https:/") never matches.
@@ -189,3 +191,75 @@ def guard_node_class(cls) -> bool:
 def guard_node_classes(classes) -> int:
     """Guard every class in ``classes``; return how many are guarded."""
     return sum(1 for cls in classes if guard_node_class(cls))
+
+
+# ---------------------------------------------------------------------------
+# Log lines: the same rule, at the one place every OTR log record is born.
+# ---------------------------------------------------------------------------
+#
+# ComfyUI serves its log at ``/internal/logs`` with no login, and copies it to
+# the console. The node-boundary guard above keeps paths out of EXCEPTION text;
+# it never saw ordinary log lines, and OTR logged full paths in hundreds of them
+# (the Hugging Face cache, the output folder, model snapshots, every episode
+# file). The registry's policy reviewer signed 2.3.51 "information-disclosure"
+# for paths in exception text, and flagged 2.3.61-2.3.63 with no reason given;
+# paths in the log were the leading candidate (Codex review, 2026-11-26).
+#
+# A logging RECORD FACTORY is the boundary: it runs for every record any logger
+# creates, after the level check, whatever the logger's name (OTR uses
+# "OTR", "OldTimeRadio", "OTR.*" and module names). Records whose source file
+# lives in this pack get their message -- and any traceback or stack text --
+# passed through ``redact_paths``. Every other pack's records pass untouched.
+
+#: The pack's root folder (the parent of ``nodes/``), as imported: a junction
+#: install reports the junction path in both ``__file__`` and the record, so
+#: the plain absolute path is compared first and the resolved one second.
+_PACK_ROOTS = tuple({
+    os.path.normcase(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) + os.sep,
+    os.path.normcase(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))) + os.sep,
+})
+
+
+def _from_this_pack(pathname) -> bool:
+    if not isinstance(pathname, str) or not pathname:
+        return False
+    here = os.path.normcase(os.path.abspath(pathname))
+    return any(here.startswith(root) for root in _PACK_ROOTS)
+
+
+def _redact_record(record: logging.LogRecord) -> logging.LogRecord:
+    try:
+        message = record.getMessage()
+    except Exception:  # noqa: BLE001 -- a malformed record is logging's to report
+        return record
+    clean = redact_paths(message)
+    if clean != message:
+        record.msg, record.args = clean, None
+    if record.exc_info and record.exc_info[0] is not None and not record.exc_text:
+        try:
+            record.exc_text = redact_paths(logging.Formatter().formatException(record.exc_info))
+        except Exception:  # noqa: BLE001 -- leave the formatter to try
+            pass
+    if record.stack_info:
+        record.stack_info = redact_paths(record.stack_info)
+    return record
+
+
+def install_log_redaction() -> bool:
+    """Wrap the logging record factory so OTR's own records carry no absolute
+    paths. Idempotent: returns True when it installed, False when an OTR
+    factory was already in place (prestartup installs first; ``__init__``
+    calls again harmlessly)."""
+    previous = logging.getLogRecordFactory()
+    if getattr(previous, "__otr_redacts_paths__", False):
+        return False
+
+    def otr_record_factory(*args, **kwargs):
+        record = previous(*args, **kwargs)
+        if _from_this_pack(getattr(record, "pathname", None)):
+            record = _redact_record(record)
+        return record
+
+    otr_record_factory.__otr_redacts_paths__ = True  # type: ignore[attr-defined]
+    logging.setLogRecordFactory(otr_record_factory)
+    return True

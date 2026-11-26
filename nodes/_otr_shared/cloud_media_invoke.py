@@ -46,6 +46,7 @@ from .cloud_media_backend import (
     is_wallet_empty_message,
 )
 from .cloud_media_canonical import PartnerResult, validate_partner_result
+from .._otr_error_text import redact_paths as _redact_paths
 from .google_image_model_ids import resolve_selector_to_model_id
 
 __all__ = [
@@ -316,7 +317,7 @@ def _emit_heartbeat(node_key: str, elapsed_s: float, timeout_s: float) -> None:
         if not _HEARTBEAT_WARNED:
             _HEARTBEAT_WARNED = True
             print(f"[cloud_media] WARNING heartbeat unavailable for "
-                  f"{node_key}: {exc} (provider call continues)")
+                  f"{node_key}: {_redact_paths(str(exc))} (provider call continues)")
 
 
 def _cancel_and_unwind(fut: concurrent.futures.Future) -> None:
@@ -680,7 +681,7 @@ def _stream_to_temp(url: str, dest: Path) -> None:
             with contextlib.suppress(OSError):
                 dest.unlink()
             if attempt < _DOWNLOAD_ATTEMPTS:
-                print(f"[cloud_media] result download failed ({exc}); "
+                print(f"[cloud_media] result download failed ({_redact_paths(str(exc))}); "
                       f"retrying once -- the job is already delivered, so "
                       f"this fetch resubmits nothing")
     err = CloudMediaError(
@@ -891,7 +892,7 @@ def _settle_failure(session, rid: str, err: CloudMediaError,
         })
     except Exception as settle_exc:  # never mask the real failure
         print(f"[cloud_media] WARNING settlement for {rid} failed: "
-              f"{settle_exc}")
+              f"{_redact_paths(str(settle_exc))}")
 
 
 # ---------------------------------------------------------------------------

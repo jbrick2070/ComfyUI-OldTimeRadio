@@ -54,6 +54,10 @@ try:
     from . import _otr_llm_folder as _LLM
 except ImportError:  # pragma: no cover -- flat / standalone load (nodes/ on sys.path above)
     import _otr_llm_folder as _LLM  # type: ignore
+try:
+    from ._otr_error_text import redact_paths as _redact_paths
+except ImportError:  # pragma: no cover -- flat / standalone load
+    from _otr_error_text import redact_paths as _redact_paths  # type: ignore
 
 # ---------------------------------------------------------------------------
 # Canonical constants -- single source of truth for tests + wiring code.
@@ -2832,7 +2836,8 @@ def auto_download_if_missing(
     # are touched -- see _otr_llm_folder.dead_partials.
     if local_dir is not None and Path(local_dir).is_dir():
         for stale in _LLM.drop_dead_partials(Path(local_dir)):
-            print(f"[OTR] Removed a partial download a killed transfer left behind: {stale}")
+            print(f"[OTR] Removed a partial download a killed transfer left behind: "
+                  f"{_redact_paths(str(stale))}")
     # The disk check measures the drive the bytes actually land on.
     free_bytes = _free_disk_bytes_for(dest_path)
     margin = size_bytes + _DISK_SPACE_MARGIN_BYTES
@@ -2850,7 +2855,7 @@ def auto_download_if_missing(
     # ProgressBar separately).
     print(
         f"[OTR] Downloading {weights_id} -- {size_bytes / 1e9:.1f} GB -> "
-        f"{dest_path} (first run only)"
+        f"{_redact_paths(str(dest_path))} (first run only)"
     )
 
     if _snapshot_download is None:

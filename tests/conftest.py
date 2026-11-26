@@ -15,11 +15,19 @@ test (left as an exercise — no current test claims that mark).
 
 from __future__ import annotations
 
+import logging
 import os
 import socket
 import sys
 
 import pytest
+
+# The logging record factory as it stands before any test module (or any pack
+# entry point a test executes) can wrap it. nodes/_otr_error_text.py installs a
+# path-redacting factory when __init__.py or prestartup_script.py runs; a test
+# that executes either would otherwise leave it installed for every later test,
+# and tests that check a log line's own text would pass or fail by test order.
+_STDLIB_LOG_RECORD_FACTORY = logging.getLogRecordFactory()
 
 
 # Set the env var BEFORE pytest collects any test module. conftest.py at
@@ -510,6 +518,16 @@ def pytest_sessionfinish(session, exitstatus):  # kept: pytest hook signature co
         # Hard exit so CI distinguishes this from a normal pytest
         # failed-test exit. Exit code 2 per S15.1 spec.
         raise SystemExit(2)
+
+
+@pytest.fixture(autouse=True)
+def _log_record_factory_is_reset_per_test():
+    """Every test starts and ends on the stdlib record factory -- see
+    _STDLIB_LOG_RECORD_FACTORY above. tests/test_log_path_redaction.py
+    installs the OTR factory itself, inside the test, when it wants it."""
+    logging.setLogRecordFactory(_STDLIB_LOG_RECORD_FACTORY)
+    yield
+    logging.setLogRecordFactory(_STDLIB_LOG_RECORD_FACTORY)
 
 
 @pytest.fixture(autouse=True)

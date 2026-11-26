@@ -36,6 +36,21 @@ if not _otr_pre_dup:
 if _otr_pre_dup:
     print("[OldTimeRadio] prestartup skipped: another OldTimeRadio folder already ran it")
 
+# NO ABSOLUTE PATHS IN OTR'S LOG LINES, from the very first one. ComfyUI serves
+# its log at /internal/logs with no login. This loads nodes/_otr_error_text.py
+# by file (the pack is not importable as a package yet) and installs its record
+# factory; __init__.py repeats the call harmlessly.
+try:
+    import importlib.util as _otr_ilu
+    _otr_et_spec = _otr_ilu.spec_from_file_location(
+        "_otr_prestartup_error_text",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "nodes", "_otr_error_text.py"))
+    _otr_et = _otr_ilu.module_from_spec(_otr_et_spec)
+    _otr_et_spec.loader.exec_module(_otr_et)
+    _otr_et.install_log_redaction()
+except Exception as _otr_redact_err:  # noqa: BLE001 -- never block ComfyUI's startup
+    print("[OldTimeRadio] log path redaction not installed: %s" % type(_otr_redact_err).__name__)
+
 # ---------------------------------------------------------------------------
 # 1. EARLIEST POSSIBLE MOCK -- runs before ANY transformers import.
 #    The fake module goes into sys.modules before ComfyUI begins loading

@@ -46,6 +46,7 @@ from . import _otr_source_payload as _osp
 # INTEGRITY; this module stays the ONE bank-row parser (injected below), so a
 # client row can never drift from a shipped one.
 from . import _otr_user_banks as _oub
+from ._otr_error_text import redact_paths as _redact_paths
 
 _STORY_PACKS_ROOT = Path(__file__).resolve().parent / "story_packs"
 _BANKS_FILENAME = "banks.json"
@@ -651,7 +652,7 @@ def _admit_user_banks(banks: "dict[str, SourceBank]",
         pack_dirs[bundle.bank_id] = bundle.story_packs_dir
         admitted[bundle.bank_id] = bundle
     for issue in quarantined:
-        print(issue.render())
+        print(_redact_paths(issue.render()))
     return admitted, tuple(quarantined)
 
 
