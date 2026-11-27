@@ -54,11 +54,18 @@ _POSIX_ROOTS = (
     "home", "Users", "Volumes", "root", "tmp", "var", "opt", "srv", "mnt", "media",
     "private", "usr", "etc", "run", "data", "workspace", "content", "kaggle",
     "notebooks", "app", "teamspace", "runpod-volume", "comfyui", "ComfyUI",
-    "Applications", "Library", "storage",
+    "Applications",
 )
+#: What may stand to the LEFT of a rooted POSIX path. Shared with the
+#: known-folder cut below, so "/root" is never matched inside a URL
+#: ("https://example.com/root/x") or inside a longer path ("/var/root/x").
+_POSIX_LEFT = r"(?:(?<![\w./\\~-])|(?<=file://))"
+# A backslash is NOT a path character in the POSIX rule: in JSON or repr text
+# it is the escape before the closing quote ("...x.wav\"") or the start of an
+# escaped newline, and taking it into the path corrupted that text.
 _POSIX_PATH = (
-    r"(?:(?<![\w./\\~-])|(?<=file://))/(?:" + "|".join(_POSIX_ROOTS) + r")/"
-    r"(?:[^\s/'\"<>|,;()\[\]{}]+/)*[^\s/'\"<>|,;()\[\]{}]*"
+    _POSIX_LEFT + r"/(?:" + "|".join(_POSIX_ROOTS) + r")/"
+    r"(?:[^\s/\\'\"<>|,;()\[\]{}]+/)*[^\s/\\'\"<>|,;()\[\]{}]*"
 )
 _PATH_RE = re.compile(f"{_WINDOWS_PATH}|{_POSIX_PATH}")
 
@@ -98,27 +105,19 @@ def _spellings(folder: str) -> set:
             folder.replace("\\", "\\\\")}
 
 
-#: (prefix, name shown when the folder itself is all that is named) for this
-#: install's own folders whose path holds a space. None until ComfyUI's
-#: ``folder_paths`` is loaded, so a call at prestartup does not freeze a
-#: partial answer.
+#: A test seam: a tuple here is used as the answer of ``_install_prefixes``
+#: as it stands. None (always, in production) means "work it out".
 _INSTALL_PREFIXES = None
+#: (the folders the answer was built from, the answer). Rebuilt whenever the
+#: folders differ, so nothing is frozen: not the partial answer of a call at
+#: prestartup, before ComfyUI's ``folder_paths`` is loaded, and not a stubbed
+#: ``folder_paths`` a test left behind.
+_INSTALL_CACHE: tuple = ((), ())
 
 
-def _install_prefixes() -> tuple:
-    """This install's own folders that the path rule cannot cut whole.
-
-    The path rule stops at whitespace, so an install under a folder with a
-    space in its name -- ``D:\\AI Tools\\ComfyUI_windows_portable`` is a
-    common one -- left everything after the first space in the text. Like the
-    home folder, these are cut as known prefixes first: the ComfyUI folder
-    this pack sits under, and ComfyUI's own base, models, output, input, temp
-    and user folders once it is loaded. Only folders with a space are listed;
-    every other path is already handled by the rule.
-    """
-    global _INSTALL_PREFIXES
-    if _INSTALL_PREFIXES is not None:
-        return _INSTALL_PREFIXES
+def _install_folders() -> tuple:
+    """The ComfyUI folder this pack sits under, and ComfyUI's own base,
+    models, output, input, temp and user folders once it is loaded."""
     folders = []
     pack_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     parent = os.path.dirname(pack_root)
@@ -136,6 +135,24 @@ def _install_prefixes() -> tuple:
             value = getattr(comfy, attr, None)
             if isinstance(value, str):
                 folders.append(value)
+    return tuple(folders)
+
+
+def _install_prefixes() -> tuple:
+    """This install's own folders that the path rule cannot cut whole.
+
+    The path rule stops at whitespace, so an install under a folder with a
+    space in its name -- ``D:\\AI Tools\\ComfyUI_windows_portable`` is a
+    common one -- left everything after the first space in the text. Like the
+    home folder, these are cut as known prefixes first. Only folders with a
+    space are listed; every other path is already handled by the rule.
+    """
+    global _INSTALL_CACHE
+    if _INSTALL_PREFIXES is not None:
+        return _INSTALL_PREFIXES
+    folders = _install_folders()
+    if folders == _INSTALL_CACHE[0]:
+        return _INSTALL_CACHE[1]
     found = set()
     for folder in folders:
         folder = folder.rstrip("\\/")
@@ -145,23 +162,38 @@ def _install_prefixes() -> tuple:
         for spelling in _spellings(folder):
             found.add((spelling, bare))
     answer = tuple(sorted(found, key=lambda pair: len(pair[0]), reverse=True))
-    if comfy is not None:
-        _INSTALL_PREFIXES = answer
+    _INSTALL_CACHE = (folders, answer)
     return answer
 
 
 def _cut_home(text: str) -> str:
-    """Cut the known folders -- the account's home, then this install's own
-    folders that hold a space -- before the path rule runs."""
+    """Cut the known folders -- the account's home and this install's own
+    folders that hold a space -- before the path rule runs.
+
+    LONGEST FIRST, across both lists. An install under the home folder
+    (``C:\\Users\\x\\AI Tools\\ComfyUI``) must be cut as the install folder:
+    cutting the shorter home prefix first stops at the space and leaves the
+    rest of the path, which the install prefix can then no longer match.
+
+    WITH A LEFT BOUNDARY. A home of ``/root`` (a container, a pod) is also a
+    segment of other text: without the boundary ``https://example.com/root/x``
+    came out as ``https://example.comx``.
+    """
     known = [(prefix, "~") for prefix in _HOME_PREFIXES]
     known += list(_install_prefixes())
+    known.sort(key=lambda pair: len(pair[0]), reverse=True)
+    lowered = text.lower()
     for prefix, bare in known:
-        if prefix.lower() in text.lower():
-            def _tail(match: re.Match, bare=bare) -> str:
-                rest = (match.group(1) or "").rstrip("\\/.")
-                return re.split(r"[\\/]", rest)[-1] or bare
-            text = re.sub(re.escape(prefix) + "(" + _UNDER_HOME + ")", _tail, text,
-                          flags=re.IGNORECASE)
+        if prefix.lower() not in lowered:
+            continue
+
+        def _tail(match: re.Match, bare=bare) -> str:
+            rest = (match.group(1) or "").rstrip("\\/.")
+            return re.split(r"[\\/]", rest)[-1] or bare
+        left = _POSIX_LEFT if prefix.startswith("/") else r"(?<![\w])"
+        text = re.sub(left + re.escape(prefix) + "(" + _UNDER_HOME + ")", _tail, text,
+                      flags=re.IGNORECASE)
+        lowered = text.lower()
     return text
 
 # Attributes some standard exceptions read their text from instead of args.
@@ -170,9 +202,17 @@ _COMMAND_ATTRS = ("cmd",)
 
 
 def _last_component(match: re.Match) -> str:
-    path = match.group(0).rstrip("\\/.")
+    whole = match.group(0)
+    path = whole.rstrip("\\/.")
     tail = re.split(r"[\\/]", path)[-1] if path else ""
-    return tail or "<path>"
+    tail = tail or "<path>"
+    # A Windows path inside JSON or repr text ends ``...a.wav\"``: the last
+    # backslash escapes the closing quote, not the path. An ODD run of
+    # backslashes right before a quote keeps one, so the text still parses.
+    run = len(whole) - len(whole.rstrip("\\"))
+    if run % 2 == 1 and match.string[match.end():match.end() + 1] in ("\"", "'"):
+        tail += "\\"
+    return tail
 
 
 def redact_paths(text: str) -> str:
@@ -188,7 +228,16 @@ def _redact_value(value):
     if isinstance(value, os.PathLike):
         return redact_paths(os.fspath(value))
     if isinstance(value, (list, tuple)):
-        return type(value)(_redact_value(v) for v in value)
+        items = [_redact_value(v) for v in value]
+        try:
+            return type(value)(items)
+        except TypeError:
+            # A namedtuple takes its fields one by one. Falling over here
+            # used to leave the whole ``args`` unredacted.
+            try:
+                return type(value)(*items)
+            except TypeError:
+                return tuple(items) if isinstance(value, tuple) else items
     return value
 
 
@@ -227,6 +276,10 @@ def redact_exception(exc: BaseException) -> BaseException:
         _redact_one(current)
         pending.append(getattr(current, "__cause__", None))
         pending.append(getattr(current, "__context__", None))
+        # An ExceptionGroup (Python 3.11+) prints every member too.
+        members = getattr(current, "exceptions", None)
+        if isinstance(members, (list, tuple)):
+            pending.extend(m for m in members if isinstance(m, BaseException))
     return exc
 
 
