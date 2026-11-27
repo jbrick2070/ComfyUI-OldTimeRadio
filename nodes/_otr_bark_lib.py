@@ -124,38 +124,56 @@ logging.getLogger("huggingface_hub.file_download").setLevel(logging.WARNING)
 _BARK_CACHE = {"model": None, "processor": None, "device": None}
 
 
+#: transformers' own switch for the conversion check below ("in a CI
+#: environment or in a pytest run, we prevent the conversion"). Set only for
+#: the length of a Bark load, then put back.
+_CONVERSION_SWITCH = "DISABLE_SAFETENSORS_CONVERSION"
+
+
 @contextlib.contextmanager
 def _no_background_conversion():
-    """Keep transformers from starting its safetensors-conversion thread for
-    the length of ONE load.
+    """Keep transformers from starting its safetensors-conversion check for
+    the length of ONE Bark load.
 
-    Bark's repos carry ``pytorch_model.bin`` and no safetensors file. When
-    transformers fetches such a model from the Hub it starts a background
-    thread that asks a hosted conversion service whether a safetensors copy
-    exists; with a response it cannot parse, that thread prints a
-    JSONDecodeError traceback into the log of an otherwise good run.
+    Bark's repos carry ``pytorch_model.bin`` and no safetensors file. Loading
+    such a model, transformers asks a hosted conversion service whether a
+    safetensors copy exists -- from a background thread, and ALSO when the
+    weights come from the local cache (``local_files_only`` does not stop it;
+    measured on transformers 5.17.0). With a reply it cannot parse, the thread
+    prints a JSONDecodeError traceback into the log of an otherwise good run,
+    and a render with every model on disk still touches the network.
 
     Until 2.3.64 the pack answered this at ComfyUI's start, by replacing
     ``transformers.safetensors_conversion`` in ``sys.modules`` for the whole
     process -- which switched the feature off for every other pack as well.
-    This is the scoped answer: the name is swapped only while Bark's own Hub
-    load runs, and is put back however that load ends. A transformers build
-    that has no such name is left exactly as it is.
+    This is the scoped answer, and it is used around BOTH Bark model loads:
+
+    * transformers' own switch, ``DISABLE_SAFETENSORS_CONVERSION``, is set
+      while the load runs and restored to what it was;
+    * for a build older than that switch, the thread's target is swapped for
+      a no-op for the same span.
+
+    Both are put back however the load ends.
     """
+    previous = otr_env.get(_CONVERSION_SWITCH)
+    otr_env.pin(_CONVERSION_SWITCH, "1")
     missing = object()
     try:
         import transformers.modeling_utils as _modeling_utils
         original = getattr(_modeling_utils, "auto_conversion", missing)
     except Exception:  # noqa: BLE001 -- no transformers: nothing to quiet
         _modeling_utils, original = None, missing
-    if original is missing:
-        yield
-        return
-    _modeling_utils.auto_conversion = lambda *args, **kwargs: None
+    if original is not missing:
+        _modeling_utils.auto_conversion = lambda *args, **kwargs: None
     try:
         yield
     finally:
-        _modeling_utils.auto_conversion = original
+        if original is not missing:
+            _modeling_utils.auto_conversion = original
+        if previous is None:
+            otr_env.unpin(_CONVERSION_SWITCH)
+        else:
+            otr_env.pin(_CONVERSION_SWITCH, previous)
 
 
 def _load_bark(model_id="suno/bark", device=None):
@@ -290,18 +308,20 @@ def _load_bark(model_id="suno/bark", device=None):
             dtype = torch.float16 if _kind == "cuda" else torch.float32
 
             try:
-                model = BarkModel.from_pretrained(
-                    model_id,
-                    torch_dtype=dtype,
-                    device_map=device_map,
-                    local_files_only=True,
-                    cache_dir=cache_dir_path,
-                )
+                # Guarded: the cached load starts the conversion check too.
+                with _no_background_conversion():
+                    model = BarkModel.from_pretrained(
+                        model_id,
+                        torch_dtype=dtype,
+                        device_map=device_map,
+                        local_files_only=True,
+                        cache_dir=cache_dir_path,
+                    )
                 log.info(f"Bark model loaded from cache on {device} (no HTTP checks)")
             except OSError as local_err:
                 log.info("[Bark] local_files_only=True failed for model (%s), attempting Hub fallback...", local_err)
                 try:
-                    # The one load that reaches the Hub: see the guard.
+                    # The load that reaches the Hub: see the guard.
                     with _no_background_conversion():
                         model = BarkModel.from_pretrained(
                             model_id,

@@ -170,9 +170,7 @@ def test_every_flat_import_in_the_pack_is_only_a_fallback():
     assert unguarded == []
 
 
-def test_barks_guard_is_scoped_to_one_load_and_always_restored(monkeypatch):
-    from nodes import _otr_bark_lib as bark
-
+def _fake_transformers(monkeypatch):
     real = object()
     fake_utils = types.ModuleType("transformers.modeling_utils")
     fake_utils.auto_conversion = real
@@ -180,33 +178,80 @@ def test_barks_guard_is_scoped_to_one_load_and_always_restored(monkeypatch):
     fake_pkg.modeling_utils = fake_utils
     monkeypatch.setitem(sys.modules, "transformers", fake_pkg)
     monkeypatch.setitem(sys.modules, "transformers.modeling_utils", fake_utils)
+    return fake_utils, real
+
+
+def test_barks_guard_is_scoped_to_one_load_and_always_restored(monkeypatch):
+    from nodes import _otr_bark_lib as bark
+
+    fake_utils, real = _fake_transformers(monkeypatch)
+    monkeypatch.delenv(bark._CONVERSION_SWITCH, raising=False)
 
     with bark._no_background_conversion():
+        assert os.environ[bark._CONVERSION_SWITCH] == "1"      # transformers' own switch
         assert fake_utils.auto_conversion is not real
         assert fake_utils.auto_conversion("repo", ignore_errors_during_conversion=True) is None
     assert fake_utils.auto_conversion is real
+    assert bark._CONVERSION_SWITCH not in os.environ           # gone again, not left set
 
     try:
         with bark._no_background_conversion():
             raise RuntimeError("the load failed")
     except RuntimeError:
         pass
-    assert fake_utils.auto_conversion is real          # restored on failure too
+    assert fake_utils.auto_conversion is real                  # restored on failure too
+    assert bark._CONVERSION_SWITCH not in os.environ
 
-    del fake_utils.auto_conversion                     # a build without the name
+    del fake_utils.auto_conversion                             # a build without the name
     with bark._no_background_conversion():
         assert not hasattr(fake_utils, "auto_conversion")
+        assert os.environ[bark._CONVERSION_SWITCH] == "1"
     assert not hasattr(fake_utils, "auto_conversion")
 
 
-def test_the_guard_wraps_barks_hub_load_and_nothing_else():
-    """The wiring: the guard is used at the one load that reaches the Hub."""
+def test_barks_guard_puts_back_a_switch_the_user_had_set(monkeypatch):
+    from nodes import _otr_bark_lib as bark
+
+    _fake_transformers(monkeypatch)
+    monkeypatch.setenv(bark._CONVERSION_SWITCH, "0")
+    with bark._no_background_conversion():
+        assert os.environ[bark._CONVERSION_SWITCH] == "1"
+    assert os.environ[bark._CONVERSION_SWITCH] == "0"
+
+
+def test_the_guard_wraps_both_of_barks_model_loads():
+    """The wiring. Sonnet's review of the first version reproduced that the
+    CACHED load (local_files_only=True) starts the conversion check as well,
+    so guarding only the Hub load left the common case uncovered."""
     import inspect
+    import textwrap
 
     from nodes import _otr_bark_lib as bark
 
-    source = inspect.getsource(bark._load_bark)
-    assert source.count("with _no_background_conversion():") == 1
-    guarded = source.split("with _no_background_conversion():", 1)[1].split("log.info", 1)[0]
-    assert "BarkModel.from_pretrained(" in guarded
-    assert "local_files_only" not in guarded           # the Hub load, not the cache load
+    tree = ast.parse(textwrap.dedent(inspect.getsource(bark._load_bark)))
+    guarded, unguarded = [], []
+
+    def walk(node, inside):
+        if isinstance(node, ast.With):
+            names = [ast.unparse(item.context_expr) for item in node.items]
+            inside = inside or "_no_background_conversion()" in names
+        if isinstance(node, ast.Call) and ast.unparse(node.func) == "BarkModel.from_pretrained":
+            (guarded if inside else unguarded).append(node.lineno)
+        for child in ast.iter_child_nodes(node):
+            walk(child, inside)
+
+    walk(tree, False)
+    assert len(guarded) == 2 and unguarded == []
+
+
+def test_the_installed_transformers_still_knows_the_switch_the_guard_sets():
+    """The guard leans on transformers' own switch. If a future build drops
+    it, this says so: the thread swap is then the only cover."""
+    import inspect
+
+    import pytest
+
+    modeling_utils = pytest.importorskip("transformers.modeling_utils")
+    from nodes import _otr_bark_lib as bark
+
+    assert bark._CONVERSION_SWITCH in inspect.getsource(modeling_utils)
