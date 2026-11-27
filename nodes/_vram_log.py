@@ -58,12 +58,19 @@ def _cuda_available() -> bool:
 
 
 def _write_runtime_log(line: str) -> None:
+    # The file is under ComfyUI's output folder, which /view serves with no
+    # login, so a line carries no absolute path (see
+    # story_orchestrator._runtime_log, the other writer of this file).
     try:
+        try:
+            from ._otr_error_text import redact_paths as _redact
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_error_text import redact_paths as _redact  # type: ignore
         log_path = _runtime_log_path()
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
         ts = datetime.now().strftime("%H:%M:%S")
         with open(log_path, "a", encoding="utf-8") as f:
-            f.write(f"[{ts}] {line}\n")
+            f.write(f"[{ts}] {_redact(str(line))}\n")
     except Exception:
         # Never let telemetry take down a generation run.
         pass

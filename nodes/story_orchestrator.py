@@ -52,13 +52,23 @@ log = logging.getLogger("OTR")
 
 
 def _runtime_log(msg):
-    """Write a persistent heartbeat to otr_runtime.log for monitoring."""
+    """Write a persistent heartbeat to otr_runtime.log for monitoring.
+
+    NO ABSOLUTE PATHS IN THE LINE. The file lives under ComfyUI's output
+    folder, which ``/view`` serves with no login, and it is written directly
+    -- not through ``logging`` -- so the log-record redaction never saw it.
+    The loader wrote the Hugging Face home and each model snapshot's full
+    path here; every line now passes the same ``redact_paths`` rule."""
     try:
+        try:
+            from ._otr_error_text import redact_paths as _redact
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_error_text import redact_paths as _redact  # type: ignore
         ts = datetime.now().strftime("%H:%M:%S")
         log_path = str(_OTR_PATHS.otr_runtime_log_path())
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
         with open(log_path, "a", encoding="utf-8") as f:
-            f.write(f"[{ts}] {msg}\n")
+            f.write(f"[{ts}] {_redact(str(msg))}\n")
     except Exception:
         # STAYS SILENT, DELIBERATELY, AND ONLY THIS ONE DOES. This function IS
         # the heartbeat logger, so reporting its own failure through itself
