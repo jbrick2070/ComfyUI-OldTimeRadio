@@ -26,7 +26,7 @@ REPO = Path(__file__).resolve().parents[1]
 
 # --- RANK 1 ---------------------------------------------------------------- #
 
-def test_english_kokoro_refuses_before_misaki_can_download_spacy(monkeypatch):
+def test_english_kokoro_refuses_before_misaki_can_download_spacy(monkeypatch, tmp_path):
     from nodes._otr_audio_engines import _kokoro_backends as KB
     import importlib.util
     real = importlib.util.find_spec
@@ -42,9 +42,24 @@ def test_english_kokoro_refuses_before_misaki_can_download_spacy(monkeypatch):
             touched.append(kw)
     fake.KPipeline = KPipeline
     monkeypatch.setitem(sys.modules, "kokoro", fake)
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    # With the model absent from the interpreter AND the pack's own copy gone
+    # (a partial install), English refuses by name before misaki is built.
+    monkeypatch.setattr(KB, "SPACY_EN_DIR", str(tmp_path / "no_such_copy"))
     with pytest.raises(KB.BackendUnavailable, match="spacy download en_core_web_sm"):
         KB.TorchKokoroBackend("cpu", lang_code="b").load()
     assert touched == []                       # misaki was never given the chance
+    # With the pack's copy in place (every real install since 2026-11-27),
+    # misaki finds a model and so never reaches its own download either.
+    monkeypatch.undo()
+    monkeypatch.setattr(importlib.util, "find_spec", absent)
+    monkeypatch.setitem(sys.modules, "kokoro", fake)
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    assert KB.shipped_spacy_english() is not None
+    KB.TorchKokoroBackend("cpu", lang_code="b").load()
+    assert [kw["lang_code"] for kw in touched] == ["b"]
+    assert KB.SPACY_EN_DIR in sys.path
+    touched.clear()
     KB.TorchKokoroBackend("cpu", lang_code="e").load()     # espeak languages need no spaCy
     assert touched and touched[0]["lang_code"] == "e"
 

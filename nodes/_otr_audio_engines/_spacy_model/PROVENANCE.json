@@ -1,0 +1,145 @@
+{
+  "copied": "every member of the wheel, byte for byte, except the four packaging records listed under left_out",
+  "files": {
+    "en_core_web_sm-3.7.1.dist-info/LICENSE": {
+      "bytes": 1056,
+      "sha256": "3933c176979b68bc6d0bcc902c7d6c130f1d127f476f17ba5cdba8d99cfd0012"
+    },
+    "en_core_web_sm-3.7.1.dist-info/LICENSES_SOURCES": {
+      "bytes": 2347,
+      "sha256": "20d9dfacd215112251f15341edd1a47b1f98bf393a212f10f194ffdc7ee98a90"
+    },
+    "en_core_web_sm-3.7.1.dist-info/METADATA": {
+      "bytes": 2958,
+      "sha256": "faf1aa4716bf3364702ad2e3061738265050749de4ec2c0e9ec793fd17987227"
+    },
+    "en_core_web_sm/__init__.py": {
+      "bytes": 237,
+      "sha256": "c8eb57079c03fc4157c227f641781fbcb3e9d11439abe1bf0b72e4c0fa78a38d"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/LICENSE": {
+      "bytes": 1056,
+      "sha256": "3933c176979b68bc6d0bcc902c7d6c130f1d127f476f17ba5cdba8d99cfd0012"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/LICENSES_SOURCES": {
+      "bytes": 2347,
+      "sha256": "20d9dfacd215112251f15341edd1a47b1f98bf393a212f10f194ffdc7ee98a90"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/README.md": {
+      "bytes": 2587,
+      "sha256": "1a2282d8c0fc379ba37fc6e73492c6056f31a0d0a8667767aeed87768aea0ddf"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/accuracy.json": {
+      "bytes": 6320,
+      "sha256": "6cee79068ec6655cf9c68e2cd8aa1d3f5648d382d16aa43f6b29b5f82ba612c4"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/attribute_ruler/patterns": {
+      "bytes": 14735,
+      "sha256": "f8b97f7ebef9b8536bba5f0fc1e73af6183563e96e2325bcbb021b8c6dbc6683"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/config.cfg": {
+      "bytes": 5527,
+      "sha256": "65c545ca2da5bd4b87b22d4917318605360b37dee6ed6b18516a036f87319f79"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/lemmatizer/lookups/lookups.bin": {
+      "bytes": 972893,
+      "sha256": "eb64f40c0f8396d1762730c0ddf4dad2a52d138f5a389f71a1a1d088173b7737"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/meta.json": {
+      "bytes": 10085,
+      "sha256": "5fc475fbe5bb0317249fd7e51c22d53052345bb23f13eaf149ff590223964d1c"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/ner/cfg": {
+      "bytes": 221,
+      "sha256": "a7172edadafba9f472e9ac0f2660eec04b6405e471be9e20267b79c67288d22d"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/ner/model": {
+      "bytes": 6154601,
+      "sha256": "6f47ca062eb419c8ffb7d3023e6fbc4b2eb21dab14c5d49aa5e5586228b87405"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/ner/moves": {
+      "bytes": 1064,
+      "sha256": "d82b13473ebd33e0396004dd22f00c71fe3c1251742bf1f7c4554f23fd3b0af4"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/parser/cfg": {
+      "bytes": 222,
+      "sha256": "e2a240ef01f95e58f5dd4c9d6e90d61f597b8d998966570d3009dd81e8879780"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/parser/model": {
+      "bytes": 319909,
+      "sha256": "a1836fbc02b3924b2fd5f65325c58ae852ff112db1090ca724e5a801e68b85fd"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/parser/moves": {
+      "bytes": 1571,
+      "sha256": "ec41318c32eb7f9e4d8f050b2e8466ee67954d2d3455c1aec73abf46c82dd67f"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/senter/cfg": {
+      "bytes": 23,
+      "sha256": "2a4db4a729b6469da1f87d71cc7cd3ed2a73360cc85326821e850836c4671103"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/senter/model": {
+      "bytes": 197089,
+      "sha256": "e62c2504dcdc66144b30c048100af05f12207f933f6d669982b947ae71ffdeef"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/tagger/cfg": {
+      "bytes": 615,
+      "sha256": "d484c3d9391f37bf9c727aa2eb4c477a24cb103020f95e52dc37842818b50118"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/tagger/model": {
+      "bytes": 19829,
+      "sha256": "fb00ef592a2a464d95dd889ce424952ae7fd64e095153054c310345198cc0fc4"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/tok2vec/cfg": {
+      "bytes": 4,
+      "sha256": "f8a5a26e3056eb6fb06deeb3dbccfd88ae74900200c98c70b5966bbb7ec9d4de"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/tok2vec/model": {
+      "bytes": 6269370,
+      "sha256": "42d8414521eaf75f817bd1b351b26039a22a912bb2617f95ead305420f2ebffd"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/tokenizer": {
+      "bytes": 77066,
+      "sha256": "b014e8bba4958b120af2d0c1c63eabb7c00379f2bacaf10df7c5325efd2ea467"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/vocab/key2row": {
+      "bytes": 1,
+      "sha256": "76be8b528d0075f7aae98d6fa57a6d3c83ae480a8469e668d7b0af968995ac71"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/vocab/lookups.bin": {
+      "bytes": 70040,
+      "sha256": "fce9c883c56165f29573cc938c2a1c9d417ac61bd8f56b671dd5f7996de70682"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/vocab/strings.json": {
+      "bytes": 1103983,
+      "sha256": "b1966d1f07a05b68576df07f43f40203b4e11124ad82cc839e8312ad8d7fdae7"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/vocab/vectors": {
+      "bytes": 128,
+      "sha256": "14772b683e726436d5948ad3fff2b43d036ef2ebbe3458aafed6004e05a40706"
+    },
+    "en_core_web_sm/en_core_web_sm-3.7.1/vocab/vectors.cfg": {
+      "bytes": 22,
+      "sha256": "ff4359091952c8cd16f1f0482f5770fb82d1707368d5cca3c46aa501f552e3c5"
+    },
+    "en_core_web_sm/meta.json": {
+      "bytes": 10085,
+      "sha256": "5fc475fbe5bb0317249fd7e51c22d53052345bb23f13eaf149ff590223964d1c"
+    }
+  },
+  "left_out": [
+    "en_core_web_sm-3.7.1.dist-info/RECORD",
+    "en_core_web_sm-3.7.1.dist-info/WHEEL",
+    "en_core_web_sm-3.7.1.dist-info/entry_points.txt",
+    "en_core_web_sm-3.7.1.dist-info/top_level.txt"
+  ],
+  "license": "MIT (see en_core_web_sm-3.7.1.dist-info/LICENSE and LICENSES_SOURCES)",
+  "modified_files": [],
+  "source": {
+    "filename": "en_core_web_sm-any-py3-none-any.whl",
+    "host": "Hugging Face (spaCy's own model mirror)",
+    "repo_id": "spacy/en_core_web_sm",
+    "revision": "8fb6f8155286360bf5486fe399e2738d1df7ded2",
+    "sha256": "86cc141f63942d4b2c5fcee06630fd6f904788d2f0ab005cce45aadb8fb73889"
+  },
+  "what": "spaCy's small English pipeline, en_core_web_sm 3.7.1, as published by Explosion. Used by Kokoro's English phonemizer (misaki) for tokenizing and part-of-speech tagging."
+}

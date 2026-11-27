@@ -66,3 +66,8 @@ apple/known-failures.md merge=union
 BUG_LOG.md             merge=union
 
 # Preserve exact handoff snapshots and evidence hashes across checkouts.
+
+# The shipped spaCy English model is a byte-for-byte copy of the upstream
+# wheel's members, and PROVENANCE.json records each file's SHA-256. No line
+# ending is ever rewritten in it.
+nodes/_otr_audio_engines/_spacy_model/** -text

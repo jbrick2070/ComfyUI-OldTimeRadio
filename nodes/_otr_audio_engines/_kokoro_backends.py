@@ -107,21 +107,21 @@ UNSPEAKABLE_LINE_S = 0.25
 #: ``EspeakPhonemizer``.
 ESPEAK_LANGUAGES = {"e": "es", "f": "fr-fr", "h": "hi", "i": "it", "p": "pt-br"}
 
-#: spaCy's English model as the boot prefetch unpacks it, relative to the Kokoro
-#: model dir (the parent of ``voices_dir``). Duplicated from
-#: ``_otr_kokoro_voice_prefetch`` on purpose -- that file loads flat at
-#: prestartup -- and pinned equal by a test. Trusted only with the sentinel in it.
-SPACY_EN_REL_DIR = os.path.join("spacy", "en_core_web_sm-3.7.1")
+#: spaCy's small English pipeline (en_core_web_sm 3.7.1, MIT), SHIPPED IN THE
+#: PACK. misaki's English G2P needs it for tokenizing and tagging, it is not on
+#: PyPI, and so it cannot be a declared dependency. Its files are a
+#: byte-for-byte copy of the published wheel's members (``PROVENANCE.json`` in
+#: the folder lists each one's SHA-256), so nothing is downloaded, unpacked or
+#: installed for it at any time. Until 2.3.64 the pack fetched that wheel at
+#: every start and unpacked it beside the voices.
+SPACY_EN_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_spacy_model")
 SPACY_EN_SENTINEL = os.path.join("en_core_web_sm", "en_core_web_sm-3.7.1", "meta.json")
 
 
-def unpacked_spacy_english(voices_dir) -> "str | None":
-    """The boot prefetch's unpacked ``en_core_web_sm`` folder beside the Kokoro
-    voices, or None when it is absent or incomplete."""
-    if not voices_dir:
-        return None
-    folder = os.path.join(os.path.dirname(os.path.normpath(voices_dir)), SPACY_EN_REL_DIR)
-    return folder if os.path.isfile(os.path.join(folder, SPACY_EN_SENTINEL)) else None
+def shipped_spacy_english() -> "str | None":
+    """The pack's own ``en_core_web_sm`` folder, or None when this install is
+    missing it (a partial copy of the pack)."""
+    return SPACY_EN_DIR if os.path.isfile(os.path.join(SPACY_EN_DIR, SPACY_EN_SENTINEL)) else None
 
 #: The rows the ONNX backend phonemizes with the pack's own copy of misaki
 #: (``_misaki``), because misaki does not install on Python 3.13: lang_code ->
@@ -843,7 +843,7 @@ class TorchKokoroBackend:
         self.lang_code = str(lang_code or "b").strip() or "b"
         self.voices_dir = voices_dir
         self._pipeline = None
-        self._spacy_from_prefetch = False
+        self._spacy_from_pack = False
 
     def load(self) -> None:
         if self._pipeline is not None:
@@ -860,38 +860,32 @@ class TorchKokoroBackend:
             return
 
         if self.lang_code in ("a", "b"):
-            # ENGLISH NEEDS spaCy's en_core_web_sm, AND THIS PACK CHECKS
-            # (registry review, 2026-10-30): misaki's English G2P calls
-            # spacy.cli.download when the model package is absent, and that
-            # spawns `python -m pip install` in the middle of a render. A node
-            # pack never installs packages at run time, so the absence is a
-            # named refusal with the one line to run, and the download never
-            # starts. The model is not on PyPI and the registry's pattern scan
-            # flags a direct-URL requirement (contains_custom_url_dependency),
-            # so the pack does not declare it: this refusal is how a Python
-            # 3.12 install learns the one line to run.
-            #
-            # OR THE BOOT PREFETCH'S COPY (2026-11-02): a box where nobody can
-            # run that line (Comfy Cloud) gets spaCy's 3.7.1 wheel unpacked
-            # beside the voices at prestartup. Appended, never inserted, so an
-            # installed model always wins; misaki then finds it the way it
-            # finds an installed one (find_spec and importlib.metadata).
+            # ENGLISH NEEDS spaCy's en_core_web_sm, AND THIS PACK SUPPLIES IT.
+            # misaki's English G2P calls spacy.cli.download when the model
+            # package is absent, and that spawns `python -m pip install` in
+            # the middle of a render. A node pack never installs packages at
+            # run time, so misaki is never allowed to reach that call: an
+            # installed model is used as it is, and otherwise the pack's own
+            # shipped copy (``_spacy_model``, see SPACY_EN_DIR) is put where
+            # misaki looks. Appended, never inserted, so an installed model
+            # always wins; misaki then finds the shipped one the way it finds
+            # an installed one (find_spec and importlib.metadata).
             import importlib.util
             if importlib.util.find_spec("en_core_web_sm") is None:
-                unpacked = unpacked_spacy_english(self.voices_dir)
-                if unpacked is None:
+                shipped = shipped_spacy_english()
+                if shipped is None:
                     raise BackendUnavailable(
                         "Kokoro's English phonemizer (misaki) needs spaCy's "
-                        "en_core_web_sm model, which is not installed in ComfyUI's "
-                        "Python. Restart ComfyUI with internet once so the boot "
-                        "fetch can place it, or install it outside the render with "
-                        "ComfyUI's own interpreter: python -m spacy download "
-                        "en_core_web_sm")
+                        "en_core_web_sm model. It is not installed in ComfyUI's "
+                        "Python, and the copy this pack ships is missing from "
+                        "this install. Reinstall the pack, or install the model "
+                        "outside the render with ComfyUI's own interpreter: "
+                        "python -m spacy download en_core_web_sm")
                 import sys
-                if unpacked not in sys.path:
-                    sys.path.append(unpacked)
+                if shipped not in sys.path:
+                    sys.path.append(shipped)
                 importlib.invalidate_caches()
-                self._spacy_from_prefetch = True
+                self._spacy_from_pack = True
         from kokoro import KPipeline
 
         kwargs = {"lang_code": self.lang_code, "device": self.device}
@@ -901,11 +895,11 @@ class TorchKokoroBackend:
         except (TypeError, ValueError):
             kwargs["repo_id"] = "hexgrad/Kokoro-82M"
         try:
-            if self._spacy_from_prefetch:
+            if self._spacy_from_pack:
                 # spaCy 3.8 warns W095 (model built for 3.7) on every load of
-                # the prefetched 3.7.1 copy; the boot log already named the
-                # version, so the render log stays clean. Only on this path:
-                # every other load stays the verbatim KPipeline call.
+                # the shipped 3.7.1 copy; the version is a known constant, so
+                # the render log stays clean. Only on this path: every other
+                # load stays the verbatim KPipeline call.
                 with warnings.catch_warnings():
                     warnings.filterwarnings("ignore", message=r".*\[W095\]")
                     self._pipeline = KPipeline(**kwargs)

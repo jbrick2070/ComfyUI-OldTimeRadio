@@ -15,6 +15,9 @@ temp/
 models/
 *.bin
 *.safetensors
+# ...except the small English language model the pack ships for Kokoro's
+# phonemizer (15 MB in all; see its PROVENANCE.json).
+!nodes/_otr_audio_engines/_spacy_model/**/*.bin
 
 # OS files
 .DS_Store
