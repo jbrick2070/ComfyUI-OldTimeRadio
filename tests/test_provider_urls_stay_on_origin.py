@@ -138,3 +138,56 @@ def test_the_post_path_keeps_the_key_on_the_origin_and_a_scheme_change_strips_it
     down = handler.redirect_request(req, io.BytesIO(b""), 302, "Found", {},
                                     "http://generativelanguage.googleapis.com/v1beta/files/x")
     assert down is not None and not down.has_header("X-goog-api-key")
+
+
+def test_the_wallet_key_does_not_follow_a_redirect_off_its_origin():
+    """THE DEFECT THIS PINS (shipped through 2.3.64): the balance preflight
+    sent ``Authorization: Bearer <key>`` through urllib's stock opener, whose
+    redirect handler copies every header to the new request -- so a 30x to
+    another host, or to the same host over plain http, carried the Comfy or
+    OpenRouter key there."""
+    from nodes._otr_shared import cloud_balance_preflight as B
+    handler = B._BearerStaysOnOrigin()
+    req = urllib.request.Request("https://openrouter.ai/api/v1/credits",
+                                 headers={"Authorization": "Bearer K"})
+    away = handler.redirect_request(req, io.BytesIO(b""), 302, "Found", {},
+                                    "https://other.example/credits")
+    assert away is not None and not away.has_header("Authorization")
+    down = handler.redirect_request(req, io.BytesIO(b""), 302, "Found", {},
+                                    "http://openrouter.ai/api/v1/credits")
+    assert down is not None and not down.has_header("Authorization")
+    same = handler.redirect_request(req, io.BytesIO(b""), 302, "Found", {},
+                                    "https://openrouter.ai/api/v1/key")
+    assert same is not None and same.get_header("Authorization") == "Bearer K"
+
+
+def test_the_wallet_read_goes_through_the_guarded_opener(monkeypatch):
+    """The guard is wired, not just defined: `_http_get_json` builds its
+    opener with the handler and never reaches the stock `urlopen`."""
+    from nodes._otr_shared import cloud_balance_preflight as B
+    handlers, seen = [], []
+
+    class _Resp:
+        status = 200
+
+        def read(self):
+            return b'{"ok": true}'
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    class _Opener:
+        def open(self, req, timeout=None):
+            seen.append(req)
+            return _Resp()
+
+    monkeypatch.setattr(urllib.request, "build_opener",
+                        lambda *h: handlers.extend(h) or _Opener())
+    monkeypatch.setattr(urllib.request, "urlopen",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("stock urlopen")))
+    assert B._http_get_json("https://openrouter.ai/api/v1/credits", "K") == (200, {"ok": True})
+    assert any(isinstance(h, B._BearerStaysOnOrigin) for h in handlers)
+    assert seen and seen[0].get_header("Authorization") == "Bearer K"

@@ -31,9 +31,9 @@ from __future__ import annotations
 import json
 import logging
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Callable, NamedTuple, Optional
-from urllib.request import urlopen  # the pack's stdlib transport; every caller is listed in the network-sites guard
 
 log = logging.getLogger("OTR.cloud.balance")
 
@@ -269,6 +269,35 @@ def default_writer_usd(handle: str, slug: str) -> tuple:
 # Balances (lazy, injectable)
 # ---------------------------------------------------------------------------
 
+class _BearerStaysOnOrigin(urllib.request.HTTPRedirectHandler):
+    """A redirect off the wallet's own origin loses the key.
+
+    urllib's stock handler copies every header onto the redirected request, so
+    a 30x from the balance endpoint to another host -- or to the same host over
+    plain http -- would have carried ``Authorization: Bearer <key>`` there. The
+    Google client has had the same guard since 2026-10-30
+    (``_otr_google_api.client._KeyStaysOnOrigin``); this is the wallet read's.
+    Origin means scheme AND host.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new is not None:
+            before = urllib.parse.urlsplit(req.full_url)
+            after = urllib.parse.urlsplit(newurl)
+            if ((after.scheme or "").lower(), (after.netloc or "").lower()) != (
+                    (before.scheme or "").lower(), (before.netloc or "").lower()):
+                new.remove_header("Authorization")
+        return new
+
+
+def _open_key_on_origin(req, timeout=None):
+    """The one transport for a wallet read: an opener whose redirect handler
+    keeps the bearer key on the origin it was meant for. Tests fake this name
+    to answer HTTP."""
+    return urllib.request.build_opener(_BearerStaysOnOrigin()).open(req, timeout=timeout)
+
+
 def _http_get_json(url: str, bearer: str, timeout: float = 20.0) -> tuple:
     """(status, payload). Raises on transport failure; HTTP errors return."""
     headers = {"User-Agent": "OTR-cloud-balance-preflight",
@@ -277,7 +306,7 @@ def _http_get_json(url: str, bearer: str, timeout: float = 20.0) -> tuple:
         headers["Authorization"] = "Bearer %s" % bearer
     req = urllib.request.Request(url, headers=headers)
     try:
-        with urlopen(req, timeout=timeout) as resp:
+        with _open_key_on_origin(req, timeout=timeout) as resp:
             body = resp.read().decode("utf-8")
             return int(resp.status), (json.loads(body) if body.strip() else {})
     except urllib.error.HTTPError as exc:
