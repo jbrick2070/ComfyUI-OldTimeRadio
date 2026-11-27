@@ -1,5 +1,6 @@
-"""What this process is running on: ComfyUI, every custom node pack, Python,
-torch, CUDA, the GPU, its driver and the OS. (PLAN row 2.1,
+"""What this process is running on: ComfyUI, this pack, Python, torch, CUDA,
+the GPU, its driver and the OS -- and, only when the operator asks for it,
+every other custom node pack. (PLAN row 2.1,
 planning/creatoros-concepts/PLAN.md.)
 
 WHY THIS EXISTS. A ledger records only OTR's own commit. When an episode breaks
@@ -12,6 +13,13 @@ WHAT IT RECORDS, AND WHAT IT NEVER DOES.
   * Versions and commits only. No path, user name or machine name: the stamp
     travels in ledgers and replay bundles, and a pack is named by its folder
     name alone.
+  * THE OTHER PACKS ARE OPT-IN (2026-11-27). The stamp is written into files
+    under ComfyUI's output folder, which ``/view`` serves with no login, and
+    users are asked to attach ledgers to public issues -- so a list of every
+    pack a person has installed, with each one's commit, is not recorded by
+    default. This pack's own entry always is. ``OTR_ENV_FINGERPRINT_PACKS=1``
+    in the environment turns the full list on, for the two-box drift
+    comparison ``scripts/otr_env_drift.py`` was written for.
   * Read-only metadata. Nothing branches on it, so no render on any machine
     changes because of it.
   * No fallbacks: a value it cannot read is ``"unknown: <reason>"``, never a
@@ -34,8 +42,10 @@ import threading
 from typing import Any, Dict, Iterable, List, Optional
 
 try:
+    from . import env as otr_env
     from . import proc as otr_proc
 except ImportError:  # pragma: no cover -- flat load
+    import env as otr_env  # type: ignore
     import proc as otr_proc  # type: ignore
 
 #: Bump when a field changes meaning, so a reader can tell two shapes apart.
@@ -43,6 +53,13 @@ ENV_VERSION = 1
 #: This machine's last environment that published an episode (PLAN row 2.2):
 #: ``<otr_state_dir()>/known_good_env.json``, per machine, never in git.
 KNOWN_GOOD_NAME = "known_good_env.json"
+
+#: The operator's switch for listing EVERY installed pack (see the module
+#: docstring). Read from the environment, never from a workflow.
+PACKS_ENV = "OTR_ENV_FINGERPRINT_PACKS"
+#: This pack's own folder name: the one pack the fingerprint always names.
+_OWN_PACK = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__)))))
 
 _NVIDIA_SMI_TIMEOUT_S = 5
 _SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -171,9 +188,15 @@ def comfyui_state(root: Optional[str]) -> Dict[str, str]:
     return {"version": version, "commit": commit}
 
 
-def packs_state(dirs: Iterable[str]) -> Dict[str, str]:
-    """Every pack folder under ``dirs``, by folder name. The first directory
-    wins a name collision, as ComfyUI's own load order does."""
+def lists_every_pack() -> bool:
+    """Has the operator asked for the full list of installed packs?"""
+    return str(otr_env.get(PACKS_ENV, "") or "").strip() == "1"
+
+
+def packs_state(dirs: Iterable[str], only: Optional[str] = None) -> Dict[str, str]:
+    """Every pack folder under ``dirs``, by folder name -- or, with ``only``,
+    just the folder of that name. The first directory wins a name collision,
+    as ComfyUI's own load order does."""
     packs: Dict[str, str] = {}
     for base in dirs:
         try:
@@ -183,6 +206,8 @@ def packs_state(dirs: Iterable[str]) -> Dict[str, str]:
         for name in names:
             folder = os.path.join(base, name)
             if name.startswith(".") or name == "__pycache__" or name in packs:
+                continue
+            if only is not None and name != only:
                 continue
             if not os.path.isdir(folder) or name.endswith(".disabled"):
                 continue
@@ -247,7 +272,8 @@ def compute() -> Dict[str, Any]:
     root = _comfyui_root()
     for key, read in (
         ("comfyui", lambda: comfyui_state(root)),
-        ("packs", lambda: packs_state(_custom_node_dirs())),
+        ("packs", lambda: packs_state(
+            _custom_node_dirs(), only=None if lists_every_pack() else _OWN_PACK)),
         ("python", lambda: platform.python_version()),
         ("os", os_state),
         ("driver", driver_state),

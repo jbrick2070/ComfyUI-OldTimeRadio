@@ -405,3 +405,35 @@ def test_a_publish_outside_the_obs_folder_never_writes_the_real_snapshot(monkeyp
                         lambda ep: pytest.fail("a test publish must not write the snapshot"))
     assert mux._record_known_good("ep", str(tmp_path / "x_final.mp4")) == (
         "known-good not recorded (this publish is not in the obs folder)")
+
+
+# --- the other packs are opt-in (2026-11-27) ---------------------------------
+def _three_packs(tmp_path):
+    base = tmp_path / "custom_nodes"
+    for name in (EF._OWN_PACK, "ComfyUI-KJNodes", "some-private-pack"):
+        folder = base / name
+        folder.mkdir(parents=True)
+        (folder / "pyproject.toml").write_text('[project]\nversion = "1.2.3"\n', encoding="utf-8")
+    return base
+
+
+def test_only_this_pack_is_named_by_default(monkeypatch, tmp_path):
+    """THE DEFECT THIS PINS (shipped through 2.3.64): every ledger, and a
+    fixed-name known_good_env.json under the output folder that /view serves
+    with no login, listed every custom node pack the user had installed, each
+    with its commit."""
+    base = _three_packs(tmp_path)
+    monkeypatch.setattr(EF, "_custom_node_dirs", lambda: [str(base)])
+    monkeypatch.delenv(EF.PACKS_ENV, raising=False)
+    assert EF.compute()["packs"] == {EF._OWN_PACK: "version 1.2.3"}
+    text = json.dumps(EF.compute())
+    assert "KJNodes" not in text and "some-private-pack" not in text
+
+
+def test_the_operator_can_turn_the_full_list_on(monkeypatch, tmp_path):
+    base = _three_packs(tmp_path)
+    monkeypatch.setattr(EF, "_custom_node_dirs", lambda: [str(base)])
+    monkeypatch.setenv(EF.PACKS_ENV, "1")
+    assert set(EF.compute()["packs"]) == {EF._OWN_PACK, "ComfyUI-KJNodes", "some-private-pack"}
+    monkeypatch.setenv(EF.PACKS_ENV, "0")
+    assert set(EF.compute()["packs"]) == {EF._OWN_PACK}

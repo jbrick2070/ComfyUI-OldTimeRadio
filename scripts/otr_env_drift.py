@@ -2,7 +2,13 @@
 planning/creatoros-concepts/PLAN.md.)
 
 Every ledger carries the environment its run rendered on in ``meta.env``
-(nodes/_otr_shared/env_fingerprint.py). This compares two of them:
+(nodes/_otr_shared/env_fingerprint.py). This compares two of them.
+
+THE OTHER PACKS ARE OPT-IN since 2026-11-27: a stamp names this pack only,
+unless ComfyUI was started with ``OTR_ENV_FINGERPRINT_PACKS=1`` in its
+environment. Set that on each box you want to compare pack by pack; a stamp
+taken without it simply shows no other packs, and the diff says so by
+showing them as added or removed.
 
   python scripts/otr_env_drift.py
       this machine's newest stamped episode vs its known-good snapshot
