@@ -17,13 +17,14 @@ that in mind.
   direct `torch.load` calls (the Kokoro voice files) pass
   `weights_only=True`. No load turns `trust_remote_code` on: the writer's
   loads pass `False`, and the Bark and MusicGen loads leave it unset, which
-  is off. Most weights are safetensors. The rest are PyTorch checkpoint
-  formats, opened this way: the Kokoro model by the `kokoro` library; Bark's
-  `.bin` by `transformers`; the ESRGAN upscaler's `.pth`, checked against a
-  pinned SHA-256 first, by `spandrel`; the Silero voice-activity model, a
-  TorchScript file that comes inside the `silero-vad` package, with
-  `torch.jit.load`; and the AnimateDiff motion modules (`.ckpt`, `.pth`) by
-  the AnimateDiff-Evolved pack, not this one.
+  is off. Most weights are safetensors. The others, and what opens each: the
+  Kokoro model by the `kokoro` library, or its ONNX copy by `onnxruntime`;
+  Bark's `.bin` by `transformers`; the ESRGAN upscaler's `.pth`, checked
+  against a pinned SHA-256 first, by `spandrel`; the Silero voice-activity
+  model, a TorchScript file that comes inside the `silero-vad` package, with
+  `torch.jit.load`; the Whisper speech-detection model, a CTranslate2 file,
+  by `faster-whisper`; and the AnimateDiff motion modules (`.ckpt`, `.pth`)
+  by the AnimateDiff-Evolved pack, not this one.
 - **It installs nothing at run time.** No `pip`, no wheel, no archive is
   downloaded and unpacked or imported. Python dependencies are the ones in
   `requirements.txt`, installed by ComfyUI Manager or by you.
@@ -50,8 +51,8 @@ that in mind.
 | `git` | the commit stamp in an episode's record | when the pack is a git checkout |
 | `nvidia-smi` | GPU name and driver version | when torch cannot answer |
 | `vm_stat`, `sysctl` | free and total memory | macOS only |
-| `blender` | the `mesh_stage` video engine | only if you turn that engine on (`OTR_ENABLE_MESH_STAGE`) and point `OTR_BLENDER_EXE` at Blender |
-| `python` | the Chatterbox voice engine's worker, in that engine's own separate install | only if you select that engine and have installed it; `OTR_CHATTERBOX_VENV` names a different interpreter |
+| `blender` | the `mesh_stage` video engine | only if you select that engine and point `OTR_BLENDER_EXE` at Blender |
+| `python` | the Chatterbox voice engine's worker, run by the interpreter in that engine's own folder (`chatterbox`, in ComfyUI's root, outside this pack) | only if you select that engine and that folder exists; `OTR_CHATTERBOX_VENV` names a different interpreter |
 
 The ffmpeg used is the one on your machine or the one the `imageio-ffmpeg`
 dependency ships. No node takes a program path as an input.
@@ -102,9 +103,11 @@ files against the Hub.
   folder, in `otr/`. Models go under ComfyUI's models folder and the Hugging
   Face cache. Short-lived scratch files (an ffmpeg error log, a probe
   sample, an assembly folder, a lock folder for GPU use) go in the system
-  temp folder; `OTR_GPU_LEASE_DIR` moves the lock folder. If the pack cannot
-  resolve ComfyUI's output folder when it loads, its news-history file falls
-  back to `.otr_state` in your home folder.
+  temp folder; `OTR_GPU_LEASE_DIR` moves the lock folder. With the Google
+  lane on, a cache of that provider's model list goes in ComfyUI's user
+  folder, under `old_time_radio/`. If the pack cannot resolve ComfyUI's
+  output folder when it loads, its news-history file falls back to
+  `.otr_state` in your home folder.
 - **At startup.** If `HF_HOME` is not set, the pack picks one cache folder for
   Hugging Face downloads and checks that it can write there. On Windows that
   reads the `HF_HOME` and `LongPathsEnabled` registry values and no other.
@@ -169,7 +172,14 @@ saved login to their own requests by default.
 The misaki and spaCy folders each carry a `PROVENANCE.json` naming the source
 and the SHA-256 of every file, and their licence files (spaCy's sit inside
 the model folder, as published). The fonts folder carries each font's
-licence. Each public-domain story text has a provenance record beside it.
+licence. Each public-domain story text and each Shakespeare source scene has
+a provenance record beside it, and
+`config/source_banks/shakespeare/translations/manifest.json` names the
+translator, the edition and the source of every translated scene.
+
+The GitHub tree also holds files the registry package leaves out, among them
+`assets/` (art, and the Inter Display font with its SIL Open Font License)
+and `contest/`, the author's own companion app.
 
 ## Reporting a problem
 
