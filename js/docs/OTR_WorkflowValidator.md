@@ -11,9 +11,9 @@ Opt-in execution-time workflow contract validator. Place as the first node in a 
 
 The shipped workflows set these; most people never change them.
 
-**`workflow_json_path`** -- text; starts as a path on this machine.
+**`workflow_json_path`** -- text; starts as empty.
 
-Path of the workflow JSON this validator audits (default: the canonical graph). Template/expert field -- generated variants stamp it; a missing file fails the validation report, not the render.
+Path of the workflow JSON this validator audits. Leave empty for the canonical graph. Template/expert field -- generated variants stamp it; a missing file fails the validation report, not the render.
 
 **`validate_anyway`** -- on or off; starts as on.
 

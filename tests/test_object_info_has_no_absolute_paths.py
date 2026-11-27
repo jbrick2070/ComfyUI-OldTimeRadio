@@ -64,14 +64,18 @@ def _served_text(cls) -> str:
     return json.dumps(served, default=str, ensure_ascii=False)
 
 
-def _machine_strings() -> list:
-    """This machine's own locations in every spelling a JSON dump may carry."""
+def _machine_patterns() -> list:
+    """This machine's own locations in every spelling a JSON dump may carry,
+    each as a pattern that needs the folder name to END there: a checkout at
+    ``/app`` must not match a tooltip that mentions ``/apple`` or
+    ``/application``."""
     out = []
     for folder in (_REPO_ROOT, Path.home()):
         plain = str(folder)
-        for spelling in (plain, plain.replace("\\", "/"), plain.replace("\\", "\\\\")):
+        for spelling in {plain, plain.replace("\\", "/"), plain.replace("\\", "\\\\")}:
             if len(spelling) > 3:
-                out.append(spelling.lower())
+                out.append((spelling, re.compile(re.escape(spelling) + r"(?![\w.-])",
+                                                 re.IGNORECASE)))
     return out
 
 
@@ -86,9 +90,8 @@ def test_no_declared_value_is_an_absolute_path(node_id):
     assert found is None, (
         "%s serves an absolute path at /object_info: ...%s..."
         % (node_id, text[max(0, found.start() - 60):found.start() + 100]))
-    lowered = text.lower()
-    for location in _machine_strings():
-        assert location not in lowered, (
+    for location, pattern in _machine_patterns():
+        assert pattern.search(text) is None, (
             "%s serves this machine's folder %r at /object_info" % (node_id, location))
 
 

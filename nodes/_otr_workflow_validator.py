@@ -17,9 +17,10 @@ selections before the writer starts. The disk fixture is never the source
 of those selections. Skipping the structural check does not skip assets.
 
 INPUT_TYPES:
-  - workflow_json_path (STRING, optional default): absolute path to the
-    workflow JSON. If empty, falls back to the canonical fixture path
-    under workflows/otr_canonical.json relative to this file.
+  - workflow_json_path (STRING, default ""): path of the workflow JSON,
+    confined to the folders a workflow lives in. Empty (the default, and
+    what every shipped workflow saves) means the canonical graph,
+    workflows/otr_canonical.json in this pack.
   - validate_anyway (BOOLEAN, default True): set False to skip the
     STRUCTURAL check for diagnostic loads (e.g. running a
     deliberately-broken workflow to inspect intermediate state). It does

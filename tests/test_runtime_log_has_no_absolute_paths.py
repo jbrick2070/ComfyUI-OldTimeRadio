@@ -58,10 +58,33 @@ def test_the_vram_telemetry_writer_redacts_paths(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("writer", [story_orchestrator._runtime_log,
                                     _vram_log._write_runtime_log])
-def test_a_writer_never_raises(writer, monkeypatch):
-    """A monitoring write must never fail an episode, redaction included."""
+def test_a_writer_never_raises_when_the_path_is_gone(writer, monkeypatch):
+    """A monitoring write must never fail an episode."""
     monkeypatch.setattr(story_orchestrator._OTR_PATHS, "otr_runtime_log_path",
                         lambda: (_ for _ in ()).throw(OSError("no output tree")))
     monkeypatch.setattr(_vram_log, "_runtime_log_path",
                         lambda: (_ for _ in ()).throw(OSError("no output tree")))
     writer(object())
+
+
+@pytest.mark.parametrize("writer_name", ["orchestrator", "vram"])
+def test_a_writer_never_raises_when_the_redaction_itself_fails(
+        writer_name, tmp_path, monkeypatch):
+    """The redaction is one more thing that can go wrong inside the write, and
+    it must be inside the same guard: a failing rule costs a log line, never
+    an episode."""
+    from nodes import _otr_error_text
+
+    target = tmp_path / "state" / "otr_runtime.log"
+    monkeypatch.setattr(story_orchestrator._OTR_PATHS, "otr_runtime_log_path",
+                        lambda: Path(target))
+    monkeypatch.setattr(_vram_log, "_runtime_log_path", lambda: str(target))
+
+    def broken(_text):
+        raise RuntimeError("redaction broke")
+    monkeypatch.setattr(_otr_error_text, "redact_paths", broken)
+    writer = (story_orchestrator._runtime_log if writer_name == "orchestrator"
+              else _vram_log._write_runtime_log)
+    writer("HF_HOME resolved -> /home/someone/hf")
+    # Nothing unredacted reached the file either.
+    assert not target.exists() or "someone" not in target.read_text(encoding="utf-8")
