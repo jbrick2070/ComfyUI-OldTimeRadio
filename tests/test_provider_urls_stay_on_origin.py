@@ -191,3 +191,80 @@ def test_the_wallet_read_goes_through_the_guarded_opener(monkeypatch):
     assert B._http_get_json("https://openrouter.ai/api/v1/credits", "K") == (200, {"ok": True})
     assert any(isinstance(h, B._BearerStaysOnOrigin) for h in handlers)
     assert seen and seen[0].get_header("Authorization") == "Bearer K"
+
+
+def _answers(monkeypatch, module, table):
+    """Answer `_host_addresses` from a table: no DNS in the suite."""
+    def fake(host):
+        if host not in table:
+            raise OSError("no such host in the test table: %s" % host)
+        return list(table[host])
+    monkeypatch.setattr(module, "_host_addresses", fake)
+
+
+@pytest.mark.parametrize("address, word", [
+    ("127.0.0.1", "loopback"),
+    ("10.0.0.7", "private"),
+    ("192.168.1.20", "private"),
+    ("169.254.169.254", "link-local"),
+    ("::1", "loopback"),
+    ("100.64.0.9", "not publicly routable"),
+])
+def test_a_partner_result_on_a_non_public_host_is_refused_before_any_request(
+        tmp_path, monkeypatch, address, word):
+    """THE DEFECT THIS PINS (shipped through 2.3.64): the result download
+    checked the scheme only, so a provider fault or a tampered job result
+    naming an https URL on this machine's own network was fetched and handed
+    on as media."""
+    from nodes._otr_shared import cloud_media_invoke as I
+    _answers(monkeypatch, I, {"inside.example": [address]})
+    monkeypatch.setattr(I, "_open_https_only",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("fetched")))
+    dest = tmp_path / "out.mp4"
+    with pytest.raises(I.CloudMediaError, match="public hosts only") as caught:
+        I._stream_to_temp("https://inside.example/out.mp4?sig=SECRET", dest)
+    assert word in str(caught.value)
+    assert "SECRET" not in str(caught.value)
+    assert not dest.exists()
+
+
+def test_a_name_with_one_private_answer_is_refused(monkeypatch):
+    """Every answer must be public: one public and one private address is the
+    DNS-rebinding shape."""
+    from nodes._otr_shared import cloud_media_invoke as I
+    _answers(monkeypatch, I, {"mixed.example": ["93.184.216.34", "10.0.0.7"],
+                              "cdn.example": ["93.184.216.34"]})
+    with pytest.raises(I.CloudMediaError, match="public hosts only"):
+        I._refuse_non_public_host("https://mixed.example/out.mp4")
+    I._refuse_non_public_host("https://cdn.example/out.mp4")
+    # A name that does not resolve is left to fail as a transport error.
+    I._refuse_non_public_host("https://unknown.example/out.mp4")
+
+
+def test_a_redirect_to_a_non_public_host_is_refused_before_it_is_followed(monkeypatch):
+    import inspect
+    from nodes._otr_shared import cloud_media_invoke as I
+    _answers(monkeypatch, I, {"inside.example": ["192.168.1.20"]})
+    with pytest.raises(I.CloudMediaError, match="redirected to") as caught:
+        I._refuse_non_public_host("https://inside.example/x.mp4?sig=SECRET", redirected=True)
+    assert "SECRET" not in str(caught.value)
+    opener_src = inspect.getsource(I._open_https_only)
+    assert "_refuse_non_public_host(newurl, redirected=True)" in opener_src
+
+
+def test_a_failed_download_names_the_url_without_its_query(tmp_path, monkeypatch):
+    """A provider's result URL is usually signed: the query string is the
+    secret. Exception text reaches /history, so it carries host and path only."""
+    from nodes._otr_shared import cloud_media_invoke as I
+    _answers(monkeypatch, I, {"cdn.example": ["93.184.216.34"]})
+
+    def boom(req, timeout=None):
+        raise OSError("connection reset")
+    monkeypatch.setattr(I, "_open_https_only", boom)
+    with pytest.raises(I.CloudMediaError) as caught:
+        I._stream_to_temp("https://cdn.example/jobs/42/out.mp4?X-Sig=SECRET&exp=1", tmp_path / "o.mp4")
+    text = str(caught.value)
+    assert "https://cdn.example/jobs/42/out.mp4" in text
+    assert "SECRET" not in text and "X-Sig" not in text
+    assert I._shown_url("https://u:p@cdn.example:8443/a/b.mp4?k=v#f") == "https://cdn.example:8443/a/b.mp4"
+    assert I._shown_url("not a url") == "<not a url>"

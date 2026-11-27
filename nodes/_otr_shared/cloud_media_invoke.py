@@ -621,18 +621,92 @@ def _refuse_off_https(url: str, *, redirected: bool = False) -> None:
         raise CloudMediaError(
             CloudErrorCode.PROVIDER_REJECTED,
             "result URL %s%r is not https; the pack fetches no other scheme"
-            % ("redirected to " if redirected else "", url))
+            % ("redirected to " if redirected else "", _shown_url(url)))
+
+
+def _shown_url(url) -> str:
+    """A result URL as error text may carry it: scheme, host and path only.
+
+    A provider's result URL is usually SIGNED -- its query string is the
+    secret that lets anyone holding it download the clip -- and a node's
+    exception text is stored in the prompt's history, which needs no login.
+    """
+    from urllib.parse import urlsplit
+    try:
+        parts = urlsplit(str(url))
+        host = parts.hostname or ""
+        if parts.port:
+            host += ":%d" % parts.port
+    except ValueError:
+        return "<unparsable url>"
+    if not parts.scheme or not host:
+        return "<not a url>"
+    return "%s://%s%s" % (parts.scheme, host, parts.path)
+
+
+def _host_addresses(host: str) -> list:
+    """Every address ``host`` resolves to. A seam: tests answer it without DNS."""
+    import socket
+    return [info[4][0] for info in socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)]
+
+
+def _refuse_non_public_host(url: str, *, redirected: bool = False) -> None:
+    """A result URL must name a PUBLIC host -- the first URL and every
+    redirect target alike.
+
+    The URL is a provider's return value, never a workflow field, but it is
+    still content from the network: a provider fault or a tampered job result
+    naming ``https://localhost/...``, a LAN address or a cloud metadata
+    address would have made this machine fetch from inside its own network and
+    hand the body on as media. The rule is the feed reader's
+    (``_otr_feed_fetch._reject_reason``): every address the name resolves to
+    must be publicly routable. A provider's CDN host cannot be listed ahead of
+    time, so the policy is on the address, not the name.
+
+    A name that does not resolve is not refused here: the GET then fails as an
+    ordinary transport error, exactly as before.
+    """
+    import ipaddress
+    from urllib.parse import urlsplit
+    try:
+        from .._otr_feed_fetch import _reject_reason
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_feed_fetch import _reject_reason  # type: ignore
+    where = "redirected to " if redirected else ""
+    host = urlsplit(str(url)).hostname or ""
+    if not host:
+        raise CloudMediaError(
+            CloudErrorCode.PROVIDER_REJECTED,
+            "result URL %s%r names no host" % (where, _shown_url(url)))
+    try:
+        addresses = _host_addresses(host)
+    except OSError:
+        return
+    for raw in addresses:
+        try:
+            ip = ipaddress.ip_address(str(raw).split("%", 1)[0])
+        except ValueError:
+            continue
+        reason = _reject_reason(ip)
+        if reason:
+            raise CloudMediaError(
+                CloudErrorCode.PROVIDER_REJECTED,
+                "result URL %s%r resolves to a %s address; results are "
+                "downloaded from public hosts only"
+                % (where, _shown_url(url), reason))
 
 
 def _open_https_only(req, timeout=None):
     """The one transport for a result GET: an opener whose redirect handler
-    asks `_refuse_off_https` of every target before following it. Tests fake
-    this name to answer HTTP; the stock `urlopen` is no longer on the path."""
+    asks `_refuse_off_https` and `_refuse_non_public_host` of every target
+    before following it. Tests fake this name to answer HTTP; the stock
+    `urlopen` is no longer on the path."""
     import urllib.request
 
     class _HttpsOnly(urllib.request.HTTPRedirectHandler):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
             _refuse_off_https(newurl, redirected=True)
+            _refuse_non_public_host(newurl, redirected=True)
             return super().redirect_request(req, fp, code, msg, headers, newurl)
     return urllib.request.build_opener(_HttpsOnly()).open(req, timeout=timeout)
 
@@ -653,6 +727,9 @@ def _stream_to_temp(url: str, dest: Path) -> None:
     # a redirect off https, which the stock handler would have followed
     # (`_open_https_only`).
     _refuse_off_https(url)
+    # AND FROM A PUBLIC HOST ONLY (2026-11-27): https to a loopback, LAN or
+    # metadata address is still a fetch from inside this machine's network.
+    _refuse_non_public_host(url)
     req = urllib.request.Request(url, headers={"User-Agent": _USAGE_SOURCE})
     last_exc: Exception | None = None
     for attempt in range(1, _DOWNLOAD_ATTEMPTS + 1):
@@ -668,7 +745,7 @@ def _stream_to_temp(url: str, dest: Path) -> None:
                     if total > _DOWNLOAD_MAX_BYTES:
                         raise CloudMediaError(
                             CloudErrorCode.CORRUPT_OUTPUT,
-                            f"result from {url!r} exceeds {_DOWNLOAD_MAX_BYTES} bytes; "
+                            f"result from {_shown_url(url)!r} exceeds {_DOWNLOAD_MAX_BYTES} bytes; "
                             "refused mid-stream")
                     out.write(chunk)
             return
@@ -686,8 +763,10 @@ def _stream_to_temp(url: str, dest: Path) -> None:
                       f"this fetch resubmits nothing")
     err = CloudMediaError(
         CloudErrorCode.RETRYABLE_TRANSPORT,
-        f"download failed from {url!r} after {_DOWNLOAD_ATTEMPTS} "
-        f"attempt(s): {last_exc}",
+        # The URL without its query string (a signed URL's secret), and the
+        # transport error without any local path.
+        f"download failed from {_shown_url(url)!r} after {_DOWNLOAD_ATTEMPTS} "
+        f"attempt(s): {_redact_paths(str(last_exc))}",
     )
     err.provider_charged = True
     raise err
