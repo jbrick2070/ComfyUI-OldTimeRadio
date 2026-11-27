@@ -65,12 +65,14 @@ module above, and only if you select that engine.
 
 - **Hugging Face (`huggingface.co`).** Model weights are downloaded when a run
   needs them and they are not on disk, each from a repository named in the
-  code. Pinned to one commit, with every file checked against its SHA-256
-  before it is used: most image and video weights
-  (`nodes/_otr_visual_assets.py`), and Kokoro's model, config and voice
-  files, its ONNX export and the Whisper speech-detection model
-  (`nodes/_otr_model_pins.py`). A pinned file already in the cache is used
-  with no network call. From the repository's current revision: the writer
+  code. Pinned to one commit, with every downloaded file checked against
+  its SHA-256: most image and video weights (`nodes/_otr_visual_assets.py`),
+  and Kokoro's model, config and voice files, its ONNX export and the
+  Whisper speech-detection model (`nodes/_otr_model_pins.py`). A pinned
+  file already on disk is used with no network call; Kokoro's voice files
+  and ONNX model, once in the models folder, are used as they are, and a
+  copy found in the Hugging Face cache is checked first. From the
+  repository's current revision: the writer
   models, Bark, MusicGen and the AnimateDiff motion modules. The Kokoro voice
   files, and on Python 3.13 the Kokoro ONNX model, are fetched once when
   ComfyUI starts so the default voice works on a fresh install; set

@@ -213,18 +213,24 @@ def fetch(source: str, filename: str, **hub_kwargs) -> str:
 
     Returns the local path. Without a ``local_dir`` a cached copy holding the
     pinned bytes is returned with no network call (``cached_copy``). A file
-    that arrives with the wrong digest is removed when it was written into a
-    caller's ``local_dir`` (a hub-cache copy is left to the hub, which keys it
-    by digest) and ``PinMismatch`` is raised. Every other failure is the hub
+    with the wrong digest raises ``PinMismatch``; if this call wrote it into a
+    caller's ``local_dir`` it is removed first. A file that was already there
+    is never removed: offline, the hub hands back whatever sits in a
+    ``local_dir`` without asking which commit it came from, and a refusal must
+    not delete a user's file (Sonnet review, 2026-11-27). A hub-cache copy is
+    left to the hub, which keys it by digest. Every other failure is the hub
     library's own exception."""
     pin = pin_for(source, filename)
     if pin is None:
         raise PinMismatch("%s has no pinned copy of %s; OTR fetches only pinned files"
                           % (repo_and_revision(source)[0], filename))
-    if not hub_kwargs.get("local_dir"):
+    local_dir = hub_kwargs.get("local_dir")
+    if not local_dir:
         cached = cached_copy(source, filename, hub_kwargs.get("cache_dir"))
         if cached:
             return cached
+    already_there = bool(local_dir) and os.path.exists(
+        os.path.join(str(local_dir), *filename.split("/")))
     from huggingface_hub import hf_hub_download
 
     repo, revision = repo_and_revision(source)
@@ -233,7 +239,7 @@ def fetch(source: str, filename: str, **hub_kwargs) -> str:
     hub_kwargs["token"] = False
     path = hf_hub_download(repo_id=repo, filename=filename, revision=revision, **hub_kwargs)
     if not file_matches(path, *pin):
-        if hub_kwargs.get("local_dir"):
+        if local_dir and not already_there:
             try:
                 os.remove(path)
             except OSError:

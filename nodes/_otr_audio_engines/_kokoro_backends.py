@@ -754,11 +754,16 @@ def pinned_kokoro_model(device: "str | None"):
     ``kokoro-v1_0.pth`` from the repository's ``main`` and asks the Hub again
     on every load. Here both files come from ``_otr_model_pins.fetch``: one
     commit, checked SHA-256, a cached copy used with no network call. Every
-    kokoro release the requirements admit (0.8.1 onward) takes ``config=`` and
-    ``model=``. KPipeline is handed this instance, and an instance it is handed
-    it uses as it is, so the device and the CUDA refusal it would have applied
+    kokoro release the requirements admit (0.7.16 onward) takes ``config=``
+    and ``model=`` and reads the same two files of the same repository;
+    ``repo_id`` arrived in 0.8, and passing it to 0.7.16 raises TypeError
+    (Sonnet review, 2026-11-27), so it is passed only where the signature has
+    it. KPipeline is handed this instance, and an instance it is handed it
+    uses as it is, so the device and the CUDA refusal it would have applied
     are applied here, in its words.
     """
+    import inspect
+
     import torch
     from kokoro import KModel
 
@@ -768,10 +773,15 @@ def pinned_kokoro_model(device: "str | None"):
         # KPipeline's own refusal: never a silent move to the CPU.
         raise RuntimeError("CUDA requested but not available")
     pins = _model_pins()
-    config = pins.fetch(pins.KOKORO, "config.json")
-    weights = pins.fetch(pins.KOKORO, "kokoro-v1_0.pth")
+    kwargs = {"config": pins.fetch(pins.KOKORO, "config.json"),
+              "model": pins.fetch(pins.KOKORO, "kokoro-v1_0.pth")}
     try:
-        return KModel(repo_id=KOKORO_REPO_ID, config=config, model=weights).to(device).eval()
+        if "repo_id" in inspect.signature(KModel.__init__).parameters:
+            kwargs["repo_id"] = KOKORO_REPO_ID
+    except (TypeError, ValueError):
+        kwargs["repo_id"] = KOKORO_REPO_ID
+    try:
+        return KModel(**kwargs).to(device).eval()
     except RuntimeError as error:
         if device == "cuda":
             raise RuntimeError("Failed to initialize model on CUDA: %s. Try setting "

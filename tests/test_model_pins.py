@@ -120,6 +120,23 @@ def test_a_wrong_download_is_refused_and_removed_from_a_local_dir(monkeypatch, t
     assert not (local / "onnx" / "model.onnx").exists()
 
 
+def test_a_wrong_file_that_was_already_there_is_refused_but_kept(monkeypatch, tmp_path):
+    """Sonnet review, 2026-11-27: offline, the hub hands back whatever sits in
+    a local_dir without asking which commit it came from. A refusal there
+    must not delete the user's file; only a file this call wrote is removed."""
+    local = tmp_path / "engine_dir"
+    target = local / "onnx" / "model.onnx"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"a file the user already had")
+
+    monkeypatch.setitem(sys.modules, "huggingface_hub", types.SimpleNamespace(
+        hf_hub_download=lambda **kwargs: str(target)))
+    _pin(monkeypatch, pins.KOKORO_ONNX, "onnx/model.onnx", b"the pinned bytes")
+    with pytest.raises(pins.PinMismatch):
+        pins.fetch(pins.KOKORO_ONNX, "onnx/model.onnx", local_dir=str(local))
+    assert target.read_bytes() == b"a file the user already had"
+
+
 def test_a_file_with_no_pin_is_never_fetched(monkeypatch):
     def detonate(**_kwargs):
         raise AssertionError("an unpinned file reached the network")
@@ -170,8 +187,9 @@ def test_the_torch_model_is_built_from_the_pinned_files(monkeypatch):
     built = []
 
     class FakeKModel:
-        def __init__(self, **kwargs):
-            built.append(kwargs)
+        # kokoro 0.9.4's signature, so repo_id is offered.
+        def __init__(self, repo_id=None, config=None, model=None, disable_complex=False):
+            built.append({"repo_id": repo_id, "config": config, "model": model})
             self.moves = []
 
         def to(self, device):
@@ -190,6 +208,29 @@ def test_the_torch_model_is_built_from_the_pinned_files(monkeypatch):
     assert built == [{"repo_id": "hexgrad/Kokoro-82M", "config": "/pinned/config.json",
                       "model": "/pinned/kokoro-v1_0.pth"}]
     assert model.moves == ["cpu", "eval"]
+
+
+def test_kokoro_0_7_16_gets_no_repo_id(monkeypatch):
+    """Sonnet review, 2026-11-27: the requirements admit kokoro 0.7.16, whose
+    KModel takes config= and model= but no repo_id (read from its wheel:
+    ``def __init__(self, config=None, model=None)``). Passing repo_id there
+    raised TypeError on every torch voice line."""
+    built = []
+
+    class KModel0716:
+        def __init__(self, config=None, model=None):
+            built.append({"config": config, "model": model})
+
+        def to(self, device):
+            return self
+
+        def eval(self):
+            return self
+
+    monkeypatch.setitem(sys.modules, "kokoro", types.SimpleNamespace(KModel=KModel0716))
+    monkeypatch.setattr(pins, "fetch", lambda source, name, **kw: "/pinned/" + name)
+    kb.pinned_kokoro_model("cpu")
+    assert built == [{"config": "/pinned/config.json", "model": "/pinned/kokoro-v1_0.pth"}]
 
 
 def test_cuda_that_is_not_there_is_refused_not_moved_to_the_cpu(monkeypatch):
