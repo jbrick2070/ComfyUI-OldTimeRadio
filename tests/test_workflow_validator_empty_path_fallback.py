@@ -82,9 +82,11 @@ class TestValidatorEmptyPathFallback:
         schema = wv.WorkflowValidator.INPUT_TYPES()
         widget = schema["required"]["workflow_json_path"]
         assert widget[0] == "STRING"
-        # The default may be the canonical Path string -- but the JSON
-        # ships "" so the resolution branch fires. The schema default
-        # documents the operator-resolved canonical path for reference.
+        # The default IS the empty string: ComfyUI serves it at /object_info
+        # with no login, and the resolved canonical path is absolute (it
+        # names the install folder and the account). The JSON ships "" too,
+        # so the resolution branch fires either way.
+        assert widget[1]["default"] == ""
 
     def test_source_has_explicit_empty_branch(self):
         """AST-level: source must contain an explicit empty-path

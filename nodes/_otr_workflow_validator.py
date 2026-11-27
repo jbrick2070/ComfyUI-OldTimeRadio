@@ -373,11 +373,18 @@ class WorkflowValidator:
             "required": {
                 "workflow_json_path": ("STRING", {
                     "multiline": False,
-                    "default": str(_DEFAULT_WORKFLOW_PATH),
-                    "tooltip": "Path of the workflow JSON this validator audits "
-                               "(default: the canonical graph). Template/expert "
-                               "field -- generated variants stamp it; a missing "
-                               "file fails the validation report, not the render.",
+                    # EMPTY, never the resolved path. ComfyUI serves every
+                    # INPUT_TYPES default at /object_info with no login, and
+                    # the resolved default is an absolute path that names the
+                    # install folder and the account. Empty already means "the
+                    # canonical graph" (_resolve_workflow_path), and every
+                    # shipped workflow saves this widget as "".
+                    "default": "",
+                    "tooltip": "Path of the workflow JSON this validator audits. "
+                               "Leave empty for the canonical graph. Template/"
+                               "expert field -- generated variants stamp it; a "
+                               "missing file fails the validation report, not "
+                               "the render.",
                 }),
                 "validate_anyway": ("BOOLEAN", {
                     "default": True,
@@ -927,7 +934,9 @@ class WorkflowValidator:
         msg = (
             f"OTR_WorkflowValidator: OK -- {n_nodes} nodes, {n_links} links, "
             f"strict_unknown_types={strict_unknown_types}, "
-            f"path={workflow_json_path or str(_DEFAULT_WORKFLOW_PATH)!r}"
+            # The file's NAME only: this string is a node output, and an
+            # absolute path in it names the install folder and the account.
+            f"path={str(workflow_json_path or _DEFAULT_WORKFLOW_PATH).replace(chr(92), '/').rsplit('/', 1)[-1]!r}"
             f", widget_vector_drift=0"
             + (f" | {stamp_msg}" if stamp_msg else "")
         )
