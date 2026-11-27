@@ -13,13 +13,17 @@ that in mind.
 - **It registers no HTTP route.** Nothing here adds an endpoint to ComfyUI's
   server (`tests/test_pack_registers_no_http_route.py`). ComfyUI serves the
   pack's browser files from `js/`, as it does for every pack that has them.
-- **It runs no `eval` or `exec`, and its own code unpickles nothing.** The
-  pack's direct `torch.load` calls (the Kokoro voice files) pass
+- **It runs no `eval` or `exec`, and it calls no `pickle`.** The pack's
+  direct `torch.load` calls (the Kokoro voice files) pass
   `weights_only=True`. No load turns `trust_remote_code` on: the writer's
   loads pass `False`, and the Bark and MusicGen loads leave it unset, which
-  is off. Most weights are safetensors. Bark's are a `.bin` checkpoint that
-  `transformers` loads, and the AnimateDiff motion modules are `.ckpt` files
-  that the AnimateDiff-Evolved pack loads, not this one.
+  is off. Most weights are safetensors. The rest are PyTorch checkpoint
+  formats, opened this way: the Kokoro model by the `kokoro` library; Bark's
+  `.bin` by `transformers`; the ESRGAN upscaler's `.pth`, checked against a
+  pinned SHA-256 first, by `spandrel`; the Silero voice-activity model, a
+  TorchScript file that comes inside the `silero-vad` package, with
+  `torch.jit.load`; and the AnimateDiff motion modules (`.ckpt`, `.pth`) by
+  the AnimateDiff-Evolved pack, not this one.
 - **It installs nothing at run time.** No `pip`, no wheel, no archive is
   downloaded and unpacked or imported. Python dependencies are the ones in
   `requirements.txt`, installed by ComfyUI Manager or by you.
@@ -31,7 +35,9 @@ that in mind.
   to the author. It sets `HF_HUB_DISABLE_TELEMETRY=1` if you have not set it.
 - **It does not go looking for credentials.** No token or key is read at
   startup, and none is copied into the process environment
-  (`tests/test_hf_token_is_never_read_from_the_registry.py`).
+  (`tests/test_hf_token_is_never_read_from_the_registry.py`). The voice
+  files fetched at startup are requested with no token
+  (`tests/test_kokoro_voice_prefetch.py`).
 - **It does not change other packs.** At startup it replaces no module of
   another package and leaves nothing of its own on the import path
   (`tests/test_prestartup_leaves_the_process_alone.py`).
@@ -44,8 +50,8 @@ that in mind.
 | `git` | the commit stamp in an episode's record | when the pack is a git checkout |
 | `nvidia-smi` | GPU name and driver version | when torch cannot answer |
 | `vm_stat`, `sysctl` | free and total memory | macOS only |
-| `blender` | the `mesh_stage` video engine | only if you select that engine and set `OTR_BLENDER_EXE` |
-| `python` | the Chatterbox voice engine's own interpreter | only if you select that engine and set `OTR_CHATTERBOX_VENV` |
+| `blender` | the `mesh_stage` video engine | only if you turn that engine on (`OTR_ENABLE_MESH_STAGE`) and point `OTR_BLENDER_EXE` at Blender |
+| `python` | the Chatterbox voice engine's worker, in that engine's own separate install | only if you select that engine and have installed it; `OTR_CHATTERBOX_VENV` names a different interpreter |
 
 The ffmpeg used is the one on your machine or the one the `imageio-ffmpeg`
 dependency ships. No node takes a program path as an input.
@@ -94,7 +100,11 @@ files against the Hub.
   own folders before it is opened (`nodes/_otr_paths.py`).
 - **Writes.** Episodes and their working files go under ComfyUI's output
   folder, in `otr/`. Models go under ComfyUI's models folder and the Hugging
-  Face cache.
+  Face cache. Short-lived scratch files (an ffmpeg error log, a probe
+  sample, an assembly folder, a lock folder for GPU use) go in the system
+  temp folder; `OTR_GPU_LEASE_DIR` moves the lock folder. If the pack cannot
+  resolve ComfyUI's output folder when it loads, its news-history file falls
+  back to `.otr_state` in your home folder.
 - **At startup.** If `HF_HOME` is not set, the pack picks one cache folder for
   Hugging Face downloads and checks that it can write there. On Windows that
   reads the `HF_HOME` and `LongPathsEnabled` registry values and no other.
@@ -137,9 +147,12 @@ lines. Never paste a key or a token into a workflow widget: a value saved in
 a workflow travels with it.
 
 A Hugging Face token is not needed for any model the pack ships a choice for.
-If you point the pack at a gated model of your own, it uses `HF_TOKEN` from
-the environment that started ComfyUI or your `hf auth login`, for that
-download only.
+If you have one (`HF_TOKEN` in the environment that started ComfyUI, or your
+`hf auth login`), the writer, image and video model downloads send it to
+huggingface.co with the download, which is what lets a gated model of your
+own work. The startup voice fetch and the speech-detection model fetch send
+none. Other loads go through the Hugging Face libraries, which attach a
+saved login to their own requests by default.
 
 ## Third-party code and data inside the pack
 
@@ -147,9 +160,16 @@ download only.
   (Apache-2.0).
 - `nodes/_otr_audio_engines/_spacy_model/` -- spaCy's small English pipeline
   `en_core_web_sm` (MIT), a byte-for-byte copy of the published release.
+- `nodes/fonts/` -- DejaVu Sans and DejaVu Sans Mono (the DejaVu licence),
+  Noto Sans SC (SIL Open Font License), and a Devanagari and Latin font
+  merged from two unmodified Noto fonts (SIL Open Font License).
+- `config/source_banks/` -- public-domain story texts, and Shakespeare
+  sources and translations, that the adaptation lanes read.
 
-Each folder carries its licence and a `PROVENANCE.json` naming the source and
-the SHA-256 of every file.
+The misaki and spaCy folders each carry a `PROVENANCE.json` naming the source
+and the SHA-256 of every file, and their licence files (spaCy's sit inside
+the model folder, as published). The fonts folder carries each font's
+licence. Each public-domain story text has a provenance record beside it.
 
 ## Reporting a problem
 
