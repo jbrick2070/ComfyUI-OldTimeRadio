@@ -43,6 +43,11 @@ def _stub_kokoro(monkeypatch):
     monkeypatch.setitem(sys.modules, "kokoro", types.SimpleNamespace(KPipeline=_Pipe))
     monkeypatch.delenv("OTR_KOKORO_BACKEND", raising=False)
     monkeypatch.setattr(eng_kokoro, "_kokoro_voice_path", lambda v: __file__)
+    # The torch backend's two file reads (2026-11-27): the pinned model build
+    # and the local voice load. Stubbed, the fake pipeline sees voice ids.
+    from nodes._otr_audio_engines import _kokoro_backends as _kb
+    monkeypatch.setattr(_kb, "pinned_kokoro_model", lambda device: None)
+    monkeypatch.setattr(_kb, "load_local_voice", lambda voices_dir, voice: voice)
 
 
 def test_leftover_engine_arg_cannot_override_a_concrete_stamp(monkeypatch):

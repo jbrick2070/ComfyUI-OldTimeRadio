@@ -28,6 +28,40 @@ def _models_dir():
     return Path(_models_root()) / "foley_speech"
 
 
+def _model_pins():
+    try:
+        from .. import _otr_model_pins
+    except ImportError:  # pragma: no cover -- flat ComfyUI import
+        import _otr_model_pins  # type: ignore
+    return _otr_model_pins
+
+
+def _pinned_whisper_dir(model_dir, snapshot_download):
+    """The Whisper folder, holding exactly the pinned files.
+
+    ``Systran/faster-whisper-base`` at one commit, each file checked against
+    its SHA-256 (``_otr_model_pins``). A folder that already holds the pinned
+    bytes is used with no network call; otherwise the four files are fetched
+    at that commit with no token (HF_HUB_OFFLINE is honoured by the hub). Any
+    file that is still not the pinned bytes raises ``PinMismatch``, which
+    ``detect_foley_speech`` turns into "no stems ducked", as for missing
+    weights."""
+    pins = _model_pins()
+    names = pins.filenames(pins.WHISPER_BASE)
+
+    def all_pinned():
+        return all(pins.file_matches(str(Path(model_dir) / name), *pins.pin_for(pins.WHISPER_BASE, name))
+                   for name in names)
+
+    if not all_pinned():
+        repo, revision = pins.repo_and_revision(pins.WHISPER_BASE)
+        snapshot_download(repo, revision=revision, local_dir=str(model_dir), token=False,
+                          allow_patterns=names)
+        for name in names:
+            pins.check(pins.WHISPER_BASE, name, str(Path(model_dir) / name))
+    return str(model_dir)
+
+
 def _load_vad():
     """Silero ships its JIT weights; copy them into the resolved models root.
 
@@ -77,13 +111,7 @@ def _load_whisper():
     from huggingface_hub import snapshot_download
 
     model_dir = _models_dir() / "faster-whisper-base"
-    # Tokenless, explicit cache destination; HF_HUB_OFFLINE is honoured by the
-    # hub. Cached weights work offline; missing weights fail open in detect().
-    path = snapshot_download(
-        "Systran/faster-whisper-base", local_dir=str(model_dir), token=False,
-        allow_patterns=["config.json", "model.bin", "tokenizer.json",
-                        "vocabulary.*", "preprocessor_config.json"],
-    )
+    path = _pinned_whisper_dir(model_dir, snapshot_download)
     def build(device, compute_type):
         return WhisperModel(path, device=device, compute_type=compute_type,
                             cpu_threads=2, num_workers=1, local_files_only=True)

@@ -71,6 +71,11 @@ def kokoro_stub(monkeypatch):
     monkeypatch.delenv("OTR_KOKORO_BACKEND", raising=False)
     monkeypatch.delenv("OTR_VOICE_REFERENCE_BANK", raising=False)
     monkeypatch.setattr(eng_kokoro, "_kokoro_voice_path", lambda _v: __file__)
+    # The torch backend's two file reads (2026-11-27): the pinned model build
+    # and the local voice load. Stubbed, the fake pipeline sees voice ids.
+    from nodes._otr_audio_engines import _kokoro_backends as _kb
+    monkeypatch.setattr(_kb, "pinned_kokoro_model", lambda device: None)
+    monkeypatch.setattr(_kb, "load_local_voice", lambda voices_dir, voice: voice)
     return rendered
 
 

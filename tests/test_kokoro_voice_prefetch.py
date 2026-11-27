@@ -36,6 +36,28 @@ sys.path.insert(0, str(REPO_ROOT / "nodes"))
 import _otr_kokoro_voice_prefetch as PRE  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _an_empty_hub_cache(monkeypatch, tmp_path):
+    """The pinned fetch uses a verified copy already in the Hugging Face cache
+    before it asks the network (``_otr_model_pins.cached_copy``). A dev box's
+    real cache would then answer for every fake hub below, so each test gets
+    an empty one."""
+    import huggingface_hub.constants
+
+    monkeypatch.setattr(huggingface_hub.constants, "HF_HUB_CACHE", str(tmp_path / "empty_hub"))
+
+
+def _pin_voice_bytes(monkeypatch, data):
+    """Make ``data`` the pinned content of every voice file, for a fake hub."""
+    import hashlib
+
+    pins = PRE._pins
+    repo, revision, files = pins.SOURCES[pins.KOKORO]
+    row = (len(data), hashlib.sha256(data).hexdigest())
+    monkeypatch.setitem(pins.SOURCES, pins.KOKORO, (repo, revision, dict(
+        files, **{name: row for name in files if name.startswith("voices/")})))
+
+
 # --------------------------------------------------------------------------- #
 # the voice list is real, and big enough to dress a cast
 # --------------------------------------------------------------------------- #
@@ -213,6 +235,7 @@ def test_a_fetched_voice_is_COPIED_not_symlinked(monkeypatch, tmp_path):
     src_dir = tmp_path / "hubcache"
     src_dir.mkdir()
     monkeypatch.setattr(PRE, "_models_dir", lambda: str(tmp_path))
+    _pin_voice_bytes(monkeypatch, b"voice-bytes")
 
     def _fake_download(repo_id, filename, **_k):
         blob = src_dir / os.path.basename(filename)
@@ -237,10 +260,12 @@ def test_the_startup_voice_fetch_sends_no_credential(monkeypatch, tmp_path):
     the user's saved login or HF_TOKEN. The files are public, so every call
     says ``token=False``."""
     monkeypatch.setattr(PRE, "_models_dir", lambda: str(tmp_path))
-    tokens = []
+    _pin_voice_bytes(monkeypatch, b"voice-bytes")
+    tokens, revisions = [], []
 
     def _fake_download(repo_id, filename, **kwargs):
         tokens.append(kwargs.get("token", "not passed"))
+        revisions.append(kwargs.get("revision", "not passed"))
         blob = tmp_path / os.path.basename(filename)
         blob.write_bytes(b"voice-bytes")
         return str(blob)
@@ -253,6 +278,8 @@ def test_the_startup_voice_fetch_sends_no_credential(monkeypatch, tmp_path):
 
     assert len(tokens) == len(PRE.admitted_kokoro_voices())
     assert all(token is False for token in tokens), set(map(repr, tokens))
+    # And every one at the pinned commit, never the repository's `main`.
+    assert set(revisions) == {PRE._pins.repo_and_revision(PRE._pins.KOKORO)[1]}
 
 
 # --------------------------------------------------------------------------- #

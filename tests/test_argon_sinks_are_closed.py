@@ -43,6 +43,8 @@ def test_english_kokoro_refuses_before_misaki_can_download_spacy(monkeypatch, tm
     fake.KPipeline = KPipeline
     monkeypatch.setitem(sys.modules, "kokoro", fake)
     monkeypatch.setattr(sys, "path", list(sys.path))
+    # The pinned model build (2026-11-27) reads weights; not this test's subject.
+    monkeypatch.setattr(KB, "pinned_kokoro_model", lambda device: None)
     # With the model absent from the interpreter AND the pack's own copy gone
     # (a partial install), English refuses by name before misaki is built.
     monkeypatch.setattr(KB, "SPACY_EN_DIR", str(tmp_path / "no_such_copy"))
@@ -55,6 +57,7 @@ def test_english_kokoro_refuses_before_misaki_can_download_spacy(monkeypatch, tm
     monkeypatch.setattr(importlib.util, "find_spec", absent)
     monkeypatch.setitem(sys.modules, "kokoro", fake)
     monkeypatch.setattr(sys, "path", list(sys.path))
+    monkeypatch.setattr(KB, "pinned_kokoro_model", lambda device: None)
     assert KB.shipped_spacy_english() is not None
     KB.TorchKokoroBackend("cpu", lang_code="b").load()
     assert [kw["lang_code"] for kw in touched] == ["b"]

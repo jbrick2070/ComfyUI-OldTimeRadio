@@ -165,10 +165,21 @@ def _pick_announcer_voice(episode_seed, voice_override="random",
             ANNOUNCER_VOICE_POOL)
 
 
+def _model_pins():
+    try:
+        from .. import _otr_model_pins
+    except ImportError:  # pragma: no cover -- flat test imports
+        import _otr_model_pins  # type: ignore
+    return _otr_model_pins
+
+
 def _onnx_model_fetch_hint() -> str:
+    pins = _model_pins()
     return (
-        "Fetch it OFFLINE (never during a render), e.g.: huggingface-cli download %s "
-        "onnx/model.onnx --local-dir %s" % (KOKORO_ONNX_REPO_ID, _kokoro_model_dir()))
+        "Restart ComfyUI to fetch it, or fetch it OFFLINE (never during a render), "
+        "e.g.: hf download %s onnx/model.onnx --revision %s --local-dir %s"
+        % (KOKORO_ONNX_REPO_ID, pins.repo_and_revision(pins.KOKORO_ONNX)[1],
+           _kokoro_model_dir()))
 
 
 @register
@@ -225,12 +236,14 @@ class KokoroEngine:
         self._episode_voice = voice_id
         path = _kokoro_voice_path(voice_id)
         if not os.path.exists(path):
+            pins = _model_pins()
+            revision = pins.repo_and_revision(pins.KOKORO)[1]
             raise self._unusable(
                 EngineUsabilityReason.MISSING_MODEL,
-                f"kokoro announcer voice {voice_id!r} not found at {path}. Fetch "
-                f"it OFFLINE (never during a render), e.g.: huggingface-cli "
-                f"download hexgrad/Kokoro-82M voices/{voice_id}.pt --local-dir "
-                f"{_kokoro_model_dir()}",
+                f"kokoro announcer voice {voice_id!r} not found at {path}. Restart "
+                f"ComfyUI to fetch it, or fetch it OFFLINE (never during a render), "
+                f"e.g.: hf download hexgrad/Kokoro-82M voices/{voice_id}.pt "
+                f"--revision {revision} --local-dir {_kokoro_model_dir()}",
             )
 
     # ------------------------------------------------------------------ #

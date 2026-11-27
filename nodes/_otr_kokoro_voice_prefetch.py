@@ -54,12 +54,19 @@ except ImportError:  # pragma: no cover -- flat / standalone load
         _sys_boot.path.insert(0, _NODES_DIR)
     from _otr_shared import env as otr_env  # type: ignore
 
+try:
+    from . import _otr_model_pins as _pins
+except ImportError:  # pragma: no cover -- flat / standalone load (nodes/ is on sys.path)
+    import _otr_model_pins as _pins  # type: ignore
+
 log = logging.getLogger("OTR")
 
-#: The upstream repo. Pinned by name, never by revision: a voice file is a
-#: leaf asset and the repo's `main` is what `eng_kokoro`'s own KPipeline
-#: resolves against, so pinning a different revision here would fetch files
-#: the engine then cannot see.
+#: The upstream repo. Every file fetched from it is pinned to one commit and
+#: checked against its SHA-256 (``_otr_model_pins``, 2026-11-27). This used to
+#: say "pinned by name, never by revision", because the torch backend handed
+#: KPipeline a bare voice id and KPipeline fetched `main` itself; the backend
+#: now reads the voice file this module copies, so a pinned copy is the one
+#: the render plays.
 KOKORO_REPO_ID = "hexgrad/Kokoro-82M"
 
 #: The ONNX model for the kokoro-onnx backend (Python 3.13 boxes, where the torch
@@ -198,7 +205,7 @@ def prefetch_kokoro_onnx_model(*, force: bool = False) -> "dict":
         receipt["reason"] = "OTR_SKIP_KOKORO_PREFETCH=1"
         return receipt
     try:
-        from huggingface_hub import hf_hub_download
+        import huggingface_hub  # noqa: F401 -- a missing library is a reason, not a crash
     except Exception as exc:  # noqa: BLE001
         receipt["reason"] = f"huggingface_hub unavailable: {exc}"
         return receipt
@@ -209,12 +216,11 @@ def prefetch_kokoro_onnx_model(*, force: bool = False) -> "dict":
         KOKORO_ONNX_REPO_ID, KOKORO_ONNX_FILENAME, kokoro_dir)
     try:
         os.makedirs(kokoro_dir, exist_ok=True)
-        # token=False: a public repo, fetched while ComfyUI starts. Left to
-        # its default the hub library would attach the user's saved login or
-        # HF_TOKEN to this request; nothing at startup reads a credential.
-        got = hf_hub_download(
-            repo_id=KOKORO_ONNX_REPO_ID, filename=KOKORO_ONNX_FILENAME,
-            local_dir=kokoro_dir, token=False)
+        # The pinned commit and SHA-256 (``_otr_model_pins``), with no token:
+        # a public repo, fetched while ComfyUI starts, and nothing at startup
+        # reads a credential. A copy with the wrong digest is removed from the
+        # engine's folder and reported, never used.
+        got = _pins.fetch(_pins.KOKORO_ONNX, KOKORO_ONNX_FILENAME, local_dir=kokoro_dir)
         if not os.path.exists(dest):
             # A hub version that resolved elsewhere: copy, never symlink (the
             # engine checks this exact path with os.path.exists).
@@ -290,7 +296,7 @@ def prefetch_kokoro_voices(*, force: bool = False) -> "dict":
         return receipt          # the ordinary case after first boot
 
     try:
-        from huggingface_hub import hf_hub_download
+        import huggingface_hub  # noqa: F401 -- a missing library is a reason, not a crash
     except Exception as exc:  # noqa: BLE001
         receipt["reason"] = f"huggingface_hub unavailable: {exc}"
         return receipt
@@ -303,13 +309,8 @@ def prefetch_kokoro_voices(*, force: bool = False) -> "dict":
 
     for voice in wanted:
         try:
-            # token=False, as for the ONNX model above: public files, and
-            # no credential is read while ComfyUI starts.
-            src = hf_hub_download(
-                repo_id=KOKORO_REPO_ID,
-                filename=f"voices/{voice}.pt",
-                token=False,
-            )
+            # Pinned commit and SHA-256, no token, as for the ONNX model above.
+            src = _pins.fetch(_pins.KOKORO, f"voices/{voice}.pt")
             dest = os.path.join(voices_dir, f"{voice}.pt")
             if not os.path.exists(dest):
                 # COPY, never symlink. The hub cache is a different tree with

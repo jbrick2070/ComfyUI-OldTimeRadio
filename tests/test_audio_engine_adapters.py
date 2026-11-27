@@ -111,23 +111,30 @@ def test_kokoro_uses_explicit_requested_device(monkeypatch):
     captured = {}
 
     class _FakeKPipeline:
-        def __init__(self, lang_code, device, repo_id):
+        def __init__(self, lang_code, device, repo_id, model):
             captured["lang_code"] = lang_code
             captured["device"] = device
             captured["repo_id"] = repo_id
+            captured["model"] = model
 
     fake_kokoro_module = types.SimpleNamespace(KPipeline=_FakeKPipeline)
     monkeypatch.setitem(sys.modules, "kokoro", fake_kokoro_module)
+    # Since 2026-11-27 the model KPipeline uses is built from the pinned files
+    # by the pack, so the device must reach that build as well.
+    from nodes._otr_audio_engines import _kokoro_backends as _kb
+    monkeypatch.setattr(_kb, "pinned_kokoro_model", lambda device: ("pinned model on", device))
 
     explicit = eng_kokoro.KokoroEngine()
     explicit.requested_device = "cpu"
     explicit.load()
     assert captured["device"] == "cpu"
+    assert captured["model"] == ("pinned model on", "cpu")
 
     # requested_device unset -> the nv50 baseline default ("cuda").
     default_device = eng_kokoro.KokoroEngine()
     default_device.load()
     assert captured["device"] == "cuda"
+    assert captured["model"] == ("pinned model on", "cuda")
 
 
 def test_musicgen_is_clip_after_cleanbreak_1c():

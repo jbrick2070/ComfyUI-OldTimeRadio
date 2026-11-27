@@ -34,6 +34,17 @@ from nodes._otr_audio_engines.registry import (  # noqa: E402
 import nodes._otr_kokoro_voice_prefetch as prefetch  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _torch_kokoro_reads_no_files(monkeypatch):
+    """Every test here fakes kokoro's KPipeline. The torch backend's two file
+    reads -- the pinned model build and the local voice load (2026-11-27) --
+    are stubbed so the fake pipeline sees the voice id it always saw. The
+    tests of those two reads live in tests/test_model_pins.py and call the
+    real functions."""
+    monkeypatch.setattr(kb, "pinned_kokoro_model", lambda device: None)
+    monkeypatch.setattr(kb, "load_local_voice", lambda voices_dir, voice: voice)
+
+
 # --------------------------------------------------------------------------- #
 # selection
 # --------------------------------------------------------------------------- #
@@ -425,7 +436,9 @@ def test_engine_missing_onnx_model_names_the_offline_fetch(monkeypatch, tmp_path
     with pytest.raises(EngineUnusable) as exc:
         eng.generate_voice("hello", "bm_george", None, 7)
     assert exc.value.reason == EngineUsabilityReason.MISSING_MODEL
-    assert "huggingface-cli download onnx-community/Kokoro-82M-v1.0-ONNX" in str(exc.value)
+    assert "hf download onnx-community/Kokoro-82M-v1.0-ONNX onnx/model.onnx" in str(exc.value)
+    # The command names the pinned commit, so a hand fetch gets the same bytes.
+    assert "--revision 1939ad2a8e416c0acfeecc08a694d14ef25f2231" in str(exc.value)
 
 
 def test_engine_with_no_backend_installed_is_a_named_error(monkeypatch, tmp_path):
@@ -497,9 +510,10 @@ def test_onnx_prefetch_receipts(monkeypatch, tmp_path):
 
     fetched = {}
 
-    def _fake_download(repo_id, filename, local_dir, token=None):
+    def _fake_download(repo_id, filename, local_dir, token=None, revision=None):
         fetched["args"] = (repo_id, filename, local_dir)
         fetched["token"] = token
+        fetched["revision"] = revision
         target = os.path.join(local_dir, *filename.split("/"))
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target, "wb") as fh:
@@ -508,8 +522,14 @@ def test_onnx_prefetch_receipts(monkeypatch, tmp_path):
 
     monkeypatch.setitem(sys.modules, "huggingface_hub",
                         types.SimpleNamespace(hf_hub_download=_fake_download))
+    pins = prefetch._pins
+    repo, revision, files = pins.SOURCES[pins.KOKORO_ONNX]
+    import hashlib
+    monkeypatch.setitem(pins.SOURCES, pins.KOKORO_ONNX, (repo, revision, dict(
+        files, **{"onnx/model.onnx": (4, hashlib.sha256(b"onnx").hexdigest())})))
     r = prefetch.prefetch_kokoro_onnx_model()
     assert r["fetched"] == 1 and dest.exists()
+    assert fetched["revision"] == revision        # the pinned commit, never `main`
     assert fetched["args"] == (prefetch.KOKORO_ONNX_REPO_ID, "onnx/model.onnx",
                                str(tmp_path / "TTS" / "KokoroTTS"))
     # A startup fetch of a public file sends no credential: left to its

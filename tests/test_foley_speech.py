@@ -83,6 +83,9 @@ def test_whisper_proves_cuda_with_a_real_encode_else_uses_the_cpu(monkeypatch, c
             return iter([]), None
 
     monkeypatch.setattr(huggingface_hub, "snapshot_download", lambda *a, **k: "unused")
+    # The pinned weights are not what this test is about (the download test
+    # above is): the folder is taken as found.
+    monkeypatch.setattr(speech, "_pinned_whisper_dir", lambda model_dir, snapshot_download: "unused")
     monkeypatch.setattr(faster_whisper, "WhisperModel", FakeWhisper)
     monkeypatch.setattr(ctranslate2, "get_cuda_device_count", lambda: 1)
     monkeypatch.setattr(ctranslate2, "get_supported_compute_types", lambda d: {"float16", "int8"})
@@ -350,13 +353,28 @@ def test_whisper_auto_download_is_ungated_small_external_and_device_aware(monkey
     monkeypatch.setitem(sys.modules, "ctranslate2", SimpleNamespace(
         get_cuda_device_count=lambda: int(cuda),
         get_supported_compute_types=lambda device: {"float16", "int8_float16"}))
-    monkeypatch.setitem(sys.modules, "huggingface_hub", SimpleNamespace(
-        snapshot_download=lambda *a, **kw: downloads.append((a, kw)) or kw["local_dir"]))
+    pins = speech._model_pins()
+    repo, revision, files = pins.SOURCES[pins.WHISPER_BASE]
+
+    def fake_snapshot(*a, **kw):
+        downloads.append((a, kw))
+        for name in kw["allow_patterns"]:
+            target = Path(kw["local_dir"]) / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(name.encode())
+        return kw["local_dir"]
+
+    import hashlib
+    monkeypatch.setitem(pins.SOURCES, pins.WHISPER_BASE, (repo, revision, {
+        name: (len(name.encode()), hashlib.sha256(name.encode()).hexdigest()) for name in files}))
+    monkeypatch.setitem(sys.modules, "huggingface_hub", SimpleNamespace(snapshot_download=fake_snapshot))
     monkeypatch.setitem(sys.modules, "faster_whisper", SimpleNamespace(
         WhisperModel=lambda *a, **kw: calls.append((a, kw))))
     speech._load_whisper()
     assert downloads[0][0] == ("Systran/faster-whisper-base",)
     assert downloads[0][1]["token"] is False
+    assert downloads[0][1]["revision"] == revision            # pinned, never `main`
+    assert sorted(downloads[0][1]["allow_patterns"]) == sorted(files)
     assert Path(downloads[0][1]["local_dir"]).is_relative_to(tmp_path / "models")
     assert calls[0][1]["device"] == ("cuda" if cuda else "cpu")
     assert calls[0][1]["compute_type"] == ("float16" if cuda else "int8")

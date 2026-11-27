@@ -65,13 +65,16 @@ module above, and only if you select that engine.
 
 - **Hugging Face (`huggingface.co`).** Model weights are downloaded when a run
   needs them and they are not on disk, each from a repository named in the
-  code. Most image and video weights are pinned to an exact revision and
-  SHA-256 (`nodes/_otr_visual_assets.py`); the writer models, the AnimateDiff
-  motion modules and the voice files come from their repositories at the
-  current revision. The Kokoro voice files, and on Python 3.13 the Kokoro
-  ONNX model, are fetched once when ComfyUI starts so the default voice works
-  on a fresh install; set `OTR_SKIP_KOKORO_PREFETCH=1` or `HF_HUB_OFFLINE=1`
-  to stop that.
+  code. Pinned to one commit, with every file checked against its SHA-256
+  before it is used: most image and video weights
+  (`nodes/_otr_visual_assets.py`), and Kokoro's model, config and voice
+  files, its ONNX export and the Whisper speech-detection model
+  (`nodes/_otr_model_pins.py`). A pinned file already in the cache is used
+  with no network call. From the repository's current revision: the writer
+  models, Bark, MusicGen and the AnimateDiff motion modules. The Kokoro voice
+  files, and on Python 3.13 the Kokoro ONNX model, are fetched once when
+  ComfyUI starts so the default voice works on a fresh install; set
+  `OTR_SKIP_KOKORO_PREFETCH=1` or `HF_HUB_OFFLINE=1` to stop that.
 - **News feeds.** Only when you pick a source bank that reads feeds. The
   reader (`nodes/_otr_feed_fetch.py`) uses https only, refuses any address
   that is not publicly routable, connects to the address it validated, and

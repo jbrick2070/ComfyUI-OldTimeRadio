@@ -739,6 +739,73 @@ def kokoro_has_pipeline_api() -> bool:
 _VOICE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
 
+def _model_pins():
+    try:
+        from .. import _otr_model_pins
+    except ImportError:  # pragma: no cover -- flat test imports
+        import _otr_model_pins  # type: ignore
+    return _otr_model_pins
+
+
+def pinned_kokoro_model(device: "str | None"):
+    """kokoro's ``KModel`` built from the pinned config and weights, on ``device``.
+
+    Left to itself, ``KModel(repo_id=...)`` downloads ``config.json`` and
+    ``kokoro-v1_0.pth`` from the repository's ``main`` and asks the Hub again
+    on every load. Here both files come from ``_otr_model_pins.fetch``: one
+    commit, checked SHA-256, a cached copy used with no network call. Every
+    kokoro release the requirements admit (0.8.1 onward) takes ``config=`` and
+    ``model=``. KPipeline is handed this instance, and an instance it is handed
+    it uses as it is, so the device and the CUDA refusal it would have applied
+    are applied here, in its words.
+    """
+    import torch
+    from kokoro import KModel
+
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    if device == "cuda" and not torch.cuda.is_available():
+        # KPipeline's own refusal: never a silent move to the CPU.
+        raise RuntimeError("CUDA requested but not available")
+    pins = _model_pins()
+    config = pins.fetch(pins.KOKORO, "config.json")
+    weights = pins.fetch(pins.KOKORO, "kokoro-v1_0.pth")
+    try:
+        return KModel(repo_id=KOKORO_REPO_ID, config=config, model=weights).to(device).eval()
+    except RuntimeError as error:
+        if device == "cuda":
+            raise RuntimeError("Failed to initialize model on CUDA: %s. Try setting "
+                               "device='cpu' or check CUDA installation." % error) from error
+        raise
+
+
+def load_local_voice(voices_dir: "str | None", voice: str):
+    """The voice pack for ``voice`` from ``<voices_dir>/<voice>.pt``, as a tensor.
+
+    The voice id arrives from a cast row a workflow can supply, so it must be a
+    bare name, and the file it names must RESOLVE inside the approved voice
+    roots -- a symlinked .pt or a junctioned voices folder is refused, not read
+    (registry policy review, 2026-10-22). This is the file the engine has
+    already checked and the prefetch fetched pinned; nothing here networks.
+    """
+    import torch
+
+    if not voices_dir:
+        raise BackendUnavailable("the kokoro voices folder is not known, so voice %r "
+                                 "cannot be read" % (voice,))
+    if not _VOICE_NAME.fullmatch(str(voice or "")):
+        raise ValueError("kokoro voice id %r is not a bare voice name" % (voice,))
+    try:
+        from .._otr_paths import confine_to_read_roots, voice_read_roots
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_paths import confine_to_read_roots, voice_read_roots  # type: ignore
+    path = confine_to_read_roots(
+        os.path.join(voices_dir, "%s.pt" % voice), "kokoro voice",
+        roots=voice_read_roots() + [os.path.normpath(
+            os.path.join(voices_dir, "..", "..", ".."))])
+    return torch.load(path, weights_only=True)
+
+
 class OwnG2PPipeline:
     """kokoro's ``KPipeline`` for Japanese and Mandarin, with the phonemes from
     the pack's copy of misaki (``OWN_G2P``) instead of the installed misaki.
@@ -757,47 +824,15 @@ class OwnG2PPipeline:
     """
 
     def __init__(self, lang_code: str, device: str, voices_dir: str):
-        import inspect
-
-        from kokoro import KModel
-
         self.lang_code = lang_code
-        kwargs = {}
-        try:
-            if "repo_id" in inspect.signature(KModel.__init__).parameters:
-                kwargs["repo_id"] = KOKORO_REPO_ID
-        except (TypeError, ValueError):
-            kwargs["repo_id"] = KOKORO_REPO_ID
-        if device == "cuda":
-            import torch
-
-            if not torch.cuda.is_available():
-                # KPipeline's own refusal: never a silent move to the CPU.
-                raise RuntimeError("CUDA requested but not available")
-        self.model = KModel(**kwargs).to(device).eval()
+        self.model = pinned_kokoro_model(device)
         self._g2p = OWN_G2P[lang_code]()
         self._voices_dir = voices_dir
         self._voices = {}
 
     def _voice_pack(self, voice: str):
-        import torch
-
         if voice not in self._voices:
-            # The voice id arrives from a cast row a workflow can supply, so it
-            # must be a bare name, and the file it names must RESOLVE inside the
-            # approved voice roots -- a symlinked .pt or a junctioned voices
-            # folder is refused, not read (registry policy review, 2026-10-22).
-            if not _VOICE_NAME.fullmatch(str(voice or "")):
-                raise ValueError("kokoro voice id %r is not a bare voice name" % (voice,))
-            try:
-                from .._otr_paths import confine_to_read_roots, voice_read_roots
-            except ImportError:  # pragma: no cover -- flat test imports
-                from _otr_paths import confine_to_read_roots, voice_read_roots  # type: ignore
-            path = confine_to_read_roots(
-                os.path.join(self._voices_dir, "%s.pt" % voice), "kokoro voice",
-                roots=voice_read_roots() + [os.path.normpath(
-                    os.path.join(self._voices_dir, "..", "..", ".."))])
-            self._voices[voice] = torch.load(path, weights_only=True)
+            self._voices[voice] = load_local_voice(self._voices_dir, voice)
         return self._voices[voice]
 
     def __call__(self, text: str, voice: str, speed: float = 1, split_pattern=r"\n+"):
@@ -844,6 +879,7 @@ class TorchKokoroBackend:
         self.voices_dir = voices_dir
         self._pipeline = None
         self._spacy_from_pack = False
+        self._voices = {}
 
     def load(self) -> None:
         if self._pipeline is not None:
@@ -895,6 +931,10 @@ class TorchKokoroBackend:
         except (TypeError, ValueError):
             kwargs["repo_id"] = "hexgrad/Kokoro-82M"
         try:
+            # The pinned model, not KPipeline's own download of `main`
+            # (``pinned_kokoro_model``). Inside the try, as KPipeline's own
+            # model build was, so its errors meet the same handling.
+            kwargs["model"] = pinned_kokoro_model(self.device)
             if self._spacy_from_pack:
                 # spaCy 3.8 warns W095 (model built for 3.7) on every load of
                 # the shipped 3.7.1 copy; the version is a known constant, so
@@ -923,8 +963,15 @@ class TorchKokoroBackend:
         if self.lang_code == "j":
             text = japanese_long_numbers_spelled(text)
         segments = []
+        # The voice is handed over as the tensor from the local, pinned file.
+        # Given a bare id, KPipeline would download voices/<id>.pt from the
+        # repository's `main` itself (kokoro 0.9.4 ``load_single_voice``), and a
+        # path string would be split at any comma in the folder name
+        # (``load_voice``). ``load_voice`` takes a tensor as it is.
+        if voice_id not in self._voices:
+            self._voices[voice_id] = load_local_voice(self.voices_dir, voice_id)
         for _, _, audio_data in self._pipeline(
-            text, voice=voice_id, speed=speed, split_pattern=r"\n+",
+            text, voice=self._voices[voice_id], speed=speed, split_pattern=r"\n+",
         ):
             if torch.is_tensor(audio_data):
                 arr = audio_data.detach().cpu().numpy()
@@ -940,6 +987,7 @@ class TorchKokoroBackend:
 
     def close(self) -> None:
         pipe, self._pipeline = self._pipeline, None
+        self._voices = {}
         try:
             if pipe is not None and hasattr(pipe, "model"):
                 pipe.model.to("cpu")
