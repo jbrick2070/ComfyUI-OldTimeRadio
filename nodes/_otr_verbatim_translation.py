@@ -11,8 +11,10 @@ What is fixed and what is not:
 - TEXTS ONLY. The model never sees a speaker as something it may return;
   speakers are copied from the plan, because the executor and the outline
   compare them by exact string and a renamed speaker dies loud downstream.
-- STRUCTURAL VALIDATION ONLY. Count and non-empty. No prose judgement (story
-  quality is closed), no language detector, no back-translation.
+- STRUCTURAL VALIDATION ONLY. Count, non-empty, no JSON residue, and not the
+  English source handed back (English function words in the reply; see
+  ``_looks_untranslated``). No prose judgement (story quality is closed), no
+  general language detector, no back-translation.
 - BATCHED FOR THE FLOOR. The smallest shipped writer context is 2048 tokens
   (``otr_4060_floor.json``), so consecutive entries are grouped under a
   source-word budget and ``max_new_tokens`` is sized to each batch rather
@@ -95,6 +97,48 @@ _TRUNCATION_SIGNATURES = (
 #: ship as dialogue. A quote followed by a comma is NOT here -- `dijo "sí", y`
 #: is ordinary Spanish.
 _JSON_RESIDUE = re.compile(r'\]\s*\}|"\s*[\]\}]|[\[\{]\s*"')
+
+
+#: English words that are not words in any admitted target language (es, pt,
+#: it, fr, hi, ja, zh). Gemma 4 E2B handed the English source back unchanged
+#: for whole batches on the 2.3.66 matrix (2026-11-27, Mandarin and Japanese
+#: Shakespeare), the reply parsed, every line was non-empty, and English
+#: captions shipped over a Chinese voice. Names never trip this -- they are
+#: not function words -- and neither does a Romance translation: words that
+#: are also words there ("no", "me", "a", "in", "he", "so", "do", "as", "or",
+#: "an", "art") are left out.
+_ENGLISH_FUNCTION_WORDS = frozenset({
+    "the", "and", "of", "is", "not", "you", "your", "that", "with", "this",
+    "for", "be", "but", "his", "her", "him", "they", "them", "what", "which",
+    "shall", "will", "have", "hath", "doth", "thou", "thee", "thy", "thine",
+    "from", "are", "was", "were", "my", "it", "to", "at", "by",
+    "we", "our", "she", "if", "would", "should",
+    "there", "here", "when", "where", "who", "upon", "into", "than", "then",
+})
+_LATIN_WORD = re.compile(r"[A-Za-z']+")
+
+
+def _looks_untranslated(shipped: str, source: str) -> bool:
+    """Did the model hand back English? Two or more English function words
+    making up at least a fifth of the reply's Latin words, from a source line
+    that has at least two of its own (a two-word "O, Romeo!" is never judged)."""
+    def _function_words(text: str) -> tuple[int, int]:
+        words = [w.strip("'").lower() for w in _LATIN_WORD.findall(str(text or ""))]
+        return sum(1 for w in words if w in _ENGLISH_FUNCTION_WORDS), len(words)
+
+    source_hits, _ = _function_words(source)
+    if source_hits >= 1 and _plain(shipped) == _plain(source):
+        # Handed back word for word. A names-only line ("Romeo, Mercutio!")
+        # carries no function word and is never judged this way.
+        return True
+    if source_hits < 2:
+        return False
+    hits, total = _function_words(shipped)
+    return hits >= 2 and hits >= 0.2 * max(total, 1)
+
+
+def _plain(text: str) -> str:
+    return " ".join(w.lower() for w in _LATIN_WORD.findall(str(text or "")))
 
 
 def _looks_out_of_room(error: Any) -> bool:
@@ -371,6 +415,9 @@ def translate_entries(
         if not shipped.strip():
             return (f"line {n} came back empty (or as a bare speaker "
                     "label); return the spoken words")
+        if _looks_untranslated(shipped, entries[index].text):
+            return (f"line {n} came back in English, untranslated; write it "
+                    "in the episode language")
         residue = _JSON_RESIDUE.search(shipped)
         if residue and not _JSON_RESIDUE.search(str(entries[index].text)):
             return (f"line {n} has JSON punctuation "

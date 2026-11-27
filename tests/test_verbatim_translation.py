@@ -539,3 +539,54 @@ def test_a_caseless_label_is_kept_when_the_evidence_is_mixed():
     words stay: a name read aloud is a nuisance, a lost clause is worse."""
     assert VT.strip_echoed_label("リア：聞け", "LEAR", "Hear me: traitor") == \
         "リア：聞け"
+
+
+# --------------------------------------------------------------------------- #
+# the English source handed back is not a translation (2.3.66 matrix,
+# 2026-11-27: Gemma 4 E2B returned Shakespeare's English for whole batches and
+# English captions shipped over a Chinese voice)
+# --------------------------------------------------------------------------- #
+
+_VIOLA = "I am no fee'd post, lady. Keep your purse. My master, not myself, lacks recompense."
+
+
+@pytest.mark.parametrize("translated", [
+    "我不是收钱的信使，小姐。收起你的钱包。",
+    "No soy un mensajero pagado, señora. Guardad vuestra bolsa.",
+    "Je ne suis pas un messager payé, madame. Gardez votre bourse.",
+    "Non sono un messaggero pagato, signora. Tenete la borsa.",
+    "Não sou um mensageiro pago, senhora. Guardai a vossa bolsa.",
+    "मैं कोई वेतनभोगी दूत नहीं हूँ, देवी। अपना बटुआ रखो।",
+    "He dicho que no, señora.",
+])
+def test_a_real_translation_is_never_read_as_english(translated):
+    assert not VT._looks_untranslated(translated, _VIOLA)
+
+
+def test_the_english_handed_back_is_untranslated():
+    assert VT._looks_untranslated(_VIOLA, _VIOLA)
+    assert VT._looks_untranslated("Go, get thee gone.", "Go, get thee gone.")
+
+
+def test_a_names_only_line_is_never_judged():
+    assert not VT._looks_untranslated("Romeo, Mercutio!", "Romeo, Mercutio!")
+
+
+def test_an_english_batch_is_sent_back_then_split_then_translated():
+    entries = _entries(_VIOLA, "Not too fast! Soft, soft! Unless the master were the man.")
+    english = {"texts": [e.text for e in entries]}
+    slot = _Slot([english, english,
+                  {"text": "我不是收钱的信使，小姐。"},
+                  {"text": "别太快！轻点，轻点！"}])
+    out, receipt = VT.translate_entries(entries, language_instruction=RULE,
+                                        creative_fn=slot)
+    assert [e.text for e in out] == ["我不是收钱的信使，小姐。", "别太快！轻点，轻点！"]
+    assert receipt["split_batches"] == [0]
+
+
+def test_a_line_that_stays_english_alone_fails_loud():
+    entries = _entries(_VIOLA)
+    slot = _Slot([{"text": _VIOLA}, {"text": _VIOLA}])
+    with pytest.raises(RuntimeError) as caught:
+        VT.translate_entries(entries, language_instruction=RULE, creative_fn=slot)
+    assert "came back in English" in str(caught.value)

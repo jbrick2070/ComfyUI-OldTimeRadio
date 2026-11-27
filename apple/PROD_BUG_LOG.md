@@ -17895,3 +17895,24 @@ not promote it to the Bug Bible on this evidence alone.
   with it (found by agy).
 - status: FIXED in code; the live proof is the ja / zh / hi one-act legs on the
   5080 desktop, the Mac and the 4060.
+
+## PBUG-20261127-04 -- Japanese and Mandarin Shakespeare shipped English lines: the writer handed the source back and the pass called it translated
+- evidence: the 2.3.66-candidate matrix on the 5080 desktop (5813390b1,
+  canonical, Gemma 4 E2B writer). `cold_identity_zh_20261127_122956` published
+  with English captions ("VIOLA: I am no fee'd post, lady...") over a Mandarin
+  Kokoro voice; the writer log shows both verbatim-translation batches came back
+  as Shakespeare's English, and the receipt still said "translated into zh: 4
+  entries". The surviving ledger of the 12:10 Japanese leg
+  (`pending_20261127_121049`) holds the same: receipt v2 with 4 entries
+  translated, every character row English. Hindi translated correctly.
+- cause: validation checked count, non-empty and JSON residue only. An echo of
+  the English source parses, has the right count and is non-empty, so it passed
+  as a translation.
+- fix: `_looks_untranslated` -- a reply that repeats its English source word
+  for word, or whose Latin words are at least a fifth English function words
+  (the, thou, thy, is, not, ...) that are not words in any admitted target, is
+  sent back as "came back in English, untranslated"; the batch then splits line
+  by line and a line that stays English fails loud. Names never trip it, and
+  Spanish, Portuguese, Italian, French, Hindi and Chinese replies were checked.
+  Coverage in `tests/test_verbatim_translation.py`.
+- status: FIXED in code; the live proof is the re-run ja / zh / hi legs.
