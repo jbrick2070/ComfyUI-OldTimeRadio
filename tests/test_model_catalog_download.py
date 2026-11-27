@@ -34,11 +34,9 @@ def test_resolve_hf_token_from_environ(monkeypatch):
 
 def test_resolve_hf_token_returns_none_when_missing(monkeypatch):
     monkeypatch.delenv("HF_TOKEN", raising=False)
-    # On non-Windows the winreg branch is skipped; on Windows the
-    # registry lookup may legitimately return a value, so the safe
-    # cross-platform assertion is "returns either None or a string".
-    out = resolve_hf_token()
-    assert out is None or isinstance(out, str)
+    # The environment is the only source this resolver reads (the Windows
+    # registry lookup was removed 2026-11-27), so the answer is exactly None.
+    assert resolve_hf_token() is None
 
 
 def test_resolve_hf_token_is_cross_platform_safe():

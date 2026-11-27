@@ -648,12 +648,12 @@ were removed in 2.3.60).
 **Never paste a token into a workflow widget.** No node here asks for one, and a
 value saved into a workflow travels with it -- into every workflow you share, every
 queue entry, and the metadata of every image you generate. A token in the login
-file, or in `HF_TOKEN` in the environment that launches ComfyUI, is the whole
-setup. ComfyUI Desktop on Windows does not inherit user-scope environment
-variables -- the pack bridges that itself there, reading `HF_TOKEN` out of your
-user registry at load and exporting it into the process, so a token you set that
-way does work. The login file is still the habit to build: it is the one that
-works on every platform.
+file (`hf auth login`), or in `HF_TOKEN` in the environment that launches
+ComfyUI, is the whole setup, and you only need one if you point the pack at a
+gated model of your own. The pack reads a token only when a download asks for
+it and hands it to that download alone: it does not read the Windows registry
+for one and does not export one into the ComfyUI process (it did both through
+2.3.64). The login file is the habit to build: it works on every platform.
 
 Nearly every weight fetches itself. The picks that do not are listed in
 [apple/MACHINES.md](apple/MACHINES.md); where no manifest exists -- `mesh_stage`

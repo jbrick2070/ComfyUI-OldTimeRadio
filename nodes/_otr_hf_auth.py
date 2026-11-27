@@ -1,20 +1,21 @@
 """HuggingFace token resolution -- cross-platform safe.
 
-S30 B1a2. Used by GatedModelError pre-flight checks and
-auto_download_if_missing's token forwarding.
+Used by the gated-model pre-flight checks and by the token forwarding of a
+model download the user asked for.
 
 Resolution order:
-    1. otr_env.get("HF_TOKEN")
-    2. (Windows only) HKCU\\Environment via winreg
+    1. ``HF_TOKEN`` in the environment that launched ComfyUI
+    2. (run time only) the Hub's own login -- ``hf auth login`` -- see
+       :func:`resolve_hf_token_runtime`
     3. None
 
-The winreg branch is gated on os.name == "nt" so macOS/Linux callers
-never hit `import winreg` (which raises ImportError off-Windows).
+NO REGISTRY READ. Until 2.3.64 this also read ``HF_TOKEN`` out of the Windows
+user registry, and the pack's ``__init__`` exported what it found into the
+whole ComfyUI process at every start, for gated models the pack no longer
+ships. A credential is now read only from where the user put it for this
+process, only when a download needs it, and it is handed to that one download.
 
-Every token-presence check in the codebase MUST go through this helper.
-Never read os.environ["HF_TOKEN"] directly -- the HKCU fallback is the
-common case for ComfyUI Desktop on Windows since that process doesn't
-inherit user-scope env vars without an explicit bake-in.
+Every token-presence check in the codebase goes through this helper.
 """
 
 from __future__ import annotations
@@ -27,29 +28,16 @@ except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
 
 def resolve_hf_token() -> str | None:
-    """Return the user's HF_TOKEN if available, else None.
+    """Return ``HF_TOKEN`` from the process environment, else None.
 
-    Reads from process env first (works everywhere), then HKCU on
-    Windows (catches the ComfyUI Desktop env-inheritance gap), then
-    gives up cleanly.
+    Pure stdlib, and what import time uses. The login file is read by
+    :func:`resolve_hf_token_runtime`, on the execution path.
     """
-    env_token = otr_env.get("HF_TOKEN")
-    if env_token:
-        return env_token
-    if os.name == "nt":
-        try:
-            import winreg  # type: ignore
-
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
-                value, _ = winreg.QueryValueEx(key, "HF_TOKEN")
-                return value or None
-        except (ImportError, FileNotFoundError, OSError):
-            return None
-    return None
+    return otr_env.get("HF_TOKEN") or None
 
 
 def resolve_hf_token_runtime() -> str | None:
-    """Token resolution for the EXECUTION path -- env, HKCU, then token FILES.
+    """Token resolution for the EXECUTION path -- env, then token FILES.
 
     ``resolve_hf_token`` above stays pure stdlib and is what import time uses:
     node registration must not import the Hub client or touch credential files.
@@ -58,8 +46,8 @@ def resolve_hf_token_runtime() -> str | None:
 
     WHY IT EXISTS. `hf auth login` -- the documented, recommended way to
     authenticate -- writes a plain text file containing the token and nothing
-    else. OTR could not see it: the resolver read only the environment and
-    HKCU, so the standard login was invisible and the README could not honestly
+    else. OTR could not see it: the resolver did not read the login file, so
+    the standard login was invisible and the README could not honestly
     recommend it (PBUG-20260829-10).
 
     AND THE FILE MOVES, which is the subtle half. `_otr_hf_env` relocates
@@ -71,7 +59,7 @@ def resolve_hf_token_runtime() -> str | None:
     the cache.
 
     Order, and each step is a superset of the last:
-      1. ``resolve_hf_token()`` -- process env, then HKCU on Windows.
+      1. ``resolve_hf_token()`` -- the process environment.
       2. ``huggingface_hub.get_token()`` -- honours ``HF_TOKEN_PATH``, the
          cached login, and the Hub's own alias/precedence rules.
       3. the DEFAULT ``~/.cache/huggingface/token``, which step 2 stops seeing
