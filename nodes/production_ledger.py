@@ -1590,6 +1590,12 @@ class Ledger:
             ssig = _safe_str(r.get("speech_signature"))
             if ssig:
                 row["speech_signature"] = ssig
+            # The name in the episode's own script, for captions and credits
+            # only (`_otr_cast_display_names`). Kept only when set, so every
+            # row written before has exactly the keys it had.
+            native_display = _safe_str(r.get("native_display_name"))
+            if native_display:
+                row["native_display_name"] = native_display
             rows.append(row)
         self.data["cast"] = rows
         return self

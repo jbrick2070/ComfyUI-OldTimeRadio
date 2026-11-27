@@ -1699,6 +1699,17 @@ class WriterTailMixin:
             canon.title = final_title
             _OTRC.write_episode_canon(episode_root, canon)
 
+        # Cast names in the episode's own script (2026-11-27). The cast is
+        # final here for every bank, the cleanup transaction has reconciled (a
+        # rollback cannot drop the field), and the technical slot is the one
+        # cleanup just used. Display only, fail-soft, and English or a Latin-
+        # script row makes no call at all.
+        from . import _otr_cast_display_names as _OTRCDN
+        if _OTRCDN.needs_native_names(meta):
+            with slot_scheduler.helper_context("cast_display_names"):
+                _OTRCDN.populate(led.data, technical_fn=technical_generate_fn)
+            led.save()
+
         # PBUG-20260802-02 repair, right here and nowhere else: this is the
         # LAST point before the freeze cascade node runs, and (per the
         # comment below) the last thing that touches canonical `text` --

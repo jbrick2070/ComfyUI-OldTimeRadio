@@ -452,6 +452,12 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
         if not isinstance(entry, dict):
             continue
         name = str(entry.get("name") or entry.get("char_id") or "").strip()
+        # CAST & VOICES names the character the way the viewer read it in the
+        # captions, with the identity name beside it so the roll still says
+        # exactly which cast row each voice belongs to.
+        native = str(entry.get("native_display_name") or "").strip()
+        if native and name:
+            name = "%s (%s)" % (native, name)
         ref = entry.get("voice_ref_id") or entry.get("voice_preset")
         eng = entry.get("voice_engine") or (
             "bark" if entry.get("voice_preset") else "")
@@ -575,6 +581,9 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
             cast_row = _OTRLC.cast_lookup(
                 led, str(line.get("char_id") or "")
             )
+            # The transcript reads like the captions: the name in the
+            # episode's own script when one was accepted.
+            spk = str(cast_row.get("native_display_name") or spk)
             voice = (
                 cast_row.get("voice_ref_id")
                 or cast_row.get("voice_preset")

@@ -789,8 +789,10 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
 
     try:
         from . import _otr_ledger_consumers as _OTRLC  # type: ignore
+        from . import _otr_cast_display_names as _OTRCDN  # type: ignore
     except ImportError:  # pragma: no cover - direct CLI execution
         import _otr_ledger_consumers as _OTRLC  # type: ignore
+        import _otr_cast_display_names as _OTRCDN  # type: ignore
     events: list[str] = []
     lint: list[str] = []
     prev_char = None
@@ -827,9 +829,10 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
         # authority. Preserve the legacy display_name fallback on the resolved
         # row rather than rebuilding another raw-id map here.
         cast_row = _OTRLC.cast_lookup(ledger, cid)
-        nm = str(
-            cast_row.get("name") or cast_row.get("display_name") or ""
-        ).strip()
+        # The name in the episode's own script when one was accepted
+        # (`_otr_cast_display_names`), else the identity name, else the legacy
+        # display_name fallback. English rows never carry the native field.
+        nm = _OTRCDN.display_name(cast_row)
         # THE RESERVED ANNOUNCER'S DISPLAY NAME (the multilingual one-switch,
         # 2026-09-18). Character names are whatever the writer produced -- a
         # Spanish episode gets Spanish names from the writer, and Python never
