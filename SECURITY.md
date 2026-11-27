@@ -11,17 +11,20 @@ that in mind.
 ## What the pack never does
 
 - **It registers no HTTP route.** Nothing here adds an endpoint to ComfyUI's
-  server (`tests/test_pack_registers_no_http_route.py`).
+  server (`tests/test_pack_registers_no_http_route.py`). ComfyUI serves the
+  pack's browser files from `js/`, as it does for every pack that has them.
 - **It runs no `eval` or `exec`, and its own code unpickles nothing.** The
   pack's direct `torch.load` calls (the Kokoro voice files) pass
-  `weights_only=True`, and every `transformers` load passes
-  `trust_remote_code=False`. Most weights are safetensors. Bark's are a `.bin`
-  checkpoint that `transformers` loads, and the AnimateDiff motion modules
-  are `.ckpt` files that the AnimateDiff-Evolved pack loads, not this one.
+  `weights_only=True`. No load turns `trust_remote_code` on: the writer's
+  loads pass `False`, and the Bark and MusicGen loads leave it unset, which
+  is off. Most weights are safetensors. Bark's are a `.bin` checkpoint that
+  `transformers` loads, and the AnimateDiff motion modules are `.ckpt` files
+  that the AnimateDiff-Evolved pack loads, not this one.
 - **It installs nothing at run time.** No `pip`, no wheel, no archive is
   downloaded and unpacked or imported. Python dependencies are the ones in
   `requirements.txt`, installed by ComfyUI Manager or by you.
-- **It runs no shell.** Every process it starts goes through one module
+- **It runs no shell.** In the package the registry distributes, every
+  process the pack starts goes through one module
   (`nodes/_otr_shared/proc.py`) that takes an argument list, refuses
   `shell=True`, and refuses any program not on its list.
 - **It sends no telemetry.** It collects nothing about you and reports nothing
@@ -47,6 +50,10 @@ that in mind.
 The ffmpeg used is the one on your machine or the one the `imageio-ffmpeg`
 dependency ships. No node takes a program path as an input.
 
+The IndexTTS2 voice engine is in the GitHub tree and is left out of the
+registry package. It starts its own worker process directly, outside the
+module above, and only if you select that engine.
+
 ## Network access
 
 - **Hugging Face (`huggingface.co`).** Model weights are downloaded when a run
@@ -64,13 +71,21 @@ dependency ships. No node takes a program path as an input.
   caps size and time.
 - **Cloud lanes (off by default).** OpenRouter, the Google API and Comfy
   credits are used only when you enable a cloud slot in the workflow and
-  supply your own key. A key is sent only to its provider's own host and is
-  dropped if a response redirects elsewhere. A provider's result is downloaded
-  over https from a public address only, and its URL is kept out of error
-  text.
+  supply your own key or sign-in. A key is sent only to its provider's own
+  host and is dropped if a response redirects elsewhere. The OpenRouter and
+  Comfy credits requests carry a title header naming this project, and the
+  OpenRouter ones a referrer header pointing at this repository; neither
+  says anything about you. A provider's result is downloaded over https, and
+  only from a host whose addresses are all publicly routable. That is
+  checked when the name is resolved and is not pinned for the connection
+  that follows. `OTR_CLOUD_RESULT_ANY_HOST=1` turns the address check off,
+  for networks that map every host to a private address. The result's URL is
+  kept out of error text.
 
 With the models on disk, no cloud slot enabled and a source bank that does not
-read feeds, an episode renders with no network access.
+read feeds, an episode can render with the network unplugged (set
+`HF_HUB_OFFLINE=1`). Online, the Hugging Face libraries may still check cached
+files against the Hub.
 
 ## Files
 
@@ -102,8 +117,9 @@ read feeds, an episode renders with no network access.
   steps open them, and it stamps the software it ran on: ComfyUI's version,
   this pack's version, Python, torch, CUDA, the GPU and its driver, and the
   operating system. It does not list your other custom node packs unless you
-  start ComfyUI with `OTR_ENV_FINGERPRINT_PACKS=1`. The default cleanup
-  removes the ledger once the episode is published. Read a ledger before you
+  start ComfyUI with `OTR_ENV_FINGERPRINT_PACKS=1`. Whether the ledger is
+  removed once the episode is published depends on the workflow's cleanup
+  setting, and a cleanup that is refused keeps it. Read a ledger before you
   attach it to a public issue.
 - **The credits.** The finished video's credits include a SYSTEM block naming
   the machine's CPU, GPU, memory, operating system and library versions. It
@@ -112,11 +128,13 @@ read feeds, an episode renders with no network access.
 
 ## Credentials
 
-API keys for the cloud lanes come from environment variables or from a key
-file you create (`api_key.location.example` shows the layout). A key is read
-when a cloud call is made, attached to that provider's host only, and kept out
-of the pack's error text and log lines. Never paste a key or a token into a
-workflow widget: a value saved in a workflow travels with it.
+API keys for the OpenRouter and Google lanes come from environment variables
+or from a key file you create (`api_key.location.example` shows the layout).
+The Comfy credits lane uses the sign-in ComfyUI itself hands to the node; the
+pack stores nothing for it. A key is read when a cloud call is made, attached
+to that provider's host only, and kept out of the pack's error text and log
+lines. Never paste a key or a token into a workflow widget: a value saved in
+a workflow travels with it.
 
 A Hugging Face token is not needed for any model the pack ships a choice for.
 If you point the pack at a gated model of your own, it uses `HF_TOKEN` from
