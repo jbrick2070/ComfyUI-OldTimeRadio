@@ -147,3 +147,7 @@
 2026-11-26 | Image | Ming-Image 0.1/0.2 Design (Comfy-Org repack, DiT int8_convrot 6.2 GB, text encoder 19.5 GB) | WATCH | https://huggingface.co/Comfy-Org/Ming-Image
 2026-11-26 | Image | H3 Image Pose Transfer LoRA (supermansundies, 298 MB, Apache-2.0) | WATCH | https://huggingface.co/supermansundies/Minimax-H3-Image-Pose-Transfer-Lora
 2026-11-26 | Upscale | Kandinsky ImageSR 2.0 (MIT, 10.25 GB bf16 diffusers, no int8, no ComfyUI path) | WATCH | https://huggingface.co/kandinskylab/Kandinsky-ImageSR-2.0
+2026-11-27 | Upscale | Kandinsky SR 2.0 int8_convrot repack + native nodes (image 5.14 GB, video 1.96 GB, pack kandinsky-sr-native, GPL-3.0) | TEST | https://huggingface.co/PedroMarinhoDev/Kandinsky-SR-ComfyUI
+2026-11-27 | Writer | TimeCapsuleLLM-ja v4-chat (1.05B, Japanese 1868-1945, safetensors 4.19 GB, Apache-2.0) | WATCH | https://huggingface.co/trtd56/TimeCapsuleLLM-ja-v4-chat
+2026-11-27 | Video | H3 Face Fix (news only, face redraw from reference photo) | WATCH | https://comfyui-wiki.com/en/news
+2026-11-27 | Video | vidlamp-lipsync (LatentSync wrapper) | SKIP | https://api.comfy.org/nodes/vidlamp-lipsync
