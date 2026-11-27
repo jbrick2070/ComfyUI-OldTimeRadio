@@ -513,6 +513,15 @@ class TestAddressPolicy:
         ("100.64.0.9", "not publicly routable"),
         ("100.127.255.254", "not publicly routable"),
         ("198.18.0.1", "private"),             # benchmarking block: already refused
+        # NAT64 (64:ff9b::/96): the address it CARRIES is judged. On an
+        # IPv6-only network with DNS64 every IPv4-only host resolves here, and
+        # the standard library calls the whole prefix reserved -- every public
+        # host was refused through 2.3.64.
+        ("64:ff9b::808:808", ""),              # carries 8.8.8.8
+        ("64:ff9b::5db8:d822", ""),            # carries 93.184.216.34
+        ("64:ff9b::7f00:1", "loopback"),       # carries 127.0.0.1
+        ("64:ff9b::a00:1", "private"),         # carries 10.0.0.1
+        ("64:ff9b::a9fe:a9fe", "link-local"),  # carries 169.254.169.254
         ("8.8.8.8", ""),
         ("93.184.216.34", ""),
         ("2606:2800:220:1:248:1893:25c8:1946", ""),

@@ -182,15 +182,26 @@ class _Deadline:
 
 # ---- address policy --------------------------------------------------------
 
+#: NAT64's well-known prefix (RFC 6052). On an IPv6-only network with DNS64,
+#: every IPv4-only host resolves to an address in it, with the real IPv4
+#: address in the last 32 bits.
+_NAT64_PREFIX = ipaddress.ip_network("64:ff9b::/96")
+
+
 def _reject_reason(ip) -> str:
     """The name of the rule an address breaks, or "" when it is routable.
 
     Checked in a fixed order so the message names the most specific rule. A
     v4-mapped v6 address is unwrapped first: ``::ffff:127.0.0.1`` is loopback
-    no matter which family carries it.
+    no matter which family carries it. So is a NAT64 address: the standard
+    library calls the whole prefix "reserved", which refused EVERY IPv4-only
+    host on an IPv6-only network; the address it carries is what is judged
+    (``64:ff9b::7f00:1`` is still loopback, ``64:ff9b::808:808`` is public).
     """
     if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
         ip = ip.ipv4_mapped
+    if isinstance(ip, ipaddress.IPv6Address) and ip in _NAT64_PREFIX:
+        ip = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
     if ip.is_unspecified:
         return "unspecified"
     if ip.is_loopback:
