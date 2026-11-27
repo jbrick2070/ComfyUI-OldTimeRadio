@@ -14,6 +14,12 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/jbrick2070/ComfyUI-OldTimeRadio?color=0a7bbb" alt="License"></a>
 </p>
 
+**Installing with an AI agent?** Hand it [apple/AGENT_INSTALL.md](apple/AGENT_INSTALL.md).
+It is written for Claude Code, Codex, Cursor, Gemini CLI or any agent with a
+terminal: a prompt to paste, a check that proves each step worked, and the traps
+that waste an agent's time. It is optional -- the five install steps below need no
+agent.
+
 > *"Good evening. This is SIGNAL LOST."*
 
 <p align="center">
@@ -280,13 +286,8 @@ machine with more than one GPU, start ComfyUI with `CUDA_VISIBLE_DEVICES` set to
 the card you want.
 
 The long form of the install, with the traps: [apple/INSTALL.md](apple/INSTALL.md)
-and [apple/RUN.md](apple/RUN.md).
-
-**Would rather hand it to an AI agent?** [apple/AGENT_INSTALL.md](apple/AGENT_INSTALL.md)
-is written for one -- Claude Code, Codex, Cursor, Gemini CLI, whatever you use --
-with a prompt to paste, a verification command for every step, and the traps that
-waste an agent's time. It is an alternative to the path above, not a
-requirement: nothing here needs an agent.
+and [apple/RUN.md](apple/RUN.md). To hand the install to an AI agent instead, see
+[apple/AGENT_INSTALL.md](apple/AGENT_INSTALL.md).
 
 ### The widgets worth touching
 
