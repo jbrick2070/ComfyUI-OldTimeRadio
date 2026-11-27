@@ -270,6 +270,39 @@ def test_kpipeline_gets_the_pinned_model_and_the_local_voice_tensor(monkeypatch,
     assert loads == [(str(tmp_path), "ef_dora")]          # read once per backend
 
 
+@pytest.mark.parametrize("lang", ["j", "z"])
+def test_japanese_and_mandarin_synthesize_through_the_pack_pipeline(monkeypatch, tmp_path, lang):
+    """The other window, LIVE on the 5080, 2026-11-27: synthesize hands every
+    pipeline the voice TENSOR (right for KPipeline), but the pack's own
+    OwnG2PPipeline, which serves Japanese and Mandarin, took only a name and
+    died on ``str(voice or "")`` -- "Boolean value of Tensor with more than one
+    value is ambiguous". Driven here through the real OwnG2PPipeline and a real
+    voice file; only the model and the phonemizer are fakes."""
+    import torch
+
+    voices = tmp_path / "TTS" / "KokoroTTS" / "voices"
+    voices.mkdir(parents=True)
+    voice = "jf_alpha" if lang == "j" else "zf_xiaobei"
+    torch.save(torch.full((510, 1, 256), 0.5), voices / ("%s.pt" % voice))
+
+    class FakeModel:
+        device = torch.device("cpu")
+
+        def __call__(self, phonemes, ref_s, speed, return_output=True):
+            assert tuple(ref_s.shape) == (1, 256)          # one row of the real pack
+            return types.SimpleNamespace(audio=torch.full((24,), float(len(phonemes))))
+
+    monkeypatch.setattr(kb, "pinned_kokoro_model", lambda device: FakeModel())
+    monkeypatch.setitem(kb.OWN_G2P, lang, lambda: (lambda text: "abc"))
+    monkeypatch.setattr(kb, "own_g2p_ready", lambda code: True)
+    monkeypatch.setattr(kb, "kokoro_has_pipeline_api", lambda: True)
+    backend = kb.TorchKokoroBackend("cpu", lang_code=lang, voices_dir=str(voices))
+    backend.load()
+    assert isinstance(backend._pipeline, kb.OwnG2PPipeline)
+    out = backend.synthesize("first line", voice, 1.0)
+    assert out.size == 24 and float(out.max()) == 3.0
+
+
 def test_a_local_voice_is_read_from_the_folder_and_nothing_else(tmp_path):
     import torch
 

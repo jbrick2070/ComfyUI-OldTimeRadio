@@ -845,8 +845,17 @@ class OwnG2PPipeline:
             self._voices[voice] = load_local_voice(self._voices_dir, voice)
         return self._voices[voice]
 
-    def __call__(self, text: str, voice: str, speed: float = 1, split_pattern=r"\n+"):
-        pack = self._voice_pack(voice).to(self.model.device)
+    def __call__(self, text: str, voice, speed: float = 1, split_pattern=r"\n+"):
+        # KPipeline's call shape in full: ``voice`` is a voice id or the voice
+        # pack itself. ``TorchKokoroBackend.synthesize`` hands every pipeline
+        # the tensor it read from the local file (2026-11-27); taking only a
+        # name here killed every Japanese and Mandarin torch line ("Boolean
+        # value of Tensor with more than one value is ambiguous", found live
+        # by the other window the same day).
+        import torch
+
+        pack = voice if torch.is_tensor(voice) else self._voice_pack(voice)
+        pack = pack.to(self.model.device)
         segments = re.split(split_pattern, text.strip()) if split_pattern else [text]
         for graphemes in segments:
             if not graphemes.strip():

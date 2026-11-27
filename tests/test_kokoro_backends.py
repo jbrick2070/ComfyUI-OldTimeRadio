@@ -34,13 +34,16 @@ from nodes._otr_audio_engines.registry import (  # noqa: E402
 import nodes._otr_kokoro_voice_prefetch as prefetch  # noqa: E402
 
 
-@pytest.fixture(autouse=True)
-def _torch_kokoro_reads_no_files(monkeypatch):
-    """Every test here fakes kokoro's KPipeline. The torch backend's two file
+@pytest.fixture
+def torch_kokoro_reads_no_files(monkeypatch):
+    """For a test that fakes kokoro's KPipeline: the torch backend's two file
     reads -- the pinned model build and the local voice load (2026-11-27) --
-    are stubbed so the fake pipeline sees the voice id it always saw. The
-    tests of those two reads live in tests/test_model_pins.py and call the
-    real functions."""
+    are stubbed so the fake pipeline sees the voice id it always saw. OPT-IN,
+    never autouse: as autouse it also stubbed the one test here that runs the
+    REAL kokoro (the byte-identity check), which then built a pipeline with no
+    model -- and hid that synthesize hands Japanese and Mandarin a tensor the
+    pack's own pipeline did not take (found live by the other window,
+    2026-11-27). The real reads are tested in tests/test_model_pins.py."""
     monkeypatch.setattr(kb, "pinned_kokoro_model", lambda device: None)
     monkeypatch.setattr(kb, "load_local_voice", lambda voices_dir, voice: voice)
 
@@ -114,7 +117,7 @@ def test_provider_list_parsing_rejects_empty():
 # --------------------------------------------------------------------------- #
 # the torch call shape (the byte-identity contract)
 # --------------------------------------------------------------------------- #
-def test_torch_backend_is_one_pipeline_call_over_the_full_line(monkeypatch):
+def test_torch_backend_is_one_pipeline_call_over_the_full_line(torch_kokoro_reads_no_files, monkeypatch):
     calls = []
 
     class _Pipe:
@@ -649,7 +652,7 @@ def test_the_shipped_folder_is_found_the_way_an_installed_model_is(tmp_path):
     assert "SHIPPED-OK 5" in done.stdout, done.stdout + done.stderr
 
 
-def test_english_torch_kokoro_speaks_from_the_shipped_copy(monkeypatch, tmp_path):
+def test_english_torch_kokoro_speaks_from_the_shipped_copy(torch_kokoro_reads_no_files, monkeypatch, tmp_path):
     import importlib.util
     import warnings
 
@@ -685,7 +688,7 @@ def test_english_torch_kokoro_speaks_from_the_shipped_copy(monkeypatch, tmp_path
         kb.TorchKokoroBackend("cpu", lang_code="b").load()
 
 
-def test_an_installed_model_is_used_as_it_is(monkeypatch):
+def test_an_installed_model_is_used_as_it_is(torch_kokoro_reads_no_files, monkeypatch):
     """When en_core_web_sm is installed, sys.path is not touched at all."""
     import importlib.util
 
@@ -1095,7 +1098,7 @@ def test_a_line_that_phonemizes_to_nothing_is_silence_too():
     assert stub.calls == [] and out.size == int(kb.SAMPLE_RATE * kb.UNSPEAKABLE_LINE_S)
 
 
-def test_the_torch_pipeline_gives_a_line_with_nothing_to_say_silence(monkeypatch):
+def test_the_torch_pipeline_gives_a_line_with_nothing_to_say_silence(torch_kokoro_reads_no_files, monkeypatch):
     """KPipeline skips a line whose phonemes come back empty and yields nothing;
     the torch backend raised "produced no audio" and killed the episode. It is
     the same quarter second of silence as on ONNX; a blank line is still loud."""
@@ -1117,7 +1120,7 @@ def test_the_torch_pipeline_gives_a_line_with_nothing_to_say_silence(monkeypatch
         backend.synthesize(" \n ", "jf_alpha", 0.95)
 
 
-def test_the_torch_pipeline_reads_a_japanese_phone_number_digit_by_digit(monkeypatch):
+def test_the_torch_pipeline_reads_a_japanese_phone_number_digit_by_digit(torch_kokoro_reads_no_files, monkeypatch):
     """misaki's own Japanese reader raises past nine digits on the torch
     pipeline too; the torch backend hands it the same spelled-out digits the
     ONNX phonemizer reads, and only for Japanese."""
@@ -1174,7 +1177,7 @@ def _torch_backend_that_voices_nothing(monkeypatch, lang_code="j"):
     return backend
 
 
-def test_letters_that_make_no_sound_are_loud_not_a_silent_clip(monkeypatch):
+def test_letters_that_make_no_sound_are_loud_not_a_silent_clip(torch_kokoro_reads_no_files, monkeypatch):
     """A Cyrillic or accented word on the Japanese lane phonemizes to nothing.
     Silence would lose the words without a trace (the no-fallback rule), so
     both backends refuse the line and say why, as they did before fd2078f4."""
@@ -1190,7 +1193,7 @@ def test_letters_that_make_no_sound_are_loud_not_a_silent_clip(monkeypatch):
     assert stub.calls == []
 
 
-def test_a_pause_line_is_a_logged_pause_on_both_backends(monkeypatch, caplog):
+def test_a_pause_line_is_a_logged_pause_on_both_backends(torch_kokoro_reads_no_files, monkeypatch, caplog):
     torch_backend = _torch_backend_that_voices_nothing(monkeypatch)
     stub = _StubKokoro(voices=("jf_alpha",))
     onnx_backend = _onnx_backend_with_stub(stub)
@@ -1293,7 +1296,7 @@ def test_the_torch_backend_takes_the_pack_copy_for_japanese(monkeypatch, tmp_pat
 @pytest.mark.parametrize("ready, api, voices", [
     (False, True, True), (True, False, True), (True, True, False)])
 def test_the_torch_backend_keeps_kpipeline_when_the_copy_cannot_serve(
-        monkeypatch, tmp_path, ready, api, voices):
+        torch_kokoro_reads_no_files, monkeypatch, tmp_path, ready, api, voices):
     built = []
     fake = types.ModuleType("kokoro")
 
