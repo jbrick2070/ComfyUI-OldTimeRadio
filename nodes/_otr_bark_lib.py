@@ -25,6 +25,7 @@ import contextlib
 import logging
 import os
 import re
+import threading
 import warnings
 
 import numpy as np
@@ -129,6 +130,13 @@ _BARK_CACHE = {"model": None, "processor": None, "device": None}
 #: the length of a Bark load, then put back.
 _CONVERSION_SWITCH = "DISABLE_SAFETENSORS_CONVERSION"
 
+#: One guarded load at a time. The guard changes two process-wide things (an
+#: environment variable and a module attribute) and puts back what it found.
+#: Two overlapping guards on different threads would each record the OTHER's
+#: change as "what was there" and leave it behind for good, so the second
+#: waits for the first. Re-entrant: the same thread may nest.
+_CONVERSION_GUARD = threading.RLock()
+
 
 @contextlib.contextmanager
 def _no_background_conversion():
@@ -153,27 +161,30 @@ def _no_background_conversion():
     * for a build older than that switch, the thread's target is swapped for
       a no-op for the same span.
 
-    Both are put back however the load ends.
+    Both are put back however the load ends. Guarded loads on different
+    threads take turns (``_CONVERSION_GUARD``), so one can never record the
+    other's change as the state to restore.
     """
-    previous = otr_env.get(_CONVERSION_SWITCH)
-    otr_env.pin(_CONVERSION_SWITCH, "1")
-    missing = object()
-    try:
-        import transformers.modeling_utils as _modeling_utils
-        original = getattr(_modeling_utils, "auto_conversion", missing)
-    except Exception:  # noqa: BLE001 -- no transformers: nothing to quiet
-        _modeling_utils, original = None, missing
-    if original is not missing:
-        _modeling_utils.auto_conversion = lambda *args, **kwargs: None
-    try:
-        yield
-    finally:
+    with _CONVERSION_GUARD:
+        previous = otr_env.get(_CONVERSION_SWITCH)
+        otr_env.pin(_CONVERSION_SWITCH, "1")
+        missing = object()
+        try:
+            import transformers.modeling_utils as _modeling_utils
+            original = getattr(_modeling_utils, "auto_conversion", missing)
+        except Exception:  # noqa: BLE001 -- no transformers: nothing to quiet
+            _modeling_utils, original = None, missing
         if original is not missing:
-            _modeling_utils.auto_conversion = original
-        if previous is None:
-            otr_env.unpin(_CONVERSION_SWITCH)
-        else:
-            otr_env.pin(_CONVERSION_SWITCH, previous)
+            _modeling_utils.auto_conversion = lambda *args, **kwargs: None
+        try:
+            yield
+        finally:
+            if original is not missing:
+                _modeling_utils.auto_conversion = original
+            if previous is None:
+                otr_env.unpin(_CONVERSION_SWITCH)
+            else:
+                otr_env.pin(_CONVERSION_SWITCH, previous)
 
 
 def _load_bark(model_id="suno/bark", device=None):

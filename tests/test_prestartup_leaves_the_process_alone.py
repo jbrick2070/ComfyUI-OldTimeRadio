@@ -219,6 +219,48 @@ def test_barks_guard_puts_back_a_switch_the_user_had_set(monkeypatch):
     assert os.environ[bark._CONVERSION_SWITCH] == "0"
 
 
+def test_two_threads_in_the_guard_leave_nothing_behind(monkeypatch):
+    """Sonnet review, 2026-11-27: the guard changes two process-wide things
+    and restores what it found. With two guards overlapping on different
+    threads, the second found the first's change, and on leaving last it put
+    THAT back: the switch stayed "1" and the no-op stayed installed for the
+    rest of the process. The second now waits for the first."""
+    import threading
+
+    from nodes import _otr_bark_lib as bark
+
+    fake_utils, real = _fake_transformers(monkeypatch)
+    monkeypatch.delenv(bark._CONVERSION_SWITCH, raising=False)
+    first_inside, first_may_leave = threading.Event(), threading.Event()
+    second_inside, second_may_leave = threading.Event(), threading.Event()
+
+    def first():
+        with bark._no_background_conversion():
+            first_inside.set()
+            first_may_leave.wait(10)
+
+    def second():
+        with bark._no_background_conversion():
+            second_inside.set()
+            second_may_leave.wait(10)
+
+    one, two = threading.Thread(target=first), threading.Thread(target=second)
+    one.start()
+    assert first_inside.wait(10)
+    two.start()
+    # The overlap: without the lock the second thread is inside at once.
+    overlapped = second_inside.wait(0.5)
+    first_may_leave.set()
+    one.join(10)
+    assert second_inside.wait(10)
+    second_may_leave.set()
+    two.join(10)
+
+    assert not overlapped, "the second guard entered while the first was open"
+    assert fake_utils.auto_conversion is real
+    assert bark._CONVERSION_SWITCH not in os.environ
+
+
 def test_the_guard_wraps_both_of_barks_model_loads():
     """The wiring. Sonnet's review of the first version reproduced that the
     CACHED load (local_files_only=True) starts the conversion check as well,
