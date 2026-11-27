@@ -497,8 +497,9 @@ def test_onnx_prefetch_receipts(monkeypatch, tmp_path):
 
     fetched = {}
 
-    def _fake_download(repo_id, filename, local_dir):
+    def _fake_download(repo_id, filename, local_dir, token=None):
         fetched["args"] = (repo_id, filename, local_dir)
+        fetched["token"] = token
         target = os.path.join(local_dir, *filename.split("/"))
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target, "wb") as fh:
@@ -511,6 +512,9 @@ def test_onnx_prefetch_receipts(monkeypatch, tmp_path):
     assert r["fetched"] == 1 and dest.exists()
     assert fetched["args"] == (prefetch.KOKORO_ONNX_REPO_ID, "onnx/model.onnx",
                                str(tmp_path / "TTS" / "KokoroTTS"))
+    # A startup fetch of a public file sends no credential: left to its
+    # default the hub library attaches the user's saved login or HF_TOKEN.
+    assert fetched["token"] is False
     r = prefetch.prefetch_kokoro_onnx_model()
     assert r["present"] is True and r["attempted"] == 0          # second boot: nothing to do
 

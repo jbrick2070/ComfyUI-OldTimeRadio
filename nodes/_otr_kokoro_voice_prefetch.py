@@ -209,9 +209,12 @@ def prefetch_kokoro_onnx_model(*, force: bool = False) -> "dict":
         KOKORO_ONNX_REPO_ID, KOKORO_ONNX_FILENAME, kokoro_dir)
     try:
         os.makedirs(kokoro_dir, exist_ok=True)
+        # token=False: a public repo, fetched while ComfyUI starts. Left to
+        # its default the hub library would attach the user's saved login or
+        # HF_TOKEN to this request; nothing at startup reads a credential.
         got = hf_hub_download(
             repo_id=KOKORO_ONNX_REPO_ID, filename=KOKORO_ONNX_FILENAME,
-            local_dir=kokoro_dir)
+            local_dir=kokoro_dir, token=False)
         if not os.path.exists(dest):
             # A hub version that resolved elsewhere: copy, never symlink (the
             # engine checks this exact path with os.path.exists).
@@ -300,9 +303,12 @@ def prefetch_kokoro_voices(*, force: bool = False) -> "dict":
 
     for voice in wanted:
         try:
+            # token=False, as for the ONNX model above: public files, and
+            # no credential is read while ComfyUI starts.
             src = hf_hub_download(
                 repo_id=KOKORO_REPO_ID,
                 filename=f"voices/{voice}.pt",
+                token=False,
             )
             dest = os.path.join(voices_dir, f"{voice}.pt")
             if not os.path.exists(dest):

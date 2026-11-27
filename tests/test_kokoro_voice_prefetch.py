@@ -231,6 +231,30 @@ def test_a_fetched_voice_is_COPIED_not_symlinked(monkeypatch, tmp_path):
     assert landed.read_bytes() == b"voice-bytes"
 
 
+def test_the_startup_voice_fetch_sends_no_credential(monkeypatch, tmp_path):
+    """Sonnet review, 2026-11-27: the fetch that runs while ComfyUI starts
+    passed no ``token`` argument, and the hub library's default is to attach
+    the user's saved login or HF_TOKEN. The files are public, so every call
+    says ``token=False``."""
+    monkeypatch.setattr(PRE, "_models_dir", lambda: str(tmp_path))
+    tokens = []
+
+    def _fake_download(repo_id, filename, **kwargs):
+        tokens.append(kwargs.get("token", "not passed"))
+        blob = tmp_path / os.path.basename(filename)
+        blob.write_bytes(b"voice-bytes")
+        return str(blob)
+
+    import huggingface_hub
+
+    monkeypatch.setattr(huggingface_hub, "hf_hub_download", _fake_download)
+
+    PRE.prefetch_kokoro_voices()
+
+    assert len(tokens) == len(PRE.admitted_kokoro_voices())
+    assert all(token is False for token in tokens), set(map(repr, tokens))
+
+
 # --------------------------------------------------------------------------- #
 # prestartup wiring -- an unwired prefetch is inert
 # --------------------------------------------------------------------------- #
