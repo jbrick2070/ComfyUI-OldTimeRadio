@@ -913,7 +913,7 @@ MusicGen and IndexTTS2 engines -- thanks to all of their authors. The workflows
 and recipes the lanes follow are credited by name, with links, in
 [Workflow sources and acknowledgments](#workflow-sources-and-acknowledgments).
 
-**Two third-party pieces ship inside the pack**, each with its licence and a
+**Third-party pieces that ship inside the pack**, each with its licence and a
 provenance record beside it: a copy of [misaki](https://github.com/hexgrad/misaki)'s
 phonemizer modules (Apache-2.0, `nodes/_otr_audio_engines/_misaki/`), and
 spaCy's small English pipeline `en_core_web_sm` 3.7.1 by Explosion (MIT,
