@@ -175,3 +175,37 @@ def test_credits_cast_and_transcript_read_the_native_name():
     src = inspect.getsource(CR)
     assert 'name = "%s (%s)" % (native, name)' in src
     assert 'spk = str(cast_row.get("native_display_name") or spk)' in src
+
+
+# Sonnet QA on 003c3b84f: "any non-Latin letter" let a Latin gloss, Cyrillic,
+# Hangul and a caption line break through.
+@pytest.mark.parametrize("display, iso", [
+    ("Viola (ヴァイオラ)", "ja"),
+    ("ヴァイオラ VIOLA", "ja"),
+    ("Violа", "ja"),                 # Cyrillic homoglyph
+    ("비올라", "ja"),         # Hangul on a Japanese episode
+    ("ヴァ" + chr(92) + "Nイ", "ja"),      # an ASS line break
+    ("ヴァイオラ", "zh"),                 # kana on a Mandarin episode
+    ("薇奥拉", "hi"),
+])
+def test_a_name_outside_the_episodes_script_is_refused(display, iso):
+    assert CDN.judge_display_name("VIOLA", display, iso) is not None
+
+
+@pytest.mark.parametrize("display, iso", [
+    ("ヴァイオラ", "ja"), ("リア・王", "ja"), ("マルヴォーリオー", "ja"),
+    ("第一の魔女", "ja"), ("薇奥拉", "zh"), ("第一女巫", "zh"),
+    ("वायोला", "hi"), ("पहली डायन", "hi"),
+])
+def test_a_name_in_the_episodes_script_is_accepted(display, iso):
+    assert CDN.judge_display_name("VIOLA", display, iso) is None
+
+
+def test_populate_judges_against_the_episodes_own_script():
+    led = _ledger("zh")
+    slot = _Slot([{"names": [{"name": "VIOLA", "display_name": "ヴァイオラ"},
+                             {"name": "MALVOLIO", "display_name": "马伏里奥"}]}])
+    CDN.populate(led, technical_fn=slot)
+    rows = {r["name"]: r for r in led["cast"]}
+    assert "native_display_name" not in rows["VIOLA"]
+    assert rows["MALVOLIO"]["native_display_name"] == "马伏里奥"

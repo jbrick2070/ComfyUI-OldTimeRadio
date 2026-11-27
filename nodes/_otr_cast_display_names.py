@@ -46,12 +46,24 @@ FIELD = "native_display_name"
 RECEIPT_KEY = "cast_display_names"
 RECEIPT_VERSION = "otr_cast_display_names_v1"
 
-#: Longest display name kept. A caption prefix longer than this is a sentence.
-MAX_CHARS = 32
+#: Longest display name kept. A caption prefix longer than this is a sentence,
+#: and CAST & VOICES draws "<native> (<NAME>)" on one line of a 424 px column.
+MAX_CHARS = 16
 
 #: Characters a name never carries: the caption separator, line breaks, JSON
-#: punctuation (a merged or broken reply), and list separators.
-_FORBIDDEN = set(":：\n\r\t[]{}\"/|;；")
+#: punctuation (a merged or broken reply), list separators, a backslash (an
+#: ASS override: "\N" is a line break on the burned caption), and brackets (a
+#: reply that glosses the Latin name, "Viola (ヴァイオラ)").
+_FORBIDDEN = set(":：\n\r\t[]{}\"/|;；\\()（）")
+
+#: The scripts a name may be written in, by episode language, read from each
+#: letter's Unicode name. Sonnet QA on 003c3b84f: "any non-Latin letter" let
+#: Cyrillic, Greek or Hangul through on a Japanese episode.
+_SCRIPTS = {
+    "ja": ("CJK UNIFIED IDEOGRAPH", "HIRAGANA", "KATAKANA"),
+    "zh": ("CJK UNIFIED IDEOGRAPH",),
+    "hi": ("DEVANAGARI",),
+}
 
 
 class _NameRow(BaseModel):
@@ -99,8 +111,12 @@ def needs_native_names(meta: Any) -> bool:
         return False
 
 
-def judge_display_name(name: str, display: str) -> str | None:
-    """Why ``display`` cannot stand for ``name`` on screen, or None if it can."""
+def judge_display_name(name: str, display: str, iso: str = "") -> str | None:
+    """Why ``display`` cannot stand for ``name`` on screen, or None if it can.
+
+    With ``iso``, every letter must be in that language's script (kana and
+    kanji for Japanese, Han for Mandarin, Devanagari for Hindi); without it,
+    every letter must at least be non-Latin."""
     value = " ".join(unicodedata.normalize("NFKC", str(display or "")).split())
     if not value:
         return "empty"
@@ -112,7 +128,11 @@ def judge_display_name(name: str, display: str) -> str | None:
     if value.casefold() == " ".join(str(name or "").split()).casefold():
         return "the Latin name echoed"
     letters = [c for c in value if c.isalpha()]
-    if not letters or all(_is_latin_or_ascii(c) for c in letters):
+    if not letters or any(_is_latin_or_ascii(c) for c in letters):
+        return "not in the episode's script"
+    allowed = _SCRIPTS.get(str(iso or ""))
+    if allowed and not all(
+            unicodedata.name(c, "").startswith(allowed) for c in letters):
         return "not in the episode's script"
     return None
 
@@ -145,6 +165,7 @@ def populate(led_data: dict, *, technical_fn: Callable[..., str]) -> dict:
             return {}
         wanted = [str(r["name"]).strip() for r in rows]
         receipt["asked"] = len(wanted)
+        iso = _EPLANG.row_from_meta(meta).iso
         lead = _EPLANG.native_translation_instruction(meta)
         user = ("Character names:\n" + "\n".join(f"- {n}" for n in wanted))
         result = structured_call(
@@ -165,10 +186,11 @@ def populate(led_data: dict, *, technical_fn: Callable[..., str]) -> dict:
             match = next((n for n in wanted if n.casefold() == key.casefold()), None)
             if match is None or match in proposed:
                 continue
-            reason = judge_display_name(match, item.display_name)
+            reason = judge_display_name(match, item.display_name, iso)
             if reason:
                 receipt["rejected"][match] = reason
                 continue
+            receipt["rejected"].pop(match, None)
             proposed[match] = " ".join(
                 unicodedata.normalize("NFKC", str(item.display_name)).split())
         # Two speakers who would read the same on screen keep their Latin names.
