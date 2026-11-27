@@ -239,3 +239,50 @@ def test_pack_init_guards_every_registered_node():
     ]
     assert calls, "__init__.py must call guard_node_classes"
     assert "NODE_CLASS_MAPPINGS" in ast.unparse(calls[0])
+
+
+def test_the_cause_and_context_of_an_exception_are_redacted_too():
+    """THE DEFECT THIS PINS (shipped through 2.3.64): only the top exception
+    was redacted. ComfyUI's traceback, in its log and in /history, prints
+    every link of the chain with its own message, so the path survived on the
+    cause."""
+    # Built from parts: a traceback also prints each frame's SOURCE LINE, and
+    # a literal path on those lines would be this test's own text, not the
+    # exception's.
+    where = "/".join(("", "home", "someone", "models", "tts", "missing_voice.pt"))
+
+    def _work():
+        try:
+            open(where)
+        except OSError as err:
+            raise ValueError("voice load failed for " + where) from err
+
+    class _Chained:
+        FUNCTION = "run"
+
+        def run(self):
+            _work()
+
+    guard_node_class(_Chained)
+    with pytest.raises(ValueError) as caught:
+        _Chained().run()
+    top = caught.value
+    assert "someone" not in str(top)
+    assert top.__cause__ is not None and "someone" not in str(top.__cause__)
+    assert "missing_voice.pt" in str(top.__cause__)
+    import traceback
+    text = "".join(traceback.format_exception(type(top), top, top.__traceback__))
+    assert "/home/someone" not in text
+
+
+def test_an_implicit_context_is_redacted_and_a_cycle_ends():
+    try:
+        try:
+            raise KeyError("/home/someone/a.json")
+        except KeyError:
+            raise RuntimeError("while reading /home/someone/b.json")
+    except RuntimeError as err:
+        err.__context__.__context__ = err          # a cycle must not loop
+        redact_exception(err)
+        assert "someone" not in str(err)
+        assert "someone" not in str(err.__context__)

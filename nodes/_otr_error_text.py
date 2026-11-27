@@ -127,8 +127,7 @@ def _redact_value(value):
     return value
 
 
-def redact_exception(exc: BaseException) -> BaseException:
-    """Redact paths in ``exc``'s text in place and return the same object."""
+def _redact_one(exc: BaseException) -> None:
     try:
         exc.args = tuple(_redact_value(a) for a in exc.args)
     except Exception:  # noqa: BLE001 -- an exotic args setter must not mask the real error
@@ -141,6 +140,28 @@ def redact_exception(exc: BaseException) -> BaseException:
             setattr(exc, attr, _redact_value(value))
         except Exception:  # noqa: BLE001 -- read-only attribute: leave it
             pass
+
+
+def redact_exception(exc: BaseException) -> BaseException:
+    """Redact paths in ``exc``'s text in place and return the same object.
+
+    THE WHOLE CHAIN, not only the top. ``raise X(...) from err`` and a raise
+    inside an ``except`` block keep the earlier exception on ``__cause__`` /
+    ``__context__``, and the traceback ComfyUI formats for its log and for the
+    prompt's history prints every link's own message. A top-level message cut
+    to ``voice.pt`` under a ``FileNotFoundError`` still naming the whole path
+    disclosed exactly what the cut was for.
+    """
+    seen: set = set()
+    pending = [exc]
+    while pending:
+        current = pending.pop()
+        if current is None or id(current) in seen:
+            continue
+        seen.add(id(current))
+        _redact_one(current)
+        pending.append(getattr(current, "__cause__", None))
+        pending.append(getattr(current, "__context__", None))
     return exc
 
 
