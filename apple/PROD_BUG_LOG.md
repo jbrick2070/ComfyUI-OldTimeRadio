@@ -17829,3 +17829,31 @@ not promote it to the Bug Bible on this evidence alone.
   status messages or the echoed prompt, and no line the pack wrote to the
   server log carried one. The registry's verdict on 2.3.65 is the remaining
   proof, and it is theirs to give.
+
+## PBUG-20261127-02 -- On the Windows desktop ComfyUI, ffmpeg output carrying a Japanese title killed subprocess's reader thread
+- evidence: the 2.3.65 release leg on the 5080's own Comfy Desktop app
+  (port 8000, started without PYTHONUTF8, so Python ran in cp1252 with
+  `sys.flags.utf8_mode == 0`), canonical workflow, Shakespeare in Japanese,
+  one act, prompt `42ec265c`. The episode published
+  (`inbras_shadow_ja_20261127_111830`, 160 s), but the server log carried three
+  `Exception in thread Thread-N (_readerthread)` ...
+  `UnicodeDecodeError: 'charmap' codec can't decode byte 0x81` tracebacks
+  while the credits ran ffmpeg on `signal_lost_インブラスの影_ja_...mp4`. The
+  English leg on the same boot was clean.
+- cause: `nodes/_otr_shared/proc.py`, the pack's one spawn wrapper, passed
+  `text=True` through with no `encoding`, so subprocess decoded ffmpeg's UTF-8
+  in the locale's code page. The reader thread died and the call's `stdout` /
+  `stderr` came back None. Reproduced outside ComfyUI with the 2.3.65 wrapper
+  and a child writing the title's UTF-8 bytes: same traceback, `stdout` None.
+  The credits survived only because they test the return code; a call that
+  parses ffprobe's output would have read nothing. The headless harness sets
+  PYTHONUTF8=1, so no harness leg on any box could show it.
+- fix: `proc.run` and `proc.popen` decode text mode as UTF-8 with
+  `errors="replace"` when the caller names no encoding (`_utf8_text`). This
+  covers all 16 text-mode call sites at once. A caller's own `encoding` and
+  binary mode are untouched. Coverage: four tests in
+  `tests/test_shared_env_and_proc_owners.py`, and the whole file passes with
+  PYTHONUTF8 unset (cp1252).
+- bible: 12.201.
+- status: FIXED; the live proof is a rerun of the same Japanese leg on the
+  desktop app with a clean log.

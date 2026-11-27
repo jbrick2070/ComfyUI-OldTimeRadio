@@ -9,7 +9,8 @@ WHAT THIS OWNS: the spawn. It does NOT build commands -- every caller keeps
 its own argv, because what a caller runs is part of what the caller does --
 and it does not interpret results. ``run`` returns the real
 ``subprocess.CompletedProcess``, ``popen`` returns the real
-``subprocess.Popen``, every keyword passes straight through, and no exception
+``subprocess.Popen``, every keyword passes straight through (one exception:
+text mode with no ``encoding`` decodes as UTF-8, see ``_utf8_text``), and no exception
 is wrapped: callers already catch ``subprocess.CalledProcessError`` and
 ``subprocess.TimeoutExpired``, and those names are re-exported below as
 IDENTITY aliases so an existing ``except`` clause stays true.
@@ -167,15 +168,38 @@ def _no_shell(kwargs: dict) -> None:
             "Put the real program in argv[0].")
 
 
+def _utf8_text(kwargs: dict) -> None:
+    """Text-mode output is read as UTF-8, and a stray byte cannot kill the read.
+
+    With ``text=True`` and no ``encoding``, Python decodes a child's output in
+    the locale's code page -- cp1252 on a stock Windows ComfyUI (Desktop and
+    portable both). ffmpeg writes UTF-8, so the first Japanese, Chinese or
+    Hindi title in its output raised ``UnicodeDecodeError`` in subprocess's
+    reader thread (byte 0x81, measured on the 2.3.65 desktop leg 2026-11-27).
+    The headless harness sets PYTHONUTF8=1, which is why no harness leg ever
+    showed it. Every tool this module admits writes UTF-8 or plain ASCII.
+    A caller that names its own ``encoding`` or ``errors`` keeps it.
+    """
+    if kwargs.get("encoding") is not None:
+        return
+    if kwargs.get("text") or kwargs.get("universal_newlines"):
+        kwargs["encoding"] = "utf-8"
+        kwargs.setdefault("errors", "replace")
+
+
 def run(argv: Sequence[Any], **kwargs) -> subprocess.CompletedProcess:
-    """``subprocess.run`` for an allowed executable. Contracts pass through."""
+    """``subprocess.run`` for an allowed executable. Contracts pass through,
+    except that text mode with no encoding decodes as UTF-8 (``_utf8_text``)."""
     _no_shell(kwargs)
     _check(argv)
+    _utf8_text(kwargs)
     return _spawn_run(argv, **kwargs)
 
 
 def popen(argv: Sequence[Any], **kwargs) -> subprocess.Popen:
-    """``subprocess.Popen`` for an allowed executable. Returns the real Popen."""
+    """``subprocess.Popen`` for an allowed executable. Returns the real Popen;
+    text mode with no encoding decodes as UTF-8 (``_utf8_text``)."""
     _no_shell(kwargs)
     _check(argv)
+    _utf8_text(kwargs)
     return _spawn_popen(argv, **kwargs)

@@ -300,3 +300,43 @@ def test_the_refusal_message_names_BOTH_tables():
         assert exact in text, exact
     for prefix in otr_proc.ALLOWED_EXECUTABLE_PREFIXES:
         assert prefix + "*" in text, prefix
+
+
+# ---- text mode reads UTF-8 whatever the locale says (2.3.65 desktop leg) ----
+# A stock Windows ComfyUI runs without PYTHONUTF8, so text=True decoded a
+# child's output as cp1252 and the first Japanese title in ffmpeg's output
+# killed subprocess's reader thread (UnicodeDecodeError, byte 0x81). The
+# child below writes raw UTF-8 bytes, the way ffmpeg does.
+_WRITES_JAPANESE = (
+    "import sys; sys.stdout.buffer.write('インブラスの影'.encode('utf-8'))")
+
+
+@pytest.mark.parametrize("flag", ["text", "universal_newlines"])
+def test_text_mode_decodes_utf8_output_on_any_locale(flag):
+    done = otr_proc.run([sys.executable, "-c", _WRITES_JAPANESE],
+                        capture_output=True, timeout=60, check=True,
+                        **{flag: True})
+    assert done.stdout == "インブラスの影"
+
+
+def test_a_byte_that_is_not_utf8_cannot_kill_the_read():
+    done = otr_proc.run(
+        [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'ok \\x81 ok')"],
+        capture_output=True, text=True, timeout=60, check=True)
+    assert done.stdout.startswith("ok ") and done.stdout.endswith(" ok")
+
+
+def test_popen_text_mode_decodes_utf8_too():
+    child = otr_proc.popen([sys.executable, "-c", _WRITES_JAPANESE],
+                           stdout=otr_proc.PIPE, text=True)
+    out, _ = child.communicate(timeout=60)
+    assert out == "インブラスの影"
+
+
+def test_a_caller_named_encoding_and_binary_mode_are_left_alone():
+    done = otr_proc.run([sys.executable, "-c", _WRITES_JAPANESE],
+                        capture_output=True, encoding="latin-1", timeout=60)
+    assert done.stdout == "インブラスの影".encode("utf-8").decode("latin-1")
+    raw = otr_proc.run([sys.executable, "-c", _WRITES_JAPANESE],
+                       capture_output=True, timeout=60)
+    assert raw.stdout == "インブラスの影".encode("utf-8")
