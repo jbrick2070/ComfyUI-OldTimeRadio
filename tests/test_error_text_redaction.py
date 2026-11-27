@@ -76,6 +76,21 @@ def test_a_home_folder_with_spaces_is_cut_whole(monkeypatch, home, text, expecte
     assert "Smith" not in out and "mary" not in out
 
 
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        # A colon right before the path is a key/value separator, not a URL.
+        ("cache dir:/home/someone/.cache/hf", "cache dir:hf"),
+        # A file:// URL's third slash is the root of a local path.
+        ("opened file:///home/someone/out/ep.mp4", "opened file://ep.mp4"),
+    ],
+)
+def test_a_path_after_a_colon_or_in_a_file_url_is_cut(text, expected):
+    out = redact_paths(text)
+    assert out == expected
+    assert "someone" not in out
+
+
 def test_os_error_filename_attribute_is_redacted():
     try:
         open(r"C:\Users\someone\missing_folder\clip.wav", "rb")  # noqa: SIM115

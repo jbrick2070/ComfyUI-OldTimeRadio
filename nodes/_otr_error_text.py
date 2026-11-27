@@ -43,15 +43,17 @@ __all__ = ["redact_paths", "redact_exception", "guard_node_class", "guard_node_c
 _WINDOWS_PATH = r"(?:(?<![\w])[A-Za-z]:|\\\\[^\\/\s'\"<>|]+)[\\/][^\s'\"<>|,;()\[\]{}]*"
 # A rooted POSIX path under a filesystem top level (/home/a/b, /workspace/x).
 # Naming the top levels keeps HTTP routes (/v1/chat/completions, /api/prompt)
-# intact, and the look-behind keeps URLs (scheme://host/path) and relative
-# paths (a/b) out.
+# intact, and the look-behind keeps relative paths (a/b) and the tail of a
+# longer path out. A colon may precede it ("cache_dir:/home/a/b" is a path; a
+# URL's host always stands between its scheme and its path), and so may a
+# ``file://`` scheme, whose third slash IS the path's root.
 _POSIX_ROOTS = (
     "home", "Users", "Volumes", "root", "tmp", "var", "opt", "srv", "mnt", "media",
     "private", "usr", "etc", "run", "data", "workspace", "content", "kaggle",
     "notebooks", "app", "teamspace",
 )
 _POSIX_PATH = (
-    r"(?<![\w.:/\\~-])/(?:" + "|".join(_POSIX_ROOTS) + r")/"
+    r"(?:(?<![\w./\\~-])|(?<=file://))/(?:" + "|".join(_POSIX_ROOTS) + r")/"
     r"(?:[^\s/'\"<>|,;()\[\]{}]+/)*[^\s/'\"<>|,;()\[\]{}]*"
 )
 _PATH_RE = re.compile(f"{_WINDOWS_PATH}|{_POSIX_PATH}")
