@@ -286,3 +286,69 @@ def test_an_implicit_context_is_redacted_and_a_cycle_ends():
         redact_exception(err)
         assert "someone" not in str(err)
         assert "someone" not in str(err.__context__)
+
+
+def _install_under(monkeypatch, *folders):
+    import nodes._otr_error_text as mod
+
+    pairs = set()
+    for folder in folders:
+        bare = folder.replace("\\", "/").rstrip("/").split("/")[-1]
+        for spelling in mod._spellings(folder):
+            pairs.add((spelling, bare))
+    monkeypatch.setattr(mod, "_INSTALL_PREFIXES",
+                        tuple(sorted(pairs, key=lambda pair: len(pair[0]), reverse=True)))
+
+
+def test_an_install_folder_with_a_space_is_cut_whole(monkeypatch):
+    """THE DEFECT THIS PINS (shipped through 2.3.64): the path rule stops at
+    whitespace, so an install under a folder with a space in its name -- a
+    portable ComfyUI unzipped into "AI Tools" -- left every folder after the
+    first space in the text."""
+    import nodes._otr_error_text as mod
+
+    sep = chr(92)                     # one backslash, spelled without escapes
+    base = sep.join(("D:", "AI Tools", "ComfyUI_windows_portable", "ComfyUI"))
+    _install_under(monkeypatch, base, base + sep + "output")
+    monkeypatch.setattr(mod, "_HOME_PREFIXES", ())
+    shown = redact_paths("wrote " + sep.join((base, "output", "otr", "obs", "ep.mp4")) + " ok")
+    assert shown == "wrote ep.mp4 ok"
+    forward = redact_paths("model " + base.replace(sep, "/") + "/models/LLM/x.safetensors")
+    assert forward == "model x.safetensors"
+    # The doubled backslashes of a repr() or a JSON dump.
+    doubled = redact_paths(
+        "repr '" + (sep * 2).join(base.split(sep) + ["input", "a.png"]) + "'")
+    assert doubled == "repr 'a.png'"
+    assert redact_paths("base is " + base) == "base is ComfyUI"
+    for text in (shown, forward, doubled):
+        assert "AI Tools" not in text and "portable" not in text
+
+
+def test_install_folders_come_from_comfyui_and_only_those_with_a_space(monkeypatch):
+    import sys
+    import types
+
+    import nodes._otr_error_text as mod
+
+    comfy = types.ModuleType("folder_paths")
+    comfy.base_path = "/opt/My ComfyUI"
+    comfy.models_dir = "/srv/models"                       # no space: not listed
+    comfy.get_output_directory = lambda: "/opt/My ComfyUI/output"
+    comfy.get_input_directory = lambda: "/opt/My ComfyUI/input"
+    comfy.get_temp_directory = lambda: (_ for _ in ()).throw(RuntimeError("stub"))
+    monkeypatch.setitem(sys.modules, "folder_paths", comfy)
+    monkeypatch.setattr(mod, "_INSTALL_PREFIXES", None)
+    prefixes = [prefix for prefix, _bare in mod._install_prefixes()]
+    assert "/opt/My ComfyUI/output" in prefixes and "/opt/My ComfyUI" in prefixes
+    assert not any(prefix.startswith("/srv/models") for prefix in prefixes)
+    assert prefixes == sorted(prefixes, key=len, reverse=True)
+    assert redact_paths("saved /opt/My ComfyUI/output/otr/obs/ep.mp4") == "saved ep.mp4"
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("weights at /runpod-volume/models/x.safetensors", "weights at x.safetensors"),
+    ("app in /Applications/ComfyUI.app/Contents/x.py", "app in x.py"),
+    ("pack at /comfyui/custom_nodes/pack/nodes/a.py", "pack at a.py"),
+])
+def test_more_filesystem_roots_are_recognized(text, expected):
+    assert redact_paths(text) == expected

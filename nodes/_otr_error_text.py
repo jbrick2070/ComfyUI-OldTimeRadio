@@ -35,6 +35,7 @@ import inspect
 import logging
 import os
 import re
+import sys
 from pathlib import Path
 
 __all__ = ["redact_paths", "redact_exception", "guard_node_class", "guard_node_classes",
@@ -52,7 +53,8 @@ _WINDOWS_PATH = r"(?:(?<![\w])[A-Za-z]:|\\\\[^\\/\s'\"<>|]+)[\\/][^\s'\"<>|,;()\
 _POSIX_ROOTS = (
     "home", "Users", "Volumes", "root", "tmp", "var", "opt", "srv", "mnt", "media",
     "private", "usr", "etc", "run", "data", "workspace", "content", "kaggle",
-    "notebooks", "app", "teamspace",
+    "notebooks", "app", "teamspace", "runpod-volume", "comfyui", "ComfyUI",
+    "Applications", "Library", "storage",
 )
 _POSIX_PATH = (
     r"(?:(?<![\w./\\~-])|(?<=file://))/(?:" + "|".join(_POSIX_ROOTS) + r")/"
@@ -88,15 +90,78 @@ _HOME_PREFIXES = _home_prefixes()
 _UNDER_HOME = r"(?:(?:\\\\|[\\/])[^\s'\"<>|,;()\[\]{}]*|(?!\.?[\w-]))"
 
 
-def _home_tail(match: re.Match) -> str:
-    rest = (match.group(1) or "").rstrip("\\/.")
-    return re.split(r"[\\/]", rest)[-1] or "~"
+def _spellings(folder: str) -> set:
+    """One folder in every spelling a message may carry: either slash, and
+    the doubled backslash of a ``repr`` or a JSON dump."""
+    folder = folder.rstrip("\\/")
+    return {folder, folder.replace("\\", "/"), folder.replace("/", "\\"),
+            folder.replace("\\", "\\\\")}
+
+
+#: (prefix, name shown when the folder itself is all that is named) for this
+#: install's own folders whose path holds a space. None until ComfyUI's
+#: ``folder_paths`` is loaded, so a call at prestartup does not freeze a
+#: partial answer.
+_INSTALL_PREFIXES = None
+
+
+def _install_prefixes() -> tuple:
+    """This install's own folders that the path rule cannot cut whole.
+
+    The path rule stops at whitespace, so an install under a folder with a
+    space in its name -- ``D:\\AI Tools\\ComfyUI_windows_portable`` is a
+    common one -- left everything after the first space in the text. Like the
+    home folder, these are cut as known prefixes first: the ComfyUI folder
+    this pack sits under, and ComfyUI's own base, models, output, input, temp
+    and user folders once it is loaded. Only folders with a space are listed;
+    every other path is already handled by the rule.
+    """
+    global _INSTALL_PREFIXES
+    if _INSTALL_PREFIXES is not None:
+        return _INSTALL_PREFIXES
+    folders = []
+    pack_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    parent = os.path.dirname(pack_root)
+    if os.path.basename(parent).lower() == "custom_nodes":
+        folders.append(os.path.dirname(parent))
+    comfy = sys.modules.get("folder_paths")
+    if comfy is not None:
+        for getter in ("get_output_directory", "get_input_directory",
+                       "get_temp_directory", "get_user_directory"):
+            try:
+                folders.append(str(getattr(comfy, getter)()))
+            except Exception:  # noqa: BLE001 -- an older or stubbed folder_paths
+                pass
+        for attr in ("base_path", "models_dir"):
+            value = getattr(comfy, attr, None)
+            if isinstance(value, str):
+                folders.append(value)
+    found = set()
+    for folder in folders:
+        folder = folder.rstrip("\\/")
+        if len(folder) < 4 or not re.search(r"\s", folder):
+            continue
+        bare = re.split(r"[\\/]", folder)[-1] or "<path>"
+        for spelling in _spellings(folder):
+            found.add((spelling, bare))
+    answer = tuple(sorted(found, key=lambda pair: len(pair[0]), reverse=True))
+    if comfy is not None:
+        _INSTALL_PREFIXES = answer
+    return answer
 
 
 def _cut_home(text: str) -> str:
-    for prefix in _HOME_PREFIXES:
+    """Cut the known folders -- the account's home, then this install's own
+    folders that hold a space -- before the path rule runs."""
+    known = [(prefix, "~") for prefix in _HOME_PREFIXES]
+    known += list(_install_prefixes())
+    for prefix, bare in known:
         if prefix.lower() in text.lower():
-            text = re.sub(re.escape(prefix) + "(" + _UNDER_HOME + ")", _home_tail, text, flags=re.IGNORECASE)
+            def _tail(match: re.Match, bare=bare) -> str:
+                rest = (match.group(1) or "").rstrip("\\/.")
+                return re.split(r"[\\/]", rest)[-1] or bare
+            text = re.sub(re.escape(prefix) + "(" + _UNDER_HOME + ")", _tail, text,
+                          flags=re.IGNORECASE)
     return text
 
 # Attributes some standard exceptions read their text from instead of args.
