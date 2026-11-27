@@ -663,24 +663,41 @@ def _refuse_non_public_host(url: str, *, redirected: bool = False) -> None:
     must be publicly routable. A provider's CDN host cannot be listed ahead of
     time, so the policy is on the address, not the name.
 
-    A name that does not resolve is not refused here: the GET then fails as an
-    ordinary transport error, exactly as before.
+    A name that does not resolve, or a URL that does not parse, is not
+    refused here: the GET then fails as the ordinary transport error it always
+    was, inside the retry loop, and is settled as a charged job.
+
+    THE OPERATOR'S WAY OUT. Some networks map every host to a private or
+    shared address on purpose (a proxy in fake-IP mode, a corporate resolver),
+    and there this rule would refuse every result of a job that was already
+    paid for. ``OTR_CLOUD_RESULT_ANY_HOST=1`` in the environment turns the
+    address rule off; the https rule stays. The environment is the operator's,
+    never a workflow's.
     """
     import ipaddress
     from urllib.parse import urlsplit
     try:
         from .._otr_feed_fetch import _reject_reason
+        from . import env as otr_env
     except ImportError:  # pragma: no cover -- flat (sys.path) load
         from _otr_feed_fetch import _reject_reason  # type: ignore
+        from _otr_shared import env as otr_env  # type: ignore
+    if str(otr_env.get("OTR_CLOUD_RESULT_ANY_HOST", "") or "").strip() == "1":
+        return
     where = "redirected to " if redirected else ""
-    host = urlsplit(str(url)).hostname or ""
+    try:
+        host = urlsplit(str(url)).hostname or ""
+    except ValueError:
+        return
     if not host:
         raise CloudMediaError(
             CloudErrorCode.PROVIDER_REJECTED,
             "result URL %s%r names no host" % (where, _shown_url(url)))
     try:
         addresses = _host_addresses(host)
-    except OSError:
+    except (OSError, UnicodeError, ValueError):
+        # UnicodeError is what the resolver raises for a label it cannot
+        # encode ("a..b", a label over 63 characters); it is not an OSError.
         return
     for raw in addresses:
         try:
@@ -691,8 +708,9 @@ def _refuse_non_public_host(url: str, *, redirected: bool = False) -> None:
         if reason:
             raise CloudMediaError(
                 CloudErrorCode.PROVIDER_REJECTED,
-                "result URL %s%r resolves to a %s address; results are "
-                "downloaded from public hosts only"
+                "result URL %s%r resolves to an address that is %s; results are "
+                "downloaded from public hosts only (on a network that maps "
+                "hosts to private addresses, set OTR_CLOUD_RESULT_ANY_HOST=1)"
                 % (where, _shown_url(url), reason))
 
 
@@ -726,10 +744,21 @@ def _stream_to_temp(url: str, dest: Path) -> None:
     # http return is refused as a provider fault, not fetched -- and so is
     # a redirect off https, which the stock handler would have followed
     # (`_open_https_only`).
-    _refuse_off_https(url)
-    # AND FROM A PUBLIC HOST ONLY (2026-11-27): https to a loopback, LAN or
-    # metadata address is still a fetch from inside this machine's network.
-    _refuse_non_public_host(url)
+    #
+    # A REFUSED RESULT IS STILL A CHARGED JOB. The provider finished and
+    # charged before this function was called, so every refusal that leaves
+    # it carries ``provider_charged``: without the mark `_settle_failure`
+    # reads PROVIDER_REJECTED as "never sent" and releases the reservation,
+    # and the budget ceiling under-counts a job that was paid for.
+    try:
+        _refuse_off_https(url)
+        # AND FROM A PUBLIC HOST ONLY (2026-11-27): https to a loopback, LAN
+        # or metadata address is still a fetch from inside this machine's
+        # network.
+        _refuse_non_public_host(url)
+    except CloudMediaError as refused:
+        refused.provider_charged = True
+        raise
     req = urllib.request.Request(url, headers={"User-Agent": _USAGE_SOURCE})
     last_exc: Exception | None = None
     for attempt in range(1, _DOWNLOAD_ATTEMPTS + 1):
@@ -749,9 +778,10 @@ def _stream_to_temp(url: str, dest: Path) -> None:
                             "refused mid-stream")
                     out.write(chunk)
             return
-        except CloudMediaError:
+        except CloudMediaError as refused:
             with contextlib.suppress(OSError):
                 dest.unlink()          # a refused body leaves no partial file
+            refused.provider_charged = True   # a redirect or size refusal: still charged
             raise
         except Exception as exc:
             last_exc = exc

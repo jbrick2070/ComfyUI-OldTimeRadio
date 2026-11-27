@@ -268,3 +268,76 @@ def test_a_failed_download_names_the_url_without_its_query(tmp_path, monkeypatch
     assert "SECRET" not in text and "X-Sig" not in text
     assert I._shown_url("https://u:p@cdn.example:8443/a/b.mp4?k=v#f") == "https://cdn.example:8443/a/b.mp4"
     assert I._shown_url("not a url") == "<not a url>"
+
+
+def test_a_refused_result_is_billed_not_released(tmp_path, monkeypatch):
+    """Sonnet review of 4e306f946: the job finished and was charged before the
+    download, so a refusal must carry `provider_charged`. Without it
+    `_settle_failure` reads PROVIDER_REJECTED as "never sent" and RELEASES the
+    reservation, and the budget ceiling under-counts a paid job."""
+    from nodes._otr_shared import cloud_media_invoke as I
+    _answers(monkeypatch, I, {"inside.example": ["10.0.0.7"]})
+    with pytest.raises(I.CloudMediaError) as private:
+        I._stream_to_temp("https://inside.example/out.mp4", tmp_path / "a.mp4")
+    assert getattr(private.value, "provider_charged", False) is True
+    with pytest.raises(I.CloudMediaError) as plain:
+        I._stream_to_temp("http://provider.example/out.mp4", tmp_path / "b.mp4")
+    assert getattr(plain.value, "provider_charged", False) is True
+
+    settled = []
+
+    class _Session:
+        def release(self, rid):
+            settled.append("released")
+
+        def bill(self, rid):
+            settled.append("billed")
+
+        def ledger_append(self, row):
+            pass
+    I._settle_failure(_Session(), "rid-1", private.value, "node")
+    assert settled == ["billed"]
+
+
+@pytest.mark.parametrize("url, addresses", [
+    ("https://[::1/x", None),                       # urlsplit raises ValueError
+    ("https://cdn..example.com/x.mp4", UnicodeError("label empty or too long")),
+    ("https://" + "a" * 70 + ".example/x.mp4", UnicodeError("label too long")),
+])
+def test_an_unparsable_host_is_left_to_the_transport(monkeypatch, url, addresses):
+    """These used to fail inside the retry loop as a transport error, which is
+    billed. The address rule must not turn them into an early refusal -- and
+    must not let a ValueError or UnicodeError escape as something else."""
+    from nodes._otr_shared import cloud_media_invoke as I
+
+    def resolver(host):
+        if isinstance(addresses, Exception):
+            raise addresses
+        raise AssertionError("resolved a host that should not have parsed")
+    monkeypatch.setattr(I, "_host_addresses", resolver)
+    I._refuse_non_public_host(url)
+    I._refuse_non_public_host(url, redirected=True)
+
+
+def test_the_operator_can_turn_the_address_rule_off(monkeypatch):
+    """A proxy in fake-IP mode or a corporate resolver maps every host to a
+    private or shared address; there the rule would refuse every result of a
+    job already paid for. The environment is the operator's, never a
+    workflow's, and the https rule is not affected."""
+    from nodes._otr_shared import cloud_media_invoke as I
+    _answers(monkeypatch, I, {"cdn.example": ["198.18.0.12"]})
+    with pytest.raises(I.CloudMediaError, match="OTR_CLOUD_RESULT_ANY_HOST"):
+        I._refuse_non_public_host("https://cdn.example/out.mp4")
+    monkeypatch.setenv("OTR_CLOUD_RESULT_ANY_HOST", "1")
+    I._refuse_non_public_host("https://cdn.example/out.mp4")
+    with pytest.raises(I.CloudMediaError, match="not https"):
+        I._refuse_off_https("http://cdn.example/out.mp4")
+
+
+def test_a_public_host_behind_nat64_is_not_refused(monkeypatch):
+    from nodes._otr_shared import cloud_media_invoke as I
+    _answers(monkeypatch, I, {"cdn.example": ["64:ff9b::5db8:d822"],
+                              "inside.example": ["64:ff9b::a00:1"]})
+    I._refuse_non_public_host("https://cdn.example/out.mp4")
+    with pytest.raises(I.CloudMediaError, match="public hosts only"):
+        I._refuse_non_public_host("https://inside.example/out.mp4")
