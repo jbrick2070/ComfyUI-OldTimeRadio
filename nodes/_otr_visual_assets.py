@@ -784,7 +784,16 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
         if (category, loader_token) in seen:
             return
         seen.add((category, loader_token))
-        path = _native_path(folder_paths, category, loader_token)
+        path = None
+        # A file kept in a subfolder of the model folder is listed, loaded and
+        # resolved by ComfyUI under its RELATIVE name ("qwen/x.safetensors");
+        # the bare file name finds nothing there. An adapter that reports such a
+        # name is resolved by it first. A flat name takes the basename path
+        # below exactly as before.
+        if token != loader_token and not os.path.isabs(token):
+            path = _native_path(folder_paths, category, token)
+        if path is None:
+            path = _native_path(folder_paths, category, loader_token)
         if authority is not None and not _same_file(authority, path):
             raise VisualAssetError("adapter/native loader disagree for %s/%s; "
                                    "no download or path repair" % (category, loader_token))

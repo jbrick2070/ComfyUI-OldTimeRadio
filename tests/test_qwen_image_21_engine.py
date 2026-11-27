@@ -358,3 +358,63 @@ def test_provisioning_routes_the_engine_to_its_own_lane():
     spec.loader.exec_module(prov)
     lane = prov.lane_for_engine("qwen_image_21", "image")
     assert (lane.lane, lane.manual) == ("qwen_image_21", False)
+
+
+# --- a model kept in a subfolder of diffusion_models -------------------------------
+class _SubfolderInstall:
+    """``folder_paths`` with the diffusion model in ``qwen/`` under a real root.
+
+    ComfyUI lists and resolves such a file only by its RELATIVE name; the bare
+    file name finds nothing. The encoder and VAE sit flat at their roots."""
+
+    def __init__(self, root):
+        self.root = root
+        self.files = {
+            ("diffusion_models", "qwen/qwen_image_2.1_int8_convrot.safetensors"),
+            ("text_encoders", QI._DEFAULT_CLIP),
+            ("vae", QI._DEFAULT_VAE),
+        }
+        for category, name in self.files:
+            path = root / category / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"weights")
+
+    def get_filename_list(self, category):
+        return sorted(name for cat, name in self.files if cat == category)
+
+    def get_full_path(self, category, name):
+        path = self.root / category / name
+        return str(path) if path.is_file() else None
+
+    def get_folder_paths(self, category):
+        return [str(self.root / category)]
+
+
+def test_a_model_in_a_subfolder_keeps_its_loader_name(monkeypatch, tmp_path, no_qwen_env):
+    install = _SubfolderInstall(tmp_path)
+    monkeypatch.setattr("folder_paths.get_filename_list", install.get_filename_list,
+                        raising=False)
+    monkeypatch.setattr("folder_paths.get_full_path", install.get_full_path,
+                        raising=False)
+    name, verified = QI._resolve_unet_name()
+    assert (name, verified) == ("qwen/qwen_image_2.1_int8_convrot.safetensors", True)
+    assert install.get_full_path("diffusion_models", name)
+    assert QI.QwenImage21Engine()._params({})["unet_name"] == name
+    # An override naming just the file still finds the subfolder copy.
+    monkeypatch.setenv(QI.MODEL_ENV, "qwen_image_2.1_int8_convrot.safetensors")
+    assert QI._resolve_unet_name() == (name, True)
+
+
+def test_the_queue_time_preflight_accepts_a_subfolder_install(monkeypatch, tmp_path,
+                                                              no_qwen_env):
+    install = _SubfolderInstall(tmp_path)
+    monkeypatch.setattr("folder_paths.get_filename_list", install.get_filename_list,
+                        raising=False)
+    monkeypatch.setattr("folder_paths.get_full_path", install.get_full_path,
+                        raising=False)
+    requests = VA.native_requests({"qwen_image_21"}, folder_paths=install, qwen21=QI,
+                                  env={})
+    paths = {r["category"]: r["path"] for r in requests}
+    assert paths["diffusion_models"] == tmp_path / "diffusion_models" / "qwen" / \
+        "qwen_image_2.1_int8_convrot.safetensors"
+    assert all(r["path"] is not None for r in requests)

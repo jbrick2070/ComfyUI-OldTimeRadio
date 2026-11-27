@@ -119,33 +119,41 @@ def _installed_unets():
     """Installed ``qwen_image_2.1*`` diffusion models, ranked int8 > bf16 > other.
     The TURBO builds (``qwen_image_2.1_turbo*``) are excluded: they are a few-step
     recipe and this one is the 25-step recipe. ``[]`` when none (or ``folder_paths``
-    absent)."""
+    absent).
+
+    Each entry is the name exactly as ComfyUI lists it, subfolder included
+    (``qwen/qwen_image_2.1_int8_convrot.safetensors``): that is the only name
+    ``UNETLoader`` and ``folder_paths.get_full_path`` accept for a file kept in a
+    subfolder. Filtering and ranking read the file's own name."""
     try:
         import folder_paths  # ComfyUI runtime; stubbed in tests
         names = folder_paths.get_filename_list("diffusion_models") or []
     except Exception:  # noqa: BLE001
         return []
-    cands = [os.path.basename(n) for n in names
-             if os.path.basename(n).lower().startswith("qwen_image_2.1")
-             and "turbo" not in os.path.basename(n).lower()
+    cands = [str(n) for n in names
+             if os.path.basename(str(n)).lower().startswith("qwen_image_2.1")
+             and "turbo" not in os.path.basename(str(n)).lower()
              and str(n).lower().endswith(".safetensors")]
 
     def _rank(n):
-        low = n.lower()
-        return (0 if "int8" in low else 1 if "bf16" in low else 2, low)
+        low = os.path.basename(n).lower()
+        return (0 if "int8" in low else 1 if "bf16" in low else 2, low, n.lower())
 
     return sorted(set(cands), key=_rank)
 
 
 def _resolve_unet_name():
-    """``(basename, verified)`` -- ONE truth shared by the params and
+    """``(loader name, verified)`` -- ONE truth shared by the params and
     ``assert_usable``. Env override (verified iff it resolves) > best installed
-    > the fetch default (unverified)."""
+    > the fetch default (unverified). An installed pick keeps its subfolder."""
     env = otr_env.get(MODEL_ENV, "").strip()
     installed = _installed_unets()
     if env:
         base = os.path.basename(env)
-        verified = (base in installed) or os.path.isfile(env)
+        listed = [n for n in installed if os.path.basename(n) == base]
+        if listed:
+            return listed[0], True
+        verified = os.path.isfile(env)
         if not verified:
             try:
                 import folder_paths

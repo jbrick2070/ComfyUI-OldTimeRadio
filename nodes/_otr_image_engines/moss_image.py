@@ -81,34 +81,41 @@ def _installed_unets():
     """Installed ``moss_image*`` diffusion models, ranked: ``moss_image_sft*``
     first (int8 > bf16 > other), then any other ``moss_image*`` build. The BASE
     checkpoints (``moss_image_base*``, meant for training) are excluded: this
-    recipe is the SFT one. ``[]`` when none (or ``folder_paths`` absent)."""
+    recipe is the SFT one. ``[]`` when none (or ``folder_paths`` absent).
+
+    Each entry is the name exactly as ComfyUI lists it, subfolder included: that
+    is the only name ``UNETLoader`` and ``folder_paths.get_full_path`` accept for
+    a file kept in a subfolder. Filtering and ranking read the file's own name."""
     try:
         import folder_paths  # ComfyUI runtime; stubbed in tests
         names = folder_paths.get_filename_list("diffusion_models") or []
     except Exception:  # noqa: BLE001
         return []
-    cands = [os.path.basename(n) for n in names
-             if os.path.basename(n).lower().startswith("moss_image")
-             and not os.path.basename(n).lower().startswith("moss_image_base")
+    cands = [str(n) for n in names
+             if os.path.basename(str(n)).lower().startswith("moss_image")
+             and not os.path.basename(str(n)).lower().startswith("moss_image_base")
              and str(n).lower().endswith(".safetensors")]
 
     def _rank(n):
-        low = n.lower()
+        low = os.path.basename(n).lower()
         return (0 if low.startswith("moss_image_sft") else 1,
-                0 if "int8" in low else 1 if "bf16" in low else 2, low)
+                0 if "int8" in low else 1 if "bf16" in low else 2, low, n.lower())
 
     return sorted(set(cands), key=_rank)
 
 
 def _resolve_unet_name():
-    """``(basename, verified)`` -- ONE truth shared by the params and
+    """``(loader name, verified)`` -- ONE truth shared by the params and
     ``assert_usable``. Env override (verified iff it resolves) > best installed
-    > the fetch default (unverified)."""
+    > the fetch default (unverified). An installed pick keeps its subfolder."""
     env = otr_env.get(MODEL_ENV, "").strip()
     installed = _installed_unets()
     if env:
         base = os.path.basename(env)
-        verified = (base in installed) or os.path.isfile(env)
+        listed = [n for n in installed if os.path.basename(n) == base]
+        if listed:
+            return listed[0], True
+        verified = os.path.isfile(env)
         if not verified:
             try:
                 import folder_paths

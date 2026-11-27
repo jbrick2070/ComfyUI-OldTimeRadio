@@ -204,3 +204,14 @@ def test_fetch_lane_and_provision_route_name_the_same_pins():
     names = {os.path.basename(row[1]) for row in fetch.LANES["moss_image"]}
     assert names == {basename for _category, basename in _SET}
     assert "moss_image" in fetch.LANE_INFO
+
+
+def test_a_model_in_a_subfolder_keeps_its_loader_name(monkeypatch, no_moss_env):
+    import folder_paths  # noqa: F401  (stubbed by conftest if absent)
+    names = ["moss/moss_image_sft_int8_convrot.safetensors"]
+    monkeypatch.setattr("folder_paths.get_filename_list", lambda c: names,
+                        raising=False)
+    # ComfyUI's UNETLoader and get_full_path accept only the relative name.
+    assert MI._resolve_unet_name() == ("moss/moss_image_sft_int8_convrot.safetensors", True)
+    monkeypatch.setenv(MI.MODEL_ENV, "moss_image_sft_int8_convrot.safetensors")
+    assert MI._resolve_unet_name() == ("moss/moss_image_sft_int8_convrot.safetensors", True)
