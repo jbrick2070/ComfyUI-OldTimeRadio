@@ -178,11 +178,14 @@ def _utf8_text(kwargs: dict) -> None:
     reader thread (byte 0x81, measured on the 2.3.65 desktop leg 2026-11-27).
     The headless harness sets PYTHONUTF8=1, which is why no harness leg ever
     showed it. Every tool this module admits writes UTF-8 or plain ASCII.
-    A caller that names its own ``encoding`` or ``errors`` keeps it.
+    A caller that names its own ``encoding`` or ``errors`` keeps it. ``errors``
+    alone is text mode too (subprocess reads any of the four as text mode), so
+    it gets the UTF-8 encoding and keeps its own error handler.
     """
     if kwargs.get("encoding") is not None:
         return
-    if kwargs.get("text") or kwargs.get("universal_newlines"):
+    if (kwargs.get("text") or kwargs.get("universal_newlines")
+            or kwargs.get("errors") is not None):
         kwargs["encoding"] = "utf-8"
         kwargs.setdefault("errors", "replace")
 

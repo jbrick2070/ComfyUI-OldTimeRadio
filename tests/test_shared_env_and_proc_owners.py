@@ -333,6 +333,30 @@ def test_popen_text_mode_decodes_utf8_too():
     assert out == "インブラスの影"
 
 
+@pytest.mark.parametrize("spawn, target", [("run", "_spawn_run"), ("popen", "_spawn_popen")])
+@pytest.mark.parametrize("given, expected", [
+    ({"text": True}, {"encoding": "utf-8", "errors": "replace"}),
+    ({"universal_newlines": True}, {"encoding": "utf-8", "errors": "replace"}),
+    ({"errors": "strict"}, {"encoding": "utf-8", "errors": "strict"}),
+    ({"text": True, "errors": "ignore"}, {"encoding": "utf-8", "errors": "ignore"}),
+    ({"text": True, "encoding": "latin-1"}, {"encoding": "latin-1"}),
+    ({"text": True, "encoding": None}, {"encoding": "utf-8", "errors": "replace"}),
+    ({}, {}),
+])
+def test_the_wrapper_names_utf8_whatever_mode_the_tests_run_in(
+        monkeypatch, spawn, target, given, expected):
+    """The decode tests above only bite on a cp1252 interpreter, and the
+    harness runs in UTF-8 mode. This one reads the keywords the wrapper hands
+    subprocess, so it fails on any interpreter if the default goes away."""
+    seen = {}
+    monkeypatch.setattr(otr_proc, target, lambda argv, **kw: seen.update(kw))
+    getattr(otr_proc, spawn)([sys.executable, "-c", "pass"], **dict(given))
+    for key, value in expected.items():
+        assert seen.get(key) == value, (key, seen)
+    if not expected:
+        assert "encoding" not in seen and "errors" not in seen
+
+
 def test_a_caller_named_encoding_and_binary_mode_are_left_alone():
     done = otr_proc.run([sys.executable, "-c", _WRITES_JAPANESE],
                         capture_output=True, encoding="latin-1", timeout=60)
