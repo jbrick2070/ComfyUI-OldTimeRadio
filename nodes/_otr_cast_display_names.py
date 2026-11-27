@@ -106,6 +106,20 @@ _SYSTEM = (
     "name itself is an acronym."
 )
 
+#: The script spelled out for the model, with one worked example. Gemma 4 E2B
+#: transliterated Shakespeare's names but handed modern invented ones back in
+#: Latin letters ("Kenji Gordon", "Jenna Okafor"; 5080 desktop, 2026-11-27),
+#: as though an ordinary English name needed no rendering.
+_SCRIPT_HINT = {
+    "ja": "Japanese katakana (kanji only for a name that is itself Japanese); "
+          "an ordinary English name is written in katakana too: JOHN SMITH is "
+          "ジョン・スミス.",
+    "zh": "Simplified Chinese characters; an ordinary English name is written "
+          "in characters too: JOHN SMITH is 约翰·史密斯.",
+    "hi": "Devanagari; an ordinary English name is written in Devanagari too: "
+          "JOHN SMITH is जॉन स्मिथ.",
+}
+
 
 def _is_latin_or_ascii(ch: str) -> bool:
     return ord(ch) <= 127 or "LATIN" in unicodedata.name(ch, "")
@@ -198,18 +212,34 @@ def populate(led_data: dict, *, technical_fn: Callable[..., str]) -> dict:
         receipt["asked"] = len(wanted)
         iso = _EPLANG.row_from_meta(meta).iso
         lead = _EPLANG.native_translation_instruction(meta)
+        hint = _SCRIPT_HINT.get(iso, "")
+        system = _SYSTEM + (" Write every name in " + hint if hint else "")
         user = ("Character names:\n"
                 + "\n".join(f"{i}. {n}" for i, n in enumerate(wanted, 1)))
+
+        def _check(reply: CastDisplayNames) -> str | None:
+            # A reply with NO usable name is sent back once with the reason;
+            # a reply that names some characters is kept as it is (each bad
+            # name keeps its Latin spelling on its own).
+            usable = [item for item in reply.names
+                      if 1 <= item.n <= len(wanted)
+                      and judge_display_name(wanted[item.n - 1], item.display_name, iso) is None]
+            if usable:
+                return None
+            return ("no display_name is usable: each one came back in Latin "
+                    "letters, empty, or outside the episode's script; write "
+                    "every name in " + (hint or "the episode's script"))
         # LLM slot: technical -- transliterating fixed names is extraction,
         # not voice work, and the technical slot is the one cleanup just used.
         result = structured_call(
-            prompt=[{"role": "system", "content": _EPLANG.lead_system(_SYSTEM, lead)},
+            prompt=[{"role": "system", "content": _EPLANG.lead_system(system, lead)},
                     {"role": "user", "content": user}],
             schema=CastDisplayNames,
             slot_fn=technical_fn,
             base_temperature=0.2,
             structural_retry_temperature=0.1,
             repair_prompt_factory=make_dispatching_repair_factory(),
+            post_validator=_check,
             # Room for a fenced, pretty-printed reply: Gemma 4 E2B on the 4060
             # (2026-11-27) wrapped three names in ```json and indented them,
             # ran out at 96 tokens mid-name ("尤里·肯德尔…") on both attempts,

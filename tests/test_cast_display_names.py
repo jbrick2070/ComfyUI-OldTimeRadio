@@ -283,3 +283,36 @@ def test_the_first_answer_for_a_number_wins_even_when_it_is_refused():
     receipt = CDN.populate(led, technical_fn=slot)
     assert led["cast"][1].get("native_display_name") is None
     assert receipt["rejected"] == {"ORLANDO": "the Latin name echoed"}
+
+
+def test_an_all_latin_reply_is_sent_back_once_and_the_retry_lands():
+    """5080 desktop, 2026-11-27: E2B returned "Kenji Gordon" and "Oya Wells"
+    in Latin letters and every name stayed Latin."""
+    led = _ledger("ja", names=("KENJI GORDON", "OYA WELLS"))
+    slot = _Slot([{"names": [{"n": 1, "display_name": "Kenji Gordon"},
+                             {"n": 2, "display_name": "Oya Wells"}]},
+                  {"names": [{"n": 1, "display_name": "ケンジ・ゴードン"},
+                             {"n": 2, "display_name": "オヤ・ウェルズ"}]}])
+    receipt = CDN.populate(led, technical_fn=slot)
+    rows = {r["name"]: r.get("native_display_name") for r in led["cast"]}
+    assert rows["KENJI GORDON"] == "ケンジ・ゴードン"
+    assert rows["OYA WELLS"] == "オヤ・ウェルズ"
+    assert receipt["accepted"] == 2 and len(slot.calls) == 2
+
+
+def test_a_partly_usable_reply_is_kept_without_a_retry():
+    led = _ledger("ja", names=("KENJI GORDON", "OYA WELLS"))
+    slot = _Slot([{"names": [{"n": 1, "display_name": "ケンジ・ゴードン"},
+                             {"n": 2, "display_name": "Oya Wells"}]}])
+    CDN.populate(led, technical_fn=slot)
+    assert len(slot.calls) == 1
+
+
+@pytest.mark.parametrize("iso, example", [
+    ("ja", "ジョン・スミス"), ("zh", "约翰·史密斯"), ("hi", "जॉन स्मिथ"),
+])
+def test_the_prompt_names_the_script_with_an_example(iso, example):
+    led = _ledger(iso, names=("JOHN DOE",))
+    slot = _Slot([{"names": [{"n": 1, "display_name": example}]}])
+    CDN.populate(led, technical_fn=slot)
+    assert example in slot.calls[0][0][0]["content"]
