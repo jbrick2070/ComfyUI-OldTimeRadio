@@ -17767,3 +17767,65 @@ not promote it to the Bug Bible on this evidence alone.
   events). Caption strips sampled every 5 s across two minutes show no line
   opening with a closing mark; small kana stay with their syllable and lines
   break before "か。" rather than inside it.
+
+## PBUG-20261127-01 -- 2.3.61 to 2.3.63 were Flagged and 2.3.64 sat Pending: a live boot showed three surfaces still giving the install path away
+- evidence: on 2026-11-27 the registry listed one version, 2.3.64, Pending,
+  with an empty reason (2.3.61 to 2.3.63 had been Flagged). The published
+  2.3.64 package (`cdn.comfy.org/fluxus/comfyui-old-time-radio/2.3.64/node.zip`,
+  718 files) matched release commit `f22ff4da4` blob for blob, and the scan
+  replica read 0 findings on it, so whatever a reviewer objects to is in the
+  policy layer. A headless CPU boot of that tree (ComfyUI 0.46.3, port 8011,
+  a `--base-directory` sandbox, CUDA hidden, `HF_HUB_OFFLINE=1`) showed, with
+  no login:
+  1. `GET /object_info`: the `workflow_json_path` default of
+     `OTR_WorkflowValidator` was the absolute path of the canonical workflow
+     on this machine, account name included.
+  2. A prompt whose path the pack refuses: `exception_type` in `/history` was
+     `<absolute pack folder>.nodes._otr_paths.OtrPathContractError`. ComfyUI
+     imports a pack under a module name that IS its folder path and reports
+     `__module__ + "." + __qualname__`. Eight model reviews of the package
+     missed this one; only the live boot showed it.
+  3. Read from the code, not booted: `OTR_MasterAudioMux` put the published
+     file's absolute path in its `ui` text, which ComfyUI stores in `/history`.
+- cause: 2.3.64 redacted exception MESSAGES and the pack's log records. A
+  node speaks through three more surfaces (the defaults it declares, the type
+  name of what it raises, the text it draws on the canvas) and none of them
+  was covered. The package review also found startup behavior a policy
+  reviewer can object to whatever the scan says: prestartup downloaded and
+  unpacked the spaCy English wheel (it is not on PyPI); read `HF_TOKEN` from
+  the Windows registry and exported it to the whole process; replaced
+  `transformers.safetensors_conversion` in `sys.modules` for every pack; left
+  `nodes/` on the import path; and `meta.env` listed every installed pack.
+- fix (release 2.3.65): the validator default is empty and its report names
+  files, not paths; `clean_pack_exception_modules` cuts the folder off the
+  pack's exception classes; the node-boundary guard redacts `ui["text"]` and
+  the mux shows `output/otr/obs/<file>`; redaction walks the whole exception
+  chain and handles install folders with spaces. The spaCy pipeline ships in
+  the pack (`nodes/_otr_audio_engines/_spacy_model/`, byte for byte from the
+  published wheel, with `PROVENANCE.json`), so nothing is downloaded and
+  unpacked. The token registry read is deleted; the startup voice fetch sends
+  no token. The conversion guard is scoped to Bark's two loads and uses
+  transformers' own switch. The other-packs list in `meta.env` is opt-in
+  (`OTR_ENV_FINGERPRINT_PACKS=1`; set it on both boxes before a drift diff).
+  Cloud results download only from public addresses and a key stays on its
+  provider's host. `SECURITY.md` states what the pack runs, reads, writes and
+  contacts, and three review passes held each sentence to the code.
+  Coverage: `tests/test_object_info_has_no_absolute_paths.py`,
+  `tests/test_error_type_names_carry_no_path.py`,
+  `tests/test_error_text_redaction_edges.py`,
+  `tests/test_prestartup_leaves_the_process_alone.py`,
+  `tests/test_hf_token_is_never_read_from_the_registry.py`,
+  `tests/test_kokoro_voice_prefetch.py`,
+  `tests/test_shipped_files_name_no_private_machine.py`.
+- what ComfyUI still shows, and the pack cannot change: the traceback it
+  attaches to any failed node names each source file by full path, and it
+  echoes the failing node's inputs. `SECURITY.md` says so.
+- status: FIXED, PROVEN LIVE 2026-11-27 on the 5080. CPU boot of the fixed
+  tree: `/object_info` carries no absolute path, and the refused-path prompt
+  reports `ComfyUI-OldTimeRadio.nodes._otr_paths.OtrPathContractError`. GPU:
+  one canonical one-act episode from the release branch (ComfyUI 0.46.3,
+  port 8012, RTX 5080), `seoul_duet_20261127_101529`, published to `otr/obs/`
+  in 11:23; its `/history` record held no absolute path in the outputs, the
+  status messages or the echoed prompt, and no line the pack wrote to the
+  server log carried one. The registry's verdict on 2.3.65 is the remaining
+  proof, and it is theirs to give.
