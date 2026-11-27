@@ -90,3 +90,27 @@ def test_both_entry_points_install_it_before_anything_logs():
         pre = fh.read()
     assert "install_log_redaction()" in pre
     assert pre.index("install_log_redaction()") < pre.index("HF_HOME=%s")
+
+
+def test_the_prestartup_by_file_load_really_installs_the_factory():
+    """Behaviour, not source order: prestartup cannot import the pack as a
+    package, so it loads nodes/_otr_error_text.py BY FILE and swallows any
+    failure. Load it the same way and prove the copy it gets redacts a record
+    from this pack -- a relative import or a load-time error added to that
+    module fails here, where the source-order test above would still pass."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "_otr_prestartup_error_text_probe",
+        os.path.join(_REPO, "nodes", "_otr_error_text.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    original = logging.getLogRecordFactory()
+    logging.setLogRecordFactory(logging.LogRecord)
+    try:
+        assert module.install_log_redaction() is True
+        make = logging.getLogRecordFactory()
+        rec = _record(make, _INSIDE, "HF_HOME=%s", ("/home/someone/ComfyUI-Models/hf",))
+        assert rec.getMessage() == "HF_HOME=hf"
+    finally:
+        logging.setLogRecordFactory(original)
