@@ -200,6 +200,8 @@ def populate(led_data: dict, *, technical_fn: Callable[..., str]) -> dict:
         lead = _EPLANG.native_translation_instruction(meta)
         user = ("Character names:\n"
                 + "\n".join(f"{i}. {n}" for i, n in enumerate(wanted, 1)))
+        # LLM slot: technical -- transliterating fixed names is extraction,
+        # not voice work, and the technical slot is the one cleanup just used.
         result = structured_call(
             prompt=[{"role": "system", "content": _EPLANG.lead_system(_SYSTEM, lead)},
                     {"role": "user", "content": user}],
