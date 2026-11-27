@@ -6,9 +6,10 @@ Every ledger carries the environment its run rendered on in ``meta.env``
 
 THE OTHER PACKS ARE OPT-IN since 2026-11-27: a stamp names this pack only,
 unless ComfyUI was started with ``OTR_ENV_FINGERPRINT_PACKS=1`` in its
-environment. Set that on each box you want to compare pack by pack; a stamp
-taken without it simply shows no other packs, and the diff says so by
-showing them as added or removed.
+environment. Set that on each box you want to compare pack by pack. When one
+stamp has the full list and the other does not, the packs only one of them
+names are not reported as added or removed; a note says they were not
+compared.
 
   python scripts/otr_env_drift.py
       this machine's newest stamped episode vs its known-good snapshot
@@ -164,11 +165,23 @@ def diff_env(old: dict, new: dict) -> list[str]:
     for name in sorted(set(old_packs) & set(new_packs)):
         if old_packs[name] != new_packs[name]:
             lines.append("pack changed %s: %s -> %s" % (name, old_packs[name], new_packs[name]))
-    for name in sorted(set(new_packs) - set(old_packs)):
-        lines.append("pack added %s: %s" % (name, new_packs[name]))
-    for name in sorted(set(old_packs) - set(new_packs)):
-        lines.append("pack removed %s: %s" % (name, old_packs[name]))
+    # A stamp names every pack only when ComfyUI ran with
+    # OTR_ENV_FINGERPRINT_PACKS=1; otherwise it names this pack alone. A pack
+    # missing from such a stamp was not removed -- it was never recorded -- so
+    # additions and removals are only read off two full lists.
+    if not pack_lists_differ_in_kind(old, new):
+        for name in sorted(set(new_packs) - set(old_packs)):
+            lines.append("pack added %s: %s" % (name, new_packs[name]))
+        for name in sorted(set(old_packs) - set(new_packs)):
+            lines.append("pack removed %s: %s" % (name, old_packs[name]))
     return lines
+
+
+def pack_lists_differ_in_kind(old: dict, new: dict) -> bool:
+    """True when one stamp lists every pack and the other only this one."""
+    old_packs = old.get("packs") if isinstance(old.get("packs"), dict) else {}
+    new_packs = new.get("packs") if isinstance(new.get("packs"), dict) else {}
+    return (len(old_packs) > 1) != (len(new_packs) > 1)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -201,6 +214,10 @@ def main(argv: list[str] | None = None) -> int:
         print("[env-drift] %s" % exc)
         return 2
     print("[env-drift] %s -> %s" % (old_name, new_name))
+    if pack_lists_differ_in_kind(old_env, new_env):
+        print("[env-drift] note: one of these stamps names this pack only, so the "
+              "other packs were not compared (start ComfyUI with "
+              "OTR_ENV_FINGERPRINT_PACKS=1 to record them)")
     lines = diff_env(old_env, new_env)
     if not lines:
         print("[env-drift] no difference")

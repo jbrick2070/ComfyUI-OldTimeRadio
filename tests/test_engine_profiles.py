@@ -86,7 +86,12 @@ def test_no_audio_profile_needs_a_hugging_face_token():
 
 
 def test_missing_token_raises_in_generate_not_input_types(monkeypatch):
+    from nodes import _otr_hf_auth
+
     monkeypatch.delenv("HF_TOKEN", raising=False)
+    # No token anywhere: not in the environment, and no login on this machine
+    # (whatever the machine running the suite really has).
+    monkeypatch.setattr(_otr_hf_auth, "resolve_hf_token_runtime", lambda: None)
     r = EP.load_resolver()
     # No shipped profile is gated, so a stand-in exercises the guard that
     # still protects the generate path.
@@ -94,12 +99,28 @@ def test_missing_token_raises_in_generate_not_input_types(monkeypatch):
     with pytest.raises(EngineUnusable) as ei:
         EP.assert_token_for_profile(sa)
     assert ei.value.reason is EngineUsabilityReason.MISSING_HF_TOKEN
-    # With a token present it passes.
+    assert "hf auth login" in str(ei.value)
+    # A non-gated profile never needs a token, and never asks for one.
+    monkeypatch.setattr(_otr_hf_auth, "resolve_hf_token_runtime",
+                        lambda: pytest.fail("a non-gated profile resolved a token"))
+    EP.assert_token_for_profile(r.get("char_bark_v1"))
+
+
+def test_a_login_only_user_passes_the_gated_profile_check(monkeypatch):
+    """Sonnet review, 2026-11-27: the check read HF_TOKEN from the environment
+    only, so a user who had run `hf auth login` -- the documented way -- was
+    told a token was missing. It now asks the resolver the downloads use."""
+    from nodes import _otr_hf_auth
+
+    monkeypatch.delenv("HF_TOKEN", raising=False)
+    monkeypatch.setattr(_otr_hf_auth, "resolve_hf_token_runtime", lambda: "from-the-login-file")
+    r = EP.load_resolver()
+    sa = r.get("char_bark_v1").model_copy(update={"requires_hf_token": True})
+    EP.assert_token_for_profile(sa)
+    # And the environment still works by itself.
+    monkeypatch.setattr(_otr_hf_auth, "resolve_hf_token_runtime", _otr_hf_auth.resolve_hf_token)
     monkeypatch.setenv("HF_TOKEN", "x")
     EP.assert_token_for_profile(sa)
-    # A non-gated profile never needs a token.
-    monkeypatch.delenv("HF_TOKEN", raising=False)
-    EP.assert_token_for_profile(r.get("char_bark_v1"))
 
 
 def test_legacy_first_engines_pure_and_legacy_first():

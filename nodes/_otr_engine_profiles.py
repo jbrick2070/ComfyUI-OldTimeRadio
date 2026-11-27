@@ -259,16 +259,25 @@ def require_resolver() -> EngineProfileResolver:
 
 
 def assert_token_for_profile(profile: EngineProfile) -> None:
-    """Raise MISSING_HF_TOKEN if a HF-gated profile lacks ``HF_TOKEN``.
+    """Raise MISSING_HF_TOKEN if a HF-gated profile has no token to use.
 
-    Reads the environment, so call this on the generate() path, NEVER in
-    INPUT_TYPES (C-5).
+    Asks the same resolver the downloads use (``HF_TOKEN`` in the
+    environment, or the Hub's own login), so a user who ran ``hf auth login``
+    is not told a token is missing. It reads the environment and a login
+    file, so call this on the generate() path, NEVER in INPUT_TYPES (C-5).
     """
-    if profile.requires_hf_token and not otr_env.get("HF_TOKEN"):
+    if not profile.requires_hf_token:
+        return
+    try:
+        from ._otr_hf_auth import resolve_hf_token_runtime
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_hf_auth import resolve_hf_token_runtime  # type: ignore
+    if not resolve_hf_token_runtime():
         raise EngineUnusable(
             profile.engine, profile.role, EngineUsabilityReason.MISSING_HF_TOKEN,
-            f"profile '{profile.profile_id}' needs HF_TOKEN (accept the model "
-            f"license and set HF_TOKEN before enabling it)",
+            f"profile '{profile.profile_id}' needs a Hugging Face token (accept "
+            f"the model license, then run `hf auth login` or set HF_TOKEN in "
+            f"the environment that starts ComfyUI)",
         )
 
 

@@ -2654,7 +2654,8 @@ def _format_gated_message(repo_id: str) -> str:
         f"To run OTR end-to-end as designed, free one-time setup (~5 min):\n"
         f"  1. Create HF account at https://huggingface.co/join.\n"
         f"  2. Accept the license at https://huggingface.co/{repo_id}.\n"
-        f"  3. Set HF_TOKEN in your environment (or HKCU on Windows).\n"
+        f"  3. Log in once with `hf auth login`, or set HF_TOKEN in the "
+        f"environment that starts ComfyUI.\n"
         f"Once configured, this download fires automatically on first Queue."
     )
 
@@ -2773,7 +2774,7 @@ def auto_download_if_missing(
         )
 
     # EXECUTION path -- use the Hub-aware resolver so a cached
-    # `hf auth login` is honoured, not just env/HKCU (PBUG-20260829-10).
+    # `hf auth login` is honoured, not just the environment (PBUG-20260829-10).
     # B1d: local-cache short-circuit FIRST. If the snapshot is already on
     # disk, return the path immediately. This also makes a cached gated
     # repo (e.g. Mistral-Nemo) usable when HF_TOKEN is unset -- the user

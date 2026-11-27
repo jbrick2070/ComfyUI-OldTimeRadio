@@ -437,3 +437,21 @@ def test_the_operator_can_turn_the_full_list_on(monkeypatch, tmp_path):
     assert set(EF.compute()["packs"]) == {EF._OWN_PACK, "ComfyUI-KJNodes", "some-private-pack"}
     monkeypatch.setenv(EF.PACKS_ENV, "0")
     assert set(EF.compute()["packs"]) == {EF._OWN_PACK}
+
+
+def test_the_diff_does_not_call_unrecorded_packs_removed():
+    """Sonnet review, 2026-11-27: a full-list stamp from before the opt-in,
+    compared with an own-pack-only stamp, printed "pack removed" for every
+    other pack and exited 1. They were not removed; they were not recorded."""
+    full = dict(OLD_ENV)
+    own_only = dict(OLD_ENV, packs={"ComfyUI-KJNodes": OLD_ENV["packs"]["ComfyUI-KJNodes"]})
+    assert len(full["packs"]) > 1
+    assert drift.pack_lists_differ_in_kind(full, own_only)
+    assert drift.diff_env(full, own_only) == []
+    assert drift.diff_env(own_only, full) == []
+    # A pack BOTH stamps name is still compared.
+    moved = dict(own_only, packs={"ComfyUI-KJNodes": "git 999999999999"})
+    assert drift.diff_env(full, moved) == [
+        "pack changed ComfyUI-KJNodes: %s -> git 999999999999" % OLD_ENV["packs"]["ComfyUI-KJNodes"]]
+    # Two full lists are compared exactly as before.
+    assert not drift.pack_lists_differ_in_kind(OLD_ENV, NEW_ENV)
