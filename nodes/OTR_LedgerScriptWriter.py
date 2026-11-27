@@ -4068,8 +4068,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 meta.setdefault("verbatim_passage", {})["translation"] = _vt_receipt
                 log.info(
                     "[OTR_LedgerScriptWriter] verbatim passage translated into "
-                    "%s: %d entries in %d call(s)", _vt_receipt["iso"],
-                    _vt_receipt["entries"], _vt_receipt["batches"])
+                    "%s: %d entries in %d batch(es), %d model call(s), "
+                    "%d batch(es) re-asked line by line", _vt_receipt["iso"],
+                    _vt_receipt["entries"], _vt_receipt["batches"],
+                    _vt_receipt["attempts"], len(_vt_receipt["split_batches"]))
         # kibitz r2-r4 provenance: any bank whose defaults define
         # credits_source_line gets it stamped (data-driven -- the
         # original_radio row always defines it, so its credits line is

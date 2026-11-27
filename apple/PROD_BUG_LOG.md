@@ -17857,3 +17857,41 @@ not promote it to the Bug Bible on this evidence alone.
 - bible: 12.201.
 - status: FIXED; the live proof is a rerun of the same Japanese leg on the
   desktop app with a clean log.
+
+## PBUG-20261127-03 -- Japanese Shakespeare on the default E2B writer died: two lines came back as one string, and the batch had no way out
+- evidence: the 2.3.65 desktop release leg on the 5080 (Comfy Desktop, port 8000,
+  canonical workflow, writer `comfy_native:gemma4-e2b-it-int8-convrot`, the
+  canonical default), Shakespeare in Japanese, one act, prompt
+  `rel2365_ja_1act_fix`. King Lear 1.1, LEAR then GONERIL, 217 words. The first
+  verbatim-translation batch held 2 lines; both attempts (base at T=0.2, typed
+  repair at T=0.1) returned `{"texts": ["<one Japanese string covering both
+  lines>"]}` under a bound decode, `_check` refused "returned 1 strings for 2
+  numbered lines", and `translate_entries` raised: the episode died 40 s in.
+  The same leg had published an hour earlier on a different passage.
+- cause: the bound schema (`TranslatedTexts`, `min_length=1`) does not fix the
+  count, and a batch that failed its ladder had no fallback but RuntimeError,
+  so one merge by a small writer killed a translatable passage.
+- fix: a multi-line batch that fails is asked again one line at a time under
+  its own single-string schema (`TranslatedLine`); a line that fails alone still
+  raises. The list length is deliberately NOT pinned: a model that merged two
+  lines would then be forced to invent or split a second string, a silent
+  misalignment. The one-line schema is a string, not a list of one, so a small
+  model cannot add a romanization or a note as a second string to be spoken.
+  Receipt v2 records `split_batches` and `line_attempts`, and `attempts` counts
+  every model call. Design read by Codex (gpt-5.6-sol), agy and Fable, all
+  three picking the split.
+- found by review in the same pass (Fable, confirmed by running the function;
+  not a separate PBUG under the admission rule): `strip_echoed_label` read any
+  caseless prefix before a colon as a speaker label, so a Chinese, Japanese or
+  Hindi translation of "Hear me, recreant: ..." lost its opening clause and a
+  line that was only "记住：" stripped to empty and would die on every retry. A
+  caseless prefix is now stripped only when the translation carries more colons
+  than its English source (the colon the model added).
+- coverage: `tests/test_verbatim_translation.py` (merged batch splits, a line
+  failing alone stays loud, one-line calls bind `TranslatedLine`, receipt
+  fields, caseless clauses kept, an added caseless label still stripped).
+- open, next: every non-English row's `writer_instruction` says "do not
+  translate an English draft" and the translation pass leads its system prompt
+  with it (found by agy).
+- status: FIXED in code; the live proof is the ja / zh / hi one-act legs on the
+  5080 desktop, the Mac and the 4060.

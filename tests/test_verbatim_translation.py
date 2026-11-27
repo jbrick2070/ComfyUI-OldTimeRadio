@@ -78,14 +78,15 @@ def test_texts_are_replaced_in_order_and_everything_else_is_copied():
 
 def test_a_long_passage_is_translated_in_consecutive_batches():
     entries = _entries("a b c d e", "f g h i j", "k l m n o")
-    slot = _Slot([{"texts": ["uno", "dos"]}, {"texts": ["tres"]}])
+    slot = _Slot([{"texts": ["uno", "dos"]}, {"text": "tres"}])
     out, receipt = VT.translate_entries(
         entries, language_instruction=RULE, creative_fn=slot,
         max_source_words=10)
     assert [e.text for e in out] == ["uno", "dos", "tres"]
     assert receipt["batches"] == 2 and len(slot.calls) == 2
     assert "2 lines" in slot.calls[0][0][1]["content"]
-    assert "1 lines" in slot.calls[1][0][1]["content"]
+    assert "Translate this one line" in slot.calls[1][0][1]["content"]
+    assert receipt["split_batches"] == [] and receipt["attempts"] == 2
 
 
 def test_output_budget_is_explicit_and_sized_to_the_batch():
@@ -97,13 +98,66 @@ def test_output_budget_is_explicit_and_sized_to_the_batch():
         VT._OUTPUT_TOKENS_FLOOR, 11 * VT._OUTPUT_TOKENS_PER_SOURCE_WORD)
 
 
-def test_a_wrong_count_is_retried_once_then_fails_loud():
+def test_a_merged_batch_is_asked_again_one_line_at_a_time():
+    """2.3.65 release leg, 2026-11-27: Gemma 4 E2B returned ONE Japanese string
+    for LEAR's two lines on both attempts and the episode died. The batch is
+    now re-asked line by line, so each speaker keeps exactly its own words."""
     entries = _entries("one", "two")
-    slot = _Slot([{"texts": ["uno"]}, {"texts": ["uno", "dos", "tres"]}])
+    merged = {"texts": ["uno dos"]}
+    slot = _Slot([merged, merged, {"text": "uno"}, {"text": "dos"}])
+    out, receipt = VT.translate_entries(entries, language_instruction=RULE,
+                                        creative_fn=slot)
+    assert [e.text for e in out] == ["uno", "dos"]
+    assert [e.speaker for e in out] == [e.speaker for e in entries]
+    assert receipt["split_batches"] == [0]
+    assert receipt["attempts"] == 4 == len(slot.calls)
+    assert receipt["line_attempts"] == 2
+    assert receipt["receipt_version"] == "otr_verbatim_translation_v2"
+    line_prompts = [c[0][1]["content"] for c in slot.calls[2:]]
+    assert line_prompts == ["Translate this one line:\n\nFIRST WITCH: one",
+                            "Translate this one line:\n\nSECOND WITCH: two"]
+    assert "one line of stage dialogue" in slot.calls[2][0][0]["content"]
+
+
+def test_a_line_that_fails_alone_still_fails_loud():
+    entries = _entries("one", "two")
+    merged = {"texts": ["uno dos"]}
+    slot = _Slot([merged, merged, {"text": "uno"}, {"text": "   "},
+                  {"text": "  "}])
     with pytest.raises(RuntimeError) as caught:
         VT.translate_entries(entries, language_instruction=RULE, creative_fn=slot)
-    assert "could not be translated" in str(caught.value)
-    assert len(slot.calls) == 2
+    message = str(caught.value)
+    assert "could not be translated" in message
+    assert "line at entry 1, asked alone after its batch of 2 failed" in message
+    assert len(slot.calls) == 5
+
+
+def test_a_one_line_call_binds_a_single_string_not_a_list():
+    """A list of one would let a small model add a romanization or a note as
+    a second string, and it would be spoken. Bound, it cannot be sampled."""
+    entries = _entries("one", "two")
+    bound_seen = []
+    replies = _Slot([{"texts": ["uno dos"]}, {"texts": ["uno dos"]},
+                     {"text": "uno"}, {"text": "dos"}])
+    unbound = _Slot([])
+
+    def bind(schema):
+        bound_seen.append(schema)
+        return replies
+
+    unbound._otr_bind_schema = bind
+    out, _ = VT.translate_entries(entries, language_instruction=RULE,
+                                  creative_fn=unbound)
+    assert [e.text for e in out] == ["uno", "dos"]
+    assert bound_seen == [VT.TranslatedTexts, VT.TranslatedLine,
+                          VT.TranslatedLine]
+    assert unbound.calls == []
+
+
+def test_english_byte_identity_receipt_fields_exist_when_empty():
+    _, receipt = VT.translate_entries((), language_instruction=RULE,
+                                      creative_fn=_Slot([]))
+    assert receipt["split_batches"] == [] and receipt["line_attempts"] == 0
 
 
 def test_an_empty_line_is_a_structural_failure():
@@ -283,7 +337,7 @@ def test_a_label_only_reply_is_empty_so_the_validator_retries():
     ran on the RAW reply, found it non-empty, and the strip happened after."""
     assert VT.strip_echoed_label("ANA: ", "ANA") == ""
     entries = _entries("Speak now.")
-    slot = _Slot([{"texts": ["ANA: "]}, {"texts": ["Habla ahora."]}])
+    slot = _Slot([{"text": "ANA: "}, {"text": "Habla ahora."}])
     out, _ = VT.translate_entries(entries, language_instruction=RULE,
                                   creative_fn=slot)
     assert [e.text for e in out] == ["Habla ahora."]
@@ -384,3 +438,38 @@ def test_json_punctuation_buried_in_a_line_is_sent_back_not_shipped():
 ])
 def test_ordinary_quotation_in_any_language_is_not_residue(line):
     assert VT._JSON_RESIDUE.search(line) is None
+
+
+
+# --------------------------------------------------------------------------- #
+# caseless scripts: a colon in the speaker's own line is not a label
+# (Fable review of the 2.3.65 E2B leg, 2026-11-27)
+# --------------------------------------------------------------------------- #
+
+_LEAR = "Hear me, recreant: on thine allegiance, hear me!"
+
+
+@pytest.mark.parametrize("translated", [
+    "听着，逆贼：以你的忠诚起誓，听我说！",
+    "聞け、裏切り者よ：忠誠にかけて聞け！",
+    "सुनो, विश्वासघाती: अपनी निष्ठा पर, सुनो!",
+])
+def test_a_caseless_opening_clause_before_the_sources_colon_is_kept(translated):
+    assert VT.strip_echoed_label(translated, "LEAR", _LEAR) == translated
+
+
+def test_a_line_that_is_only_a_caseless_clause_and_colon_is_not_emptied():
+    assert VT.strip_echoed_label("记住：", "KENT", "Remember:") == "记住："
+
+
+def test_a_caseless_label_the_model_added_still_goes():
+    """One more colon than the English line has is the label the model added."""
+    assert VT.strip_echoed_label("李尔：听着，逆贼：以你的忠诚起誓", "LEAR", _LEAR) == \
+        "听着，逆贼：以你的忠诚起誓"
+    assert VT.strip_echoed_label("船長：老大！", "BOATSWAIN", "Boatswain!") == "老大！"
+
+
+def test_a_cased_label_is_judged_as_before():
+    assert VT.strip_echoed_label("ANTÍFON DE EFESO: Ve, vete.",
+                                 "ANTIPHOLUS OF EPHESUS", "Go, get thee gone.") == \
+        "Ve, vete."
