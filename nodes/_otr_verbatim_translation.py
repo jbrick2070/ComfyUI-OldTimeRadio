@@ -212,6 +212,26 @@ def _colon_count(text: str) -> int:
     return text.count(":") + text.count("：")
 
 
+#: Punctuation that ends or splits a clause. A speaker label is a name, and a
+#: name carries none of these; "聞け、裏切り者よ" does. The katakana middle dot
+#: (リア・王) is a name separator and is deliberately absent.
+_CLAUSE_PUNCTUATION = set("、，,。．.！!？?「」『』（）()…—–;；\"'“”‘’")
+
+#: Longest caseless prefix read as a name. Longer runs are sentences.
+_CASELESS_LABEL_MAX_CHARS = 12
+
+
+def _caseless_label_evidence(prefix: str, remainder: str, raw: str,
+                             source_text: str) -> bool:
+    """Is this caseless prefix a label the MODEL added? All four must hold:
+    short, no clause punctuation, a colon its English source does not account
+    for, and something left to speak once it goes."""
+    return (len(prefix) <= _CASELESS_LABEL_MAX_CHARS
+            and not any(c in _CLAUSE_PUNCTUATION for c in prefix)
+            and _colon_count(raw) > _colon_count(source_text)
+            and bool(remainder.strip()))
+
+
 def strip_echoed_label(text: str, speaker: str = "", source_text: str = "") -> str:
     """Remove a leading speaker label from one translated line.
 
@@ -240,16 +260,18 @@ def strip_echoed_label(text: str, speaker: str = "", source_text: str = "") -> s
     if not _is_label_shaped(raw, speaker):
         return raw.strip()
     prefix = match.group(1).strip()
-    if (source_text and _fold(prefix) != _fold(speaker)
-            and _is_caseless(prefix)
-            and _colon_count(raw) <= _colon_count(source_text)):
+    if (_fold(prefix) != _fold(speaker) and _is_caseless(prefix)
+            and not _caseless_label_evidence(prefix, raw[match.end():],
+                                             raw, source_text)):
         # A CASELESS prefix (Chinese, Japanese, Devanagari) is label-shaped by
         # the rule above whatever it says, so "聞け、裏切り者よ：忠誠にかけて"
         # lost its opening clause and a line that was only "记住：" stripped to
-        # empty and killed the episode on every retry (Fable review of the
-        # 2.3.65 E2B leg, 2026-11-27). The tell that the model ADDED a label
-        # is a colon the English line does not have: the translation carries
-        # more colons than its source. A colon the source has is the speaker's.
+        # empty and killed the episode on every retry (Fable and Sonnet
+        # reviews of the 2.3.65 E2B leg, 2026-11-27). Without the speaker's
+        # translated name to compare against, the strip needs positive
+        # evidence; when the evidence is mixed the words stay, because a name
+        # read aloud is a nuisance and a lost clause or an emptied line is
+        # worse.
         return raw.strip()
     # An empty remainder means the model returned ONLY a label. Returning the
     # raw label here shipped "ANA:" as the whole spoken line, because the

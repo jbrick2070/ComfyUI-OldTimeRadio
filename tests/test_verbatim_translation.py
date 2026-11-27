@@ -202,7 +202,8 @@ def test_the_writer_translates_under_the_empty_instruction_guard_before_the_outl
     src = inspect.getsource(W.OTR_LedgerScriptWriter.run)
     call = src.index("_OTRVT.translate_plan(")
     guard = src.rindex("if _vt_instruction:", 0, call)
-    assert src.rindex("_EPLANG.native_authoring_instruction(meta)", 0, guard) > 0
+    assert src.rindex("_vt_instruction = _EPLANG.native_translation_instruction(meta)",
+                      0, guard) > 0
     assert call < src.index("verbatim_texts=")
     assert call > src.index('_verbatim_plan = resolved.get("verbatim_plan")')
     assert 'meta.setdefault("verbatim_passage", {})["translation"]' in src
@@ -473,3 +474,68 @@ def test_a_cased_label_is_judged_as_before():
     assert VT.strip_echoed_label("ANTÍFON DE EFESO: Ve, vete.",
                                  "ANTIPHOLUS OF EPHESUS", "Go, get thee gone.") == \
         "Ve, vete."
+
+
+# --------------------------------------------------------------------------- #
+# the translation pass is not told "do not translate" (agy review, 2026-11-27)
+# --------------------------------------------------------------------------- #
+
+_FORBIDS = {
+    "es": "No traduzcas", "pt": "Não traduza", "it": "Non tradurre",
+    "fr": "Ne traduis pas", "hi": "अनुवाद मत करो", "ja": "翻訳ではなく",
+    "zh": "不要翻译",
+}
+
+
+@pytest.mark.parametrize("iso", sorted(_FORBIDS))
+def test_the_translation_lead_drops_only_the_do_not_translate_sentence(iso):
+    meta = {"episode_language": iso}
+    writer = EL.native_authoring_instruction(meta)
+    translation = EL.native_translation_instruction(meta)
+    assert _FORBIDS[iso] in writer
+    assert _FORBIDS[iso] not in translation
+    assert translation and translation != writer
+
+
+def test_mandarin_keeps_its_script_rule_when_translating():
+    lead = EL.native_translation_instruction({"episode_language": "zh"})
+    assert "简体字" in lead and "不要写粤语" in lead
+
+
+def test_english_and_off_get_no_translation_lead():
+    assert EL.native_translation_instruction({"episode_language": "en"}) == ""
+    assert EL.native_translation_instruction({}) == ""
+
+
+def test_a_row_without_a_translation_instruction_falls_back_to_the_writer_one(
+        monkeypatch):
+    row = EL.row_by_iso("ja")
+    trimmed = {k: v for k, v in row.authoring.items()
+               if k != "translation_instruction"}
+
+    class _Bare:
+        iso = row.iso
+        authoring = trimmed
+
+    monkeypatch.setattr(EL, "row_from_meta", lambda meta, path=None: _Bare())
+    assert EL.native_translation_instruction({"episode_language": "ja"}) == \
+        trimmed["writer_instruction"]
+
+
+@pytest.mark.parametrize("translated, source, want", [
+    # Sonnet QA on b32cd3276: no colon in the source used to mean "strip".
+    ("记住：", "Remember.", "记住："),
+    ("聞け、裏切り者よ：忠誠にかけて", "Hear me, traitor, upon your loyalty",
+     "聞け、裏切り者よ：忠誠にかけて"),
+    # A short bare name with a colon the source does not have still goes.
+    ("李尔：听着", "Hear me.", "听着"),
+])
+def test_a_caseless_strip_needs_positive_evidence(translated, source, want):
+    assert VT.strip_echoed_label(translated, "LEAR", source) == want
+
+
+def test_a_caseless_label_is_kept_when_the_evidence_is_mixed():
+    """The source's own colon accounts for the one in the translation, so the
+    words stay: a name read aloud is a nuisance, a lost clause is worse."""
+    assert VT.strip_echoed_label("リア：聞け", "LEAR", "Hear me: traitor") == \
+        "リア：聞け"

@@ -44,6 +44,7 @@ __all__ = [
     "lead_system",
     "load_registry",
     "native_authoring_instruction",
+    "native_translation_instruction",
     "reload_registry",
     "replay_language_check",
     "resolve_label",
@@ -81,6 +82,13 @@ _REQUIRED_ROW_KEYS = (
 _REQUIRED_AUTHORING = (
     "spoken_name", "writer_instruction", "visual_prompt_iso", "title_instruction",
 )
+#: Optional authoring keys: kept when present, validated as non-empty strings.
+#: `translation_instruction` leads the verbatim translation pass. It is the
+#: writer instruction without its "do not translate an English draft"
+#: sentence, which contradicted a pass whose job is to translate (agy review of
+#: the 2.3.65 E2B leg, 2026-11-27). A row without it falls back to the writer
+#: instruction.
+_OPTIONAL_AUTHORING = ("translation_instruction",)
 _REQUIRED_SPOKEN = (
     # The station as this row SAYS it: SIGNAL LOST where the voice reads Latin
     # letters, the row's own script where it cannot (operator 2026-09-29).
@@ -206,6 +214,10 @@ def _validate_row(raw: dict, index: int) -> LanguageRow:
         raise EpisodeLanguageError("%s.row_revision must be >= 1" % path)
     native_header = _nonempty_str(raw["native_header"], path + ".native_header")
     authoring = _require_str_map(raw["authoring"], path + ".authoring", _REQUIRED_AUTHORING)
+    for key in _OPTIONAL_AUTHORING:
+        if key in raw["authoring"]:
+            authoring[key] = _nonempty_str(
+                raw["authoring"][key], "%s.authoring.%s" % (path, key))
     spoken = _require_str_map(raw["spoken"], path + ".spoken", _REQUIRED_SPOKEN)
     credits = _require_str_map(raw["credits"], path + ".credits", _REQUIRED_CREDITS)
     captions = _require_str_map(raw["captions"], path + ".captions", _REQUIRED_CAPTIONS)
@@ -704,6 +716,21 @@ def writer_language_instruction(row: Optional[LanguageRow]) -> str:
     if row is None:
         return ""
     return str(row.authoring.get("writer_instruction") or "")
+
+
+def native_translation_instruction(meta, *, path: str = None) -> str:
+    """The lead for a pass that TRANSLATES into the episode language, or "".
+
+    The row's `translation_instruction` when it has one, else its writer
+    instruction. English (and a legacy unstamped episode) returns "", the same
+    gate `native_authoring_instruction` keeps, so no English episode ever
+    reaches a translation pass.
+    """
+    row = row_from_meta(meta, path=path)
+    if row.iso == ENGLISH_ISO:
+        return ""
+    return str(row.authoring.get("translation_instruction")
+               or writer_language_instruction(row))
 
 
 def native_authoring_instruction(meta, *, path: str = None) -> str:

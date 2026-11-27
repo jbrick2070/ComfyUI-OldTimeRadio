@@ -4052,7 +4052,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         _vreceipt.get("reason") or "no reason")
 
         if _verbatim_plan is not None and _vendored_row is None:
-            _vt_instruction = _EPLANG.native_authoring_instruction(meta)
+            _vt_instruction = _EPLANG.native_translation_instruction(meta)
             if _vt_instruction:
                 try:
                     from . import _otr_verbatim_translation as _OTRVT

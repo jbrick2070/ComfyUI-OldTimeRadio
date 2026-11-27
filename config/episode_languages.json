@@ -11,6 +11,7 @@
       "authoring": {
         "spoken_name": "English",
         "writer_instruction": "Write the episode in English. Titles, dialogue, and announcer copy are English.",
+        "translation_instruction": "Write the episode in English. Titles, dialogue, and announcer copy are English.",
         "visual_prompt_iso": "en",
         "title_instruction": "Author meta.episode_title in English, 2-5 words, at most 28 characters."
       },
@@ -135,6 +136,7 @@
       "authoring": {
         "spoken_name": "español",
         "writer_instruction": "Escribe el episodio en español. Títulos, diálogo y locución del locutor en español. No traduzcas un borrador en inglés: genera en español.",
+        "translation_instruction": "Escribe el episodio en español. Títulos, diálogo y locución del locutor en español.",
         "visual_prompt_iso": "en",
         "title_instruction": "Author meta.episode_title in Spanish, 2-5 words, at most 28 characters, Spanish title case. Accents survive."
       },
@@ -230,6 +232,7 @@
       "authoring": {
         "spoken_name": "português",
         "writer_instruction": "Escreva o episódio em português brasileiro. Títulos, diálogo e locução do locutor em português. Não traduza um rascunho em inglês: gere em português.",
+        "translation_instruction": "Escreva o episódio em português brasileiro. Títulos, diálogo e locução do locutor em português.",
         "visual_prompt_iso": "en",
         "title_instruction": "Author meta.episode_title in Portuguese, 2-5 words, at most 30 characters. Accents survive."
       },
@@ -325,6 +328,7 @@
       "authoring": {
         "spoken_name": "italiano",
         "writer_instruction": "Scrivi l'episodio in italiano. Titoli, dialoghi e locuzione dell'annunciatore in italiano. Non tradurre una bozza inglese: genera in italiano.",
+        "translation_instruction": "Scrivi l'episodio in italiano. Titoli, dialoghi e locuzione dell'annunciatore in italiano.",
         "visual_prompt_iso": "en",
         "title_instruction": "Author meta.episode_title in Italian, 2-5 words, at most 28 characters. Accents survive."
       },
@@ -419,6 +423,7 @@
       "authoring": {
         "spoken_name": "français",
         "writer_instruction": "Écris l'épisode en français. Titres, dialogues et locution de l'annonceur en français. Ne traduis pas un brouillon anglais: génère en français.",
+        "translation_instruction": "Écris l'épisode en français. Titres, dialogues et locution de l'annonceur en français.",
         "visual_prompt_iso": "en",
         "title_instruction": "Author meta.episode_title in French, 2-5 words, at most 28 characters. Accents survive."
       },
@@ -512,6 +517,7 @@
       "authoring": {
         "spoken_name": "हिन्दी",
         "writer_instruction": "पूरा एपिसोड हिन्दी में लिखो। शीर्षक, संवाद और उद्घोषक की भाषा हिन्दी हो। अंग्रेज़ी ड्राफ्ट का अनुवाद मत करो — सीधे हिन्दी में लिखो। स्टेशन का नाम देवनागरी में “सिग्नल लॉस्ट” लिखो।",
+        "translation_instruction": "पूरा एपिसोड हिन्दी में लिखो। शीर्षक, संवाद और उद्घोषक की भाषा हिन्दी हो। स्टेशन का नाम देवनागरी में “सिग्नल लॉस्ट” लिखो।",
         "visual_prompt_iso": "en",
         "title_instruction": "Author meta.episode_title in Hindi, short, Devanagari. Accents and matras survive."
       },
@@ -608,6 +614,7 @@
       "authoring": {
         "spoken_name": "日本語",
         "writer_instruction": "エピソード全体を日本語で書いてください。タイトル、台詞、アナウンサーも日本語。英語原稿の翻訳ではなく、最初から日本語で書くこと。局名は「シグナル・ロスト」とカタカナで書くこと。",
+        "translation_instruction": "エピソード全体を日本語で書いてください。タイトル、台詞、アナウンサーも日本語。局名は「シグナル・ロスト」とカタカナで書くこと。",
         "visual_prompt_iso": "en",
         "title_instruction": "Author meta.episode_title in Japanese, short. CJK glyphs survive."
       },
@@ -707,6 +714,7 @@
       "authoring": {
         "spoken_name": "普通话",
         "writer_instruction": "请用简体字的标准普通话（中国大陆书面语）写完整集，不要写粤语，也不要用繁体字。标题、对白和播音员台词都用中文。不要翻译英文草稿，直接用中文创作。电台名称写作“失落的信号”。",
+        "translation_instruction": "请用简体字的标准普通话（中国大陆书面语）写完整集，不要写粤语，也不要用繁体字。标题、对白和播音员台词都用中文。电台名称写作“失落的信号”。",
         "visual_prompt_iso": "en",
         "title_instruction": "Author meta.episode_title in Mandarin Chinese, short. CJK glyphs survive."
       },
