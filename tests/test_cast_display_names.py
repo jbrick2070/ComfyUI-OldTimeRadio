@@ -225,3 +225,16 @@ def test_ordinary_names_with_marks_and_variants_are_accepted(display, iso):
 ])
 def test_symbols_dandas_and_stray_accents_are_refused(display, iso):
     assert CDN.judge_display_name("X", display, iso) is not None
+
+
+def test_the_reply_has_room_for_a_fenced_pretty_printed_answer():
+    """4060, 2026-11-27: three names, 96 tokens, the reply cut off mid-name on
+    both attempts. The budget now leaves room for the fence and indentation."""
+    assert CDN._output_budget(3) >= 300
+    assert CDN._output_budget(1) >= 192
+    led = _ledger("zh", names=("TRUMAN MING", "MIRA BERNARD", "YURI KENDALL"))
+    slot = _Slot([{"names": [{"name": "TRUMAN MING", "display_name": "杜鲁门·明"},
+                             {"name": "MIRA BERNARD", "display_name": "米拉·伯纳德"},
+                             {"name": "YURI KENDALL", "display_name": "尤里·肯德尔"}]}])
+    CDN.populate(led, technical_fn=slot)
+    assert slot.calls[0][1]["max_new_tokens"] == CDN._output_budget(3)

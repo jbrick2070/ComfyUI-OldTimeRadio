@@ -106,6 +106,13 @@ def _is_latin_or_ascii(ch: str) -> bool:
     return ord(ch) <= 127 or "LATIN" in unicodedata.name(ch, "")
 
 
+def _output_budget(name_count: int) -> int:
+    """Tokens for the reply: a fixed allowance for the JSON frame (and the
+    code fence a small model adds) plus room per name for the echoed Latin
+    name, the native name and the indentation around them."""
+    return 128 + 64 * max(1, int(name_count))
+
+
 def needs_native_names(meta: Any) -> bool:
     """True for a non-English episode whose own language name is not written
     in Latin letters (Hindi, Japanese, Mandarin today). English, Off, legacy,
@@ -195,7 +202,11 @@ def populate(led_data: dict, *, technical_fn: Callable[..., str]) -> dict:
             base_temperature=0.2,
             structural_retry_temperature=0.1,
             repair_prompt_factory=make_dispatching_repair_factory(),
-            max_new_tokens=max(96, 24 * len(wanted)),
+            # Room for a fenced, pretty-printed reply: Gemma 4 E2B on the 4060
+            # (2026-11-27) wrapped three names in ```json and indented them,
+            # ran out at 96 tokens mid-name ("尤里·肯德尔…") on both attempts,
+            # and every name fell back to Latin.
+            max_new_tokens=_output_budget(len(wanted)),
             max_attempts=2,
             helper_name="cast_display_names",
         )
