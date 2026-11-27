@@ -943,7 +943,7 @@ def cfr_flags(ffmpeg):
     ``-vsync`` (deprecated since 5.1) was REMOVED outright by ffmpeg 9: it
     dies at argv parse time with "Unrecognized option 'vsync'" before a single
     frame is read, which killed a whole otherwise-green episode at the scopes
-    stage on the first box carrying ffmpeg 9 (MRKT 2026-08-29). Its
+    stage on the first box carrying ffmpeg 9 (2026-08-29). Its
     replacement ``-fps_mode`` only exists from 5.1 up, so neither spelling is
     safe unconditionally. Same discipline as the kokoro ``repo_id`` gate:
     probe the artifact actually installed, once, and cache per binary path --

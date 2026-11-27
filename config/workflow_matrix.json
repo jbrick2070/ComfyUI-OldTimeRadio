@@ -1210,7 +1210,7 @@
       "episodes": 11,
       "date": "2026-09-13",
       "scope": "six episodes through the E2B writer, AnimateDiff video, kokoro voices and musicgen (2026-08-29) plus four more on 2026-09-13, one for each 8 GB workflow that ships -- otr_8gb_low, otr_8gb_still, otr_8gb_video and otr_8gb_animatediff, every one an act-count-1 episode published to obs on the physical card",
-      "evidence": "the 4060 drill log (retired 2026-09-24; in git history) steps 7-19 (five of five banks published); signal_lost_the_ledger_of_shadows_20260902_134447 (obs, 37 min, RESULT SUCCESS + obs_publish OK); the 4060 drill log (retired 2026-09-24; in git history) 2026-09-13 (shipping_set_20260913_045924, three filenames and byte counts verified on disk; the animatediff re-test at 14:04 verified as D:\\output\\otr\\obs\\the_strangling_flicker_20260913_140440__rfrc__adhv__none__koko__orig__q354b__mgen_final.mp4)"
+      "evidence": "the 4060 drill log (retired 2026-09-24; in git history) steps 7-19 (five of five banks published); signal_lost_the_ledger_of_shadows_20260902_134447 (obs, 37 min, RESULT SUCCESS + obs_publish OK); the 4060 drill log (retired 2026-09-24; in git history) 2026-09-13 (shipping_set_20260913_045924, three filenames and byte counts verified on disk; the animatediff re-test at 14:04 verified as the_strangling_flicker_20260913_140440__rfrc__adhv__none__koko__orig__q354b__mgen_final.mp4 in the obs folder)"
     },
     {
       "workflows": "otr_16gb_*",

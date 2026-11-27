@@ -51,8 +51,8 @@ _NVENC_MAX_TIMEOUTS = 3
 
 #: Refusals that depend on the MOMENT, not the machine:
 #:   * "OpenEncodeSessionEx failed: incompatible client key (21)" -- the
-#:     GeForce CONCURRENT-SESSION CAP on current drivers. MEASURED on MRKT (RTX
-#:     4060 Laptop, driver 617.42, ffmpeg 9.0, 2026-10-14): twelve live
+#:     GeForce CONCURRENT-SESSION CAP on current drivers. MEASURED on an RTX
+#:     4060 Laptop (driver 617.42, ffmpeg 9.0, 2026-10-14): twelve live
 #:     h264_nvenc encodes ran, and the thirteenth session was refused with
 #:     exactly this. NVIDIA's header calls it a licensing refusal, and the r1
 #:     review dropped it on that reading; the hardware says otherwise.
@@ -60,7 +60,7 @@ _NVENC_MAX_TIMEOUTS = 3
 #:   * MEMORY EXHAUSTION ANYWHERE in the probe -- "out of memory" (the same cap
 #:     on older drivers, NVENC surface allocation, VRAM), CUDA_ERROR_OUT_OF_
 #:     MEMORY, "Cannot allocate memory" (the host). Memory pressure passes. A
-#:     probe with 48 MB of VRAM free still ENCODED on MRKT, so model weights
+#:     probe with 48 MB of VRAM free still ENCODED there, so model weights
 #:     alone rarely trip this; when something does, it clears.
 #: The costs are lopsided (codex r2): read a permanent refusal as passing and a
 #: box pays a sub-second refusal per cooldown; read a passing one as permanent
