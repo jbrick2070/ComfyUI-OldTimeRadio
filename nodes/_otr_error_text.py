@@ -14,6 +14,8 @@ policy is applied once, at the node boundary, rather than at each raise:
   component, in place, then propagates unchanged: same type, same traceback,
   same identity, so ComfyUI's interrupt and out-of-memory handling see exactly
   what they saw before.
+  The text a node returns for the canvas (``ui["text"]``) is stored and
+  served the same way, so the same wrapper applies the same rule to it.
 * ``redact_paths(text)`` is the string rule, exposed for callers that build
   user-facing text themselves.
 
@@ -142,6 +144,28 @@ def redact_exception(exc: BaseException) -> BaseException:
     return exc
 
 
+def _redact_ui_text(result):
+    """Cut absolute paths in the TEXT a node shows on the canvas; return
+    ``result``.
+
+    A node that returns ``{"ui": {"text": [...]}, "result": ...}`` has that
+    text stored in the prompt's history and sent on the websocket, which any
+    client that can reach the server reads -- the same audience as exception
+    text. Only ``ui["text"]`` is touched: the file references beside it
+    (``filename`` / ``subfolder`` / ``type``) are already relative to
+    ComfyUI's own folders, and ``result`` is what the next node receives, so
+    a path in it must stay whole.
+    """
+    if isinstance(result, dict):
+        ui = result.get("ui")
+        if isinstance(ui, dict) and ui.get("text"):
+            try:
+                ui["text"] = _redact_value(ui["text"])
+            except Exception:  # noqa: BLE001 -- never fail a finished node over its label
+                pass
+    return result
+
+
 def _guarded(func):
     if getattr(func, "__otr_redacts_paths__", False):
         return func
@@ -149,7 +173,7 @@ def _guarded(func):
         @functools.wraps(func)
         async def guarded(*args, **kwargs):
             try:
-                return await func(*args, **kwargs)
+                return _redact_ui_text(await func(*args, **kwargs))
             except Exception as exc:
                 redact_exception(exc)
                 raise
@@ -157,7 +181,7 @@ def _guarded(func):
         @functools.wraps(func)
         def guarded(*args, **kwargs):
             try:
-                return func(*args, **kwargs)
+                return _redact_ui_text(func(*args, **kwargs))
             except Exception as exc:
                 redact_exception(exc)
                 raise

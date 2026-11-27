@@ -174,6 +174,55 @@ def test_guarded_async_node_stays_a_coroutine_function():
         asyncio.run(_AsyncNode().work(where="/srv/someone/z.wav"))
 
 
+class _CanvasTextNode:
+    FUNCTION = "show"
+
+    def show(self, where):
+        return {"ui": {"text": ["saved to " + where, "second " + where],
+                       "video": [{"filename": "ep.mp4", "subfolder": "otr/obs",
+                                  "type": "output"}]},
+                "result": (where, "report for " + where)}
+
+
+class _AsyncCanvasTextNode:
+    FUNCTION = "show"
+
+    async def show(self, where):
+        return {"ui": {"text": ["saved to " + where]}, "result": (where,)}
+
+
+def test_guarded_node_redacts_its_canvas_text_and_nothing_else():
+    """A node's `ui` text is stored in /history and sent on the websocket with
+    no login, exactly like exception text, so the same wrapper cuts paths in
+    it. The file references beside it are already relative, and `result` is
+    what the next node receives: both pass through whole."""
+    guard_node_class(_CanvasTextNode)
+    where = "/home/someone/ComfyUI/output/otr/obs/ep.mp4"
+    out = _CanvasTextNode().show(where)
+    assert out["ui"]["text"] == ["saved to ep.mp4", "second ep.mp4"]
+    assert out["ui"]["video"] == [{"filename": "ep.mp4", "subfolder": "otr/obs",
+                                   "type": "output"}]
+    assert out["result"] == (where, "report for " + where)
+
+
+def test_guarded_async_node_redacts_its_canvas_text():
+    guard_node_class(_AsyncCanvasTextNode)
+    out = asyncio.run(_AsyncCanvasTextNode().show(r"C:\Users\someone\out\ep.mp4"))
+    assert out["ui"]["text"] == ["saved to ep.mp4"]
+    assert out["result"] == (r"C:\Users\someone\out\ep.mp4",)
+
+
+def test_a_plain_tuple_result_passes_through_the_guard_untouched():
+    class _Tuple:
+        FUNCTION = "run"
+
+        def run(self):
+            return ("/home/someone/x.wav",)
+
+    guard_node_class(_Tuple)
+    assert _Tuple().run() == ("/home/someone/x.wav",)
+
+
 def test_guarding_twice_wraps_once():
     guard_node_class(_Node)
     first = vars(_Node)["run"]

@@ -157,7 +157,7 @@ class TestItCannotHangTheQueue:
 
         ui = MUX._canvas_preview(str(episode), "/obs/copy.mp4")
         assert "images" not in ui
-        assert ui["text"] == ["/obs/copy.mp4"]
+        assert ui["text"] == ["copy.mp4"]
 
 
 class TestItDegradesInSteps:
@@ -165,13 +165,13 @@ class TestItDegradesInSteps:
             self, episode, comfy_temp, monkeypatch):
         _stub_ffmpeg(monkeypatch, path="")
         ui = MUX._canvas_preview(str(episode), "/obs/copy.mp4")
-        assert ui == {"text": ["/obs/copy.mp4"]}
+        assert ui == {"text": ["copy.mp4"]}
 
     def test_no_comfyui_still_names_the_file(self, episode, monkeypatch):
         """Under pytest there is no `folder_paths`; the helper must not care."""
         monkeypatch.setitem(sys.modules, "folder_paths", None)
         ui = MUX._canvas_preview(str(episode), "/obs/copy.mp4")
-        assert ui == {"text": ["/obs/copy.mp4"]}
+        assert ui == {"text": ["copy.mp4"]}
 
     def test_a_missing_episode_is_not_an_error(self, tmp_path):
         ui = MUX._canvas_preview(str(tmp_path / "gone.mp4"), "")
@@ -189,13 +189,16 @@ class TestTheWithheldEpisodeSaysSo:
         ui = MUX._canvas_preview(str(episode), None)
         text = ui["text"][0]
         assert "not published" in text
-        assert str(episode) in text
+        # The file is named; the folders above it are not (the text is stored
+        # in /history, which needs no login).
+        assert episode.name in text
+        assert str(episode.parent) not in text
 
     def test_a_published_episode_names_the_obs_copy_only(
             self, episode, comfy_temp, monkeypatch):
         _stub_ffmpeg(monkeypatch, path="")
         ui = MUX._canvas_preview(str(episode), "/obs/copy.mp4")
-        assert ui["text"] == ["/obs/copy.mp4"]
+        assert ui["text"] == ["copy.mp4"]
         assert "not published" not in ui["text"][0]
 
 
@@ -223,6 +226,26 @@ class TestTheAppPlaysTheEpisode:
         ui = MUX._canvas_preview(str(episode), str(published))
         assert ui["video"] == [{"filename": published.name,
                                 "subfolder": "otr/obs", "type": "output"}]
+
+    def test_the_location_is_shown_relative_to_the_output_folder(
+            self, episode, comfy_output):
+        """THE DEFECT THIS PINS (shipped through 2.3.64): the canvas text was
+        the absolute path of the published copy, and ComfyUI stores a node's
+        `ui` text in /history and sends it on the websocket with no login --
+        so every finished episode told any caller the install folder and the
+        account name. "output/otr/obs/<file>" still says where the episode is."""
+        obs = comfy_output / "otr" / "obs"
+        obs.mkdir(parents=True)
+        published = obs / "gauge_20260913__sbke_final.mp4"
+        published.write_bytes(b"\x00" * 8)
+        ui = MUX._canvas_preview(str(episode), str(published))
+        assert ui["text"] == ["output/otr/obs/" + published.name]
+        assert str(comfy_output.parent) not in ui["text"][0]
+
+    def test_a_copy_outside_the_output_folder_is_named_by_file_only(
+            self, episode, comfy_output):
+        ui = MUX._canvas_preview(str(episode), str(episode))
+        assert ui["text"] == [episode.name]
 
     def test_a_file_outside_the_output_tree_is_not_offered(
             self, episode, comfy_output):

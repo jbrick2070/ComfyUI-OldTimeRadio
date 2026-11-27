@@ -176,8 +176,33 @@ def _served_output_ref(path) -> "dict | None":
             "type": "output"}
 
 
+def _shown_location(path) -> str:
+    """Where a file is, as the canvas names it: relative to ComfyUI's output
+    folder when it lives there (``output/otr/obs/ep.mp4``), else its file name.
+
+    NEVER THE ABSOLUTE PATH. The ``ui`` text is stored in the prompt's history
+    and sent on the websocket, which need no login, and an absolute path names
+    the install folder and the account. "output/..." still answers the
+    question the preview exists for -- where is my episode -- because ComfyUI's
+    output folder is the one place every user already knows.
+    """
+    text = str(path or "")
+    if not text:
+        return ""
+    try:
+        import folder_paths  # ComfyUI's own; absent under bare pytest
+        root = os.path.realpath(folder_paths.get_output_directory())
+        rel = os.path.relpath(os.path.realpath(text), root)
+        if (rel != os.pardir and not rel.startswith(os.pardir + os.sep)
+                and not os.path.isabs(rel)):
+            return "output/" + rel.replace(os.sep, "/")
+    except Exception:  # noqa: BLE001 -- no ComfyUI, or another drive: name only
+        pass
+    return os.path.basename(text.rstrip("\\/")) or "episode"
+
+
 def _canvas_preview(final_path: str, obs_copy) -> dict:
-    """A poster frame and the path, for the ComfyUI canvas. Never raises.
+    """A poster frame and the location, for the ComfyUI canvas. Never raises.
 
     Written 2026-09-13 after the first outside user reported a green run with an
     empty canvas and went looking through the filesystem to find out whether it
@@ -193,9 +218,9 @@ def _canvas_preview(final_path: str, obs_copy) -> dict:
     # beside an archival path reads as a normal publish, which is the exact
     # confusion this preview exists to remove. (The mux publishes every
     # finished episode since 2026-10-15, so this is a defensive branch.)
-    where = (str(obs_copy) if obs_copy
+    where = (_shown_location(obs_copy) if obs_copy
              else ("not published -- archived at "
-                   + str(final_path)) if final_path else "")
+                   + _shown_location(final_path)) if final_path else "")
     ui: dict = {}
     try:
         if where:
