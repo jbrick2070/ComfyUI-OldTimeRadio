@@ -39,7 +39,7 @@ import sys
 from pathlib import Path
 
 __all__ = ["redact_paths", "redact_exception", "guard_node_class", "guard_node_classes",
-           "install_log_redaction"]
+           "install_log_redaction", "clean_module_name", "clean_pack_exception_modules"]
 
 # A drive-letter path (C:\a\b, C:/a/b) or a UNC share (\\host\share\a). The
 # drive letter must stand alone, so a URL scheme ("https:/") never matches.
@@ -241,7 +241,41 @@ def _redact_value(value):
     return value
 
 
+def clean_module_name(name):
+    """A module name with the folders cut off it, or ``name`` unchanged.
+
+    ComfyUI imports a custom node pack under a module name that IS the pack
+    folder's absolute path, so every class the pack defines carries that path
+    in ``__module__`` (``<install folder>/custom_nodes/Pack.nodes.mod``, with
+    the machine's own separators).
+    Nothing reads it that way on purpose -- but ComfyUI reports a failed
+    node's ``exception_type`` as ``__module__ + "." + __qualname__``, to the
+    prompt's history and the websocket, with no login, and Python prints the
+    same name on the last line of every traceback. A module name never holds
+    a path separator of its own, so everything up to the last one is the
+    folder path and is dropped: ``Pack.nodes.mod``.
+    """
+    if not isinstance(name, str) or ("/" not in name and "\\" not in name):
+        return name
+    return re.split(r"[\\/]", name)[-1] or name
+
+
+def _clean_class_module(cls) -> None:
+    """Take the folder path off one class's ``__module__``, in place."""
+    try:
+        module = vars(cls).get("__module__")
+        cleaned = clean_module_name(module)
+        if cleaned != module:
+            cls.__module__ = cleaned
+    except Exception:  # noqa: BLE001 -- a class that will not take it is left as it is
+        pass
+
+
 def _redact_one(exc: BaseException) -> None:
+    # The TYPE's name first: it is reported beside the message (see
+    # ``clean_module_name``), and only a class defined in a custom node pack
+    # ever carries a path there.
+    _clean_class_module(type(exc))
     try:
         exc.args = tuple(_redact_value(a) for a in exc.args)
     except Exception:  # noqa: BLE001 -- an exotic args setter must not mask the real error
@@ -363,9 +397,44 @@ def guard_node_class(cls) -> bool:
     return True
 
 
+def clean_pack_exception_modules() -> int:
+    """Take the folder path off the ``__module__`` of every exception class
+    this pack has defined so far; return how many were changed.
+
+    The node-boundary guard does this for an exception as it leaves a node.
+    This covers the ones ComfyUI reports from OUTSIDE a node's own function --
+    an exception raised while it validates a prompt is reported with its type
+    name too. Only exception classes are touched, and only in modules whose
+    source file sits inside this pack.
+    """
+    changed = 0
+    for module in list(sys.modules.values()):
+        try:
+            if not _from_this_pack(getattr(module, "__file__", None)):
+                continue
+            members = list(vars(module).values())
+        except Exception:  # noqa: BLE001 -- a module that will not list itself
+            continue
+        for member in members:
+            try:
+                if not (isinstance(member, type) and issubclass(member, BaseException)):
+                    continue
+                before = vars(member).get("__module__")
+                _clean_class_module(member)
+                changed += vars(member).get("__module__") != before
+            except Exception:  # noqa: BLE001
+                continue
+    return changed
+
+
 def guard_node_classes(classes) -> int:
-    """Guard every class in ``classes``; return how many are guarded."""
-    return sum(1 for cls in classes if guard_node_class(cls))
+    """Guard every class in ``classes``; return how many are guarded. Also
+    cleans the type names of the pack's own exception classes
+    (:func:`clean_pack_exception_modules`), so the one call ``__init__`` makes
+    covers both."""
+    guarded = sum(1 for cls in classes if guard_node_class(cls))
+    clean_pack_exception_modules()
+    return guarded
 
 
 # ---------------------------------------------------------------------------

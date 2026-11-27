@@ -89,8 +89,14 @@ read feeds, an episode renders with no network access.
 - **Errors, log lines and on-canvas text carry no absolute paths.** A path is
   cut to its file name before it leaves a node, in the whole exception chain,
   in the pack's log records and in the text a node draws on the canvas
-  (`nodes/_otr_error_text.py`). No value a node declares to ComfyUI is an
-  absolute path (`tests/test_object_info_has_no_absolute_paths.py`).
+  (`nodes/_otr_error_text.py`). The type name ComfyUI reports beside an
+  error is cut the same way (`tests/test_error_type_names_carry_no_path.py`).
+  No value a node declares to ComfyUI is an absolute path
+  (`tests/test_object_info_has_no_absolute_paths.py`).
+- **What ComfyUI adds by itself.** When any node fails, ComfyUI attaches a
+  traceback that names each source file by its full path, its own files
+  included, and echoes the failing node's inputs. That is ComfyUI's behavior
+  for every pack, and this pack does not alter it.
 - **An episode's record.** Each episode writes a ledger under the output
   folder. It names the files of that episode by absolute path, because later
   steps open them, and it stamps the software it ran on: ComfyUI's version,
