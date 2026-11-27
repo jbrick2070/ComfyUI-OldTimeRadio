@@ -62,8 +62,8 @@ def test_english_makes_no_call_and_changes_no_byte():
 ])
 def test_accepted_names_land_on_the_cast_row_and_the_identity_name_stays(iso, viola, malvolio):
     led = _ledger(iso)
-    slot = _Slot([{"names": [{"name": "VIOLA", "display_name": viola},
-                             {"name": "MALVOLIO", "display_name": malvolio}]}])
+    slot = _Slot([{"names": [{"n": 1, "display_name": viola},
+                             {"n": 2, "display_name": malvolio}]}])
     receipt = CDN.populate(led, technical_fn=slot)
     rows = {r["name"]: r for r in led["cast"]}
     assert rows["VIOLA"]["native_display_name"] == viola
@@ -78,9 +78,9 @@ def test_accepted_names_land_on_the_cast_row_and_the_identity_name_stays(iso, vi
 def test_each_bad_name_keeps_its_latin_spelling_alone():
     led = _ledger("zh", names=("VIOLA", "MALVOLIO", "KENT", "LEAR"))
     slot = _Slot([{"names": [
-        {"name": "VIOLA", "display_name": "VIOLA"},          # echoed
-        {"name": "MALVOLIO", "display_name": "马伏里奥"},     # good
-        {"name": "KENT", "display_name": "Kent the loyal"},  # wrong script
+        {"n": 1, "display_name": "VIOLA"},          # echoed
+        {"n": 2, "display_name": "马伏里奥"},     # good
+        {"n": 3, "display_name": "Kent the loyal"},  # wrong script
         # LEAR missing
     ]}])
     receipt = CDN.populate(led, technical_fn=slot)
@@ -96,8 +96,8 @@ def test_each_bad_name_keeps_its_latin_spelling_alone():
 def test_two_speakers_who_would_read_alike_both_keep_latin():
     led = _ledger("ja", names=("ANTIPHOLUS OF EPHESUS", "ANTIPHOLUS OF SYRACUSE"))
     slot = _Slot([{"names": [
-        {"name": "ANTIPHOLUS OF EPHESUS", "display_name": "アンティフォラス"},
-        {"name": "ANTIPHOLUS OF SYRACUSE", "display_name": "アンティフォラス"}]}])
+        {"n": 1, "display_name": "アンティフォラス"},
+        {"n": 2, "display_name": "アンティフォラス"}]}])
     CDN.populate(led, technical_fn=slot)
     assert all("native_display_name" not in r for r in led["cast"])
 
@@ -203,8 +203,8 @@ def test_a_name_in_the_episodes_script_is_accepted(display, iso):
 
 def test_populate_judges_against_the_episodes_own_script():
     led = _ledger("zh")
-    slot = _Slot([{"names": [{"name": "VIOLA", "display_name": "ヴァイオラ"},
-                             {"name": "MALVOLIO", "display_name": "马伏里奥"}]}])
+    slot = _Slot([{"names": [{"n": 1, "display_name": "ヴァイオラ"},
+                             {"n": 2, "display_name": "马伏里奥"}]}])
     CDN.populate(led, technical_fn=slot)
     rows = {r["name"]: r for r in led["cast"]}
     assert "native_display_name" not in rows["VIOLA"]
@@ -233,38 +233,35 @@ def test_the_reply_has_room_for_a_fenced_pretty_printed_answer():
     assert CDN._output_budget(3) >= 300
     assert CDN._output_budget(1) >= 192
     led = _ledger("zh", names=("TRUMAN MING", "MIRA BERNARD", "YURI KENDALL"))
-    slot = _Slot([{"names": [{"name": "TRUMAN MING", "display_name": "杜鲁门·明"},
-                             {"name": "MIRA BERNARD", "display_name": "米拉·伯纳德"},
-                             {"name": "YURI KENDALL", "display_name": "尤里·肯德尔"}]}])
+    slot = _Slot([{"names": [{"n": 1, "display_name": "杜鲁门·明"},
+                             {"n": 2, "display_name": "米拉·伯纳德"},
+                             {"n": 3, "display_name": "尤里·肯德尔"}]}])
     CDN.populate(led, technical_fn=slot)
     assert slot.calls[0][1]["max_new_tokens"] == CDN._output_budget(3)
 
 
-def test_a_reply_that_translated_every_key_is_read_in_order():
-    """Mac, 2026-11-27: Qwen 3.5 4B wrote the katakana into "name" as well."""
+def test_rows_are_matched_by_number_whatever_order_or_key_they_carry():
+    """Mac, 2026-11-27: Qwen 3.5 4B translated the "name" key; Sonnet QA on
+    5b6dcedb0: pairing by position mislabels a reordered reply. The number
+    the name was asked with is the only key."""
     led = _ledger("ja", names=("ORLANDO", "CORIN", "TOUCHSTONE"))
-    slot = _Slot([{"names": [{"name": "オーランドー", "display_name": "オーランドー"},
-                             {"name": "コリン", "display_name": "コリン"},
-                             {"name": "タッチストーン", "display_name": "タッチストーン"}]}])
-    receipt = CDN.populate(led, technical_fn=slot)
+    slot = _Slot([{"names": [{"n": 2, "display_name": "コリン"},
+                             {"n": 3, "display_name": "タッチストーン"},
+                             {"n": 1, "display_name": "オーランドー"}]}])
+    CDN.populate(led, technical_fn=slot)
     rows = {r["name"]: r.get("native_display_name") for r in led["cast"]}
     assert rows == {"ANNOUNCER": None, "ORLANDO": "オーランドー",
                     "CORIN": "コリン", "TOUCHSTONE": "タッチストーン"}
-    assert receipt["paired_by_position"] is True
+    assert "1. ORLANDO" in slot.calls[0][0][1]["content"]
 
 
-def test_a_partly_matching_reply_never_falls_back_to_position():
+def test_an_invented_row_and_a_repeated_number_match_nothing_extra():
     led = _ledger("ja", names=("ORLANDO", "CORIN"))
-    slot = _Slot([{"names": [{"name": "コリン", "display_name": "コリン"},
-                             {"name": "ORLANDO", "display_name": "オーランドー"}]}])
-    CDN.populate(led, technical_fn=slot)
+    slot = _Slot([{"names": [{"n": 0, "display_name": "アナウンサー"},
+                             {"n": 9, "display_name": "タッチストーン"},
+                             {"n": 1, "display_name": "オーランドー"},
+                             {"n": 1, "display_name": "コリン"}]}])
+    receipt = CDN.populate(led, technical_fn=slot)
     rows = {r["name"]: r.get("native_display_name") for r in led["cast"]}
-    assert rows["ORLANDO"] == "オーランドー"
-    assert rows["CORIN"] is None
-
-
-def test_a_short_rewritten_reply_is_not_paired():
-    led = _ledger("ja", names=("ORLANDO", "CORIN", "TOUCHSTONE"))
-    slot = _Slot([{"names": [{"name": "コリン", "display_name": "コリン"}]}])
-    CDN.populate(led, technical_fn=slot)
-    assert all(not r.get("native_display_name") for r in led["cast"])
+    assert rows["ORLANDO"] == "オーランドー" and rows["CORIN"] is None
+    assert receipt["rejected"] == {"CORIN": "missing from the reply"}

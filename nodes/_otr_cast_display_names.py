@@ -79,7 +79,12 @@ _ALLOWED_MARKS = {
 
 
 class _NameRow(BaseModel):
-    name: str
+    """One numbered answer. The row is keyed by the NUMBER the name was asked
+    with, never by the name echoed back: Qwen 3.5 4B translated the "name"
+    key too (Mac, 2026-11-27), and pairing by position instead would put a
+    name on the wrong character when the reply is reordered or slips in an
+    extra row (Sonnet QA on 5b6dcedb0)."""
+    n: int
     display_name: str
 
 
@@ -90,8 +95,8 @@ class CastDisplayNames(BaseModel):
 _SYSTEM = (
     "You write the character names of a radio play the way a viewer of this "
     "episode reads them in captions. Return JSON only: {\"names\": "
-    "[{\"name\": \"<the name exactly as given>\", \"display_name\": \"...\"}]} "
-    "with one entry per given name, in the same order. Transliterate personal "
+    "[{\"n\": <the number the name was given with>, \"display_name\": \"...\"}]} "
+    "with one entry per numbered name. Transliterate personal "
     "and place names into the episode's script, using the established "
     "rendering where a famous one exists (Shakespeare's characters have "
     "standard published names). Translate generic role words, ordinals and "
@@ -193,7 +198,8 @@ def populate(led_data: dict, *, technical_fn: Callable[..., str]) -> dict:
         receipt["asked"] = len(wanted)
         iso = _EPLANG.row_from_meta(meta).iso
         lead = _EPLANG.native_translation_instruction(meta)
-        user = ("Character names:\n" + "\n".join(f"- {n}" for n in wanted))
+        user = ("Character names:\n"
+                + "\n".join(f"{i}. {n}" for i, n in enumerate(wanted, 1)))
         result = structured_call(
             prompt=[{"role": "system", "content": _EPLANG.lead_system(_SYSTEM, lead)},
                     {"role": "user", "content": user}],
@@ -211,19 +217,11 @@ def populate(led_data: dict, *, technical_fn: Callable[..., str]) -> dict:
             helper_name="cast_display_names",
         )
         proposed: dict[str, str] = {}
-        keys = [" ".join(str(item.name or "").split()) for item in result.names]
-        matched = [next((n for n in wanted if n.casefold() == k.casefold()), None)
-                   for k in keys]
-        if len(keys) == len(wanted) and not any(matched):
-            # QWEN TRANSLATED THE KEY TOO (Mac, 2026-11-27): it returned
-            # {"name": "コリン", "display_name": "コリン"} for CORIN, so no
-            # reply matched and every name fell back to Latin. When EVERY key
-            # was rewritten and the count is exact, the reply is read in the
-            # order it was asked for. A partial match never falls back to
-            # position: one reordered row would put a name on the wrong
-            # character.
-            matched = list(wanted)
-            receipt["paired_by_position"] = True
+        # Each row names the number its name was asked with; a number outside
+        # the list (an invented row) matches nothing, and the first answer for
+        # a number wins.
+        matched = [wanted[item.n - 1] if 1 <= int(item.n) <= len(wanted) else None
+                   for item in result.names]
         for item, match in zip(result.names, matched):
             if match is None or match in proposed:
                 continue
