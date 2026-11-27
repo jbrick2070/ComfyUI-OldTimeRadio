@@ -105,15 +105,13 @@ def ensure_hf_token() -> str | None:
     _HF_TOKEN_CACHE["value"] = token
     _HF_TOKEN_CACHE["resolved"] = True
 
+    # DEBUG, AND PRESENCE ONLY. ComfyUI serves its log with no login, and
+    # where a credential came from and how long it is are facts about the
+    # credential: both were logged at INFO on every start until 2.3.64.
     if token:
-        # Log presence + length, never the token itself.
-        log.info(
-            "[hf_token] HF_TOKEN resolved from %s (len=%d)",
-            source,
-            len(token),
-        )
+        log.debug("[hf_token] HF_TOKEN found (%s)", source)
     else:
-        log.info("[hf_token] No HF_TOKEN found in env or HKCU -- public repos only")
+        log.debug("[hf_token] no HF_TOKEN found -- public repos only")
 
     return token
 
