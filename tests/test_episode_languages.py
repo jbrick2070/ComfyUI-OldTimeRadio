@@ -250,11 +250,17 @@ def test_portuguese_house_calls_from_the_fable_seed():
 
 @pytest.mark.parametrize("label", ADMITTED_LABELS)
 def test_every_admitted_row_carries_every_english_key_non_empty(label):
-    """Admission test: same English keys on every table, no empty value."""
+    """Admission test: same English keys on every table, no empty value.
+
+    Optional authoring keys are left out of the comparison: English never
+    translates, so it carries no `translation_instruction`, and adding one
+    would change its row hash for nothing."""
     english = el.row_by_label("English")
     row = el.row_by_label(label)
+    optional = set(el._OPTIONAL_AUTHORING)
     for table in ("spoken", "credits", "captions", "authoring"):
-        assert set(getattr(row, table)) == set(getattr(english, table)), \
+        skip = optional if table == "authoring" else set()
+        assert set(getattr(row, table)) - skip == set(getattr(english, table)) - skip, \
             "%s.%s key drift" % (label, table)
         for key, value in getattr(row, table).items():
             assert isinstance(value, str) and value.strip(), \
@@ -582,3 +588,12 @@ def test_an_older_torch_kokoro_does_not_count_the_copy(monkeypatch):
     assert el._pack_copy_lang("ja") is None
     monkeypatch.setenv("OTR_KOKORO_BACKEND", "onnx")
     assert el._pack_copy_lang("ja") == "j"
+
+
+def test_english_row_is_unchanged_by_the_translation_instruction_key():
+    """English never translates; its row (and so its row hash in every replay
+    receipt) carries no translation_instruction. Every non-English row does."""
+    assert "translation_instruction" not in el.row_by_label("English").authoring
+    for label in ADMITTED_LABELS:
+        if label != "English":
+            assert el.row_by_label(label).authoring["translation_instruction"].strip()
