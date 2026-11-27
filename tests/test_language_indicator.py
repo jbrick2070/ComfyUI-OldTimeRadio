@@ -16,10 +16,13 @@ from nodes import video_engine as VE
 
 
 @pytest.mark.parametrize("iso, label", [
-    ("es", "Spanish"), ("pt", "Portuguese"), ("it", "Italian"), ("fr", "French"),
-    ("hi", "Hindi"), ("ja", "Japanese"), ("zh", "Mandarin"),
+    # The row's own name; the English one rides beside it only where the own
+    # name is not in Latin letters (operator 2026-09-18 reads the card, and a
+    # native viewer reads it too -- 2026-11-27).
+    ("es", "Español"), ("pt", "Português"), ("it", "Italiano"), ("fr", "Français"),
+    ("hi", "हिन्दी (Hindi)"), ("ja", "日本語 (Japanese)"), ("zh", "普通话 (Mandarin)"),
 ])
-def test_a_non_english_ledger_yields_its_iso_and_english_label(iso, label):
+def test_a_non_english_ledger_yields_its_iso_and_card_label(iso, label):
     assert VE._language_marks({"meta": {"episode_language": iso}}) == ("_" + iso, label)
 
 
@@ -45,7 +48,7 @@ def _renderer(title, card_label=""):
     return VE._CRTRenderer(64, 64, title, [], 24, card_label=card_label)
 
 
-def test_the_hero_card_carries_the_english_label_only_off_english():
+def test_the_hero_card_carries_the_label_only_off_english():
     assert _renderer("El mapa prohibido")._hero_text() == "EL MAPA PROHIBIDO"
     assert _renderer("El mapa prohibido", "Spanish")._hero_text() == \
         "EL MAPA PROHIBIDO · SPANISH"
@@ -184,3 +187,56 @@ def test_every_registry_row_declares_a_known_policy():
     for row in EL.load_registry()[0]:
         policy = (row.captions or {}).get("font_policy")
         assert policy in VE.KNOWN_FONT_POLICIES, (row.iso, policy)
+
+
+def test_a_non_latin_card_reads_in_both_scripts():
+    assert _renderer("黒い霧の帳", "日本語 (Japanese)")._hero_text() == \
+        "黒い霧の帳 · 日本語 (JAPANESE)"
+
+
+# --------------------------------------------------------------------------- #
+# the title reveal scrambles in the title's own script (2026-11-27: a Japanese
+# title read "黒い霧のM H FYQ7--BO" mid-reveal)
+# --------------------------------------------------------------------------- #
+
+from nodes import _otr_title_card as TC  # noqa: E402
+
+
+@pytest.mark.parametrize("title", [
+    "黒い霧の帳 · 日本語 (JAPANESE)", "影子里的困惑 · 普通话 (MANDARIN)",
+])
+def test_a_cjk_title_never_scrambles_through_latin_letters_for_its_own_glyphs(title):
+    own = set(title)
+    for frame in range(40):
+        for reveal in range(len(title)):
+            shown = TC.decode_line(title, reveal, TC.decode_rng(title, frame, "hero"))
+            cjk_slots = [c for c in shown[reveal:] if ord(c) > 0x2E80]
+            assert all(c in own for c in cjk_slots)
+
+
+def test_a_hindi_scramble_never_shows_a_vowel_sign_without_its_letter():
+    import unicodedata
+    title = "बॉक्सट्री की छाया · हिन्दी (HINDI)"
+    for frame in range(40):
+        shown = TC.decode_line(title, 0, TC.decode_rng(title, frame, "hero"))
+        for i, c in enumerate(shown):
+            if unicodedata.category(c).startswith("M"):
+                assert i > 0 and not shown[i - 1].isspace()
+
+
+@pytest.mark.parametrize("title", [
+    "THE SHIVERING GAUGE", "EL MAPA PROHIBIDO · ESPAÑOL", "=== SIGNAL LOST ===",
+])
+def test_a_latin_title_draws_exactly_the_original_glyphs(title):
+    import numpy as np
+    for frame in range(30):
+        for reveal in range(len(title) + 1):
+            rng = TC.decode_rng(title, frame, "hero")
+            expected = []
+            ref = TC.decode_rng(title, frame, "hero")
+            for i, ch in enumerate(title):
+                if ch == " " or i < reveal:
+                    expected.append(ch)
+                else:
+                    expected.append(TC.DECODE_GLYPHS[int(ref.integers(0, len(TC.DECODE_GLYPHS)))])
+            assert TC.decode_line(title, reveal, rng) == "".join(expected)

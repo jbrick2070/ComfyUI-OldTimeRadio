@@ -96,6 +96,25 @@ _FONT_PATH_KEY = object()          # a sentinel no real key can equal
 _FONT_LOCK = threading.Lock()
 
 
+def _card_language_label(row) -> str:
+    """The language as the hero card names it: the row's own name, plus the
+    English one in parentheses when the own name is not in Latin letters.
+
+    Two readers (2026-11-27): a native viewer, for whom "· JAPANESE" was an
+    English word on a Japanese card, and the operator, whose 2026-09-18 ask
+    was a label he can read without knowing the language. "日本語 (Japanese)"
+    serves both; "Español" already serves both on its own.
+    """
+    native = str(getattr(row, "native_header", "") or "").strip()
+    english = str(getattr(row, "label", "") or "").strip()
+    if not native:
+        return english
+    if all(ord(c) <= 127 or "LATIN" in unicodedata.name(c, "")
+           for c in native if c.isalpha()):
+        return native
+    return f"{native} ({english})" if english else native
+
+
 def _language_marks(led) -> "tuple[str, str]":
     """``("_es", "Spanish")`` for a non-English ledger; ``("", "")`` for
     English, Off, a legacy ledger, or an unreadable row.
@@ -115,7 +134,7 @@ def _language_marks(led) -> "tuple[str, str]":
         row = _EPLANG.row_from_meta(meta)
         if row.iso == _EPLANG.ENGLISH_ISO:
             return "", ""
-        return "_" + row.iso, str(row.label)
+        return "_" + row.iso, _card_language_label(row)
     except Exception:  # noqa: BLE001 -- a label never breaks the render
         return "", ""
 

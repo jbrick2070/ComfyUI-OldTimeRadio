@@ -36,6 +36,7 @@ edge between them would be a cycle. UTF-8, no BOM.
 from __future__ import annotations
 
 import hashlib
+import unicodedata
 
 import numpy as np
 
@@ -78,15 +79,55 @@ def decode_rng(title, fi, salt):
     return np.random.default_rng(seed)
 
 
+def _scrambles_latin(ch):
+    """ASCII and Latin letters (Ñ, É, Ç) scramble through ``DECODE_GLYPHS``, so
+    an English, Spanish, Portuguese, Italian or French title is unchanged."""
+    return ord(ch) <= 127 or "LATIN" in unicodedata.name(ch, "")
+
+
+def _own_script_pool(text):
+    """The title's own base letters outside ASCII, in order, de-duplicated.
+
+    A Japanese, Chinese or Hindi title scrambled through A-Z read as Latin
+    garbage on screen until it resolved ("黒い霧のM H FYQ7--BO", 2.3.66 desktop
+    leg, 2026-11-27). Drawing from the title's own letters keeps the scramble in
+    its script and inside the glyphs the row's font is already known to carry.
+    Combining marks (Devanagari vowel signs) are left out: one without its base
+    renders as a dotted circle.
+    """
+    pool = []
+    for ch in text:
+        if not _scrambles_latin(ch) and not ch.isspace() and ch.isalpha() \
+                and not unicodedata.category(ch).startswith("M") and ch not in pool:
+            pool.append(ch)
+    return pool
+
+
 def decode_line(text, reveal_n, rng):
     """Left-to-right decode: the first ``reveal_n`` chars are solid, the rest are
-    seeded scramble. Spaces stay spaces so word shape survives the scramble."""
+    seeded scramble. Spaces stay spaces so word shape survives the scramble.
+
+    An ASCII character scrambles through ``DECODE_GLYPHS`` exactly as it always
+    has (one draw per character), and so does a Latin letter, so English and
+    the Romance rows are byte-identical. Any other character scrambles through
+    the title's own letters, and a combining mark stays hidden until revealed."""
+    pool = None
     out = []
     for i, ch in enumerate(text):
         if ch == " " or i < reveal_n:
             out.append(ch)
         else:
-            out.append(DECODE_GLYPHS[int(rng.integers(0, len(DECODE_GLYPHS)))])
+            if pool is None:
+                pool = _own_script_pool(text)
+            if _scrambles_latin(ch) or not pool:
+                # A title with no letters of another script (English, the
+                # Romance rows, a "·" separator among Latin words) keeps the
+                # original draw exactly.
+                out.append(DECODE_GLYPHS[int(rng.integers(0, len(DECODE_GLYPHS)))])
+            elif unicodedata.category(ch).startswith("M"):
+                continue
+            else:
+                out.append(pool[int(rng.integers(0, len(pool)))])
     return "".join(out)
 
 
