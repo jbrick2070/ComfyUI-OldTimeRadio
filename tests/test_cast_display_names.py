@@ -257,11 +257,29 @@ def test_rows_are_matched_by_number_whatever_order_or_key_they_carry():
 
 def test_an_invented_row_and_a_repeated_number_match_nothing_extra():
     led = _ledger("ja", names=("ORLANDO", "CORIN"))
-    slot = _Slot([{"names": [{"n": 0, "display_name": "アナウンサー"},
-                             {"n": 9, "display_name": "タッチストーン"},
+    slot = _Slot([{"names": [{"n": 9, "display_name": "タッチストーン"},
                              {"n": 1, "display_name": "オーランドー"},
                              {"n": 1, "display_name": "コリン"}]}])
     receipt = CDN.populate(led, technical_fn=slot)
     rows = {r["name"]: r.get("native_display_name") for r in led["cast"]}
     assert rows["ORLANDO"] == "オーランドー" and rows["CORIN"] is None
     assert receipt["rejected"] == {"CORIN": "missing from the reply"}
+
+
+def test_a_reply_counted_from_zero_is_void():
+    """Sonnet QA on 7502d17bd: 0..k-1 would put every name one character early."""
+    led = _ledger("ja", names=("ORLANDO", "CORIN"))
+    slot = _Slot([{"names": [{"n": 0, "display_name": "オーランドー"},
+                             {"n": 1, "display_name": "コリン"}]}])
+    receipt = CDN.populate(led, technical_fn=slot)
+    assert all(not r.get("native_display_name") for r in led["cast"])
+    assert receipt.get("error")
+
+
+def test_the_first_answer_for_a_number_wins_even_when_it_is_refused():
+    led = _ledger("ja", names=("ORLANDO",))
+    slot = _Slot([{"names": [{"n": 1, "display_name": "ORLANDO"},
+                             {"n": 1, "display_name": "オーランドー"}]}])
+    receipt = CDN.populate(led, technical_fn=slot)
+    assert led["cast"][1].get("native_display_name") is None
+    assert receipt["rejected"] == {"ORLANDO": "the Latin name echoed"}

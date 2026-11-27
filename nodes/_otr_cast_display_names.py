@@ -95,8 +95,8 @@ class CastDisplayNames(BaseModel):
 _SYSTEM = (
     "You write the character names of a radio play the way a viewer of this "
     "episode reads them in captions. Return JSON only: {\"names\": "
-    "[{\"n\": <the number the name was given with>, \"display_name\": \"...\"}]} "
-    "with one entry per numbered name. Transliterate personal "
+    "[{\"n\": <the number the name is listed with, starting at 1>, "
+    "\"display_name\": \"...\"}]} with one entry per numbered name. Transliterate personal "
     "and place names into the episode's script, using the established "
     "rendering where a famous one exists (Shakespeare's characters have "
     "standard published names). Translate generic role words, ordinals and "
@@ -220,11 +220,17 @@ def populate(led_data: dict, *, technical_fn: Callable[..., str]) -> dict:
         # Each row names the number its name was asked with; a number outside
         # the list (an invented row) matches nothing, and the first answer for
         # a number wins.
-        matched = [wanted[item.n - 1] if 1 <= int(item.n) <= len(wanted) else None
-                   for item in result.names]
-        for item, match in zip(result.names, matched):
-            if match is None or match in proposed:
+        if any(item.n == 0 for item in result.names):
+            # Counted from zero, every answer would land one character early,
+            # and nothing would show it (Sonnet QA on 7502d17bd). The whole
+            # reply is void and every name keeps its Latin spelling.
+            raise ValueError("the reply numbered the names from 0")
+        seen_numbers: set[int] = set()
+        for item in result.names:
+            if not 1 <= item.n <= len(wanted) or item.n in seen_numbers:
                 continue
+            seen_numbers.add(item.n)
+            match = wanted[item.n - 1]
             reason = judge_display_name(match, item.display_name, iso)
             if reason:
                 receipt["rejected"][match] = reason
