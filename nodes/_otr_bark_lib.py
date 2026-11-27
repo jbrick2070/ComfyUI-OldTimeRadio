@@ -21,6 +21,7 @@ Special Bark tokens (insert in text):
 v1.0  2026-04-04  Jeffrey Brick
 """
 
+import contextlib
 import logging
 import os
 import re
@@ -121,6 +122,40 @@ logging.getLogger("huggingface_hub.file_download").setLevel(logging.WARNING)
 
 # Bounded cache with device tracking (Section 34, Section 5)
 _BARK_CACHE = {"model": None, "processor": None, "device": None}
+
+
+@contextlib.contextmanager
+def _no_background_conversion():
+    """Keep transformers from starting its safetensors-conversion thread for
+    the length of ONE load.
+
+    Bark's repos carry ``pytorch_model.bin`` and no safetensors file. When
+    transformers fetches such a model from the Hub it starts a background
+    thread that asks a hosted conversion service whether a safetensors copy
+    exists; with a response it cannot parse, that thread prints a
+    JSONDecodeError traceback into the log of an otherwise good run.
+
+    Until 2.3.64 the pack answered this at ComfyUI's start, by replacing
+    ``transformers.safetensors_conversion`` in ``sys.modules`` for the whole
+    process -- which switched the feature off for every other pack as well.
+    This is the scoped answer: the name is swapped only while Bark's own Hub
+    load runs, and is put back however that load ends. A transformers build
+    that has no such name is left exactly as it is.
+    """
+    missing = object()
+    try:
+        import transformers.modeling_utils as _modeling_utils
+        original = getattr(_modeling_utils, "auto_conversion", missing)
+    except Exception:  # noqa: BLE001 -- no transformers: nothing to quiet
+        _modeling_utils, original = None, missing
+    if original is missing:
+        yield
+        return
+    _modeling_utils.auto_conversion = lambda *args, **kwargs: None
+    try:
+        yield
+    finally:
+        _modeling_utils.auto_conversion = original
 
 
 def _load_bark(model_id="suno/bark", device=None):
@@ -266,12 +301,14 @@ def _load_bark(model_id="suno/bark", device=None):
             except OSError as local_err:
                 log.info("[Bark] local_files_only=True failed for model (%s), attempting Hub fallback...", local_err)
                 try:
-                    model = BarkModel.from_pretrained(
-                        model_id,
-                        torch_dtype=dtype,
-                        device_map=device_map,
-                        cache_dir=cache_dir_path,
-                    )
+                    # The one load that reaches the Hub: see the guard.
+                    with _no_background_conversion():
+                        model = BarkModel.from_pretrained(
+                            model_id,
+                            torch_dtype=dtype,
+                            device_map=device_map,
+                            cache_dir=cache_dir_path,
+                        )
                     log.info(f"Bark model downloaded and cached on {device}")
                 except Exception as hub_err:
                     log.error("[Bark] Hub fallback failed. Ensure model is downloaded or Hub is reachable: %s", hub_err)

@@ -1,8 +1,13 @@
 """prestartup_script.py -- runs BEFORE ComfyUI imports ANY node module.
 
-Early mock for ``transformers.safetensors_conversion``, injected into
-``sys.modules`` before ComfyUI begins loading custom nodes, so the background
-conversion check never spawns its JSONDecodeError thread.
+What it does, all of it: installs the pack's own log-path redaction, sets
+three library environment defaults if they are unset, picks one Hugging Face
+cache folder, fetches the Kokoro voice files once, and on Apple Silicon asks
+ComfyUI for PyTorch attention. It changes nothing in any other package: until
+2.3.64 it also replaced ``transformers.safetensors_conversion`` in
+``sys.modules`` for the whole process and left this pack's ``nodes`` folder at
+the front of ``sys.path``; both are gone (see ``_otr_bark_lib`` for the scoped
+guard that replaced the first).
 
 ASCII-ONLY, AND THAT IS LOAD-BEARING HERE (2026-07-29). This file used
 em-dashes, box-drawing rules and a check-mark emoji, and the closing ``print``
@@ -12,7 +17,7 @@ on a cp1252 Windows console -- so EVERY boot logged
     [ERROR] Failed to execute startup-script: ... prestartup_script.py
     0.0 seconds (PRESTARTUP FAILED): ... ComfyUI-OldTimeRadio
 
-The mock itself had already been installed by then, so the pack worked and the
+Everything above the print had already run by then, so the pack worked and the
 banner lied. Two costs: a permanent red herring in the boot log for whoever
 reads it next, and a silent trapdoor -- anything added BELOW that print would
 never have run, and nothing would have said so. The repo's UTF-8/no-BOM/
@@ -27,7 +32,7 @@ from os import environ  # bound once at import; prestartup runs before the pack'
 import sys
 import types
 
-# Duplicate pack folders each run this file. The mock is idempotent; the
+# Duplicate pack folders each run this file. Its steps are idempotent; the
 # OK banner is not. A second copy must not look like a second pack booting.
 _OTR_PRESTARTUP_GUARD = "_comfyui_old_time_radio_prestartup_singleton"
 _otr_pre_dup = _OTR_PRESTARTUP_GUARD in sys.modules
@@ -52,27 +57,12 @@ except Exception as _otr_redact_err:  # noqa: BLE001 -- never block ComfyUI's st
     print("[OldTimeRadio] log path redaction not installed: %s" % type(_otr_redact_err).__name__)
 
 # ---------------------------------------------------------------------------
-# 1. EARLIEST POSSIBLE MOCK -- runs before ANY transformers import.
-#    The fake module goes into sys.modules before ComfyUI begins loading
-#    custom nodes, so the real one is never imported.
-# ---------------------------------------------------------------------------
-_mock_sc = types.ModuleType("transformers.safetensors_conversion")
-_mock_sc.auto_conversion = lambda *a, **kw: None
-_mock_sc.get_conversion_pr_reference = lambda *a, **kw: None
-_mock_sc.spawn_conversion = lambda *a, **kw: None
-# Also mock the entry points that have appeared in recent transformers.
-_mock_sc._get_conversion_pr_reference = lambda *a, **kw: None
-_mock_sc._auto_conversion = lambda *a, **kw: None
-
-sys.modules["transformers.safetensors_conversion"] = _mock_sc
-
-# ---------------------------------------------------------------------------
-# 2. Environment (secondary -- the mock above is what actually stops it)
+# 1. Library environment defaults. ``setdefault`` only: a value the user or
+#    another pack already set is left alone.
 # ---------------------------------------------------------------------------
 environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
 environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
-environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "0")
 
 # A pytest/agent parent shell can leak OTR_TEST_MODE=1 into a live Comfy
 # boot (Start-Process inherits the caller env). That skip-path disables
@@ -86,8 +76,7 @@ if environ.get("OTR_TEST_MODE") == "1" and "PYTEST_CURRENT_TEST" not in environ:
           "(live Comfy must not inherit pytest test mode)")
 
 # DO NOT set HF_HUB_OFFLINE=1 or TRANSFORMERS_OFFLINE=1 here. Download
-# capability is wanted for future models; the mock above already kills the
-# offending background check.
+# capability is wanted for the models a run fetches.
 
 # Choose one HF cache root before huggingface_hub is imported, then assign
 # it once. When HF_HOME is already in the process environment it is left alone.
@@ -154,11 +143,9 @@ if "HF_HOME" not in environ:
         environ["HF_HOME"] = _otr_hf_home
 
 logging.getLogger("OTR").info(
-    "OldTimeRadio prestartup: HF_HOME=%s | safetensors_conversion mocked EARLY",
-    environ.get("HF_HOME"))
+    "OldTimeRadio prestartup: HF_HOME=%s", environ.get("HF_HOME"))
 if not _otr_pre_dup:
-    print("[OldTimeRadio] prestartup OK: safetensors_conversion mocked before any "
-          "transformers import")
+    print("[OldTimeRadio] prestartup OK")
 
 # ---------------------------------------------------------------------------
 # 3. One-time Kokoro English voice prefetch (operator, 2026-08-24).
@@ -176,13 +163,22 @@ if not _otr_pre_dup:
 # DELIBERATELY LAST IN THIS FILE. The banner above is what a reader checks, and
 # this file's own docstring records that anything below a FAILING statement
 # silently never runs -- so the network-touching part goes after everything
-# load-bearing, and cannot cost the mock or the banner if it misbehaves.
+# load-bearing, and cannot cost the banner if it misbehaves.
 # `prefetch_at_boot` swallows everything internally; the try here is the
 # second belt, covering even an import error.
+#
+# THE PATH ENTRY IS TAKEN BACK OUT. The prefetch module loads flat (the pack
+# is not a package yet), which needs this pack's ``nodes`` folder on
+# ``sys.path`` for the length of the call. Until 2.3.64 the entry was left at
+# the FRONT of the path for the life of the process, where about three
+# hundred of this pack's module names -- bare ones such as ``video_engine``
+# among them -- sat ahead of every other pack's. Nothing in the pack needs
+# it afterwards (every flat import is the fallback arm of a relative one;
+# tests/test_prestartup_leaves_the_process_alone.py holds that).
+_otr_nodes_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "nodes")
+_otr_added_path = _otr_nodes_dir not in sys.path
 try:
-    _otr_nodes_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                  "nodes")
-    if _otr_nodes_dir not in sys.path:
+    if _otr_added_path:
         sys.path.insert(0, _otr_nodes_dir)
     from _otr_kokoro_voice_prefetch import prefetch_at_boot as _otr_prefetch
 
@@ -191,6 +187,10 @@ except Exception as _otr_exc:  # noqa: BLE001 -- a voice is never worth a boot
     logging.getLogger("OTR").info(
         "OldTimeRadio: Kokoro voice prefetch unavailable (%s); Bark needs no "
         "voice files and is unaffected", _otr_exc)
+finally:
+    if _otr_added_path:
+        while _otr_nodes_dir in sys.path:
+            sys.path.remove(_otr_nodes_dir)
 
 
 # ---------------------------------------------------------------------------
