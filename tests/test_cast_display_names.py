@@ -209,3 +209,19 @@ def test_populate_judges_against_the_episodes_own_script():
     rows = {r["name"]: r for r in led["cast"]}
     assert "native_display_name" not in rows["VIOLA"]
     assert rows["MALVOLIO"]["native_display_name"] == "马伏里奥"
+
+
+# Sonnet QA on 2718c6d55: ordinary surnames were refused, junk was accepted.
+@pytest.mark.parametrize("display, iso", [
+    ("佐々木", "ja"), ("﨑山", "ja"), ("𠮷田", "ja"), ("ﾘｱ", "ja"),
+    ("兵士2", "ja"), ("क़ासिम", "hi"), ("किरण‍", "hi"),
+])
+def test_ordinary_names_with_marks_and_variants_are_accepted(display, iso):
+    assert CDN.judge_display_name("X", display, iso) is None
+
+
+@pytest.mark.parametrize("display, iso", [
+    ("ア☺", "ja"), ("ア́", "ja"), ("राम।", "hi"),
+])
+def test_symbols_dandas_and_stray_accents_are_refused(display, iso):
+    assert CDN.judge_display_name("X", display, iso) is not None

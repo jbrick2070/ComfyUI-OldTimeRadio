@@ -54,15 +54,27 @@ MAX_CHARS = 16
 #: punctuation (a merged or broken reply), list separators, a backslash (an
 #: ASS override: "\N" is a line break on the burned caption), and brackets (a
 #: reply that glosses the Latin name, "Viola (ヴァイオラ)").
-_FORBIDDEN = set(":：\n\r\t[]{}\"/|;；\\()（）")
+_FORBIDDEN = set(":：\n\r\t[]{}\"/|;；\\()（）।॥")
 
 #: The scripts a name may be written in, by episode language, read from each
 #: letter's Unicode name. Sonnet QA on 003c3b84f: "any non-Latin letter" let
 #: Cyrillic, Greek or Hangul through on a Japanese episode.
+_HAN = ("CJK UNIFIED IDEOGRAPH", "CJK COMPATIBILITY IDEOGRAPH",
+        "IDEOGRAPHIC ITERATION MARK", "VERTICAL IDEOGRAPHIC ITERATION MARK",
+        "IDEOGRAPHIC NUMBER ZERO", "IDEOGRAPHIC CLOSING MARK")
 _SCRIPTS = {
-    "ja": ("CJK UNIFIED IDEOGRAPH", "HIRAGANA", "KATAKANA"),
-    "zh": ("CJK UNIFIED IDEOGRAPH",),
+    "ja": _HAN + ("HIRAGANA", "KATAKANA"),
+    "zh": _HAN,
     "hi": ("DEVANAGARI",),
+}
+
+#: Non-letters a name may carry besides spaces and the digits 0-9: the
+#: katakana middle dot between given and family name (and its half-width
+#: form before NFKC), and the Devanagari joiners that shape a conjunct.
+_ALLOWED_MARKS = {
+    "ja": set("・"),
+    "zh": set("·・"),
+    "hi": set("‌‍"),
 }
 
 
@@ -122,8 +134,10 @@ def judge_display_name(name: str, display: str, iso: str = "") -> str | None:
         return "empty"
     if len(value) > MAX_CHARS:
         return "too long"
+    marks = _ALLOWED_MARKS.get(str(iso or ""), set())
     if any(c in _FORBIDDEN for c in value) or any(
-            unicodedata.category(c).startswith("C") for c in value):
+            unicodedata.category(c).startswith("C") and c not in marks
+            for c in value):
         return "punctuation a name does not carry"
     if value.casefold() == " ".join(str(name or "").split()).casefold():
         return "the Latin name echoed"
@@ -131,9 +145,14 @@ def judge_display_name(name: str, display: str, iso: str = "") -> str | None:
     if not letters or any(_is_latin_or_ascii(c) for c in letters):
         return "not in the episode's script"
     allowed = _SCRIPTS.get(str(iso or ""))
-    if allowed and not all(
-            unicodedata.name(c, "").startswith(allowed) for c in letters):
-        return "not in the episode's script"
+    if allowed:
+        # EVERY character, not only letters: an emoji, a circled symbol, a
+        # danda or a stray combining accent is not a name either (Sonnet QA).
+        for c in value:
+            if c == " " or c in "0123456789" or c in marks:
+                continue
+            if not unicodedata.name(c, "").startswith(allowed):
+                return "not in the episode's script"
     return None
 
 
