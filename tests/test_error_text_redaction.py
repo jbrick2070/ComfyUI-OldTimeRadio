@@ -91,6 +91,26 @@ def test_a_path_after_a_colon_or_in_a_file_url_is_cut(text, expected):
     assert "someone" not in out
 
 
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        # Another folder whose name merely STARTS with the account name.
+        ("other /Users/jabber/secret/x.wav", "other x.wav"),
+        ("dotted /Users/jab.smith/notes/y.txt", "dotted y.txt"),
+        # The home folder itself, ending a sentence or a path.
+        ("home is /Users/jab.", "home is ~."),
+        ("in /Users/jab/ComfyUI/output/ep.mp4", "in ep.mp4"),
+    ],
+)
+def test_the_home_cut_never_splits_a_longer_folder_name(monkeypatch, text, expected):
+    import nodes._otr_error_text as mod
+
+    monkeypatch.setattr(mod, "_HOME_PREFIXES", ("/Users/jab",))
+    out = redact_paths(text)
+    assert out == expected
+    assert "ber" not in out and ".smith" not in out
+
+
 def test_os_error_filename_attribute_is_redacted():
     try:
         open(r"C:\Users\someone\missing_folder\clip.wav", "rb")  # noqa: SIM115

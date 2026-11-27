@@ -79,8 +79,11 @@ def _home_prefixes() -> tuple[str, ...]:
 _HOME_PREFIXES = _home_prefixes()
 
 
-# What follows the home prefix, up to the end of the path token.
-_UNDER_HOME = r"(?:(?:\\\\|[\\/])[^\s'\"<>|,;()\[\]{}]*)?"
+# What follows the home prefix, up to the end of the path token. The prefix must
+# END a folder name: "/Users/jab" matches in "/Users/jab/x" and "/Users/jab", not
+# inside "/Users/jabber/x" or "/Users/jab.smith/x", which the path rule handles
+# as ordinary paths. A sentence's full stop after it still counts as its end.
+_UNDER_HOME = r"(?:(?:\\\\|[\\/])[^\s'\"<>|,;()\[\]{}]*|(?!\.?[\w-]))"
 
 
 def _home_tail(match: re.Match) -> str:
