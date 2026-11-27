@@ -338,8 +338,10 @@ def test_module_imports_are_stdlib_only():
             top.extend(imp.name for imp in node.names)
         elif isinstance(node, ast.ImportFrom):
             top.append(node.module or "")
+    # urllib.parse joined on 2026-11-27: the redirect handler that keeps the
+    # bearer key on its origin compares scheme and host with urlsplit.
     assert set(top) <= {"__future__", "json", "logging", "urllib.error",
-                        "urllib.request", "typing"}, top
+                        "urllib.parse", "urllib.request", "typing"}, top
 
 
 def test_empty_wallet_with_unpriced_engine_names_the_engine():

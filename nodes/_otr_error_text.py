@@ -297,9 +297,16 @@ def _redact_ui_text(result):
     """
     if isinstance(result, dict):
         ui = result.get("ui")
-        if isinstance(ui, dict) and ui.get("text"):
+        texts = ui.get("text") if isinstance(ui, dict) else None
+        if texts:
             try:
-                ui["text"] = _redact_value(ui["text"])
+                if isinstance(texts, list):
+                    # ComfyUI's preview contract: a list of strings. Redacted
+                    # in place, entry by entry.
+                    texts[:] = [_redact_value(item) for item in texts]
+                else:
+                    items = (texts,) if isinstance(texts, str) else tuple(texts)
+                    ui["text"] = [*(_redact_value(item) for item in items)]
             except Exception:  # noqa: BLE001 -- never fail a finished node over its label
                 pass
     return result

@@ -155,3 +155,19 @@ def test_the_install_folders_are_never_frozen(monkeypatch):
     second = {prefix for prefix, _bare in mod._install_prefixes()}
     assert "/opt/Second Install/output" in second
     assert "/opt/First Install/output" not in second
+
+
+@pytest.mark.parametrize("shown, expected", [
+    (["saved /home/someone/out/ep.mp4"], ["saved ep.mp4"]),
+    (("one /home/someone/a.wav", "two"), ["one a.wav", "two"]),
+    ("only /home/someone/b.wav", ["only b.wav"]),
+])
+def test_canvas_text_is_redacted_whatever_container_holds_it(shown, expected):
+    """ComfyUI's contract is a list of strings; a node that hands back a bare
+    string or a tuple is normalized to that list rather than skipped."""
+    result = {"ui": {"text": shown}, "result": ("/home/someone/out/ep.mp4",)}
+    out = mod._redact_ui_text(result)
+    assert out["ui"]["text"] == expected
+    assert out["result"] == ("/home/someone/out/ep.mp4",)
+    if isinstance(shown, list):
+        assert out["ui"]["text"] is shown          # redacted in place
