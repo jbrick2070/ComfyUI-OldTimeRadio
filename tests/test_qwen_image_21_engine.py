@@ -418,3 +418,16 @@ def test_the_queue_time_preflight_accepts_a_subfolder_install(monkeypatch, tmp_p
     assert paths["diffusion_models"] == tmp_path / "diffusion_models" / "qwen" / \
         "qwen_image_2.1_int8_convrot.safetensors"
     assert all(r["path"] is not None for r in requests)
+
+
+def test_a_relative_override_picks_its_own_subfolder(monkeypatch, no_qwen_env):
+    """Sonnet review: with the same file name in two subfolders, an override
+    that names one of them was matched by file name alone and could load the
+    other."""
+    names = ["a/qwen_image_2.1_int8_convrot.safetensors",
+             "b/qwen_image_2.1_int8_convrot.safetensors"]
+    monkeypatch.setattr("folder_paths.get_filename_list", lambda c: names, raising=False)
+    monkeypatch.setenv(QI.MODEL_ENV, "b/qwen_image_2.1_int8_convrot.safetensors")
+    assert QI._resolve_unet_name() == ("b/qwen_image_2.1_int8_convrot.safetensors", True)
+    monkeypatch.setenv(QI.MODEL_ENV, "qwen_image_2.1_int8_convrot.safetensors")
+    assert QI._resolve_unet_name() == ("a/qwen_image_2.1_int8_convrot.safetensors", True)

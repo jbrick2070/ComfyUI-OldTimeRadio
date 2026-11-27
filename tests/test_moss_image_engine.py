@@ -215,3 +215,12 @@ def test_a_model_in_a_subfolder_keeps_its_loader_name(monkeypatch, no_moss_env):
     assert MI._resolve_unet_name() == ("moss/moss_image_sft_int8_convrot.safetensors", True)
     monkeypatch.setenv(MI.MODEL_ENV, "moss_image_sft_int8_convrot.safetensors")
     assert MI._resolve_unet_name() == ("moss/moss_image_sft_int8_convrot.safetensors", True)
+
+
+def test_a_relative_override_picks_its_own_subfolder(monkeypatch, no_moss_env):
+    import folder_paths  # noqa: F401  (stubbed by conftest if absent)
+    names = ["a/moss_image_sft_int8_convrot.safetensors",
+             "b/moss_image_sft_int8_convrot.safetensors"]
+    monkeypatch.setattr("folder_paths.get_filename_list", lambda c: names, raising=False)
+    monkeypatch.setenv(MI.MODEL_ENV, "b/moss_image_sft_int8_convrot.safetensors")
+    assert MI._resolve_unet_name() == ("b/moss_image_sft_int8_convrot.safetensors", True)

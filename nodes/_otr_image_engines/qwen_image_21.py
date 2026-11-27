@@ -150,7 +150,12 @@ def _resolve_unet_name():
     installed = _installed_unets()
     if env:
         base = os.path.basename(env)
-        listed = [n for n in installed if os.path.basename(n) == base]
+        # The name the user gave, when it IS a listed name (a relative name
+        # picks its own subfolder even when another folder holds a file of
+        # the same name); else the first listed file of that name.
+        wanted = env.replace(chr(92), "/")
+        listed = ([n for n in installed if n.replace(chr(92), "/") == wanted]
+                  or [n for n in installed if os.path.basename(n) == base])
         if listed:
             return listed[0], True
         verified = os.path.isfile(env)
