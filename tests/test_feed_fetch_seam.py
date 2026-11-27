@@ -507,6 +507,13 @@ class TestAddressPolicy:
         ("fe80::1", "link-local"),
         ("224.0.0.1", "multicast"),
         ("0.0.0.0", "unspecified"),
+        # Not caught by any named check above, and still not public: shared
+        # address space (carrier NAT, mesh VPNs). Shipped unrefused through
+        # 2.3.64.
+        ("100.64.0.9", "not publicly routable"),
+        ("100.127.255.254", "not publicly routable"),
+        ("198.18.0.1", "private"),             # benchmarking block: already refused
+        ("8.8.8.8", ""),
         ("93.184.216.34", ""),
         ("2606:2800:220:1:248:1893:25c8:1946", ""),
     ])

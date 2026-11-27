@@ -203,6 +203,14 @@ def _reject_reason(ip) -> str:
         return "private"
     if ip.is_reserved:
         return "reserved"
+    # THE REST OF WHAT IS NOT PUBLIC. The named checks above miss shared
+    # address space (100.64.0.0/10 -- carrier NAT, and what mesh VPNs hand
+    # out), which is neither "private" nor "reserved" to the standard library
+    # and is still inside somebody's network. ``is_global`` is its reading of
+    # the IANA special-purpose registries, so anything it does not call global
+    # is refused under one name.
+    if not ip.is_global:
+        return "not publicly routable"
     return ""
 
 
