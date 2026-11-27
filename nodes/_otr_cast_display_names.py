@@ -211,9 +211,20 @@ def populate(led_data: dict, *, technical_fn: Callable[..., str]) -> dict:
             helper_name="cast_display_names",
         )
         proposed: dict[str, str] = {}
-        for item in result.names:
-            key = " ".join(str(item.name or "").split())
-            match = next((n for n in wanted if n.casefold() == key.casefold()), None)
+        keys = [" ".join(str(item.name or "").split()) for item in result.names]
+        matched = [next((n for n in wanted if n.casefold() == k.casefold()), None)
+                   for k in keys]
+        if len(keys) == len(wanted) and not any(matched):
+            # QWEN TRANSLATED THE KEY TOO (Mac, 2026-11-27): it returned
+            # {"name": "コリン", "display_name": "コリン"} for CORIN, so no
+            # reply matched and every name fell back to Latin. When EVERY key
+            # was rewritten and the count is exact, the reply is read in the
+            # order it was asked for. A partial match never falls back to
+            # position: one reordered row would put a name on the wrong
+            # character.
+            matched = list(wanted)
+            receipt["paired_by_position"] = True
+        for item, match in zip(result.names, matched):
             if match is None or match in proposed:
                 continue
             reason = judge_display_name(match, item.display_name, iso)

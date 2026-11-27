@@ -238,3 +238,33 @@ def test_the_reply_has_room_for_a_fenced_pretty_printed_answer():
                              {"name": "YURI KENDALL", "display_name": "尤里·肯德尔"}]}])
     CDN.populate(led, technical_fn=slot)
     assert slot.calls[0][1]["max_new_tokens"] == CDN._output_budget(3)
+
+
+def test_a_reply_that_translated_every_key_is_read_in_order():
+    """Mac, 2026-11-27: Qwen 3.5 4B wrote the katakana into "name" as well."""
+    led = _ledger("ja", names=("ORLANDO", "CORIN", "TOUCHSTONE"))
+    slot = _Slot([{"names": [{"name": "オーランドー", "display_name": "オーランドー"},
+                             {"name": "コリン", "display_name": "コリン"},
+                             {"name": "タッチストーン", "display_name": "タッチストーン"}]}])
+    receipt = CDN.populate(led, technical_fn=slot)
+    rows = {r["name"]: r.get("native_display_name") for r in led["cast"]}
+    assert rows == {"ANNOUNCER": None, "ORLANDO": "オーランドー",
+                    "CORIN": "コリン", "TOUCHSTONE": "タッチストーン"}
+    assert receipt["paired_by_position"] is True
+
+
+def test_a_partly_matching_reply_never_falls_back_to_position():
+    led = _ledger("ja", names=("ORLANDO", "CORIN"))
+    slot = _Slot([{"names": [{"name": "コリン", "display_name": "コリン"},
+                             {"name": "ORLANDO", "display_name": "オーランドー"}]}])
+    CDN.populate(led, technical_fn=slot)
+    rows = {r["name"]: r.get("native_display_name") for r in led["cast"]}
+    assert rows["ORLANDO"] == "オーランドー"
+    assert rows["CORIN"] is None
+
+
+def test_a_short_rewritten_reply_is_not_paired():
+    led = _ledger("ja", names=("ORLANDO", "CORIN", "TOUCHSTONE"))
+    slot = _Slot([{"names": [{"name": "コリン", "display_name": "コリン"}]}])
+    CDN.populate(led, technical_fn=slot)
+    assert all(not r.get("native_display_name") for r in led["cast"])
