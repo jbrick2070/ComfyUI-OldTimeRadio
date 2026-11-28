@@ -40,7 +40,8 @@ MANDARIN ON ONNX (2026-09-28). misaki's Chinese G2P is Python over jieba,
 pypinyin, cn2an and ordered-set, all of which install on 3.13; only misaki's own
 package pin refuses. The pack carries a copy of it (``_misaki``, provenance
 hashed) and ``MandarinPhonemizer`` feeds its phonemes to kokoro-onnx; the four
-libraries are an opt-in install for the Mandarin row (``OWN_G2P_INSTALL_HINT``).
+libraries are declared requirements on every Python (``OWN_G2P_INSTALL_HINT`` is
+the repair line for an install that lost them).
 
 JAPANESE ON ONNX (the same night). ``JAG2P()`` defaults to misaki's Cutlet
 route: fugashi (MeCab) over a UniDic dictionary, jaconv, a word list and
@@ -49,7 +50,8 @@ two calls follow NFKC; measured over every code point, one is then a no-op and
 the other a three-character table, which the pack's copy uses instead. The copy
 also pins unidic-lite, so a `unidic` package without its dictionary (the
 PBUG-20260918-06 trap) cannot take MeCab over. ``JapanesePhonemizer`` feeds its
-phonemes to kokoro-onnx; fugashi, jaconv and unidic-lite are the opt-in install.
+phonemes to kokoro-onnx; fugashi, jaconv and unidic-lite are declared requirements
+on every Python.
 
 RULES THIS FILE KEEPS: C-5 -- nothing heavy (torch, numpy, onnxruntime, kokoro)
 is imported at module top; the package imports ``eng_kokoro`` at init. C-7 --
@@ -125,10 +127,12 @@ def shipped_spacy_english() -> "str | None":
 
 #: The rows the ONNX backend phonemizes with the pack's own copy of misaki
 #: (``_misaki``), because misaki does not install on Python 3.13: lang_code ->
-#: the modules that copy imports, and the pip line that installs them. Since
-#: 2026-09-29 requirements.txt declares all six on 3.13 (a fresh install used
-#: to refuse both rows at Run), so the pip line is the repair for an install
-#: that lost them, not a step every user takes.
+#: the modules that copy imports, and the pip line that installs them. The
+#: torch Kokoro on 3.12 and earlier reads through the same copy. Since 2.3.69
+#: (2026-11-27) requirements.txt declares all six on every Python -- they were
+#: 3.13-only before, and every 3.10 - 3.12 install refused both rows at Run --
+#: so the pip line is the repair for an install that lost them, not a step
+#: every user takes.
 OWN_G2P_MODULES = {"z": ("jieba", "pypinyin", "cn2an", "ordered_set"),
                    "j": ("fugashi", "jaconv", "unidic_lite")}
 OWN_G2P_INSTALL_HINT = {"z": "pip install jieba pypinyin cn2an ordered-set",

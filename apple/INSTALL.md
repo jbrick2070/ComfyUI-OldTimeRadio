@@ -150,7 +150,10 @@ Japanese and Mandarin also need their readiness extras, checked only when
 that language is selected: the libraries under the pack's own copy of
 misaki's code, which reads those two languages on every Python. They
 install with the pack's requirements on every supported Python (since
-2.3.69; before that, 3.10 - 3.12 had to add them by hand). If an install
+2.3.69; before that, 3.10 - 3.12 had to add them by hand). fugashi ships
+ready-built wheels for Windows (x86-64), Linux (glibc, x86-64 and ARM) and
+macOS; on Alpine/musl Linux or Windows on ARM it builds from source and
+needs MeCab and a compiler. If an install
 lost them, these lines repair it with ComfyUI's own Python:
 `<ComfyUI Python> -m pip install fugashi jaconv unidic-lite` for Japanese and
 `<ComfyUI Python> -m pip install jieba pypinyin cn2an ordered-set` for
