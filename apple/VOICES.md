@@ -64,8 +64,10 @@ backend) and about 8x on a from-source install (Python 3.12, Kokoro's `torch`
 backend). Either way, voices are not what makes those runs long.
 
 The Python 3.13 ONNX backend speaks every language, with the same phonemes
-the torch pipeline uses; Mandarin and Japanese need their libraries first
-(`pip install jieba pypinyin cn2an ordered-set`, `pip install fugashi jaconv unidic-lite`). See
+the torch pipeline uses. Mandarin and Japanese read through libraries that
+install with the pack's requirements on every Python (repair lines if an
+install lost them: `pip install jieba pypinyin cn2an ordered-set`,
+`pip install fugashi jaconv unidic-lite`). See
 [MULTILINGUAL.md](MULTILINGUAL.md).
 
 ### The cloning engines need two things, not one

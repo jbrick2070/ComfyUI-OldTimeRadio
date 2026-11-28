@@ -148,10 +148,10 @@ or for a crash during ComfyUI's startup, before any node loaded.
 
 Japanese and Mandarin also need their readiness extras, checked only when
 that language is selected: the libraries under the pack's own copy of
-misaki's code, which reads those two languages on every Python. On 3.13
-they install with the pack's requirements; on 3.10 - 3.12 the requirements
-still declare them for 3.13 only, so install the one you need by hand with
-ComfyUI's own Python (the same lines repair a 3.13 install that lost them):
+misaki's code, which reads those two languages on every Python. They
+install with the pack's requirements on every supported Python (since
+2.3.69; before that, 3.10 - 3.12 had to add them by hand). If an install
+lost them, these lines repair it with ComfyUI's own Python:
 `<ComfyUI Python> -m pip install fugashi jaconv unidic-lite` for Japanese and
 `<ComfyUI Python> -m pip install jieba pypinyin cn2an ordered-set` for
 Mandarin. Do not install `misaki[ja]`: it pulls `unidic`, an empty

@@ -145,12 +145,10 @@ anything past 510 phonemes; a run of spaces becomes one pause; a symbol the
 model has no sound for can pick a neighbouring style row; and a line with
 nothing speakable in it is a quarter second of silence on both.
 
-On Python 3.13 the libraries both rows need install with the pack's
-requirements. On 3.10 - 3.12 the requirements still declare them for 3.13 only
-(widening that marker means editing `pyproject.toml`, which publishes a release,
-so it waits for the next version bump); until then install the one you need by
-hand with ComfyUI's own Python. On 3.13 the same lines repair an install that
-lost them:
+The libraries both rows need install with the pack's requirements on every
+supported Python (since 2.3.69; before that, 3.10 - 3.12 had to add them by
+hand). If an install lost them, these lines repair it with ComfyUI's own
+Python:
 
 ```text
 <ComfyUI Python> -m pip install jieba pypinyin cn2an ordered-set     # Mandarin
