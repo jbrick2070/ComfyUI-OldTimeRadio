@@ -3,7 +3,7 @@
 # ComfyUI-OldTimeRadio
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_icon.gif" alt="Old Time Radio" width="400">
+  <img src="https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_icon_master.png" alt="Old Time Radio: the station ident -- Script, Voices, Music, Episode. SIGNAL LOST." width="400">
 </p>
 
 <p align="center">
