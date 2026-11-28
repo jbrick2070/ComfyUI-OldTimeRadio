@@ -151,3 +151,5 @@
 2026-11-27 | Writer | TimeCapsuleLLM-ja v4-chat (1.05B, Japanese 1868-1945, safetensors 4.19 GB, Apache-2.0) | WATCH | https://huggingface.co/trtd56/TimeCapsuleLLM-ja-v4-chat
 2026-11-27 | Video | H3 Face Fix (news only, face redraw from reference photo) | WATCH | https://comfyui-wiki.com/en/news
 2026-11-27 | Video | vidlamp-lipsync (LatentSync wrapper) | SKIP | https://api.comfy.org/nodes/vidlamp-lipsync
+2026-11-28 | Voice | Libra-TTS (Ekam, 0.3B, 16 languages incl. all 8 OTR, Apache-2.0, no cloning, third-party CPU int8 ONNX 759 MB, no ComfyUI pack) | WATCH | https://huggingface.co/Ekam/Libra-TTS
+2026-11-28 | Video | MAGI-2 partner nodes (core master-only, CLOUD) | SKIP | https://github.com/Comfy-Org/ComfyUI/commit/c450ed22e
