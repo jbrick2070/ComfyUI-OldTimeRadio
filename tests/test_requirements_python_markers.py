@@ -71,21 +71,19 @@ def test_kokoro_onnx_is_the_313_backend_and_is_bounded_below_314():
 
 @pytest.mark.parametrize("package", ["fugashi", "jaconv", "jieba", "pypinyin", "cn2an",
                                      "ordered-set"])
-def test_the_phonemizer_libraries_track_the_onnx_window(package):
-    """The six libraries under the pack's copy of misaki install exactly where
-    kokoro-onnx does (2026-09-29, PBUG-20260929-10): on 3.13 the ONNX Kokoro
-    phonemizes Japanese and Mandarin with them; on 3.12 the torch Kokoro uses
-    misaki's own extras and they would be an English-install tax; on 3.14
-    nothing speaks yet."""
+def test_the_phonemizer_libraries_install_on_every_interpreter(package):
+    """The six libraries under the pack's copy of misaki carry NO marker
+    (2026-11-27). Both Kokoro backends phonemize Japanese and Mandarin through
+    that copy -- the ONNX one on 3.13 since 2026-09-29, the torch one on 3.12
+    and earlier since 2026-10-21 -- and the old "3.13 only" marker left every
+    3.12 install refusing those two languages at Run until the user added them
+    by hand (a RunPod Linux pod on 3.12 hit it). fugashi ships wheels for
+    CPython 3.9-3.14 on Windows, Linux and macOS; the other five are pure
+    Python, so nothing about them needs a version barrier."""
     reqs = _parsed()
-    assert package in reqs, "%s is the 3.13 Japanese/Mandarin phonemizer library" % package
-    marker = reqs[package].marker
-    onnx = reqs["kokoro-onnx"].marker
-    assert marker is not None, "%s must carry kokoro-onnx's python_version marker" % package
-    for version in ("3.12", "3.13", "3.14"):
-        env = {"python_version": version}
-        assert marker.evaluate(env) is onnx.evaluate(env), (
-            "%s installs on %s differently from kokoro-onnx" % (package, version))
+    assert package in reqs, "%s is a Japanese/Mandarin phonemizer library" % package
+    assert reqs[package].marker is None, (
+        "%s must install on every interpreter: both Kokoro backends need it" % package)
 
 
 @pytest.mark.parametrize("python_version", ["3.12", "3.13"])

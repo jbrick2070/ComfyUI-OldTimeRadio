@@ -78,16 +78,16 @@ dependencies = [
     # requirements.txt and in code the same day and was unreachable from a
     # registry install until this line existed.
     "unidic-lite>=1.0.8",
-    # The Japanese and Mandarin phonemizer libraries for the ONNX Kokoro on
-    # Python 3.13 (2026-09-29): the pack's copy of misaki's code needs them,
-    # and until this line a fresh Desktop or portable install refused those
-    # two languages at Run. Same marker as kokoro-onnx. Mirrors requirements.txt.
-    "fugashi>=1.5; python_version >= '3.13' and python_version < '3.14'",
-    "jaconv>=0.4; python_version >= '3.13' and python_version < '3.14'",
-    "jieba>=0.42; python_version >= '3.13' and python_version < '3.14'",
-    "pypinyin>=0.50; python_version >= '3.13' and python_version < '3.14'",
-    "cn2an>=0.5.22; python_version >= '3.13' and python_version < '3.14'",
-    "ordered-set>=4.1; python_version >= '3.13' and python_version < '3.14'",
+    # The Japanese and Mandarin phonemizer libraries: the pack's copy of
+    # misaki's code needs them on every interpreter (ONNX Kokoro on 3.13, torch
+    # Kokoro on 3.12 and earlier). No marker since 2026-11-27, when a Python
+    # 3.12 Linux pod refused Japanese at Run. Mirrors requirements.txt.
+    "fugashi>=1.5",
+    "jaconv>=0.4",
+    "jieba>=0.42",
+    "pypinyin>=0.50",
+    "cn2an>=0.5.22",
+    "ordered-set>=4.1",
     # pyloudnorm is imported by scene_sequencer to master every episode to
     # -14 LUFS. Its import is try/except with a deliberate fallback, so a
     # missing install does not crash -- it quietly ships a differently
